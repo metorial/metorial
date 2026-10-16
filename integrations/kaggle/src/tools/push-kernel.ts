@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleSummary, requireKaggleText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let pushKernel = SlateTool.create(spec, {
@@ -45,6 +46,12 @@ export let pushKernel = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Other kernel references to attach as data sources'),
+      modelDataSources: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Model version references to attach, in owner/model/framework/variation/version format.'
+        ),
       categoryIds: z
         .array(z.string())
         .optional()
@@ -62,6 +69,11 @@ export let pushKernel = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    requireKaggleText(ctx.input.code, 'Notebook source code');
+    if (!/^[^/\s]+\/[^/\s]+$/.test(ctx.input.slug))
+      throw createApiServiceError('Notebook slug must use username/kernel-slug format.');
+    if (ctx.input.enableGpu && ctx.input.enableTpu)
+      throw createApiServiceError('Choose either GPU or TPU acceleration.');
     let client = new KaggleClient(ctx.auth);
     let result = await client.pushKernel({
       slug: ctx.input.slug,
@@ -76,11 +88,12 @@ export let pushKernel = SlateTool.create(spec, {
       datasetDataSources: ctx.input.datasetDataSources,
       competitionDataSources: ctx.input.competitionDataSources,
       kernelDataSources: ctx.input.kernelDataSources,
+      modelDataSources: ctx.input.modelDataSources,
       categoryIds: ctx.input.categoryIds
     });
 
     return {
-      output: result ?? {},
+      output: kaggleSummary(result, 'notebook push'),
       message: `Pushed notebook **${ctx.input.slug}**. Execution has been queued — check status using "Get Notebook Details".`
     };
   })

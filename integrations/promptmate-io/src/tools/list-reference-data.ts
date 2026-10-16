@@ -6,8 +6,14 @@ import { spec } from '../spec';
 export let listReferenceData = SlateTool.create(spec, {
   name: 'List Reference Data',
   key: 'list_reference_data',
-  description: `Retrieve available languages and countries that can be used to configure app jobs for localized processing. Returns both language and country lists in a single call.`,
+  description:
+    'DEPRECATED — use `list_languages` instead. Retrieve languages and countries using the legacy code/name object format.',
+  instructions: [
+    'Use list_languages for the documented language strings; it replaces only the language portion of this tool.',
+    'Country discovery is available only through this legacy combined call. It has not been revalidated and may fail when language results use the current string format.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }

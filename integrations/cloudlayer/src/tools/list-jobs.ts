@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { jobOutput, responseItems } from '../lib/responses';
 import { spec } from '../spec';
 
 export let listJobs = SlateTool.create(spec, {
   name: 'List Jobs',
   key: 'list_jobs',
-  description: `List your document generation jobs, ordered by creation date (newest first). Supports pagination to browse through job history.`,
+  description: `List your document generation jobs, ordered by creation date (newest first). Use startAfterId for cursor pagination. The provider overview and endpoint-specific pagination documentation differ; cursor behavior depends on the API deployment.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,8 +15,20 @@ export let listJobs = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Number of jobs to return (default 25, max 100)'),
-      offset: z.number().optional().describe('Pagination offset (default 0)')
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of jobs to return (provider default 10, max 100)'),
+      offset: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy pagination offset, forwarded for compatibility. Current endpoint docs describe startAfterId instead.'
+        ),
+      startAfterId: z
+        .string()
+        .optional()
+        .describe('ID of the last item from the preceding page')
     })
   )
   .output(
@@ -27,7 +40,11 @@ export let listJobs = SlateTool.create(spec, {
             status: z.string().describe('Job status'),
             jobType: z.string().optional().describe('Type of job'),
             fileSize: z.number().optional().describe('Output file size in bytes'),
-            createdAt: z.string().optional().describe('ISO 8601 creation timestamp')
+            createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Provider response details with credentials removed')
           })
         )
         .describe('List of jobs')
@@ -38,22 +55,15 @@ export let listJobs = SlateTool.create(spec, {
 
     let result = await client.listJobs({
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      startAfterId: ctx.input.startAfterId
     });
 
-    let jobs = Array.isArray(result) ? result : (result.jobs ?? result.data ?? []);
-
-    let mappedJobs = jobs.map((job: Record<string, unknown>) => ({
-      jobId: (job.id ?? job.jobId ?? '') as string,
-      status: (job.status ?? 'unknown') as string,
-      jobType: (job.type ?? job.jobType) as string | undefined,
-      fileSize: (job.size ?? job.fileSize) as number | undefined,
-      createdAt: (job.timestamp ?? job.createdAt) as string | undefined
-    }));
-
+    let items = responseItems(result, 'jobs');
+    let mapped = items.map(jobOutput);
     return {
-      output: { jobs: mappedJobs },
-      message: `Found **${mappedJobs.length}** jobs.`
+      output: { jobs: mapped },
+      message: `Found **${mapped.length}** jobs.`
     };
   })
   .build();

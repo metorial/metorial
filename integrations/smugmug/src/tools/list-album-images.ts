@@ -55,23 +55,23 @@ export let listAlbumImagesTool = SlateTool.create(spec, {
     });
 
     let images = result.items.map((img: any) => ({
-      imageKey: img.ImageKey || '',
-      title: img.Title || undefined,
-      caption: img.Caption || undefined,
-      fileName: img.FileName || undefined,
-      format: img.Format || undefined,
-      webUri: img.WebUri || undefined,
-      dateUploaded: img.Date || undefined,
-      lastUpdated: img.LastUpdated || undefined,
-      hidden: img.Hidden || undefined,
-      keywords: img.Keywords || undefined
+      imageKey: img.ImageKey,
+      title: img.Title ?? undefined,
+      caption: img.Caption ?? undefined,
+      fileName: img.FileName ?? undefined,
+      format: img.Format ?? undefined,
+      webUri: img.WebUri ?? undefined,
+      dateUploaded: img.Date ?? undefined,
+      lastUpdated: img.LastUpdated ?? undefined,
+      hidden: img.Hidden ?? undefined,
+      keywords: img.Keywords ?? undefined
     }));
 
     return {
       output: {
         images,
         totalImages: result.pages.total,
-        start: ctx.input.start || 1,
+        start: result.pages.start,
         count: images.length
       },
       message: `Listed **${images.length}** of ${result.pages.total} images in album **${ctx.input.albumKey}**`

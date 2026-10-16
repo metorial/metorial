@@ -33,7 +33,7 @@ export let getWorkflowData = SlateTool.create(spec, {
 
     return {
       output: {
-        items: data as Record<string, unknown>[],
+        items: data,
         count: data.length
       },
       message: `Retrieved **${data.length}** item(s) from workflow \`${ctx.input.workflowId}\`.`

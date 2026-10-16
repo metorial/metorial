@@ -1,6 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  assertSuccess,
+  Client,
+  requiredNumber,
+  requiredString,
+  requireInteger
+} from '../lib/client';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
@@ -24,6 +30,14 @@ let orderItemSchema = z.object({
   productQty: z.number().int().min(1).describe('Quantity to order'),
   productTitle: z.string().optional().describe('Product name/title for the packing slip'),
   productImage: z.string().optional().describe('Image URL reference for the product'),
+  productImageWidth: z
+    .number()
+    .optional()
+    .describe('Image width in pixels when supplying productImage'),
+  productImageHeight: z
+    .number()
+    .optional()
+    .describe('Image height in pixels when supplying productImage'),
   productGuid: z.string().optional().describe('Product GUID identifier'),
   productOrderPo: z.string().optional().describe('Line item purchase order reference'),
   customData1: z.string().optional().describe('Custom data field 1'),
@@ -38,7 +52,7 @@ let orderSchema = z.object({
   shippingCode: z
     .string()
     .describe(
-      'Shipping method code (e.g., "SD" for standard, "EC" for economy, "FS" for FedEx)'
+      'Shipping option ID as a string from get_shipping_options, or a legacy shipping classification code such as SD or EC'
     ),
   shipByDate: z.string().optional().describe('Optional ship-by deadline (ISO 8601 date)'),
   giftMessage: z.string().optional().describe('Optional gift message for the packing slip'),
@@ -74,6 +88,12 @@ export let submitOrder = SlateTool.create(spec, {
   .input(
     z.object({
       orders: z.array(orderSchema).min(1).max(5).describe('Orders to submit (1-5)'),
+      paymentToken: z
+        .string()
+        .optional()
+        .describe(
+          'Payment processor token, or invoice for accounts authorized for invoice payment. Use xxxx only for simulated test orders.'
+        ),
       validateOnly: z
         .boolean()
         .optional()
@@ -82,6 +102,7 @@ export let submitOrder = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the submission was successful'),
       message: z.string().optional().describe('Status message from the API'),
       orders: z
@@ -90,6 +111,11 @@ export let submitOrder = SlateTool.create(spec, {
             orderPo: z.string().describe('Original purchase order reference'),
             orderId: z.number().describe('System-assigned order ID'),
             orderConfirmationId: z.number().describe('Confirmation reference number'),
+            orderGuid: z.string().optional().describe('Provider order GUID for get_order'),
+            orderEmail: z
+              .string()
+              .optional()
+              .describe('Order email for get_order when returned'),
             orderConfirmationDatetime: z
               .string()
               .optional()
@@ -107,6 +133,14 @@ export let submitOrder = SlateTool.create(spec, {
       testMode: ctx.config.testMode
     });
 
+    for (let order of ctx.input.orders) {
+      for (let item of order.orderItems) {
+        if (item.productImageWidth !== undefined)
+          requireInteger(item.productImageWidth, 'Product image width');
+        if (item.productImageHeight !== undefined)
+          requireInteger(item.productImageHeight, 'Product image height');
+      }
+    }
     let apiOrders = ctx.input.orders.map(order => ({
       order_po: order.orderPo,
       recipient: {
@@ -117,20 +151,26 @@ export let submitOrder = SlateTool.create(spec, {
         address_2: order.recipient.address2 ?? null,
         address_3: order.recipient.address3 ?? null,
         city: order.recipient.city,
-        state_code: order.recipient.stateCode ?? '',
+        state_code: order.recipient.stateCode,
         province: order.recipient.province ?? null,
         zip_postal_code: order.recipient.zipPostalCode,
         country_code: order.recipient.countryCode,
-        phone: order.recipient.phone ?? '',
+        phone: order.recipient.phone,
         email: order.recipient.email ?? null,
         address_order_po: order.orderPo
       },
       order_items: order.orderItems.map(item => ({
         product_sku: item.productSku,
         product_qty: item.productQty,
-        product_title: item.productTitle ?? '',
-        product_image: item.productImage ?? null,
-        product_guid: item.productGuid ?? '',
+        product_title: item.productTitle,
+        product_image: item.productImage
+          ? {
+              product_url_file: item.productImage,
+              pixel_width: item.productImageWidth,
+              pixel_height: item.productImageHeight
+            }
+          : undefined,
+        product_guid: item.productGuid,
         product_order_po: item.productOrderPo ?? order.orderPo,
         custom_data_1: item.customData1 ?? null,
         custom_data_2: item.customData2 ?? null,
@@ -150,29 +190,78 @@ export let submitOrder = SlateTool.create(spec, {
       test_mode: ctx.config.testMode ?? false
     }));
 
-    let data = await client.submitOrders(apiOrders, ctx.input.validateOnly);
+    let data = await client.submitOrders(
+      apiOrders,
+      ctx.input.validateOnly,
+      ctx.input.paymentToken
+    );
 
-    let resultOrders = (data.orders ?? []).map((o: any) => ({
-      orderPo: o.order_po ?? '',
-      orderId: o.order_id ?? 0,
-      orderConfirmationId: o.order_confirmation_id ?? 0,
-      orderConfirmationDatetime: o.order_confirmation_datetime ?? undefined
-    }));
-
-    let output = {
-      success: data.status?.success ?? false,
-      message: data.status?.message || undefined,
-      orders: resultOrders
-    };
-
-    let action = ctx.input.validateOnly ? 'validated' : 'submitted';
-    let orderCount = resultOrders.length;
-
+    let returnedOrders = data.orders;
+    if (
+      returnedOrders !== undefined &&
+      returnedOrders !== null &&
+      !Array.isArray(returnedOrders)
+    ) {
+      throw createApiServiceError(
+        'FinerWorks returned invalid order confirmations. Check list_orders before retrying to avoid duplicate orders.'
+      );
+    }
+    if (!data.status.success && !returnedOrders?.length) assertSuccess(data);
+    if (!ctx.input.validateOnly && !returnedOrders?.length) {
+      throw createApiServiceError(
+        'FinerWorks did not confirm any accepted orders. Check list_orders before retrying to avoid duplicate orders.'
+      );
+    }
+    let acceptedIds = returnedOrders
+      ?.map((order: any) => order.order_id)
+      .filter((id: unknown) => typeof id === 'number');
+    let resultOrders:
+      | {
+          orderPo: string;
+          orderId: number;
+          orderConfirmationId: number;
+          orderConfirmationDatetime?: string;
+          orderGuid?: string;
+          orderEmail?: string;
+        }[]
+      | undefined;
+    try {
+      resultOrders = returnedOrders?.map((o: any) => ({
+        orderPo: requiredString(o.order_po, 'orders[].order_po'),
+        orderId: requiredNumber(o.order_id, 'orders[].order_id'),
+        orderConfirmationId: requiredNumber(
+          o.order_confirmation_id,
+          'orders[].order_confirmation_id'
+        ),
+        orderConfirmationDatetime: o.order_confirmation_datetime ?? undefined,
+        orderGuid: o.order_guid ?? undefined,
+        orderEmail: o.order_email ?? undefined
+      }));
+    } catch (error) {
+      throw createApiServiceError(
+        `FinerWorks returned incomplete confirmations. Returned order IDs: ${acceptedIds?.join(', ') || 'none'}. Check list_orders before retrying to avoid duplicates.`,
+        { parent: error }
+      );
+    }
+    let success =
+      data.status.success &&
+      (ctx.input.validateOnly || resultOrders?.length === ctx.input.orders.length);
+    let confirmation = resultOrders
+      ?.map((o: any) => `Order \`${o.orderPo}\` → ID: ${o.orderId}`)
+      .join(', ');
     return {
-      output,
-      message: output.success
-        ? `Successfully ${action} **${orderCount}** order(s). ${resultOrders.map((o: any) => `Order \`${o.orderPo}\` → ID: ${o.orderId}`).join(', ')}`
-        : `Order submission failed: ${output.message ?? 'Unknown error'}`
+      output: {
+        success,
+        message: data.status.message ?? undefined,
+        orders: resultOrders,
+        raw: data
+      },
+      message:
+        ctx.input.validateOnly && success
+          ? `Orders validated without submission. ${data.status.message ?? ''}`
+          : success
+            ? `Submitted **${resultOrders?.length}** order(s). ${confirmation}`
+            : `Submission was only partially confirmed. ${confirmation}. ${data.status.message ?? ''} Check list_orders and retry only unaccepted purchase order references to avoid duplicates.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -90,6 +90,9 @@ export let searchProducts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.searchTerm?.trim() && !ctx.input.url?.trim()) {
+      throw createApiServiceError('Provide a searchTerm or a Target search results URL.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let params: Record<string, any> = {};

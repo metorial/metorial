@@ -8,7 +8,8 @@ export let getBlob = SlateTool.create(spec, {
   key: 'get_blob',
   description: `Retrieves archived Ethereum blob data by versioned hash. Returns the commitment, proof, byte counts, and optionally the full blob data. Stores all blobs that entered the Ethereum mempool (confirmed or not), providing access to historical blob data beyond Ethereum's ~18-day ephemeral storage window.`,
   instructions: [
-    'Set includeData to false for a lighter response that excludes the raw blob data.'
+    'Set includeData to false for a lighter response that excludes the raw blob data.',
+    'Blob Archive support ended March 1, 2025; Blocknative announced all API services would stop after June 19, 2026.'
   ],
   tags: {
     readOnly: true
@@ -32,7 +33,10 @@ export let getBlob = SlateTool.create(spec, {
       nonZeroBytes: z.number().describe('Count of non-zero bytes in blob data'),
       blobData: z
         .string()
-        .describe('Raw blob data as 0x-prefixed hex (empty string if includeData was false)')
+        .optional()
+        .describe(
+          'Raw blob data as 0x-prefixed hex, omitted when the provider excludes blob data'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -52,7 +56,7 @@ export let getBlob = SlateTool.create(spec, {
         proof: blob.proof,
         zeroBytes: blob.zeroBytes,
         nonZeroBytes: blob.nonZeroBytes,
-        blobData: blob.data || ''
+        blobData: blob.data
       },
       message: `Retrieved blob \`${blob.versionedHash}\`: **${blob.nonZeroBytes}** non-zero bytes, **${blob.zeroBytes}** zero bytes.`
     };

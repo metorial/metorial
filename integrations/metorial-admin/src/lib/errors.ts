@@ -1,10 +1,5 @@
-import { badRequestError, ServiceError } from '@lowerdeck/error';
-
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
+import { ServiceError } from '@lowerdeck/error';
+import { buildApiServiceError, createApiServiceError } from 'slates';
 
 type HttpErrorInput = {
   operation: string;
@@ -14,105 +9,55 @@ type HttpErrorInput = {
   contentType?: string;
 };
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-let pushString = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
-
-  let trimmed = value.trim();
-  if (trimmed && !messages.includes(trimmed)) {
-    messages.push(trimmed);
-  }
-};
-
-let collectMessages = (value: unknown, messages: string[]) => {
-  if (!isRecord(value)) {
-    pushString(messages, value);
-    return;
-  }
-
-  for (let key of ['message', 'error_description', 'error', 'detail', 'title']) {
-    pushString(messages, value[key]);
-  }
-
-  let errors = value.errors;
-  if (Array.isArray(errors)) {
-    for (let error of errors) collectMessages(error, messages);
-  } else if (isRecord(errors)) {
-    collectMessages(errors, messages);
-  }
-};
-
-let extractMessage = (error: unknown) => {
-  let messages: string[] = [];
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-
-  collectMessages(response?.data ?? error, messages);
-
-  if (messages.length > 0) return messages.join(' - ');
-  if (error instanceof Error && error.message) return error.message;
-
-  return 'Unknown error';
-};
-
-export let metorialServiceError = (message: string) =>
-  new ServiceError(badRequestError({ message }));
-
-export let metorialValidationError = (message: string) => metorialServiceError(message);
+export let metorialServiceError = createApiServiceError;
+export let metorialValidationError = createApiServiceError;
 
 export let metorialUnsupportedContentTypeError = (
   operation: string,
   contentType: string | undefined
 ) => {
-  let serviceError = metorialServiceError(
-    `Metorial API ${operation} returned unsupported content type: ${contentType ?? 'unknown'}`
+  let error = createApiServiceError(
+    `Metorial API ${operation} returned unsupported content type: ${contentType ?? 'unknown'}`,
+    { reason: 'unsupported_content_type' }
   );
-  serviceError.data.reason = 'unsupported_content_type';
-  serviceError.data.contentType = contentType;
-  return serviceError;
+  error.data.contentType = contentType;
+  return error;
 };
+
+export let metorialApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Metorial',
+    reason: 'metorial_api_error',
+    operation,
+    extractResponse: (value, helpers) => helpers.getResponseWithBody(value),
+    detailKeys: ['message', 'error_description', 'detail', 'title', 'code'],
+    nestedKeys: ['errors', 'error'],
+    extractUpstreamCode: (_value, response, helpers) => {
+      if (!helpers.isRecord(response?.data)) return undefined;
+      let code = response.data.code ?? response.data.error;
+      return typeof code === 'string' ? code : undefined;
+    }
+  });
 
 export let metorialHttpError = (input: HttpErrorInput) => {
-  let statusLabel = `HTTP ${input.status}${input.statusText ? ` ${input.statusText}` : ''}`;
-  let serviceError = metorialServiceError(
-    `Metorial API ${input.operation} failed: ${statusLabel}: ${extractMessage(input.body)}`
-  );
-
-  serviceError.data.reason = 'metorial_api_error';
-  serviceError.data.upstreamStatus = input.status;
-  serviceError.data.contentType = input.contentType;
-
-  return serviceError;
-};
-
-export let metorialApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) return error;
-
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let status = response?.status;
-  let statusLabel =
-    status !== undefined
-      ? `HTTP ${status}${response?.statusText ? ` ${response.statusText}` : ''}: `
-      : '';
-
-  let serviceError = metorialServiceError(
-    `Metorial API ${operation} failed: ${statusLabel}${extractMessage(error)}`
-  );
-
-  serviceError.data.reason = 'metorial_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
+  let data = input.body;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      // Non-JSON error responses remain available to the shared error adapter.
+    }
   }
-
-  return serviceError;
+  let error = metorialApiError(
+    { response: { status: input.status, statusText: input.statusText, data } },
+    input.operation
+  );
+  error.data.contentType = input.contentType;
+  return error;
 };
 
 export let metorialOAuthError = (operation: string, error: unknown) => {
   if (error instanceof ServiceError) return error;
-
   let serviceError = metorialApiError(error, `OAuth ${operation}`);
   serviceError.data.reason = 'metorial_oauth_error';
   return serviceError;

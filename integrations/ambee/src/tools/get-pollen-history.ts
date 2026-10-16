@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -80,7 +80,7 @@ export let getPollenHistory = SlateTool.create(spec, {
         ctx.input.speciesRisk
       );
     } else {
-      throw new Error('Provide lat/lng coordinates or a place name.');
+      throw createApiServiceError('Provide lat/lng coordinates or a place name.');
     }
 
     let records = result.data || [];

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoinrankingClient } from '../lib/client';
+import { rawDataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getCoinPrice = SlateTool.create(spec, {
@@ -31,6 +32,9 @@ export let getCoinPrice = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: rawDataSchema
+        .optional()
+        .describe('Original provider data, including additional fields'),
       price: z.string().describe('Price of the coin in the reference currency'),
       timestamp: z.number().describe('Epoch timestamp of the price data point')
     })
@@ -52,12 +56,14 @@ export let getCoinPrice = SlateTool.create(spec, {
 
     return {
       output: {
+        rawData: result.data,
         price: price,
         timestamp: timestamp
       },
-      message: ctx.input.timestamp
-        ? `Price at timestamp ${timestamp}: **${price}**`
-        : `Current price: **${price}**`
+      message:
+        ctx.input.timestamp !== undefined
+          ? `Price at timestamp ${timestamp}: **${price}**`
+          : `Current price: **${price}**`
     };
   })
   .build();

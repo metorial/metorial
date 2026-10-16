@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,6 +45,10 @@ Invalid URL formats for website or social media fields will be skipped by the sy
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       member: z.any().describe('The updated member record.')
     })
   )
@@ -61,18 +65,30 @@ Invalid URL formats for website or social media fields will be skipped by the sy
     if (ctx.input.email) data.email = ctx.input.email;
     if (ctx.input.firstName) data.first_name = ctx.input.firstName;
     if (ctx.input.lastName) data.last_name = ctx.input.lastName;
-    if (ctx.input.phone) data.phone = ctx.input.phone;
+    if (ctx.input.phone) data.phone_number = ctx.input.phone;
     if (ctx.input.company) data.company = ctx.input.company;
     if (ctx.input.website) data.website = ctx.input.website;
-    if (ctx.input.address) data.address = ctx.input.address;
+    if (ctx.input.address) data.address1 = ctx.input.address;
     if (ctx.input.city) data.city = ctx.input.city;
-    if (ctx.input.state) data.state = ctx.input.state;
-    if (ctx.input.zip) data.zip = ctx.input.zip;
-    if (ctx.input.country) data.country = ctx.input.country;
+    if (ctx.input.state) data.state_code = ctx.input.state;
+    if (ctx.input.zip) data.zip_code = ctx.input.zip;
+    if (ctx.input.country) data.country_code = ctx.input.country;
     if (ctx.input.subscriptionId) data.subscription_id = ctx.input.subscriptionId;
-    if (ctx.input.credits !== undefined) data.credits = ctx.input.credits;
-    if (ctx.input.addCredits !== undefined) data.add_credits = ctx.input.addCredits;
-    if (ctx.input.deductCredits !== undefined) data.deduct_credits = ctx.input.deductCredits;
+    let creditChanges = [
+      ['override', ctx.input.credits],
+      ['add', ctx.input.addCredits],
+      ['deduct', ctx.input.deductCredits]
+    ].filter(([, amount]) => amount !== undefined);
+    if (creditChanges.length > 1) {
+      throw createApiServiceError(
+        'Provide only one of credits, addCredits, or deductCredits per update.'
+      );
+    }
+    if (creditChanges.length === 1) {
+      let [action, amount] = creditChanges[0]!;
+      data.credit_action = action;
+      data.credit_amount = amount;
+    }
     if (ctx.input.additionalFields) {
       for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
         data[key] = value;
@@ -84,6 +100,7 @@ Invalid URL formats for website or social media fields will be skipped by the sy
     return {
       output: {
         status: result.status,
+        raw: result,
         member: result.message
       },
       message: `Updated member **${ctx.input.userId}**.`

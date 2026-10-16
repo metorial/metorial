@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { requireArray } from '../lib/response';
 import { spec } from '../spec';
 
 export let createWebhook = SlateTool.create(spec, {
   name: 'Create Webhook',
   key: 'create_webhook',
-  description: `Create a new webhook for a Revolt channel. Webhooks allow external systems to send messages to the channel without a bot account.`,
+  description: `Create a new webhook for a Stoat channel. Webhooks allow external systems to send messages to the channel without a bot account.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -50,7 +51,7 @@ export let createWebhook = SlateTool.create(spec, {
 export let fetchWebhooks = SlateTool.create(spec, {
   name: 'Fetch Webhooks',
   key: 'fetch_webhooks',
-  description: `List all webhooks for a Revolt channel. Returns webhook IDs, names, and tokens for execution.`,
+  description: `List all webhooks for a Stoat channel. Returns webhook IDs, names, and tokens for execution.`,
   tags: {
     readOnly: true
   }
@@ -79,7 +80,7 @@ export let fetchWebhooks = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let result = await client.fetchWebhooks(ctx.input.channelId);
-    let webhooksArray = Array.isArray(result) ? result : [];
+    let webhooksArray = requireArray(result, 'channel webhooks');
 
     let webhooks = webhooksArray.map((w: any) => ({
       webhookId: w.id,
@@ -99,7 +100,7 @@ export let fetchWebhooks = SlateTool.create(spec, {
 export let executeWebhook = SlateTool.create(spec, {
   name: 'Execute Webhook',
   key: 'execute_webhook',
-  description: `Send a message through a Revolt webhook. Messages can include text content, embeds, and a custom username/avatar. Does not require bot authentication.`,
+  description: `Send a message through a Stoat webhook. Messages can include text content, embeds, and a custom username/avatar. Does not require bot authentication.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -151,5 +152,58 @@ export let executeWebhook = SlateTool.create(spec, {
       output: { success: true },
       message: `Executed webhook \`${ctx.input.webhookId}\`${ctx.input.content ? `: "${ctx.input.content.substring(0, 80)}"` : ''}`
     };
+  })
+  .build();
+
+export let editWebhook = SlateTool.create(spec, {
+  name: 'Edit Webhook',
+  key: 'edit_webhook',
+  description: 'Update an existing channel webhook name, avatar, or permissions.',
+  tags: { readOnly: false }
+})
+  .input(
+    z.object({
+      webhookId: z.string(),
+      name: z.string().optional(),
+      avatarId: z.string().optional().describe('Previously uploaded avatar file ID'),
+      permissions: z.number().optional().describe('Replacement webhook permission bitfield'),
+      removeFields: z.array(z.enum(['Avatar'])).optional()
+    })
+  )
+  .output(z.object({ webhookId: z.string(), name: z.string(), channelId: z.string() }))
+  .handleInvocation(async ctx => {
+    if (
+      ctx.input.permissions !== undefined &&
+      (!Number.isSafeInteger(ctx.input.permissions) || ctx.input.permissions < 0)
+    ) {
+      throw createApiServiceError(
+        'Webhook permissions must be a non-negative safe whole number.'
+      );
+    }
+    let webhook = await createClient(ctx).editWebhook(ctx.input.webhookId, {
+      name: ctx.input.name,
+      avatar: ctx.input.avatarId,
+      permissions: ctx.input.permissions,
+      remove: ctx.input.removeFields
+    });
+    return {
+      output: { webhookId: webhook.id, name: webhook.name, channelId: webhook.channel_id },
+      message: `Updated webhook **${webhook.name}**.`
+    };
+  })
+  .build();
+
+export let deleteWebhook = SlateTool.create(spec, {
+  name: 'Delete Webhook',
+  key: 'delete_webhook',
+  description:
+    'Permanently delete an existing channel webhook and revoke its execution token.',
+  tags: { readOnly: false, destructive: true }
+})
+  .input(z.object({ webhookId: z.string() }))
+  .output(z.object({ success: z.boolean() }))
+  .handleInvocation(async ctx => {
+    await createClient(ctx).deleteWebhook(ctx.input.webhookId);
+    return { output: { success: true }, message: 'Webhook deleted.' };
   })
   .build();

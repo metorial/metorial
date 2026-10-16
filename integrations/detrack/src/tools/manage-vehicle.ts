@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let manageVehicleTool = SlateTool.create(spec, {
   name: 'Manage Vehicle',
   key: 'manage_vehicle',
-  description: `Creates, updates, or deletes a vehicle (driver) in Detrack. Use the **action** field to specify the operation. For create and update, provide the driver name and any additional fields. For delete, only the name is needed.`,
+  description: `Creates, updates, or deletes a vehicle (driver) in Detrack. Create requires a name and detrackId from the driver app. Update and delete resolve the exact vehicle name to its ID first. Use list_vehicles to discover names.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -21,7 +21,7 @@ export let manageVehicleTool = SlateTool.create(spec, {
       detrackId: z
         .string()
         .optional()
-        .describe('Detrack ID unique to the driver (for update only)')
+        .describe('Detrack ID from the driver app. Required for create; optional for update.')
     })
   )
   .output(
@@ -47,9 +47,8 @@ export let manageVehicleTool = SlateTool.create(spec, {
         detrack_id: ctx.input.detrackId
       });
     } else if (ctx.input.action === 'update') {
-      let updateData: Record<string, unknown> = { name: ctx.input.name };
-      if (ctx.input.detrackId) updateData.detrack_id = ctx.input.detrackId;
-      result = await client.updateVehicle(updateData as any);
+      let updateData = { name: ctx.input.name, detrack_id: ctx.input.detrackId };
+      result = await client.updateVehicle(updateData);
     } else if (ctx.input.action === 'delete') {
       result = await client.deleteVehicle(ctx.input.name);
     }

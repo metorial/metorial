@@ -42,6 +42,11 @@ export let manageUserGroups = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      groupId: z
+        .number()
+        .optional()
+        .describe('ID returned for the newly created user group on supported servers'),
+      raw: z.any().optional().describe('Complete provider response'),
       groups: z
         .array(
           z.object({
@@ -73,20 +78,20 @@ export let manageUserGroups = SlateTool.create(spec, {
       }));
 
       return {
-        output: { groups },
+        output: { groups, raw: result },
         message: `Found ${groups.length} user group(s)`
       };
     }
 
     if (ctx.input.action === 'create') {
-      await client.createUserGroup({
+      let result = await client.createUserGroup({
         name: ctx.input.name!,
         description: ctx.input.description || '',
         members: ctx.input.members || []
       });
 
       return {
-        output: { success: true },
+        output: { success: true, groupId: result.group_id, raw: result },
         message: `User group "${ctx.input.name}" created successfully`
       };
     }

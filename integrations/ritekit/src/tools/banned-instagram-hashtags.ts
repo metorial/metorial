@@ -20,6 +20,7 @@ Use this before publishing Instagram content to avoid shadowbanning or reduced r
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       cleanedPost: z.string().describe('The post with banned hashtags removed'),
       bannedHashtags: z
         .array(z.string())
@@ -34,12 +35,13 @@ Use this before publishing Instagram content to avoid shadowbanning or reduced r
 
     return {
       output: {
+        raw: { ...result },
         cleanedPost: result.post,
         bannedHashtags: banned
       },
       message:
         banned.length > 0
-          ? `Found **${banned.length}** banned Instagram hashtags: ${banned.map(h => `#${h}`).join(', ')}`
+          ? `Found **${banned.length}** banned Instagram hashtags: ${banned.map(h => (h.startsWith('#') ? h : `#${h}`)).join(', ')}`
           : 'No banned Instagram hashtags detected.'
     };
   })

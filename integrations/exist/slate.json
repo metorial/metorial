@@ -1,6 +1,6 @@
 {
   "name": "@metorial/exist",
-  "description": "Read and write personal analytics data across activity, sleep, mood, productivity, health, and many other life-tracking categories. Retrieve attribute values and historical data, acquire ownership of attributes to update or increment their values, and create custom attributes for novel data points. Access automatically generated correlations between attributes, daily and weekly insights, and rolling averages with per-day-of-week breakdowns. Manage user profile information including timezone and unit preferences.",
+  "description": "Read personal analytics data, discover supported attribute templates, create or acquire attributes, and update daily values. Retrieve correlations, insights, rolling averages, and the connected user profile.",
   "categories": ["apis-and-http-requests", "healthcare-and-medical"],
   "skills": [
     "read attribute values",
@@ -11,7 +11,8 @@
     "retrieve automated insights",
     "retrieve attribute averages",
     "acquire attribute ownership",
-    "read user profile"
+    "read user profile",
+    "discover attribute templates"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/exist.svg"
 }

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, numericValue } from '../lib/client';
 import { spec } from '../spec';
 
 let shortInterestRecordSchema = z.object({
@@ -32,6 +32,7 @@ export let getShortInterestTool = SlateTool.create(spec, {
   .input(
     z.object({
       symbols: z.string().describe('Comma-separated ticker symbols (e.g. "TSLA,AAPL")'),
+      finraReport: z.boolean().optional().describe('Include FINRA short-interest report data'),
       from: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       to: z.string().optional().describe('End date (YYYY-MM-DD)'),
       page: z.number().optional().default(0).describe('Page offset'),
@@ -41,6 +42,7 @@ export let getShortInterestTool = SlateTool.create(spec, {
   .output(
     z.object({
       records: z.array(shortInterestRecordSchema).describe('Short interest data records'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of records returned')
     })
   )
@@ -49,6 +51,7 @@ export let getShortInterestTool = SlateTool.create(spec, {
 
     let data = await client.getShortInterest({
       symbols: ctx.input.symbols,
+      finraReport: ctx.input.finraReport,
       from: ctx.input.from,
       to: ctx.input.to,
       page: ctx.input.page,
@@ -70,24 +73,14 @@ export let getShortInterestTool = SlateTool.create(spec, {
             exchange: item.exchange,
             sector: item.sector,
             industry: item.industry,
-            totalShortInterest: item.totalShortInterest
-              ? Number(item.totalShortInterest)
-              : undefined,
-            daysToCover: item.daysToCover ? Number(item.daysToCover) : undefined,
-            shortPercentOfFloat: item.shortPercentOfFloat
-              ? Number(item.shortPercentOfFloat)
-              : undefined,
-            shortPriorMonth: item.shortPriorMo ? Number(item.shortPriorMo) : undefined,
-            percentChangeMoM: item.percentChangeMoMo
-              ? Number(item.percentChangeMoMo)
-              : undefined,
-            sharesFloat: item.sharesFloat ? Number(item.sharesFloat) : undefined,
-            averageDailyVolume: item.averageDailyVolume
-              ? Number(item.averageDailyVolume)
-              : undefined,
-            sharesOutstanding: item.sharesOutstanding
-              ? Number(item.sharesOutstanding)
-              : undefined
+            totalShortInterest: numericValue(item.totalShortInterest),
+            daysToCover: numericValue(item.daysToCover),
+            shortPercentOfFloat: numericValue(item.shortPercentOfFloat),
+            shortPriorMonth: numericValue(item.shortPriorMo),
+            percentChangeMoM: numericValue(item.percentChangeMoMo),
+            sharesFloat: numericValue(item.sharesFloat),
+            averageDailyVolume: numericValue(item.averageDailyVolume),
+            sharesOutstanding: numericValue(item.sharesOutstanding)
           });
         }
       }
@@ -95,6 +88,7 @@ export let getShortInterestTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         records,
         count: records.length
       },

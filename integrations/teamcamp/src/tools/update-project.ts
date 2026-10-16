@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapProject } from '../lib/response';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateProject = SlateTool.create(spec, {
   name: 'Update Project',
   key: 'update_project',
-  description: `Update an existing project's properties such as name, description, dates, customer association, and feature toggles (priority, estimates, milestones). Only provided fields are updated.`
+  description: `Call list_projects to discover project IDs. Update an existing project's properties such as name, description, dates, customer association, and feature toggles (priority, estimates, milestones). Only provided fields are updated.`
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to update'),
+      projectId: projectIdSchema,
       projectName: z.string().optional().describe('New project name'),
       description: z.string().optional().describe('New project description'),
       customerId: z.string().optional().describe('ID of the customer to associate'),
@@ -33,6 +35,12 @@ export let updateProject = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       projectId: z.string().describe('ID of the updated project'),
       projectName: z.string().describe('Name of the updated project'),
       workspaceId: z.string().optional().describe('ID of the workspace'),
@@ -54,7 +62,7 @@ export let updateProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updateData: Record<string, any> = {};
+    let updateData: Parameters<Client['updateProject']>[1] = {};
     if (ctx.input.projectName !== undefined) updateData.projectName = ctx.input.projectName;
     if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
     if (ctx.input.customerId !== undefined) updateData.customerId = ctx.input.customerId;
@@ -71,22 +79,10 @@ export let updateProject = SlateTool.create(spec, {
 
     let project = await client.updateProject(ctx.input.projectId, updateData);
 
+    let output = mapProject(project);
     return {
-      output: {
-        projectId: project.projectId ?? '',
-        projectName: project.projectName ?? '',
-        workspaceId: project.workspaceId || undefined,
-        ownerId: project.ownerId || undefined,
-        description: project.description || undefined,
-        customerId: project.customerId || undefined,
-        startDate: project.startDate || undefined,
-        dueDate: project.dueDate || undefined,
-        favoriteUsers: Array.isArray(project.favoriteUsers)
-          ? project.favoriteUsers
-          : undefined,
-        projectUsers: Array.isArray(project.projectUsers) ? project.projectUsers : undefined
-      },
-      message: `Updated project **${project.projectName}** (ID: ${project.projectId}).`
+      output,
+      message: `Updated project **${output.projectName}** (ID: ${output.projectId}).`
     };
   })
   .build();

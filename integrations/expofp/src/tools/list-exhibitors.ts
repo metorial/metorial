@@ -40,8 +40,8 @@ export let listExhibitors = SlateTool.create(spec, {
         exhibitors: exhibitors.map(e => ({
           exhibitorId: e.id,
           name: e.name,
-          externalId: e.externalId ?? '',
-          boothNames: e.boothNames ?? []
+          externalId: e.externalId,
+          boothNames: e.boothNames
         }))
       },
       message: `Found **${exhibitors.length}** exhibitor(s) for event ${ctx.input.eventId}.`

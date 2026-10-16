@@ -26,7 +26,10 @@ export let removeBackground = SlateTool.create(spec, {
   .output(
     z.object({
       jobId: z.string().optional().describe('Async job identifier'),
-      status: z.string().describe('Job status (e.g. pending, running, succeeded, failed)'),
+      status: z
+        .string()
+        .optional()
+        .describe('Job status (e.g. pending, running, succeeded, failed)'),
       statusUrl: z.string().optional().describe('URL to poll for job completion status')
     })
   )
@@ -41,11 +44,13 @@ export let removeBackground = SlateTool.create(spec, {
 
     return {
       output: {
-        jobId: result.jobId || result.links?.self?.href?.split('/').pop(),
-        status: result.status || 'submitted',
-        statusUrl: result.links?.self?.href
+        jobId:
+          result.jobId ??
+          (result._links?.self?.href ?? result.links?.self?.href)?.split('/').pop(),
+        status: result.status,
+        statusUrl: result._links?.self?.href ?? result.links?.self?.href
       },
-      message: `Background removal job submitted. Status: **${result.status || 'submitted'}**.`
+      message: `Background removal job submitted.`
     };
   })
   .build();

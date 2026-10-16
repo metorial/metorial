@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { operationOutput, providerId, providerRecords, requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageActivities = SlateTool.create(spec, {
   name: 'Manage Activities',
   key: 'manage_activities',
-  description: `Create, read, update, or delete activities (tasks) in Zixflow. Activities represent follow-ups, calls, meetings, or other tasks that can be associated with CRM records. Supports scheduling, assignees, statuses, and custom icons.`,
+  description: `Create, read, update, or delete activities (tasks) in Zixflow. Activities represent follow-ups, calls, meetings, or other tasks that can be associated with CRM records. Supports scheduling, record associations, statuses, and custom icons.`,
   instructions: [
     'For "create": provide name, iconType, iconValue, and scheduleAt. Optionally associate with a CRM record.',
     'For "get": provide activityId to fetch a single activity.',
@@ -16,7 +17,7 @@ export let manageActivities = SlateTool.create(spec, {
     'iconType can be "emoji", "interaction", or "messaging_app". iconValue depends on the type (e.g., "📞" for emoji).'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -59,6 +60,7 @@ export let manageActivities = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
       success: z.boolean().describe('Whether the operation was successful'),
       responseMessage: z.string().describe('Response message from the API'),
       activityId: z.string().optional().describe('ID of the created/affected activity'),
@@ -75,89 +77,55 @@ export let manageActivities = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ZixflowClient({ token: ctx.auth.token });
     let { action } = ctx.input;
+    if (['get', 'update', 'delete'].includes(action))
+      requireInput(ctx.input.activityId, 'activityId');
     let result: any;
-
     if (action === 'create') {
       result = await client.createActivity({
-        name: ctx.input.name!,
-        iconType: ctx.input.iconType!,
-        iconValue: ctx.input.iconValue!,
-        scheduleAt: ctx.input.scheduleAt!,
+        name: requireInput(ctx.input.name, 'name'),
+        iconType: requireInput(ctx.input.iconType, 'iconType'),
+        iconValue: requireInput(ctx.input.iconValue, 'iconValue'),
+        scheduleAt: requireInput(ctx.input.scheduleAt, 'scheduleAt'),
         description: ctx.input.description,
         associated: ctx.input.associatedRecordId,
         status: ctx.input.statusId
       });
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          activityId: result._id ?? result.data?._id,
-          activity: result.data
-        },
-        message: `Activity "${ctx.input.name}" created.`
-      };
-    }
-
-    if (action === 'get') {
-      result = await client.getActivity(ctx.input.activityId!);
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          activityId: ctx.input.activityId,
-          activity: result.data
-        },
-        message: `Fetched activity ${ctx.input.activityId}.`
-      };
-    }
-
-    if (action === 'list') {
+    } else if (action === 'get') result = await client.getActivity(ctx.input.activityId!);
+    else if (action === 'list')
       result = await client.getActivities({
         limit: ctx.input.limit ?? 10,
         offset: ctx.input.offset ?? 0,
         filter: ctx.input.filter,
         sort: ctx.input.sort
       });
-      let activities = Array.isArray(result.data) ? result.data : [];
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          activities
-        },
-        message: `Fetched ${activities.length} activity(ies).`
-      };
-    }
+    else if (action === 'update') {
+      let data = pickDefined({
+        name: ctx.input.name,
+        iconType: ctx.input.iconType,
+        iconValue: ctx.input.iconValue,
+        scheduleAt: ctx.input.scheduleAt,
+        description: ctx.input.description,
+        associated: ctx.input.associatedRecordId,
+        status: ctx.input.statusId
+      });
+      if (!Object.keys(data).length)
+        throw createApiServiceError('Provide at least one activity field to update.', {
+          reason: 'zixflow_invalid_input'
+        });
+      result = await client.updateActivity(ctx.input.activityId!, data);
+    } else result = await client.deleteActivity(ctx.input.activityId!);
 
-    if (action === 'update') {
-      let updateData: Record<string, any> = {};
-      if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-      if (ctx.input.scheduleAt !== undefined) updateData.scheduleAt = ctx.input.scheduleAt;
-      if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
-      if (ctx.input.associatedRecordId !== undefined)
-        updateData.associated = ctx.input.associatedRecordId;
-      if (ctx.input.statusId !== undefined) updateData.status = ctx.input.statusId;
-
-      result = await client.updateActivity(ctx.input.activityId!, updateData);
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          activityId: ctx.input.activityId
-        },
-        message: `Updated activity ${ctx.input.activityId}.`
-      };
-    }
-
-    // delete
-    result = await client.deleteActivity(ctx.input.activityId!);
     return {
       output: {
-        success: result.status === true,
-        responseMessage: result.message ?? 'Unknown response',
-        activityId: ctx.input.activityId
+        ...operationOutput(result),
+        activityId: providerId(result),
+        activity:
+          ['create', 'get'].includes(action) && isApiErrorRecord(result.data)
+            ? result.data
+            : undefined,
+        activities: action === 'list' ? providerRecords(result.data) : undefined
       },
-      message: `Deleted activity ${ctx.input.activityId}.`
+      message: `Zixflow ${action} operation confirmed.`
     };
   })
   .build();

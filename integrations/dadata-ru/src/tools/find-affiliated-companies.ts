@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let affiliatedCompanySchema = z.object({
-  value: z.string().describe('Company name'),
+  value: z.string().optional().describe('Company name'),
   inn: z.string().nullable().describe('INN'),
   ogrn: z.string().nullable().describe('OGRN'),
   type: z.string().nullable().describe('LEGAL or INDIVIDUAL'),
@@ -42,6 +43,7 @@ Useful for discovering business relationships and corporate structures.`,
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       affiliatedCompanies: z
         .array(affiliatedCompanySchema)
         .describe('List of affiliated companies')
@@ -59,8 +61,8 @@ Useful for discovering business relationships and corporate structures.`,
       scope: ctx.input.scope
     });
 
-    let affiliatedCompanies = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
+    let affiliatedCompanies = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
       inn: s.data?.inn ?? null,
       ogrn: s.data?.ogrn ?? null,
       type: s.data?.type ?? null,
@@ -70,7 +72,10 @@ Useful for discovering business relationships and corporate structures.`,
     }));
 
     return {
-      output: { affiliatedCompanies },
+      output: {
+        rawData: data,
+        affiliatedCompanies
+      },
       message: `Found **${affiliatedCompanies.length}** affiliated company/companies for INN "${ctx.input.inn}".`
     };
   })

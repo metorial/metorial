@@ -1,7 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
+
+  projectId: z.string().describe('ID of the project'),
+  projectName: z.string().describe('Name of the project'),
+  stage: z.string().optional().describe('Current project stage after setting target'),
+  target: z.string().optional().nullable().describe('Target variable name'),
+  targetType: z.string().optional().nullable().describe('Inferred target type'),
+  metric: z.string().optional().nullable().describe('Optimization metric being used')
+});
 
 export let startAutopilot = SlateTool.create(spec, {
   name: 'Start Autopilot',
@@ -47,20 +62,11 @@ export let startAutopilot = SlateTool.create(spec, {
       seed: z.number().optional().describe('Random seed for reproducibility')
     })
   )
-  .output(
-    z.object({
-      projectId: z.string().describe('ID of the project'),
-      projectName: z.string().describe('Name of the project'),
-      stage: z.string().optional().describe('Current project stage after setting target'),
-      target: z.string().optional().nullable().describe('Target variable name'),
-      targetType: z.string().optional().nullable().describe('Inferred target type'),
-      metric: z.string().optional().nullable().describe('Optimization metric being used')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     await client.setTarget(ctx.input.projectId, {
@@ -78,14 +84,15 @@ export let startAutopilot = SlateTool.create(spec, {
     let project = await client.getProject(ctx.input.projectId);
 
     return {
-      output: {
-        projectId: project.id || project.projectId,
+      output: parseOutput(outputSchema, {
+        raw: project,
+        projectId: project.id ?? project.projectId,
         projectName: project.projectName,
         stage: project.stage,
         target: project.target,
         targetType: project.targetType,
         metric: project.metric
-      },
+      }),
       message: `Autopilot started on project **${project.projectName}** targeting **${ctx.input.target}**${ctx.input.mode ? ` in ${ctx.input.mode} mode` : ''}.`
     };
   })

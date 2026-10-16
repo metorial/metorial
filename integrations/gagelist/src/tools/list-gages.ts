@@ -42,6 +42,10 @@ Use offset and limit to paginate through results. Returns basic gage information
           })
         )
         .describe('List of gage records'),
+      totalAvailable: z
+        .number()
+        .optional()
+        .describe('Total matching records reported by GageList'),
       totalReturned: z.number().describe('Number of gages returned in this page')
     })
   )
@@ -53,7 +57,7 @@ Use offset and limit to paginate through results. Returns basic gage information
       recordNumber: ctx.input.limit
     });
 
-    let gages = (result.data ?? []).map((g: any) => ({
+    let gages = result.data.map((g: any) => ({
       gageId: g.Id,
       status: g.Status,
       type: g.Type,
@@ -70,6 +74,7 @@ Use offset and limit to paginate through results. Returns basic gage information
     return {
       output: {
         gages,
+        totalAvailable: result.total,
         totalReturned: gages.length
       },
       message: `Retrieved **${gages.length}** gage(s) starting from offset ${ctx.input.offset}.`

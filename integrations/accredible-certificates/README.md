@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Accredible Certificates
 
-Create, manage, and issue digital certificates, badges, and credentials. Create credential groups and templates, issue credentials to recipients, update credential details, and retrieve credential information. Manage recipient data, track credential views, and customize certificate designs for courses, training programs, and professional achievements.
+Issue and manage digital certificates and badges, organize credential groups, discover design templates, inspect your issuer account, and generate downloadable PDFs for published credentials.
+
+Configure your API key for US production, EU production, or sandbox during connection setup. Credentials can be searched by group, recipient, and issue or update dates. Page-based credential search is limited to the first 10,000 matches; narrow your filters for larger result sets. Design page inputs paginate only the set returned by the provider, whose documentation does not guarantee completeness.
 
 ## License
 

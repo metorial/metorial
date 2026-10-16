@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageCampaigns = SlateTool.create(spec, {
   name: 'Manage Campaigns',
   key: 'manage_campaigns',
   description: `Create, update, or delete email campaigns. Campaigns can also be sent immediately or scheduled for a specific date.
-Combine creation and sending in separate calls: first create, then send.`,
+Create the campaign, set HTML with set_campaign_content, choose recipients with set_campaign_recipients, then send.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -71,7 +71,7 @@ Combine creation and sending in separate calls: first create, then send.`,
         !ctx.input.fromEmail ||
         !ctx.input.subject
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'name, fromName, fromEmail, and subject are required when creating a campaign'
         );
       }
@@ -93,8 +93,8 @@ Combine creation and sending in separate calls: first create, then send.`,
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.campaignId) {
-        throw new Error('campaignId is required when updating a campaign');
+      if (ctx.input.campaignId === undefined) {
+        throw createApiServiceError('campaignId is required when updating a campaign');
       }
       await client.updateCampaign(ctx.input.campaignId, {
         name: ctx.input.name,
@@ -114,8 +114,8 @@ Combine creation and sending in separate calls: first create, then send.`,
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.campaignId) {
-        throw new Error('campaignId is required when deleting a campaign');
+      if (ctx.input.campaignId === undefined) {
+        throw createApiServiceError('campaignId is required when deleting a campaign');
       }
       await client.deleteCampaign(ctx.input.campaignId);
       return {
@@ -128,11 +128,11 @@ Combine creation and sending in separate calls: first create, then send.`,
     }
 
     if (ctx.input.action === 'send') {
-      if (!ctx.input.campaignId) {
-        throw new Error('campaignId is required when sending a campaign');
+      if (ctx.input.campaignId === undefined) {
+        throw createApiServiceError('campaignId is required when sending a campaign');
       }
       if (!ctx.input.sendType) {
-        throw new Error('sendType is required when sending a campaign');
+        throw createApiServiceError('sendType is required when sending a campaign');
       }
       await client.sendCampaign(
         ctx.input.campaignId,
@@ -152,6 +152,6 @@ Combine creation and sending in separate calls: first create, then send.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

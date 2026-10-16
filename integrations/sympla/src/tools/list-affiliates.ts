@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateSymplaOutput } from '../lib/client';
 import { spec } from '../spec';
 
 let affiliateSchema = z.object({
@@ -11,6 +11,10 @@ let affiliateSchema = z.object({
   hasLimit: z.boolean().describe('Whether the affiliate has a sales limit'),
   limit: z.number().describe('Maximum number of sales allowed'),
   sales: z.number().describe('Number of sales made')
+});
+
+let outputSchema = z.object({
+  affiliates: z.array(affiliateSchema).describe('List of affiliates')
 });
 
 export let listAffiliatesTool = SlateTool.create(spec, {
@@ -26,29 +30,25 @@ export let listAffiliatesTool = SlateTool.create(spec, {
       eventId: z.number().describe('Event ID to list affiliates for')
     })
   )
-  .output(
-    z.object({
-      affiliates: z.array(affiliateSchema).describe('List of affiliates')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let result = await client.listAffiliates(ctx.input.eventId);
 
-    let affiliates = (result.data || []).map(a => ({
-      affiliateId: a.id ?? 0,
-      name: a.name ?? '',
-      email: a.email ?? '',
-      commission: a.commission ?? 0,
-      hasLimit: a.has_limit ?? false,
-      limit: a.limit ?? 0,
-      sales: a.sales ?? 0
+    let affiliates = result.data.map(a => ({
+      affiliateId: a.id,
+      name: a.name,
+      email: a.email,
+      commission: a.commission,
+      hasLimit: a.has_limit,
+      limit: a.limit,
+      sales: a.sales
     }));
 
     return {
-      output: {
+      output: validateSymplaOutput(outputSchema, {
         affiliates
-      },
+      }),
       message: `Found **${affiliates.length}** affiliates for event ${ctx.input.eventId}.`
     };
   })

@@ -18,7 +18,10 @@ export let importLayer = SlateTool.create(spec, {
       importUrl: z
         .string()
         .describe('URL of the data source (GeoJSON, CSV, shapefile, or live feed URL)'),
-      name: z.string().optional().describe('Name for the imported layer')
+      name: z
+        .string()
+        .optional()
+        .describe('Name for the imported layer. Felt requires a display name for uploads.')
     })
   )
   .output(

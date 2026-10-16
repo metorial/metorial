@@ -1,9 +1,46 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  responseArray,
+  responseNullableString,
+  responseNumber,
+  responseRecord,
+  responseString
+} from '../lib/response';
 import { spec } from '../spec';
 
 let brandShareSchema = z.object({
+  organicBasicSov: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Organic unweighted share of voice'),
+  organicAveragePosition: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Average organic result position'),
+  organicAveragePrice: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Average organic product price'),
+  sponsoredBasicSov: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Sponsored unweighted share of voice'),
+  sponsoredAveragePosition: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Average sponsored result position'),
+  sponsoredAveragePrice: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Average sponsored product price'),
   brandName: z.string().describe('Name of the brand'),
   combinedProductCount: z
     .number()
@@ -12,8 +49,8 @@ let brandShareSchema = z.object({
   combinedWeightedSov: z
     .number()
     .nullable()
-    .describe('Combined weighted share of voice percentage'),
-  combinedBasicSov: z.number().nullable().describe('Combined basic share of voice percentage'),
+    .describe('Combined weighted share of voice fraction'),
+  combinedBasicSov: z.number().nullable().describe('Combined basic share of voice fraction'),
   combinedAveragePrice: z
     .number()
     .nullable()
@@ -26,12 +63,12 @@ let brandShareSchema = z.object({
   organicWeightedSov: z
     .number()
     .nullable()
-    .describe('Organic weighted share of voice percentage'),
+    .describe('Organic weighted share of voice fraction'),
   sponsoredProductCount: z.number().nullable().describe('Number of sponsored products'),
   sponsoredWeightedSov: z
     .number()
     .nullable()
-    .describe('Sponsored weighted share of voice percentage')
+    .describe('Sponsored weighted share of voice fraction')
 });
 
 export let shareOfVoiceTool = SlateTool.create(spec, {
@@ -53,6 +90,35 @@ export let shareOfVoiceTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response including native attributes and metadata'),
+      updatedAt: z.string().nullable().optional().describe('Data collection timestamp'),
+      topAsins: z
+        .array(
+          z.object({
+            asin: z.string(),
+            name: z.string().nullable(),
+            brand: z.string().nullable(),
+            clicks: z.number().nullable(),
+            conversions: z.number().nullable(),
+            conversionRate: z.number().nullable()
+          })
+        )
+        .nullable()
+        .optional()
+        .describe('Top products by clicks with previous-week conversions'),
+      topAsinsModelStartDate: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Start date of top product performance data'),
+      topAsinsModelEndDate: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('End date of top product performance data'),
       keyword: z.string().describe('The analyzed keyword'),
       searchVolume30Day: z
         .number()
@@ -74,45 +140,114 @@ export let shareOfVoiceTool = SlateTool.create(spec, {
       keyword: ctx.input.keyword
     });
 
-    let items = Array.isArray(result.data) ? result.data : result.data ? [result.data] : [];
-
-    let searchVolume30Day: number | null = null;
-    let medianPpcBid: number | null = null;
-    let productCount: number | null = null;
-    let brands: any[] = [];
-
-    for (let item of items) {
-      let attrs = item.attributes || {};
-
-      if (attrs.estimated_30_day_search_volume !== undefined) {
-        searchVolume30Day = attrs.estimated_30_day_search_volume ?? null;
-      }
-      if (attrs.median_ppc_bid !== undefined) {
-        medianPpcBid = attrs.median_ppc_bid ?? null;
-      }
-      if (attrs.product_count !== undefined) {
-        productCount = attrs.product_count ?? null;
-      }
-
-      // Brand data may come as individual items in the data array
-      if (attrs.brand) {
-        brands.push({
-          brandName: attrs.brand || '',
-          combinedProductCount: attrs.combined_product_count ?? null,
-          combinedWeightedSov: attrs.combined_weighted_sov ?? null,
-          combinedBasicSov: attrs.combined_basic_sov ?? null,
-          combinedAveragePrice: attrs.combined_average_price ?? null,
-          combinedAveragePosition: attrs.combined_average_position ?? null,
-          organicProductCount: attrs.organic_product_count ?? null,
-          organicWeightedSov: attrs.organic_weighted_sov ?? null,
-          sponsoredProductCount: attrs.sponsored_product_count ?? null,
-          sponsoredWeightedSov: attrs.sponsored_weighted_sov ?? null
-        });
-      }
-    }
+    let resource = responseRecord(result.data, 'share of voice resource');
+    let attrs = responseRecord(resource.attributes, 'share of voice attributes');
+    let searchVolume30Day = responseNumber(
+      attrs.estimated_30_day_search_volume,
+      '30-day search volume'
+    );
+    let medianPpcBid = responseNumber(
+      attrs.exact_suggested_bid_median ?? attrs.median_ppc_bid,
+      'median PPC bid'
+    );
+    let productCount = responseNumber(attrs.product_count, 'product count');
+    let brands = responseArray(attrs.brands, 'brand share of voice data').map(value => {
+      let brand = responseRecord(value, 'brand share of voice');
+      return {
+        brandName: responseString(brand.brand, 'brand name'),
+        combinedProductCount: responseNumber(
+          brand.combined_products ?? brand.combined_product_count,
+          'combined product count'
+        ),
+        combinedWeightedSov: responseNumber(
+          brand.combined_weighted_sov,
+          'combined weighted share of voice'
+        ),
+        combinedBasicSov: responseNumber(
+          brand.combined_basic_sov,
+          'combined basic share of voice'
+        ),
+        combinedAveragePrice: responseNumber(
+          brand.combined_average_price,
+          'combined average price'
+        ),
+        combinedAveragePosition: responseNumber(
+          brand.combined_average_position,
+          'combined average position'
+        ),
+        organicProductCount: responseNumber(
+          brand.organic_products ?? brand.organic_product_count,
+          'organic product count'
+        ),
+        organicWeightedSov: responseNumber(
+          brand.organic_weighted_sov,
+          'organic weighted share of voice'
+        ),
+        sponsoredProductCount: responseNumber(
+          brand.sponsored_products ?? brand.sponsored_product_count,
+          'sponsored product count'
+        ),
+        sponsoredWeightedSov: responseNumber(
+          brand.sponsored_weighted_sov,
+          'sponsored weighted share of voice'
+        ),
+        organicBasicSov: responseNumber(
+          brand.organic_basic_sov,
+          'organic basic share of voice'
+        ),
+        organicAveragePosition: responseNumber(
+          brand.organic_average_position,
+          'organic average position'
+        ),
+        organicAveragePrice: responseNumber(
+          brand.organic_average_price,
+          'organic average price'
+        ),
+        sponsoredBasicSov: responseNumber(
+          brand.sponsored_basic_sov,
+          'sponsored basic share of voice'
+        ),
+        sponsoredAveragePosition: responseNumber(
+          brand.sponsored_average_position,
+          'sponsored average position'
+        ),
+        sponsoredAveragePrice: responseNumber(
+          brand.sponsored_average_price,
+          'sponsored average price'
+        )
+      };
+    });
+    let topAsins =
+      attrs.top_asins == null
+        ? null
+        : responseArray(attrs.top_asins, 'top ASINs').map(value => {
+            let item = responseRecord(value, 'top ASIN');
+            return {
+              asin: responseString(item.asin, 'top product ASIN'),
+              name: responseNullableString(item.name, 'top product name'),
+              brand: responseNullableString(item.brand, 'top product brand'),
+              clicks: responseNumber(item.clicks, 'top product clicks'),
+              conversions: responseNumber(item.conversions, 'top product conversions'),
+              conversionRate: responseNumber(
+                item.conversion_rate,
+                'top product conversion rate'
+              )
+            };
+          });
 
     return {
       output: {
+        raw: result,
+        updatedAt: responseNullableString(attrs.updated_at, 'share of voice update timestamp'),
+        topAsins,
+        topAsinsModelStartDate: responseNullableString(
+          attrs.top_asins_model_start_date,
+          'performance start date'
+        ),
+        topAsinsModelEndDate: responseNullableString(
+          attrs.top_asins_model_end_date,
+          'performance end date'
+        ),
         keyword: ctx.input.keyword,
         searchVolume30Day,
         medianPpcBid,

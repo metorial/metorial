@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getResponseRows } from '../lib/client';
 import { spec } from '../spec';
 
 let sourceValueSchema = z
@@ -15,8 +15,9 @@ export let getSolarDataTool = SlateTool.create(spec, {
 Returns hourly data with values from multiple meteorological sources.`,
   instructions: [
     'Provide latitude and longitude for the target location.',
-    'Specify solar parameters such as "uvIndex", "downwardShortWaveRadiationFlux", or "snowDepth".',
-    'Use source "sg" for Stormglass AI automatic best-source selection.'
+    'Specify solar parameters such as "uvIndex", "solarDownwardRadiationFlux", or "surfaceNetShortwaveRadiationDownwardsFlux".',
+    'Use source "sg" for Stormglass AI automatic best-source selection.',
+    'Solar radiation flux values are in watts per square meter.'
   ],
   tags: {
     readOnly: true
@@ -29,13 +30,20 @@ Returns hourly data with values from multiple meteorological sources.`,
       parameters: z
         .array(z.string())
         .describe(
-          'Solar parameters to retrieve (e.g., "uvIndex", "downwardShortWaveRadiationFlux", "surfaceNetShortwaveRadiationDownwardsFlux")'
+          'Solar parameters to retrieve (e.g., "uvIndex", "solarDownwardRadiationFlux", "surfaceNetShortwaveRadiationDownwardsFlux")'
         ),
       start: z
         .string()
         .optional()
-        .describe('Start time in ISO 8601 or UNIX timestamp format.'),
-      end: z.string().optional().describe('End time in ISO 8601 or UNIX timestamp format.'),
+        .describe(
+          'Start time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets.'
+        ),
+      end: z
+        .string()
+        .optional()
+        .describe(
+          'End time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets.'
+        ),
       sources: z
         .array(z.string())
         .optional()
@@ -55,7 +63,11 @@ Returns hourly data with values from multiple meteorological sources.`,
         .describe('Hourly solar data points'),
       meta: z
         .record(z.string(), z.any())
-        .describe('Request metadata including coordinates, quota, and request count')
+        .describe('Request metadata including coordinates, quota, and request count'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete original provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -70,14 +82,15 @@ Returns hourly data with values from multiple meteorological sources.`,
       source: ctx.input.sources
     });
 
-    let hourCount = result.hours?.length ?? 0;
+    let hours = getResponseRows(result, 'data', 'hours');
 
     return {
       output: {
-        hours: result.hours ?? [],
-        meta: result.meta ?? {}
+        hours,
+        meta: result.meta,
+        raw: result
       },
-      message: `Retrieved **${hourCount}** hourly solar data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
+      message: `Retrieved **${hours.length}** hourly solar data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
     };
   })
   .build();

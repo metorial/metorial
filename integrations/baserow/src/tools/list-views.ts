@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listViews = SlateTool.create(spec, {
@@ -13,7 +13,20 @@ export let listViews = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tableId: z.number().describe('The ID of the table to list views from')
+      tableId: z
+        .number()
+        .describe('The ID of the table to list views from. Discover with list_tables.'),
+      include: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated extras: filters, sortings, decorations, group_bys, default_row_values.'
+        ),
+      type: z.string().optional().describe('Return only this view type, such as grid.'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum views to return; there is no pagination or default limit.')
     })
   )
   .output(
@@ -36,23 +49,23 @@ export let listViews = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
-    let views = await client.listViews(ctx.input.tableId);
+    let views = await client.listViews(ctx.input.tableId, {
+      include: ctx.input.include,
+      type: ctx.input.type,
+      limit: ctx.input.limit
+    });
 
     return {
       output: {
         views: views.map((v: any) => ({
+          ...v,
           viewId: v.id,
           name: v.name,
           type: v.type,
           order: v.order,
-          tableId: v.table_id,
-          ...v
+          tableId: v.table_id
         }))
       },
       message: `Found **${views.length}** view(s) in table ${ctx.input.tableId}.`

@@ -27,13 +27,13 @@ export let manageGroupMembers = SlateTool.create(spec, {
     if (ctx.input.action === 'add') {
       let result = await client.addUserToGroup(ctx.input.groupId, ctx.input.userId);
       return {
-        output: { success: result.success !== false },
+        output: { success: result.success },
         message: `Added user ${ctx.input.userId} to group ${ctx.input.groupId}`
       };
     } else {
       let result = await client.removeUserFromGroup(ctx.input.groupId, ctx.input.userId);
       return {
-        output: { success: result.success !== false },
+        output: { success: result.success },
         message: `Removed user ${ctx.input.userId} from group ${ctx.input.groupId}`
       };
     }

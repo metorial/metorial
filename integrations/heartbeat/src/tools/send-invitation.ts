@@ -7,6 +7,9 @@ export let sendInvitation = SlateTool.create(spec, {
   name: 'Send Invitation',
   key: 'send_invitation',
   description: `Sends an invitation email to a new user to join your Heartbeat community. Optionally specify a pre-approved invitation link to automatically approve the user.`,
+  instructions: [
+    'This legacy email-delivery request is not documented in the current public API reference and has not been verified. Use create_invitation_link only when you need link creation; it does not send email.'
+  ],
   tags: {
     destructive: false,
     readOnly: false

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -16,11 +16,14 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Your Memberstack secret API key (starts with sk_sb_ for sandbox or sk_ for live)'
+          'Secret API key from Dev Tools → Keys & IDs in the Memberstack dashboard (sk_sb_ for sandbox or sk_ for live)'
         )
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('A Memberstack secret API key is required.');
+      }
       return {
         output: {
           token: ctx.input.token

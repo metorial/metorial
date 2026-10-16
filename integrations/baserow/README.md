@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Baserow
 
-Create, read, update, and delete rows, tables, fields, and databases in a no-code relational database platform. Manage workspaces, views (grid, gallery, form, kanban, calendar, timeline), and file uploads. Filter, sort, and search rows with AND/OR logic and view-based scoping. Configure webhooks to receive real-time notifications on row, field, and view changes. Supports a wide range of field types including text, number, date, select, link-to-table, lookup, rollup, formula, and file fields. Build no-code applications and automate workflows with triggers and actions across databases.
+Read, filter, create, update, delete, and reorder rows in Baserow. Discover workspaces, databases, tables, fields, and views; manage tables, fields, and views with a JWT connection. Upload files from public URLs and use the returned stored file name in row file fields.
+
+Database Tokens support row operations, field discovery, file upload, and discovery of their accessible tables. JWT connections also support structural operations and current-user verification. Configure the Cloud or self-hosted instance URL in the authentication setup. JWT connections refresh their access tokens automatically; accounts requiring two-factor authentication cannot use the email/password connection.
 
 ## License
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord } from '../lib/response';
 import { spec } from '../spec';
 
 export let getAiSentiment = SlateTool.create(spec, {
@@ -39,6 +40,7 @@ export let getAiSentiment = SlateTool.create(spec, {
       searchTerms: ctx.input.searchTerms
     });
 
+    requireRecord(data, 'AI sentiment');
     return {
       output: { sentiment: data },
       message: `Retrieved AI sentiment analysis for domain **${ctx.input.domainId}**.`

@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let networkSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   networkUuid: z.string().describe('Network UUID'),
   name: z.string().optional().describe('Network name'),
   subnet: z.string().optional().describe('Subnet CIDR'),
@@ -48,18 +49,19 @@ export let manageNetworks = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     let mapNet = (n: any) => ({
-      networkUuid: n.uuid,
-      name: n.name,
-      subnet: n.subnet,
-      vlanId: n.vlan_id,
-      isDefault: n.is_default,
-      vmUuids: n.vm_uuids
+      networkUuid: n.uuid ?? undefined,
+      name: n.name ?? undefined,
+      subnet: n.subnet ?? undefined,
+      vlanId: n.vlan_id ?? undefined,
+      isDefault: n.is_default ?? undefined,
+      vmUuids: n.vm_uuids ?? undefined,
+      raw: n
     });
 
     switch (action) {
       case 'list': {
         let networks = await client.listNetworks();
-        let mapped = (Array.isArray(networks) ? networks : []).map(mapNet);
+        let mapped = networks.map(mapNet);
         return {
           output: { networks: mapped, success: true },
           message: `Found **${mapped.length}** network(s).`
@@ -67,7 +69,8 @@ export let manageNetworks = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.networkUuid) throw new Error('networkUuid is required for get action');
+        if (!ctx.input.networkUuid)
+          throw createApiServiceError('networkUuid is required for get action');
         let network = await client.getNetwork(ctx.input.networkUuid);
         return {
           output: { network: mapNet(network), success: true },
@@ -85,7 +88,7 @@ export let manageNetworks = SlateTool.create(spec, {
 
       case 'rename': {
         if (!ctx.input.networkUuid || !ctx.input.name)
-          throw new Error('networkUuid and name are required for rename action');
+          throw createApiServiceError('networkUuid and name are required for rename action');
         let network = await client.renameNetwork(ctx.input.networkUuid, ctx.input.name);
         return {
           output: { network: mapNet(network), success: true },
@@ -95,7 +98,7 @@ export let manageNetworks = SlateTool.create(spec, {
 
       case 'set_default': {
         if (!ctx.input.networkUuid)
-          throw new Error('networkUuid is required for set_default action');
+          throw createApiServiceError('networkUuid is required for set_default action');
         let network = await client.setDefaultNetwork(ctx.input.networkUuid);
         return {
           output: { network: mapNet(network), success: true },
@@ -105,7 +108,7 @@ export let manageNetworks = SlateTool.create(spec, {
 
       case 'delete': {
         if (!ctx.input.networkUuid)
-          throw new Error('networkUuid is required for delete action');
+          throw createApiServiceError('networkUuid is required for delete action');
         await client.deleteNetwork(ctx.input.networkUuid);
         return {
           output: { success: true },

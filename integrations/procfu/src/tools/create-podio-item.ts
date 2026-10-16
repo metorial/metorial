@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProcFuClient } from '../lib/client';
 import { spec } from '../spec';
@@ -49,10 +49,17 @@ Optionally control whether Podio hooks and notifications are triggered.`,
       ctx.input.silent
     );
 
-    let createdItemId =
-      typeof result === 'object' && result !== null
-        ? String(result.item_id ?? result.id ?? result)
-        : String(result);
+    let createdId =
+      typeof result === 'object' && result !== null ? (result.item_id ?? result.id) : result;
+    if (
+      (typeof createdId !== 'string' && typeof createdId !== 'number') ||
+      !/^[1-9]\d*$/.test(String(createdId).trim())
+    ) {
+      throw createApiServiceError(
+        'ProcFu did not return a created item ID. Call get_last_error to inspect the failure.'
+      );
+    }
+    let createdItemId = String(createdId).trim();
 
     return {
       output: { createdItemId },

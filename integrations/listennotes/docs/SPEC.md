@@ -1,77 +1,32 @@
-Now let me fetch the webhook help page and the API docs page for more details:Now I have enough information to write the specification.
+# Listen Notes
 
-# Slates Specification for Listen Notes
+Listen Notes provides podcast and episode search, metadata, discovery, and Listen Later playlist management through its v2 REST API.
 
-## Overview
+## Authentication and environment
 
-Listen Notes is a podcast search engine and database that provides a REST API for searching, browsing, and retrieving metadata for millions of podcasts and episodes. The API powers use cases such as podcast player apps, content curation, podcast advertising platforms, and market intelligence tools.
+Requests use an API key in the `X-ListenAPI-Key` header. Obtain a key from the [API Dashboard](https://www.listennotes.com/api/dashboard/). Production uses `https://listen-api.listennotes.com/api/v2`; the optional `https://listen-api-test.listennotes.com/api/v2` server returns synthetic data. API keys have no OAuth refresh or scope configuration. Team keys act as the API admin for playlist ownership.
 
-## Authentication
+## Available tools
 
-Listen Notes uses API keys for authentication. Each API request must include the API key via the HTTP header `X-ListenAPI-Key`.
+- `search_podcasts`: full-text search for episodes, podcasts, or curated lists with date, duration, genre, language, region, and podcast filters. Podcast update frequency and interview/sponsor filters are available where supported by the plan.
+- `search_episode_titles`: targeted episode-title matching, optionally restricted by Listen Notes, Apple Podcasts, Spotify, or RSS podcast identifier.
+- `get_podcast`, `get_episode`, and `batch_fetch`: retrieve single or multiple resources. Podcast episode pagination uses `nextEpisodePubDate`; batch identifier inputs are comma-separated strings with a maximum of 10 combined items.
+- `best_podcasts`, `get_recommendations`, `curated_lists`, `random_episode`, and `get_podcasts_by_domain`: discover podcasts and episodes, including publisher-domain lookup and paginated curated lists.
+- `typeahead_search`: autocomplete suggestions, or trending terms when the query is omitted.
+- `get_genres_and_regions`: discover genre IDs, supported languages, and region codes.
+- `get_playlists`: list playlists or fetch their items. A playlist's `lastTimestampMs` is its item pagination cursor. Name sorting applies only to the playlist index; publication sorting applies only to playlist items.
+- `create_playlist`, `update_playlist`, and `delete_playlist`: manage playlist metadata and lifecycle. Deletion permanently removes that playlist's saved references and notes; confirm it with the user before calling the deletion tool.
+- `add_playlist_item`, `update_playlist_item`, and `remove_playlist_item`: save a podcast or episode, edit notes, or remove an item. Adding an existing item reuses it; adding a previously deleted item restores it. Omitted notes preserve notes; empty notes clear them. Item IDs are numeric and distinct from episode and podcast IDs.
+- `submit_podcast` and `delete_podcast`: submit podcast RSS feeds or request directory removal.
 
-- **Type:** API Key
-- **Header:** `X-ListenAPI-Key`
-- **Obtaining a key:** Sign up at the Listen Notes API website and retrieve your API key from the [API Dashboard](https://www.listennotes.com/api/dashboard/).
-- **Base URL (Production):** `https://listen-api.listennotes.com/api/v2`
-- **Base URL (Test/Mock):** You can use the API in test mode, which returns fake data for testing purposes and does not need an API key. To use the test mode, change the base URL to `https://listen-api-test.listennotes.com/api/v2`.
+## Limits and returned data
 
-Example request:
+Search offsets are plan-limited: below 30 for FREE, 300 for PRO, and 10000 for ENTERPRISE. Search page sizes range from 1 to 10. Transcript, RSS, email, batch, and some search capabilities depend on the plan. Listen Score and global rank may be unavailable; the corresponding mapped fields are omitted when the provider returns null. Original provider data remains available in each tool's response.
 
-```
-curl -X GET \
-  'https://listen-api.listennotes.com/api/v2/best_podcasts?genre_id=93&page=2' \
-  -H 'X-ListenAPI-Key: <YOUR_API_KEY>'
-```
+Playlist mutations require ownership by the API admin account; contributor membership does not grant write access. Changing playlist visibility to private rotates the RSS secret. Changing its default episode/podcast view preserves existing items. Playlist names must be nonblank, at most 4096 characters, and cannot be `rss`; notes are limited to 1024 characters.
 
-No OAuth or other authentication methods are supported. There are no scopes or additional credentials required.
+Audio and image URLs are metadata for playback or display. These tools do not download audio, produce export files, or create transcripts.
 
-## Features
+## Official reference
 
-### Podcast & Episode Search
-
-Search all publicly accessible podcasts and episodes on the Internet by keywords. Full-text search supports filtering by language, genre, region, publish date, and sort order. You can search across episode titles, descriptions, and podcast-level metadata. A typeahead API provides search-as-you-type suggestions. Related search term suggestions and spelling correction are available on PRO and ENTERPRISE plans. You can also fetch trending search terms from the platform.
-
-### Podcast & Episode Metadata Retrieval
-
-Fetch detailed metadata for podcasts and episodes, including title, description, publisher, genre, RSS feed URL, audio URLs, images, and cross-platform links (Spotify, YouTube, Apple Podcasts, etc.). You can fetch up to 10 podcasts in a single request using Listen Notes IDs, RSS URLs, or iTunes IDs.
-
-### Podcast Discovery & Recommendations
-
-Get recommendations for podcasts and episodes. Browse curated "best podcasts" lists by genre with configurable sort orders. Discover similar podcasts to a given show. Access hot/trending podcasts and curated podcast lists from the community and media.
-
-### Episode Transcripts
-
-The episode detail endpoint can return a transcript field if the `show_transcript=1` parameter is provided. Less than 1% of episodes have transcripts in the database, as these come from podcast creators who provide them. Available on PRO/ENTERPRISE plans only.
-
-### Playlist Management
-
-Fetch a playlist's info and items (episodes or podcasts), and fetch a list of your playlists. Playlists allow organizing collections of podcasts and episodes.
-
-### Podcast Submission
-
-Submit an RSS URL to Listen Notes to add new podcasts to the database. If the RSS URL already exists, the endpoint returns metadata immediately; otherwise, the podcast is reviewed and added within 12 hours. This is primarily used by podcast hosting services.
-
-### Podcast Deletion
-
-You can redirect content removal requests to Listen Notes via a delete endpoint to handle content deletion for compliance purposes.
-
-### Cross-Platform Lookup
-
-Look up podcasts using Apple Podcasts/iTunes IDs to find corresponding Listen Notes metadata. This enables importing podcast data from other platforms.
-
-### Genre & Language Directory
-
-Browse the full taxonomy of podcast genres and supported languages/regions for filtering search and discovery results.
-
-## Events
-
-Listen Notes provides limited webhook support for specific events related to podcast management.
-
-### Podcast Submission Events
-
-- **Description:** When an event is triggered (e.g., a podcast submission is accepted), Listen Notes sends a POST request to a webhook URL provided by you, which is expected to respond with status code 200.
-- **Configuration:** Webhooks are set up via the "WEBHOOKS" tab in the API dashboard.
-- **Supported triggers:** Podcast submission accepted (via `POST /podcasts/submit`) and podcast deletion (via `DELETE /podcasts/{id}`). These are primarily intended for podcast hosting services managing submissions on behalf of podcasters.
-
-Note: Listen Notes does not provide general-purpose webhook notifications for broader events like new episode availability or podcast metadata changes.
+The [official API reference](https://www.listennotes.com/api/docs/) and its linked [OpenAPI document](https://listen-api.listennotes.com/api/v2/openapi.json) describe all supported request parameters and response fields. A current-account identity endpoint and general new-episode webhook registration API are absent from this contract. Paid related-search, spellcheck, and RSS-refresh endpoints and audience analytics are outside the current tool set.

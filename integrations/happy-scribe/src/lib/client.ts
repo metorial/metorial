@@ -1,4 +1,15 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
+import { validateDownloadedFile, validateDownloadUrl } from './download';
+import {
+  collection,
+  exportSchema,
+  glossarySchema,
+  orderSchema,
+  parseResponse,
+  styleGuideSchema,
+  transcriptionSchema
+} from './responses';
 
 export interface CreateOrderParams {
   url: string;
@@ -31,6 +42,7 @@ export interface ListTranscriptionsParams {
   organizationId: string;
   folderId?: string;
   page?: number;
+  perPage?: number;
   tags?: string[];
 }
 
@@ -46,15 +58,41 @@ export interface CreateExportParams {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private downloadAxios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://www.happyscribe.com/api/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30000,
+      maxRedirects: 0,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Happy Scribe',
+          reason: 'happy_scribe_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          extractUpstreamCode: (_input, response, helpers) => {
+            let body = response?.data;
+            return helpers.isRecord(body) && typeof body.code === 'string'
+              ? body.code
+              : undefined;
+          }
+        })
+    });
+    this.downloadAxios = createAuthenticatedAxios({
+      contentType: false,
+      headers: { Authorization: undefined, Cookie: undefined },
+      withCredentials: false,
+      timeout: 60000,
+      maxRedirects: 0,
+      maxContentLength: 100 * 1024 * 1024,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Happy Scribe',
+          reason: 'happy_scribe_download_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+        })
     });
   }
 
@@ -64,13 +102,13 @@ export class Client {
     let response = await this.axios.get('/uploads/new', {
       params: { filename }
     });
-    return response.data;
+    return parseResponse(z.object({ signedUrl: z.string() }), response.data);
   }
 
   // ---- Orders ----
 
-  async createOrder(params: CreateOrderParams): Promise<any> {
-    let body: Record<string, any> = {
+  async createOrder(params: CreateOrderParams): Promise<z.output<typeof orderSchema>> {
+    let body: Record<string, unknown> = {
       url: params.url,
       language: params.language,
       organization_id: params.organizationId
@@ -88,12 +126,14 @@ export class Client {
     if (params.glossaryIds !== undefined) body.glossary_ids = params.glossaryIds;
     if (params.styleGuideId !== undefined) body.style_guide_id = params.styleGuideId;
 
-    let response = await this.axios.post('/orders', body);
-    return response.data;
+    let response = await this.axios.post('/orders', { order: body });
+    return parseResponse(orderSchema, response.data);
   }
 
-  async createTranslationOrder(params: CreateTranslationOrderParams): Promise<any> {
-    let body: Record<string, any> = {
+  async createTranslationOrder(
+    params: CreateTranslationOrderParams
+  ): Promise<z.output<typeof orderSchema>> {
+    let body: Record<string, unknown> = {
       source_transcription_id: params.sourceTranscriptionId,
       target_languages: params.targetLanguages
     };
@@ -104,55 +144,64 @@ export class Client {
     if (params.webhookUrl !== undefined) body.webhook_url = params.webhookUrl;
     if (params.tags !== undefined) body.tags = params.tags;
 
-    let response = await this.axios.post('/orders/translation', body);
-    return response.data;
+    let response = await this.axios.post('/orders/translation', { order: body });
+    return parseResponse(orderSchema, response.data);
   }
 
-  async getOrder(orderId: string): Promise<any> {
-    let response = await this.axios.get(`/orders/${orderId}`);
-    return response.data;
+  async getOrder(orderId: string): Promise<z.output<typeof orderSchema>> {
+    let response = await this.axios.get(`/orders/${encodeURIComponent(orderId)}`);
+    return parseResponse(orderSchema, response.data);
   }
 
-  async confirmOrder(orderId: string): Promise<any> {
-    let response = await this.axios.post(`/orders/${orderId}/confirm`);
-    return response.data;
+  async confirmOrder(orderId: string): Promise<z.output<typeof orderSchema>> {
+    let response = await this.axios.post(`/orders/${encodeURIComponent(orderId)}/confirm`);
+    return parseResponse(orderSchema, response.data);
   }
 
   // ---- Transcriptions ----
 
-  async listTranscriptions(params: ListTranscriptionsParams): Promise<any> {
-    let queryParams: Record<string, any> = {
+  async listTranscriptions(params: ListTranscriptionsParams) {
+    let queryParams: Record<string, unknown> = {
       organization_id: params.organizationId
     };
 
     if (params.folderId !== undefined) queryParams.folder_id = params.folderId;
     if (params.page !== undefined) queryParams.page = params.page;
+    if (params.perPage !== undefined) queryParams.per_page = params.perPage;
     if (params.tags !== undefined) queryParams.tags = params.tags;
 
     let response = await this.axios.get('/transcriptions', {
       params: queryParams
     });
-    return response.data;
+    return parseResponse(
+      z.looseObject({
+        results: z.array(transcriptionSchema),
+        _links: z.looseObject({ next: z.looseObject({ url: z.string() }).nullish() }).nullish()
+      }),
+      response.data
+    );
   }
 
-  async getTranscription(transcriptionId: string): Promise<any> {
-    let response = await this.axios.get(`/transcriptions/${transcriptionId}`);
-    return response.data;
+  async getTranscription(transcriptionId: string) {
+    let response = await this.axios.get(
+      `/transcriptions/${encodeURIComponent(transcriptionId)}`
+    );
+    return parseResponse(transcriptionSchema, response.data);
   }
 
   async deleteTranscription(
     transcriptionId: string,
     permanent: boolean = false
   ): Promise<void> {
-    await this.axios.delete(`/transcriptions/${transcriptionId}`, {
+    await this.axios.delete(`/transcriptions/${encodeURIComponent(transcriptionId)}`, {
       params: permanent ? { permanent: true } : undefined
     });
   }
 
   // ---- Exports ----
 
-  async createExport(params: CreateExportParams): Promise<any> {
-    let body: Record<string, any> = {
+  async createExport(params: CreateExportParams) {
+    let body: Record<string, unknown> = {
       format: params.format,
       transcription_ids: params.transcriptionIds
     };
@@ -166,30 +215,79 @@ export class Client {
     if (params.showHighlightsOnly !== undefined)
       body.show_highlights_only = params.showHighlightsOnly;
 
-    let response = await this.axios.post('/exports', body);
-    return response.data;
+    let response = await this.axios.post('/exports', { export: body });
+    return parseResponse(exportSchema, response.data);
   }
 
-  async getExport(exportId: string): Promise<any> {
-    let response = await this.axios.get(`/exports/${exportId}`);
-    return response.data;
+  async getExport(exportId: string) {
+    let response = await this.axios.get(`/exports/${encodeURIComponent(exportId)}`);
+    return parseResponse(exportSchema, response.data);
   }
 
   // ---- Glossaries ----
 
-  async listGlossaries(organizationId: string): Promise<any> {
+  async listGlossaries(organizationId: string) {
     let response = await this.axios.get('/glossaries', {
       params: { organization_id: organizationId }
     });
-    return response.data;
+    return collection(response.data, 'glossaries').map(value =>
+      parseResponse(glossarySchema, value)
+    );
   }
 
   // ---- Style Guides ----
 
-  async listStyleGuides(organizationId: string): Promise<any> {
+  async listStyleGuides(organizationId: string) {
     let response = await this.axios.get('/style_guides', {
       params: { organization_id: organizationId }
     });
-    return response.data;
+    return collection(response.data, 'style_guides').map(value =>
+      parseResponse(styleGuideSchema, value)
+    );
+  }
+
+  async listOrganizations() {
+    let response = await this.axios.get('/organizations');
+    return collection(response.data, 'organizations').map(value =>
+      parseResponse(
+        z.looseObject({
+          id: z.union([z.string(), z.number().int()]),
+          name: z.string(),
+          role: z.string()
+        }),
+        value
+      )
+    );
+  }
+
+  async updateTranscription(
+    transcriptionId: string,
+    params: {
+      organization_id: string;
+      name?: string;
+      sharing_enabled?: boolean;
+      folder_id?: string;
+    }
+  ) {
+    let response = await this.axios.patch(
+      `/transcriptions/${encodeURIComponent(transcriptionId)}`,
+      { transcription: params }
+    );
+    return parseResponse(transcriptionSchema, response.data);
+  }
+
+  async getMeetingSummary(transcriptionId: string) {
+    let response = await this.axios.get(
+      `/transcriptions/${encodeURIComponent(transcriptionId)}/summary`
+    );
+    return parseResponse(z.looseObject({ summary: z.string() }), response.data);
+  }
+
+  async downloadFile(url: string, format: string) {
+    let response = await this.downloadAxios.get(validateDownloadUrl(url), {
+      responseType: 'arraybuffer',
+      headers: { Authorization: undefined, Cookie: undefined }
+    });
+    return validateDownloadedFile(response.data, format);
   }
 }

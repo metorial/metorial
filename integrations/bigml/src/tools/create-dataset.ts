@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -62,6 +62,7 @@ Supports sampling, filtering, field selection, and train/test splitting.`,
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the created dataset'),
       name: z.string().optional().describe('Name of the dataset'),
       statusCode: z.number().describe('Status code of the dataset creation'),
@@ -70,9 +71,20 @@ Supports sampling, filtering, field selection, and train/test splitting.`,
     })
   )
   .handleInvocation(async ctx => {
+    let origins = [ctx.input.sourceId, ctx.input.originDatasetId, ctx.input.datasetIds].filter(
+      value => value !== undefined
+    );
+    if (
+      origins.length !== 1 ||
+      (ctx.input.datasetIds !== undefined && ctx.input.datasetIds.length === 0)
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one of sourceId, originDatasetId, or a nonempty datasetIds list.'
+      );
+    }
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
 
     if (ctx.input.sourceId) {
       body.source = ctx.input.sourceId;
@@ -82,27 +94,28 @@ Supports sampling, filtering, field selection, and train/test splitting.`,
       body.origin_datasets = ctx.input.datasetIds;
     }
 
-    if (ctx.input.name) body.name = ctx.input.name;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.sampleRate !== undefined) body.sample_rate = ctx.input.sampleRate;
-    if (ctx.input.seed) body.seed = ctx.input.seed;
+    if (ctx.input.seed !== undefined) body.seed = ctx.input.seed;
     if (ctx.input.outOfBag !== undefined) body.out_of_bag = ctx.input.outOfBag;
     if (ctx.input.inputFields) body.input_fields = ctx.input.inputFields;
     if (ctx.input.excludedFields) body.excluded_fields = ctx.input.excludedFields;
     if (ctx.input.range) body.range = ctx.input.range;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.projectId) body.project = ctx.input.projectId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
 
     let result = await client.createResource('dataset', body);
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
-        statusCode: result.status?.code ?? result.code,
-        statusMessage: result.status?.message ?? 'Created',
+        statusCode: result.status.code,
+        statusMessage: result.status.message,
         created: result.created
       },
-      message: `Dataset **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status?.message ?? 'pending'}.`
+      message: `Dataset **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status.message}.`
     };
   })
   .build();

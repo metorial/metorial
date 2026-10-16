@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { JiraClient } from '../lib/client';
 import { spec } from '../spec';
@@ -72,10 +72,7 @@ export let manageOrganizationTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let { action } = ctx.input;
 
@@ -94,10 +91,14 @@ export let manageOrganizationTool = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for get action');
+        throw createApiServiceError('organizationId is required for get action');
 
       let org = await client.getOrganization(ctx.input.organizationId);
-      let usersResult = await client.getOrganizationUsers(ctx.input.organizationId);
+      let usersResult = await client.getOrganizationUsers(
+        ctx.input.organizationId,
+        ctx.input.start,
+        ctx.input.limit
+      );
 
       let members = (usersResult.values || []).map((u: any) => ({
         accountId: u.accountId,
@@ -113,13 +114,13 @@ export let manageOrganizationTool = SlateTool.create(spec, {
             members
           }
         },
-        message: `Organization "${org.name}" has **${members.length}** members.`
+        message: `Retrieved **${members.length}** members on this page for organization "${org.name}".`
       };
     }
 
     if (action === 'create') {
       if (!ctx.input.organizationName)
-        throw new Error('organizationName is required for create action');
+        throw createApiServiceError('organizationName is required for create action');
 
       let result = await client.createOrganization(ctx.input.organizationName);
 
@@ -136,7 +137,7 @@ export let manageOrganizationTool = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for delete action');
+        throw createApiServiceError('organizationId is required for delete action');
 
       await client.deleteOrganization(ctx.input.organizationId);
 
@@ -147,8 +148,9 @@ export let manageOrganizationTool = SlateTool.create(spec, {
     }
 
     if (action === 'add_users') {
-      if (!ctx.input.organizationId) throw new Error('organizationId is required');
-      if (!ctx.input.userAccountIds?.length) throw new Error('userAccountIds are required');
+      if (!ctx.input.organizationId) throw createApiServiceError('organizationId is required');
+      if (!ctx.input.userAccountIds?.length)
+        throw createApiServiceError('userAccountIds are required');
 
       await client.addUsersToOrganization(ctx.input.organizationId, ctx.input.userAccountIds);
 
@@ -159,8 +161,9 @@ export let manageOrganizationTool = SlateTool.create(spec, {
     }
 
     if (action === 'remove_users') {
-      if (!ctx.input.organizationId) throw new Error('organizationId is required');
-      if (!ctx.input.userAccountIds?.length) throw new Error('userAccountIds are required');
+      if (!ctx.input.organizationId) throw createApiServiceError('organizationId is required');
+      if (!ctx.input.userAccountIds?.length)
+        throw createApiServiceError('userAccountIds are required');
 
       await client.removeUsersFromOrganization(
         ctx.input.organizationId,
@@ -173,6 +176,6 @@ export let manageOrganizationTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

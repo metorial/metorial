@@ -1,6 +1,17 @@
 # <img src="logo.jpeg" height="20"> Altoviz
 
-Create, manage, and send sales invoices, quotes, and credits for small businesses and freelancers. Manage customers, contacts, suppliers, products, and receipts. Finalize and download invoices, mark invoices as paid, and send invoices or quotes by email. Create purchase invoices from PDF files. Search customers by email and products by product number. Store custom metadata on entities. Retrieve account settings, VAT rates, and classifications. Register webhooks to receive notifications on changes to contacts, customers, invoices, quotes, and products.
+Manage customers, contacts, products, suppliers, customer receipts, sales invoices, quotes, and credits. Create and finalize invoices, record payments, send invoices or quotes by email, retrieve full records, and download sales documents as PDFs. Search customers by email and products by number, and retrieve the connected user, account settings, VAT rates, classifications, and units.
+
+## Authentication
+
+Use an API key from your Altoviz account's API access settings. Requests use the `X-API-KEY` header. No workspace or account identifier is required at connection setup.
+
+## Notes
+
+- Existing summary fields remain available; `raw` includes complete provider records, including structured line items, metadata, and payment or e-invoicing state when returned.
+- Receipts represent customer payments. Use `customerId` rather than the legacy unsupported `supplierId` input.
+- The quote-update tool retains its existing API route for compatibility. The current public API reference does not document this operation; its availability remains unverified.
+- Optional recipient lists let you select email addresses when sending invoices or quotes.
 
 ## License
 

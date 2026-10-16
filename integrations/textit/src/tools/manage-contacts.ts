@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Contact } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageContacts = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let manageContacts = SlateTool.create(spec, {
   key: 'manage_contacts',
   description: `Create, update, or delete contacts in your TextIt workspace. Contacts can be identified by UUID or URN (e.g., \`tel:+250788123123\`, \`twitter:jack\`, \`mailto:user@example.com\`). You can set contact name, language, URNs, group memberships, and custom field values.`,
   instructions: [
-    'To create a new contact, set action to "create" and provide at least one URN.',
+    'To create a new contact, set action to "create" and optionally provide URNs.',
     'To update a contact, set action to "update" and provide contactUuid or contactUrn to identify the contact.',
     'To delete a contact, set action to "delete" and provide contactUuid or contactUrn.',
     'Phone URNs must be in E.164 format (e.g., tel:+1234567890).',
@@ -50,6 +50,7 @@ export let manageContacts = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       contactUuid: z.string().optional().describe('UUID of the contact'),
       name: z.string().nullable().optional().describe('Name of the contact'),
       status: z.string().optional().describe('Status of the contact'),
@@ -94,7 +95,7 @@ export let manageContacts = SlateTool.create(spec, {
       fields: ctx.input.fields
     };
 
-    let contact: any;
+    let contact: Contact;
     if (ctx.input.action === 'create') {
       contact = await client.createContact(data);
     } else {
@@ -106,12 +107,13 @@ export let manageContacts = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: contact,
         contactUuid: contact.uuid,
         name: contact.name,
         status: contact.status,
         language: contact.language,
         urns: contact.urns,
-        groups: contact.groups.map((g: any) => ({ groupUuid: g.uuid, name: g.name })),
+        groups: contact.groups.map(g => ({ groupUuid: g.uuid, name: g.name })),
         fields: contact.fields,
         createdOn: contact.created_on,
         modifiedOn: contact.modified_on

@@ -2,6 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getMessageReport,
+  getRcsTemplateVariables,
+  listAttributeOptions,
+  listAttributes,
   listCollections,
   listLists,
   listWhatsAppResources,
@@ -30,7 +33,10 @@ export let provider = Slate.create({
     manageListEntries,
     listLists,
     manageActivities,
-    listWorkspaceMembers
+    listWorkspaceMembers,
+    listAttributes,
+    listAttributeOptions,
+    getRcsTemplateVariables
   ],
   triggers: []
 });

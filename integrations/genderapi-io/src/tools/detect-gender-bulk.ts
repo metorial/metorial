@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type GenderBulkResponse, requireText } from '../lib/client';
 import { spec } from '../spec';
 
 let nameEntrySchema = z.object({
@@ -91,16 +91,32 @@ Provide exactly one of **names**, **emails**, or **usernames** as the input sour
     let client = new Client({ token: ctx.auth.token });
 
     let inputCount = [ctx.input.names, ctx.input.emails, ctx.input.usernames].filter(
-      Boolean
+      value => value !== undefined
     ).length;
     if (inputCount === 0) {
-      throw new Error('Provide exactly one of names, emails, or usernames.');
+      throw createApiServiceError('Provide exactly one of names, emails, or usernames.');
     }
     if (inputCount > 1) {
-      throw new Error('Provide only one of names, emails, or usernames per request.');
+      throw createApiServiceError(
+        'Provide only one of names, emails, or usernames per request.'
+      );
     }
 
-    let response: any;
+    let entries = ctx.input.names ?? ctx.input.emails ?? ctx.input.usernames!;
+    let limit = ctx.input.names !== undefined ? 100 : 50;
+    if (entries.length < 1 || entries.length > limit) {
+      throw createApiServiceError(`Provide between 1 and ${limit} entries per request.`);
+    }
+    for (let entry of entries) {
+      let value =
+        'name' in entry ? entry.name : 'email' in entry ? entry.email : entry.username;
+      requireText(value, 'Each input value');
+      if (entry.country !== undefined && !/^[a-z]{2}$/i.test(entry.country)) {
+        throw createApiServiceError('Each country must be a two-letter ISO country code.');
+      }
+    }
+
+    let response: GenderBulkResponse;
     let sourceType: string;
 
     if (ctx.input.names) {
@@ -132,7 +148,11 @@ Provide exactly one of **names**, **emails**, or **usernames** as the input sour
       });
     }
 
-    let results = response.names.map((n: any) => ({
+    if (response.names.length !== entries.length) {
+      throw createApiServiceError('GenderAPI.io returned an incomplete bulk response.');
+    }
+
+    let results = response.names.map(n => ({
       query: n.q,
       extractedName: n.name,
       gender: n.gender,
@@ -142,9 +162,9 @@ Provide exactly one of **names**, **emails**, or **usernames** as the input sour
       referenceId: n.id
     }));
 
-    let maleCount = results.filter((r: any) => r.gender === 'male').length;
-    let femaleCount = results.filter((r: any) => r.gender === 'female').length;
-    let unknownCount = results.filter((r: any) => !r.gender).length;
+    let maleCount = results.filter(r => r.gender === 'male').length;
+    let femaleCount = results.filter(r => r.gender === 'female').length;
+    let unknownCount = results.filter(r => !r.gender).length;
 
     return {
       output: {

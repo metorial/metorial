@@ -12,7 +12,9 @@ You can filter the response to specific target currencies by providing a list of
     'Currency codes must be 3-letter ISO 4217 codes (e.g., USD, GBP, JPY).',
     'If no symbols are specified, rates for all available currencies are returned.'
   ],
-  constraints: ['Changing the base currency from EUR requires a paid Fixer plan.'],
+  constraints: [
+    'Endpoint availability and permitted base currencies depend on the subscription for the selected API host.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -43,7 +45,7 @@ You can filter the response to specific target currencies by providing a list of
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiHost: ctx.auth.apiHost });
 
     let base = ctx.input.baseCurrency || ctx.config.baseCurrency;
 

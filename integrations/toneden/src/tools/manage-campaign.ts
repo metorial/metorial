@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ToneDenClient } from '../lib/client';
 import { spec } from '../spec';
@@ -27,7 +27,8 @@ let campaignOutputSchema = z.object({
     .boolean()
     .optional()
     .describe('Whether the campaign runs until manually paused'),
-  externalId: z.string().optional().describe('External ad platform campaign ID')
+  externalId: z.string().optional().describe('External ad platform campaign ID'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider campaign')
 });
 
 export let manageCampaign = SlateTool.create(spec, {
@@ -81,6 +82,12 @@ Supports A/B testing through multiple creative variations in the creatives field
       endTimestamp: z.number().optional().describe('End time as UNIX timestamp'),
       isContinuous: z.boolean().optional().describe('Run until manually paused'),
       audiences: z.array(audienceSchema).optional().describe('Audience targeting groups'),
+      providerAudiences: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe(
+          'Provider-format audiences using data_source_platform, data_source, targeting, and is_lookalike. Used when audiences is omitted.'
+        ),
       creatives: z
         .record(z.string(), z.any())
         .optional()
@@ -97,6 +104,15 @@ Supports A/B testing through multiple creative variations in the creatives field
         .string()
         .optional()
         .describe('Instagram account ID for the campaign'),
+      isArchived: z.boolean().optional().describe('Archive or unarchive the campaign'),
+      reportEmails: z
+        .array(z.string())
+        .optional()
+        .describe('Email addresses for campaign reports'),
+      disableAllNotifications: z
+        .boolean()
+        .optional()
+        .describe('Disable campaign notifications'),
       objective: z.string().optional().describe('Facebook pixel ID for conversion tracking'),
       optimizationId: z.string().optional().describe('Conversion event name for optimization')
     })
@@ -114,7 +130,7 @@ Supports A/B testing through multiple creative variations in the creatives field
     let { action, campaignId } = ctx.input;
 
     if (action === 'get') {
-      if (!campaignId) throw new Error('campaignId is required for get action');
+      if (!campaignId) throw createApiServiceError('campaignId is required for get action');
       let campaign = await client.getCampaign(campaignId);
       return {
         output: {
@@ -129,7 +145,8 @@ Supports A/B testing through multiple creative variations in the creatives field
             startTimestamp: campaign.start_timestamp,
             endTimestamp: campaign.end_timestamp,
             isContinuous: campaign.is_continuous,
-            externalId: campaign.external_id
+            externalId: campaign.external_id,
+            raw: campaign
           }
         },
         message: `Retrieved campaign **"${campaign.title}"** (ID: ${campaign.id}).`
@@ -137,7 +154,7 @@ Supports A/B testing through multiple creative variations in the creatives field
     }
 
     if (action === 'delete') {
-      if (!campaignId) throw new Error('campaignId is required for delete action');
+      if (!campaignId) throw createApiServiceError('campaignId is required for delete action');
       await client.deleteCampaign(campaignId);
       return {
         output: { deleted: true },
@@ -146,6 +163,10 @@ Supports A/B testing through multiple creative variations in the creatives field
     }
 
     let data: Record<string, any> = {};
+    if (ctx.input.isArchived !== undefined) data.is_archived = ctx.input.isArchived;
+    if (ctx.input.reportEmails !== undefined) data.report_emails = ctx.input.reportEmails;
+    if (ctx.input.disableAllNotifications !== undefined)
+      data.disable_all_notifications = ctx.input.disableAllNotifications;
     if (ctx.input.title) data.title = ctx.input.title;
     if (ctx.input.platform) data.platform = ctx.input.platform;
     if (ctx.input.status) data.status = ctx.input.status;
@@ -158,6 +179,8 @@ Supports A/B testing through multiple creative variations in the creatives field
     if (ctx.input.endTimestamp) data.end_timestamp = ctx.input.endTimestamp;
     if (ctx.input.isContinuous !== undefined) data.is_continuous = ctx.input.isContinuous;
     if (ctx.input.audiences) data.audiences = ctx.input.audiences;
+    else if (ctx.input.providerAudiences !== undefined)
+      data.audiences = ctx.input.providerAudiences;
     if (ctx.input.creatives) data.creatives = ctx.input.creatives;
     if (ctx.input.targeting) data.targeting = ctx.input.targeting;
     if (ctx.input.externalAdAccountId)
@@ -182,7 +205,8 @@ Supports A/B testing through multiple creative variations in the creatives field
             startTimestamp: campaign.start_timestamp,
             endTimestamp: campaign.end_timestamp,
             isContinuous: campaign.is_continuous,
-            externalId: campaign.external_id
+            externalId: campaign.external_id,
+            raw: campaign
           }
         },
         message: `Created campaign **"${campaign.title}"** (ID: ${campaign.id}) on ${campaign.platform}.`
@@ -190,7 +214,7 @@ Supports A/B testing through multiple creative variations in the creatives field
     }
 
     // update
-    if (!campaignId) throw new Error('campaignId is required for update action');
+    if (!campaignId) throw createApiServiceError('campaignId is required for update action');
     let campaign = await client.updateCampaign(campaignId, data);
     return {
       output: {
@@ -205,7 +229,8 @@ Supports A/B testing through multiple creative variations in the creatives field
           startTimestamp: campaign.start_timestamp,
           endTimestamp: campaign.end_timestamp,
           isContinuous: campaign.is_continuous,
-          externalId: campaign.external_id
+          externalId: campaign.external_id,
+          raw: campaign
         }
       },
       message: `Updated campaign **"${campaign.title}"** (ID: ${campaign.id}).`

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let shoppingResultSchema = z.object({
@@ -45,6 +45,7 @@ export let shoppingSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       shoppingResults: z.array(shoppingResultSchema).describe('Product listings'),
       shoppingAds: z
@@ -75,28 +76,31 @@ export let shoppingSearch = SlateTool.create(spec, {
     let mapProduct = (p: any) => ({
       position: p.position,
       title: p.title,
-      link: p.link,
-      source: p.source,
+      link: p.link ?? p.product_link,
+      source: p.seller ?? p.source,
       price: p.price,
       extractedPrice: p.extracted_price,
       rating: p.rating,
       reviewCount: p.reviews,
-      thumbnail: p.thumbnail,
+      thumbnail: p.thumbnail ?? p.image,
       delivery: p.delivery,
       onSale: p.on_sale
     });
 
-    let shoppingResults = (data.shopping_results || []).map(mapProduct);
-    let shoppingAds = (data.shopping_ads || []).map(mapProduct);
+    let shoppingResults = resultArray(data.shopping_results, 'shopping_results').map(
+      mapProduct
+    );
+    let shoppingAds = resultArray(data.shopping_ads, 'shopping_ads').map(mapProduct);
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         shoppingResults,
         shoppingAds: shoppingAds.length > 0 ? shoppingAds : undefined,
         currentPage: data.pagination?.current
       },
-      message: `Found ${shoppingResults.length} product${shoppingResults.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
+      message: `Found on this page: ${shoppingResults.length} product${shoppingResults.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
     };
   })
   .build();

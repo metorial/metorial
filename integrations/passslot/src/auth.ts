@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,9 @@ export let auth = SlateAuth.create()
       appKey: z.string().describe('PassSlot App Key used for API authentication')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.appKey.trim()) {
+        throw createApiServiceError('Enter a PassSlot App Key.');
+      }
       return {
         output: {
           token: ctx.input.appKey

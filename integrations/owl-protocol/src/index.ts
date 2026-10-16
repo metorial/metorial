@@ -4,13 +4,17 @@ import {
   createTokenTemplate,
   createUser,
   deployCollection,
+  getContract,
   getContractMetadata,
+  getProject,
   getToken,
   getTokenTemplate,
   getUser,
   listContracts,
+  listProjectContracts,
   listTokenTemplates,
   listUsers,
+  listUserTokens,
   mintTokens,
   updateContractMetadata,
   updateToken,
@@ -32,7 +36,11 @@ export let provider = Slate.create({
     listUsers,
     getContractMetadata,
     updateContractMetadata,
-    listContracts
+    listContracts,
+    getProject,
+    listProjectContracts,
+    getContract,
+    listUserTokens
   ],
   triggers: []
 });

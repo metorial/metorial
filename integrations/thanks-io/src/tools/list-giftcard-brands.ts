@@ -25,6 +25,7 @@ Use the brand code and amount when sending gift cards via the **Send Gift Card**
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider catalog'),
       brands: z.array(z.record(z.string(), z.unknown())).describe('List of gift card brands')
     })
   )
@@ -34,13 +35,21 @@ Use the brand code and amount when sending gift cards via the **Send Gift Card**
       ? await client.listGiftcardBrandsFlat()
       : await client.listGiftcardBrands();
 
-    let brands = (Array.isArray(result) ? result : result.data || []) as Record<
-      string,
-      unknown
-    >[];
+    let brands: Record<string, unknown>[] = Array.isArray(result)
+      ? result
+      : Array.isArray(result.data)
+        ? result.data
+        : Array.isArray(result.brands)
+          ? result.brands
+          : Object.entries(result)
+              .filter(([, value]) => value && typeof value === 'object')
+              .map(([category, value]) => ({
+                category,
+                ...(value as Record<string, unknown>)
+              }));
 
     return {
-      output: { brands },
+      output: { brands, raw: result },
       message: `Retrieved **${brands.length}** gift card brand(s).`
     };
   })

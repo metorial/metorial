@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TypefullyClient } from '../lib/client';
+import { enabledDraftPlatforms, providerId, TypefullyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let platformPostSchema = z.object({
@@ -11,6 +11,10 @@ let platformPostSchema = z.object({
 
 let platformConfigSchema = z.object({
   enabled: z.boolean().default(true).describe('Whether this platform is enabled'),
+  settings: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Platform-specific settings, such as X reply_to_url.'),
   posts: z.array(platformPostSchema).min(1).describe('Array of posts')
 });
 
@@ -20,6 +24,7 @@ export let updateDraft = SlateTool.create(spec, {
   description: `Update an existing draft's content, platform configuration, tags, scheduling, or title. Can also be used to schedule, reschedule, or publish an existing draft by setting the publishAt field.`,
   instructions: [
     'Only include fields you want to change — omitted fields remain unchanged.',
+    'Call get_draft first and preserve all comment-thread markers exactly when editing text.',
     'Set publishAt to "now" to publish, "next-free-slot" to queue, or an ISO 8601 datetime to schedule.'
   ],
   tags: {
@@ -29,7 +34,9 @@ export let updateDraft = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      socialSetId: z.string().describe('ID of the social set'),
+      socialSetId: z
+        .string()
+        .describe('Social set ID. Call list_social_sets to discover accessible social sets.'),
       draftId: z.string().describe('ID of the draft to update'),
       platforms: z
         .object({
@@ -45,15 +52,38 @@ export let updateDraft = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('When to publish: "now", "next-free-slot", or ISO 8601 datetime'),
-      tags: z.array(z.string()).optional().describe('Updated tag names'),
+      planAt: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Plan for an ISO datetime or next-free-slot without auto-publishing; null clears the date. Mutually exclusive with publishAt.'
+        ),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Updated tag slugs; use manage_tags to discover them'),
       share: z.boolean().optional().describe('Whether to enable the share URL'),
-      draftTitle: z.string().optional().describe('Updated internal title')
+      draftTitle: z.string().optional().describe('Updated internal title'),
+      forceOverwriteComments: z
+        .boolean()
+        .optional()
+        .describe(
+          'Explicitly resolve comment threads whose anchor markers are omitted from updated text. Omit to preserve the default marker validation.'
+        )
     })
   )
   .output(
     z.object({
       draftId: z.string().describe('ID of the updated draft'),
       status: z.string().describe('Updated draft status'),
+      publishState: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Publishing progress; in_progress means accepted asynchronously. Poll get_draft until finished.'
+        ),
       updatedAt: z.string().describe('When the draft was last updated'),
       scheduledDate: z.string().nullable().describe('Scheduled publication time'),
       publishedAt: z.string().nullable().describe('When published, if applicable'),
@@ -73,6 +103,7 @@ export let updateDraft = SlateTool.create(spec, {
         if (config) {
           platformsPayload[platform] = {
             enabled: config.enabled,
+            ...(config.settings !== undefined ? { settings: config.settings } : {}),
             posts: config.posts.map(post => ({
               text: post.text,
               ...(post.mediaIds ? { media_ids: post.mediaIds } : {}),
@@ -86,27 +117,25 @@ export let updateDraft = SlateTool.create(spec, {
     let draft = await client.updateDraft(ctx.input.socialSetId, ctx.input.draftId, {
       platforms: platformsPayload as any,
       publishAt: ctx.input.publishAt,
+      planAt: ctx.input.planAt,
       tags: ctx.input.tags,
       share: ctx.input.share,
-      draftTitle: ctx.input.draftTitle
+      draftTitle: ctx.input.draftTitle,
+      forceOverwriteComments: ctx.input.forceOverwriteComments
     });
 
-    let enabledPlatforms: string[] = [];
-    if (draft.x_post_enabled) enabledPlatforms.push('x');
-    if (draft.linkedin_post_enabled) enabledPlatforms.push('linkedin');
-    if (draft.threads_post_enabled) enabledPlatforms.push('threads');
-    if (draft.bluesky_post_enabled) enabledPlatforms.push('bluesky');
-    if (draft.mastodon_post_enabled) enabledPlatforms.push('mastodon');
+    let enabledPlatforms = enabledDraftPlatforms(draft);
 
     return {
       output: {
-        draftId: draft.id,
+        draftId: providerId(draft.id),
         status: draft.status,
+        publishState: draft.publish_state,
         updatedAt: draft.updated_at,
         scheduledDate: draft.scheduled_date,
         publishedAt: draft.published_at,
         draftTitle: draft.draft_title,
-        tags: draft.tags ?? [],
+        tags: draft.tags,
         preview: draft.preview,
         enabledPlatforms
       },

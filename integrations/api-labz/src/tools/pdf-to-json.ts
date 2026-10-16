@@ -10,7 +10,7 @@ export let pdfToJson = SlateTool.create(spec, {
 
 Useful for extracting invoices, receipts, forms, contracts, and other structured documents into machine-readable data.`,
   instructions: [
-    'Provide either a file URL or a base64-encoded PDF string.',
+    'Provide exactly one file source: a file URL or a base64-encoded PDF string.',
     'Define a schema describing the JSON structure you want to extract from the PDF.'
   ],
   tags: {
@@ -22,7 +22,7 @@ Useful for extracting invoices, receipts, forms, contracts, and other structured
       schema: z
         .string()
         .describe(
-          'JSON schema or template describing the structure of data to extract, e.g. \'{"invoice_number": "string", "total": "number", "items": [{"name": "string", "price": "number"}]}\''
+          'A JSON object encoded as a string describing the structure of data to extract, e.g. \'{"invoice_number": "string", "total": "number", "items": [{"name": "string", "price": "number"}]}\''
         ),
       fileUrl: z.string().optional().describe('Public URL of the PDF file'),
       base64String: z.string().optional().describe('Base64-encoded PDF file content')

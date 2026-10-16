@@ -66,11 +66,16 @@ export let getGiftCard = SlateTool.create(spec, {
     if (giftCard.hasExpired) statusParts.push('expired');
     if (giftCard.isVoided) statusParts.push('voided');
     if (giftCard.notYetValid) statusParts.push('not yet valid');
-    let status = statusParts.length > 0 ? statusParts.join(', ') : 'active';
+    let status =
+      statusParts.length > 0
+        ? statusParts.join(', ')
+        : giftCard.remainingValue === 0
+          ? 'redeemed'
+          : 'not redeemable';
 
     return {
       output,
-      message: `Gift card **${giftCard.code}** (${status}): remaining balance ${giftCard.remainingValue} ${giftCard.backingType === 'Units' ? 'units' : ''}`
+      message: `Gift card **${giftCard.code}** (${status}): remaining balance ${giftCard.backingType === 'Units' ? `${giftCard.remainingUnits} units` : giftCard.remainingValue}`
     };
   })
   .build();

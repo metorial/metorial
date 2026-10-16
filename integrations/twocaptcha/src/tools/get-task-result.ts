@@ -9,7 +9,7 @@ export let getTaskResult = SlateTool.create(spec, {
   description: `Poll for the result of a previously submitted captcha task. Returns the current status and solution when available.
 If the task is still being processed, the status will be "processing". When complete, the status will be "ready" and the solution object will contain the answer.`,
   instructions: [
-    'Typically takes 5-30 seconds for most captcha types. Poll every 5 seconds.',
+    'Wait at least 5 seconds between result requests. Completion time varies by task type.',
     'The solution format varies by captcha type (e.g. gRecaptchaResponse for reCAPTCHA, token for hCaptcha/Turnstile).'
   ],
   tags: {
@@ -38,26 +38,29 @@ If the task is still being processed, the status will be "processing". When comp
         .number()
         .optional()
         .describe('Time taken to solve in seconds (endTime - createTime)'),
-      workerIp: z
-        .string()
+      workerIp: z.string().optional().describe('IP address that submitted the task request'),
+      createTime: z
+        .number()
         .optional()
-        .describe('IP address of the worker who solved the captcha')
+        .describe('Provider submission timestamp in Unix seconds'),
+      endTime: z.number().optional().describe('Provider completion timestamp in Unix seconds'),
+      solveCount: z.number().optional().describe('Number of workers who attempted the task'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including task-specific solution metadata')
     })
   )
   .handleInvocation(async ctx => {
     let client = new TwoCaptchaClient({ token: ctx.auth.token });
     let result = await client.getTaskResult(ctx.input.taskId);
 
-    if (result.errorId !== 0) {
-      throw new Error(`2Captcha error: ${result.errorCode} - ${result.errorDescription}`);
-    }
-
     let solveTime: number | undefined;
-    if (result.createTime && result.endTime) {
+    if (typeof result.createTime === 'number' && typeof result.endTime === 'number') {
       solveTime = result.endTime - result.createTime;
     }
 
-    let status = result.status ?? 'processing';
+    let status = result.status;
 
     return {
       output: {
@@ -65,12 +68,16 @@ If the task is still being processed, the status will be "processing". When comp
         solution: result.solution,
         cost: result.cost,
         solveTime,
-        workerIp: result.ip
+        workerIp: result.ip,
+        createTime: result.createTime,
+        endTime: result.endTime,
+        solveCount: result.solveCount,
+        raw: result
       },
       message:
         status === 'ready'
           ? `Task **${ctx.input.taskId}** solved successfully. Cost: **$${result.cost ?? 'N/A'}**.`
-          : `Task **${ctx.input.taskId}** is still **processing**. Try again in a few seconds.`
+          : `Task **${ctx.input.taskId}** status: **${status}**. If processing, wait at least 5 seconds before checking again.`
     };
   })
   .build();

@@ -11,7 +11,22 @@ export let listFonts = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      type: z.enum(['google', 'custom']).optional(),
+      name: z.string().optional().describe('Search for a font by name.'),
+      category: z
+        .enum(['serif', 'sans-serif', 'display', 'handwriting', 'monospace'])
+        .optional(),
+      weight: z.number().optional().describe('Weight from 100 to 900 in increments of 100.'),
+      style: z.enum(['normal', 'italic']).optional(),
+      page: z
+        .number()
+        .optional()
+        .describe('1-based page. Omit page and perPage to return every match.'),
+      perPage: z.number().optional().describe('Items per page; provider caps values over 100.')
+    })
+  )
   .output(
     z.object({
       fonts: z.array(
@@ -23,25 +38,31 @@ export let listFonts = SlateTool.create(spec, {
           availableWeights: z
             .array(z.union([z.string(), z.number()]))
             .describe('Supported font weights (e.g., 400, 700, "italic")'),
-          type: z.string().describe('Font source: "google" or "custom"')
+          type: z.string().describe('Font source: "google" or "custom"'),
+          category: z.string().optional(),
+          raw: z.record(z.string(), z.any()).optional()
         })
-      )
+      ),
+      totalCount: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new AbyssaleClient({ token: ctx.auth.token });
 
-    let fonts = await client.listFonts();
+    let result = await client.listFonts(ctx.input);
+    let fonts = result.items;
 
     let mapped = fonts.map(f => ({
       fontId: f.id,
       name: f.name,
       availableWeights: f.available_weights,
-      type: f.type
+      type: f.type,
+      category: f.category,
+      raw: f
     }));
 
     return {
-      output: { fonts: mapped },
+      output: { fonts: mapped, totalCount: result.totalCount },
       message: `Found **${mapped.length}** font(s) (${fonts.filter(f => f.type === 'custom').length} custom, ${fonts.filter(f => f.type === 'google').length} Google).`
     };
   })

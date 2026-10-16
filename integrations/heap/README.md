@@ -1,12 +1,16 @@
 # <img src="https://provider-logos.metorial-cdn.com/heap.png" height="20"> Heap
 
-Track custom events, manage user identities, and enrich analytics data server-side. Send individual or bulk custom events with properties, attach user-level and account-level properties, identify and merge user profiles across sessions and devices, delete users for privacy compliance (GDPR/CCPA), and sync user segment membership to external systems via webhooks. Supports event-based webhooks and periodic segment sync callbacks for data export.
+Track custom events, link anonymous users to known identities, and enrich user and account profiles. Supports single and bulk ingestion, asynchronous privacy deletion requests, and deletion status checks.
 
 ## Tools
 
 ### Delete User
 
-Delete a user and all their data from your Heap workspace. This checks all environments in your account for a matching user and removes their records. Primarily used for data privacy compliance (GDPR, CCPA). The user is looked up and then deleted via Heap's SCIM API.
+Submit one user or up to 10,000 users for asynchronous deletion across the account. Returns a request ID and status; `deleted` is true only after Heap reports completion. Requires the Main Production environment App ID and API Key.
+
+### Get Deletion Status
+
+Check the status of a request returned by Delete User to confirm completion.
 
 ### Identify User
 

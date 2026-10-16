@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExecutionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,6 +41,12 @@ export let convertDocument = SlateTool.create(spec, {
     switch (ctx.input.conversion) {
       case 'markdown_to_pdf': {
         let resultBase64 = await client.markdownToPdf({ markdown: ctx.input.content });
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(resultBase64, 'base64'),
+          filename: 'document.pdf',
+          mimeType: 'application/pdf'
+        });
         return {
           output: { resultBase64 },
           message: `Markdown converted to PDF successfully.`
@@ -49,6 +55,12 @@ export let convertDocument = SlateTool.create(spec, {
 
       case 'markdown_to_html': {
         let html = await client.markdownToHtml({ markdown: ctx.input.content });
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(html),
+          filename: 'document.html',
+          mimeType: 'text/html'
+        });
         return {
           output: { html },
           message: `Markdown converted to HTML successfully.`
@@ -57,6 +69,12 @@ export let convertDocument = SlateTool.create(spec, {
 
       case 'html_to_docx': {
         let resultBase64 = await client.htmlToDocx({ html: ctx.input.content });
+        await ctx.addAttachment({
+          type: 'content',
+          content: Buffer.from(resultBase64, 'base64'),
+          filename: 'document.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
         return {
           output: { resultBase64 },
           message: `HTML converted to DOCX (Word) document successfully.`
@@ -64,7 +82,7 @@ export let convertDocument = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown conversion: ${ctx.input.conversion}`);
+        throw createApiServiceError(`Unknown conversion: ${ctx.input.conversion}`);
     }
   })
   .build();

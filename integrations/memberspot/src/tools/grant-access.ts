@@ -16,7 +16,7 @@ export let grantAccessTool = SlateTool.create(spec, {
       firstname: z.string().describe('First name of the user'),
       lastname: z.string().describe('Last name of the user'),
       email: z.string().describe('Email address of the user'),
-      offerId: z.string().describe('ID of the offer/course to grant access to'),
+      offerId: z.string().describe('Offer ID from list_offers to grant access to'),
       orderId: z
         .string()
         .describe('Unique order ID for this access grant, used to track and manage access')

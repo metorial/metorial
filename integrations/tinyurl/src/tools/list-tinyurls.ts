@@ -1,33 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listFiltersSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTinyUrls = SlateTool.create(spec, {
   name: 'List TinyURLs',
   key: 'list_tinyurls',
   description: `List TinyURLs on your account. Filter by status (available or archived), date range, alias, or tag.
+This also retrieves each matching link's details to include its destination and click count. Use count_tinyurls when only a total is needed.
 Use the **search** parameter with format \`alias:value\` or \`tag:value\` to filter by alias or tag name.`,
   tags: {
     destructive: false,
     readOnly: true
   }
 })
-  .input(
-    z.object({
-      status: z
-        .enum(['available', 'archived'])
-        .optional()
-        .default('available')
-        .describe('Filter by link status'),
-      from: z.string().optional().describe('ISO 8601 datetime lower bound for creation date'),
-      to: z.string().optional().describe('ISO 8601 datetime upper bound for creation date'),
-      search: z
-        .string()
-        .optional()
-        .describe('Search filter in format "alias:value" or "tag:value"')
-    })
-  )
+  .input(listFiltersSchema)
   .output(
     z.object({
       links: z
@@ -69,7 +57,7 @@ Use the **search** parameter with format \`alias:value\` or \`tag:value\` to fil
       createdAt: r.created_at,
       expiresAt: r.expires_at,
       tags: r.tags || [],
-      description: r.description
+      description: r.description ?? null
     }));
 
     return {

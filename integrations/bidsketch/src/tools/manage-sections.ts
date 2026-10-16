@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import { readBidsketchNumber, readBidsketchString } from '../lib/response';
 import { spec } from '../spec';
 
 let sectionSchema = z.object({
@@ -38,16 +39,16 @@ export let listSections = SlateTool.create(spec, {
     let client = new BidsketchClient(ctx.auth.token);
     let data = await client.listSections(ctx.input.page, ctx.input.perPage);
 
-    let sections = (Array.isArray(data) ? data : []).map((s: any) => ({
-      sectionId: s.id,
-      name: s.name,
-      sectionType: s.sectiontype,
+    let sections = data.map((s: any) => ({
+      sectionId: readBidsketchNumber(s.id, 'id'),
+      name: readBidsketchString(s.name, 'name'),
+      sectionType: readBidsketchString(s.sectiontype, 'sectiontype'),
       category: s.category ?? null,
       description: s.description ?? null,
-      url: s.url,
-      appUrl: s.app_url,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at
+      url: readBidsketchString(s.url, 'url'),
+      appUrl: readBidsketchString(s.app_url, 'app_url'),
+      createdAt: readBidsketchString(s.created_at, 'created_at'),
+      updatedAt: readBidsketchString(s.updated_at, 'updated_at')
     }));
 
     return {
@@ -89,15 +90,15 @@ export let createSection = SlateTool.create(spec, {
 
     return {
       output: {
-        sectionId: s.id,
-        name: s.name,
-        sectionType: s.sectiontype,
+        sectionId: readBidsketchNumber(s.id, 'id'),
+        name: readBidsketchString(s.name, 'name'),
+        sectionType: readBidsketchString(s.sectiontype, 'sectiontype'),
         category: s.category ?? null,
         description: s.description ?? null,
-        url: s.url,
-        appUrl: s.app_url,
-        createdAt: s.created_at,
-        updatedAt: s.updated_at
+        url: readBidsketchString(s.url, 'url'),
+        appUrl: readBidsketchString(s.app_url, 'app_url'),
+        createdAt: readBidsketchString(s.created_at, 'created_at'),
+        updatedAt: readBidsketchString(s.updated_at, 'updated_at')
       },
       message: `Created ${s.sectiontype} section **${s.name}** (ID: ${s.id}).`
     };
@@ -135,15 +136,15 @@ export let updateSection = SlateTool.create(spec, {
 
     return {
       output: {
-        sectionId: s.id,
-        name: s.name,
-        sectionType: s.sectiontype,
+        sectionId: readBidsketchNumber(s.id, 'id'),
+        name: readBidsketchString(s.name, 'name'),
+        sectionType: readBidsketchString(s.sectiontype, 'sectiontype'),
         category: s.category ?? null,
         description: s.description ?? null,
-        url: s.url,
-        appUrl: s.app_url,
-        createdAt: s.created_at,
-        updatedAt: s.updated_at
+        url: readBidsketchString(s.url, 'url'),
+        appUrl: readBidsketchString(s.app_url, 'app_url'),
+        createdAt: readBidsketchString(s.created_at, 'created_at'),
+        updatedAt: readBidsketchString(s.updated_at, 'updated_at')
       },
       message: `Updated section **${s.name}** (ID: ${s.id}).`
     };

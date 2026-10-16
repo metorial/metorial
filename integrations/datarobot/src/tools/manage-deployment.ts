@@ -1,7 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  success: z.boolean().describe('Whether the operation succeeded'),
+  deploymentId: z.string().describe('ID of the affected deployment'),
+  label: z.string().optional().describe('Updated deployment label')
+});
 
 export let manageDeployment = SlateTool.create(spec, {
   name: 'Update, Replace Model, or Delete Deployment',
@@ -29,49 +36,58 @@ export let manageDeployment = SlateTool.create(spec, {
       replacementReason: z
         .string()
         .optional()
-        .describe('Reason for model replacement (for replace_model)')
+        .describe(
+          'Replacement reason: ACCURACY, DATA_DRIFT, ERRORS, SCHEDULED_REFRESH, SCORING_SPEED, DEPRECATION, or OTHER (default)'
+        )
     })
   )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
-      deploymentId: z.string().describe('ID of the affected deployment'),
-      label: z.string().optional().describe('Updated deployment label')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     if (ctx.input.action === 'delete') {
       await client.deleteDeployment(ctx.input.deploymentId);
       return {
-        output: {
+        output: parseOutput(outputSchema, {
           success: true,
           deploymentId: ctx.input.deploymentId
-        },
+        }),
         message: `Deployment **${ctx.input.deploymentId}** has been deleted.`
       };
     }
 
     if (ctx.input.action === 'replace_model') {
+      if (Boolean(ctx.input.modelId) === Boolean(ctx.input.modelPackageId)) {
+        throw createApiServiceError(
+          'Provide exactly one of modelId or modelPackageId to replace the model.'
+        );
+      }
       await client.replaceDeploymentModel(ctx.input.deploymentId, {
         modelId: ctx.input.modelId,
         modelPackageId: ctx.input.modelPackageId,
-        reason: ctx.input.replacementReason || 'Model replacement'
+        reason: ctx.input.replacementReason ?? 'OTHER'
       });
       return {
-        output: {
+        output: parseOutput(outputSchema, {
           success: true,
           deploymentId: ctx.input.deploymentId
-        },
+        }),
         message: `Champion model on deployment **${ctx.input.deploymentId}** has been replaced.`
       };
     }
 
-    // update
+    if (
+      [ctx.input.label, ctx.input.description, ctx.input.importance].every(
+        value => value === undefined
+      )
+    ) {
+      throw createApiServiceError(
+        'Provide label, description, or importance to update the deployment.'
+      );
+    }
     let updated = await client.updateDeployment(ctx.input.deploymentId, {
       label: ctx.input.label,
       description: ctx.input.description,
@@ -79,11 +95,11 @@ export let manageDeployment = SlateTool.create(spec, {
     });
 
     return {
-      output: {
+      output: parseOutput(outputSchema, {
         success: true,
         deploymentId: ctx.input.deploymentId,
-        label: updated.label || ctx.input.label
-      },
+        label: updated.label
+      }),
       message: `Deployment **${ctx.input.deploymentId}** updated.`
     };
   })

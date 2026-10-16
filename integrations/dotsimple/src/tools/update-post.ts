@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DotSimpleClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let contentSchema = z.object({
@@ -31,6 +32,7 @@ export let updatePost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       postUuid: z.string().describe('UUID of the post to update'),
       accountIds: z.array(z.number()).optional().describe('Updated array of account IDs'),
       versions: z.array(versionSchema).optional().describe('Updated content versions'),
@@ -53,37 +55,32 @@ export let updatePost = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
-    let data: Record<string, unknown> = {};
-    if (ctx.input.accountIds) data.accounts = ctx.input.accountIds;
-    if (ctx.input.tagIds) data.tags = ctx.input.tagIds;
-    if (ctx.input.date) data.date = ctx.input.date;
-    if (ctx.input.time) data.time = ctx.input.time;
-    if (ctx.input.timezone) data.timezone = ctx.input.timezone;
-    if (ctx.input.schedule !== undefined) data.schedule = ctx.input.schedule;
-    if (ctx.input.scheduleNow !== undefined) data.schedule_now = ctx.input.scheduleNow;
-    if (ctx.input.queue !== undefined) data.queue = ctx.input.queue;
-    if (ctx.input.versions) {
-      data.versions = ctx.input.versions.map(v => ({
+    let data = pickDefined({
+      accounts: ctx.input.accountIds,
+      tags: ctx.input.tagIds,
+      date: ctx.input.date,
+      time: ctx.input.time,
+      timezone: ctx.input.timezone,
+      schedule: ctx.input.schedule,
+      schedule_now: ctx.input.scheduleNow,
+      queue: ctx.input.queue,
+      versions: ctx.input.versions?.map(v => ({
         account_id: v.accountId,
         is_original: v.isOriginal,
-        content: v.content.map(c => ({
-          body: c.body,
-          url: c.url,
-          media: c.media
-        })),
+        content: v.content.map(c => ({ body: c.body, url: c.url, media: c.media })),
         options: v.options
-      }));
-    }
+      }))
+    });
 
-    let result = await client.updatePost(ctx.input.postUuid, data as any);
+    let result = await client.updatePost(ctx.input.postUuid, data);
 
     return {
       output: {
         postId: result?.id,
-        postUuid: result?.uuid ?? ctx.input.postUuid,
+        postUuid: result?.uuid,
         status: result?.status
       },
       message: `Post \`${ctx.input.postUuid}\` updated successfully.${result?.status ? ` Status: **${result.status}**` : ''}`

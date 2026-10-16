@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { operationOutput, providerId, providerRecords, requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageCollectionRecords = SlateTool.create(spec, {
@@ -17,7 +18,7 @@ Use the **List Collections** tool first to discover available collections and th
     'For "delete": provide collectionId and recordId.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -26,7 +27,7 @@ Use the **List Collections** tool first to discover available collections and th
       action: z
         .enum(['create', 'get', 'list', 'update', 'delete'])
         .describe('Operation to perform'),
-      collectionId: z.string().describe('Collection ID'),
+      collectionId: z.string().describe('Collection ID. Discover IDs with list_collections.'),
       recordId: z.string().optional().describe('Record ID (required for get, update, delete)'),
       recordData: z
         .record(z.string(), z.any())
@@ -37,12 +38,20 @@ Use the **List Collections** tool first to discover available collections and th
         .optional()
         .describe('Number of records to return (for list, default: 10)'),
       offset: z.number().optional().describe('Pagination offset (for list, default: 0)'),
-      filter: z.array(z.any()).optional().describe('Filter criteria array (for list)'),
+      filter: z
+        .array(z.any())
+        .optional()
+        .describe('Filter criteria combined with AND (for list)'),
+      filterObject: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Documented filter object for list; use this or filter, not both'),
       sort: z.array(z.any()).optional().describe('Sort criteria array (for list)')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
       success: z.boolean().describe('Whether the operation was successful'),
       responseMessage: z.string().describe('Response message from the API'),
       recordId: z.string().optional().describe('ID of the created/affected record'),
@@ -59,77 +68,51 @@ Use the **List Collections** tool first to discover available collections and th
   .handleInvocation(async ctx => {
     let client = new ZixflowClient({ token: ctx.auth.token });
     let { action, collectionId } = ctx.input;
+    requireInput(collectionId, 'collectionId');
+    if (['get', 'update', 'delete'].includes(action))
+      requireInput(ctx.input.recordId, 'recordId');
+    if (ctx.input.filter !== undefined && ctx.input.filterObject !== undefined) {
+      throw createApiServiceError('Provide filter or filterObject, not both.', {
+        reason: 'zixflow_invalid_input'
+      });
+    }
+    if (['create', 'update'].includes(action) && ctx.input.recordData === undefined) {
+      throw createApiServiceError('recordData is required for create and update.', {
+        reason: 'zixflow_invalid_input'
+      });
+    }
     let result: any;
-
-    if (action === 'create') {
-      result = await client.createRecord(collectionId, ctx.input.recordData ?? {});
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          recordId: result._id ?? result.data?._id,
-          record: result.data
-        },
-        message: `Record created in collection ${collectionId} with ID ${result._id ?? result.data?._id ?? 'unknown'}.`
-      };
-    }
-
-    if (action === 'get') {
+    if (action === 'create')
+      result = await client.createRecord(collectionId, ctx.input.recordData!);
+    else if (action === 'get')
       result = await client.getRecord(collectionId, ctx.input.recordId!);
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          recordId: ctx.input.recordId,
-          record: result.data
-        },
-        message: `Fetched record ${ctx.input.recordId} from collection ${collectionId}.`
-      };
-    }
-
-    if (action === 'list') {
+    else if (action === 'list')
       result = await client.getRecords(collectionId, {
         limit: ctx.input.limit ?? 10,
         offset: ctx.input.offset ?? 0,
         filter: ctx.input.filter,
+        filterObject: ctx.input.filterObject,
         sort: ctx.input.sort
       });
-      let records = Array.isArray(result.data) ? result.data : [];
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          records
-        },
-        message: `Fetched ${records.length} record(s) from collection ${collectionId}.`
-      };
-    }
-
-    if (action === 'update') {
+    else if (action === 'update')
       result = await client.updateRecord(
         collectionId,
         ctx.input.recordId!,
-        ctx.input.recordData ?? {}
+        ctx.input.recordData!
       );
-      return {
-        output: {
-          success: result.status === true,
-          responseMessage: result.message ?? 'Unknown response',
-          recordId: ctx.input.recordId
-        },
-        message: `Updated record ${ctx.input.recordId} in collection ${collectionId}.`
-      };
-    }
+    else result = await client.deleteRecord(collectionId, ctx.input.recordId!);
 
-    // delete
-    result = await client.deleteRecord(collectionId, ctx.input.recordId!);
     return {
       output: {
-        success: result.status === true,
-        responseMessage: result.message ?? 'Unknown response',
-        recordId: ctx.input.recordId
+        ...operationOutput(result),
+        recordId: providerId(result),
+        record:
+          ['create', 'get'].includes(action) && isApiErrorRecord(result.data)
+            ? result.data
+            : undefined,
+        records: action === 'list' ? providerRecords(result.data) : undefined
       },
-      message: `Deleted record ${ctx.input.recordId} from collection ${collectionId}.`
+      message: `Zixflow ${action} operation confirmed.`
     };
   })
   .build();

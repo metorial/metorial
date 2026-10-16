@@ -43,7 +43,7 @@ export let cancelCards = SlateTool.create(spec, {
         thirdPartyContactId: ctx.input.thirdPartyContactId,
         rawResponse: result
       },
-      message: `Cancelled all editable cards for contact **${ctx.input.thirdPartyContactId}**.`
+      message: `AMcards accepted the cancellation request for editable cards for contact **${ctx.input.thirdPartyContactId}**.`
     };
   })
   .build();

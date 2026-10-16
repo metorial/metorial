@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,6 +33,7 @@ export let manageProject = SlateTool.create(spec, {
       workflowEnabled: z.boolean().optional().describe('Whether task workflow is enabled'),
       created: z.string().optional().describe('Creation date'),
       modified: z.string().optional().describe('Last modified date'),
+      raw: z.unknown().optional().describe('Complete project data returned by Amara'),
       removed: z.boolean().describe('Whether the project was deleted')
     })
   )
@@ -42,6 +43,9 @@ export let manageProject = SlateTool.create(spec, {
       username: ctx.auth.username
     });
 
+    if (ctx.input.remove && !ctx.input.projectSlug) {
+      throw createApiServiceError('projectSlug is required when deleting a project.');
+    }
     if (ctx.input.remove && ctx.input.projectSlug) {
       await client.deleteProject(ctx.input.teamSlug, ctx.input.projectSlug);
       return {
@@ -60,11 +64,12 @@ export let manageProject = SlateTool.create(spec, {
         output: {
           name: project.name,
           projectSlug: project.slug,
-          description: project.description,
-          guidelines: project.guidelines,
+          description: project.description ?? undefined,
+          guidelines: project.guidelines ?? undefined,
           workflowEnabled: project.workflow_enabled,
           created: project.created,
           modified: project.modified,
+          raw: project,
           removed: false
         },
         message: `Updated project **"${project.name}"** (\`${project.slug}\`) in team \`${ctx.input.teamSlug}\`.`
@@ -72,7 +77,7 @@ export let manageProject = SlateTool.create(spec, {
     }
 
     if (!ctx.input.name || !ctx.input.slug) {
-      throw new Error('name and slug are required when creating a new project');
+      throw createApiServiceError('name and slug are required when creating a new project');
     }
 
     let project = await client.createProject(ctx.input.teamSlug, {
@@ -86,11 +91,12 @@ export let manageProject = SlateTool.create(spec, {
       output: {
         name: project.name,
         projectSlug: project.slug,
-        description: project.description,
-        guidelines: project.guidelines,
+        description: project.description ?? undefined,
+        guidelines: project.guidelines ?? undefined,
         workflowEnabled: project.workflow_enabled,
         created: project.created,
         modified: project.modified,
+        raw: project,
         removed: false
       },
       message: `Created project **"${project.name}"** (\`${project.slug}\`) in team \`${ctx.input.teamSlug}\`.`

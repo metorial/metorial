@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,7 @@ export let geocode = SlateTool.create(spec, {
       result = await client.reverseGeocodeByLatLng(ctx.input.lat, ctx.input.lng);
       direction = 'reverse';
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide a place name for forward geocoding, or lat/lng for reverse geocoding.'
       );
     }

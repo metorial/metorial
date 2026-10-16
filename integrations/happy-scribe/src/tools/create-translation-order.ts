@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let createTranslationOrder = SlateTool.create(spec, {
@@ -61,7 +62,8 @@ export let createTranslationOrder = SlateTool.create(spec, {
       outputIds: z
         .array(z.string())
         .optional()
-        .describe('IDs of the output transcriptions being created.')
+        .describe('IDs of the output transcriptions being created.'),
+      raw: rawSchema.optional().describe('Complete translation order response.')
     })
   )
   .handleInvocation(async ctx => {
@@ -82,7 +84,8 @@ export let createTranslationOrder = SlateTool.create(spec, {
         orderId: result.id,
         state: result.state,
         operations: result.operations,
-        outputIds: result.outputsIds
+        outputIds: result.outputsIds ?? undefined,
+        raw: result
       },
       message: `Created translation order **${result.id}** in state **${result.state}** for ${ctx.input.targetLanguages.length} target language(s).`
     };

@@ -65,7 +65,7 @@ export let getWeatherHistory = SlateTool.create(spec, {
       ctx.input.to,
       units
     );
-    let records = result.data?.history || [];
+    let records = Array.isArray(result.data) ? result.data : (result.data?.history ?? []);
 
     return {
       output: {

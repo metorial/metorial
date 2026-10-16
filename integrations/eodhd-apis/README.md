@@ -1,11 +1,13 @@
-# <img src="logo.svg" height="20"> Eodhd Apis
+# EODHD APIs
 
-Retrieve historical end-of-day, intraday, and real-time market data for stocks, ETFs, mutual funds, forex, cryptocurrencies, bonds, and indices across 70+ global exchanges. Access fundamental data including financial statements, company profiles, and valuation metrics. Stream real-time US stock trades, quotes, forex, and crypto prices via WebSockets. Look up corporate actions (splits, dividends), insider transactions, financial calendars (earnings, IPOs), and financial news with sentiment analysis. Screen stocks by financial criteria, compute technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands), and retrieve options chain data with Greeks. Access macroeconomic indicators, ESG scores, index constituents, historical market capitalization, and company logos. Map identifiers across CUSIP, ISIN, FIGI, LEI, and CIK. Search for tickers by name or code and query exchange metadata, trading hours, and holidays.
+Retrieve historical and intraday prices, delayed quotes, company fundamentals, news and sentiment, dividends and splits, insider transactions, financial calendars, stock screening, technical indicators, macroeconomic indicators, economic events, exchange details, and account API usage.
+
+Connect with the API token from your EODHD dashboard. Available datasets and request costs depend on your subscription.
+
+The 19 read-only tools cover price research, fundamentals, discovery, news, calendars, technical analysis, economic releases, exchange schedules, and account usage. The options tool retains the legacy options endpoint; newer US Options Marketplace data uses a separate API contract. Streaming WebSocket feeds are not exposed by this integration.
+
+See [the integration specification](docs/SPEC.md) and [EODHD documentation](https://eodhd.com/financial-apis/).
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

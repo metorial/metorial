@@ -9,3 +9,15 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
 </div>
+
+
+The Edit API generation workflow is available through `list_generation_models`,
+`get_generation_model`, `quote_generation`, `generate_media`, and `get_generation`.
+A quote estimates credits without creating work; submitting generation can incur
+charges. The existing provider-based Create API tools remain available.
+
+Completed render output is temporary and is deleted by Shotstack after 24 hours.
+The status tools prepare supported media for download while it is available.
+File copying uses a local 64 MiB limit; a failure returns the actual job status
+with a delivery warning. Use `get_assets_by_render` or `get_hosted_asset` for
+permanent CDN output when Shotstack hosting is enabled.

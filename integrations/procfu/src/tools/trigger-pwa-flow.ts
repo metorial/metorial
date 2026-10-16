@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProcFuClient } from '../lib/client';
 import { spec } from '../spec';
@@ -40,6 +40,14 @@ Requires the flow ID, item ID, and the webhook c/p values found in your app's we
       ctx.input.webhookC,
       ctx.input.webhookP
     );
+    let status =
+      typeof result === 'number' || typeof result === 'string' ? Number(result) : undefined;
+    if (status !== 200) {
+      throw createApiServiceError(
+        'ProcFu did not confirm the flow trigger with status 200. Call get_last_error to inspect the failure.',
+        { upstreamStatus: status }
+      );
+    }
 
     return {
       output: { result },

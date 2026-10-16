@@ -10,7 +10,7 @@ export let listInstances = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/compute/v1/instances', { params });
   return response.data;
@@ -109,7 +109,7 @@ export let listDisks = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/compute/v1/disks', { params });
   return response.data;
@@ -154,7 +154,7 @@ export let listImages = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/compute/v1/images', { params });
   return response.data;

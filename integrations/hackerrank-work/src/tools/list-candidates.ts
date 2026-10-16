@@ -28,6 +28,15 @@ export let listCandidates = SlateTool.create(spec, {
       candidates: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of candidate objects'),
+      next: z
+        .string()
+        .optional()
+        .describe('Provider URL for the next page, empty when no next page exists'),
+      previous: z.string().optional().describe('Provider URL for the previous page'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response including pagination'),
       total: z.number().describe('Total number of candidates for this test'),
       offset: z.number().describe('Current pagination offset')
     })
@@ -43,6 +52,9 @@ export let listCandidates = SlateTool.create(spec, {
     return {
       output: {
         candidates: result.data,
+        next: result.next,
+        previous: result.previous,
+        raw: result.raw,
         total: result.total,
         offset: result.offset
       },

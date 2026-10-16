@@ -1,25 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bannerSchema, getBannerOutput } from '../lib/schemas';
 import { spec } from '../spec';
-
-let bannerFileSchema = z.object({
-  fileId: z.string().describe('Unique identifier of the banner file'),
-  url: z.string().describe('URL to download or preview the banner file'),
-  status: z.string().describe('Processing status of the file'),
-  name: z.string().optional().describe('File name'),
-  type: z.string().optional().describe('File MIME type'),
-  size: z.number().optional().describe('File size in bytes'),
-  width: z.number().optional().describe('Banner width in pixels'),
-  height: z.number().optional().describe('Banner height in pixels')
-});
 
 export let createBanner = SlateTool.create(spec, {
   name: 'Create Banner',
   key: 'create_banner',
   description: `Create image, video, or HTML5 banners from an Adrapid template. Supports generating banners in multiple formats (png, jpeg, webp, html5, video) simultaneously. Template content such as text, images, and CSS can be customized using overrides. Banners can be generated in specific sizes or all available sizes for a template.
 
-The tool will wait for the banner to finish processing and return the resulting files with download URLs.`,
+By default, the tool waits for processing for about one minute. Completed files are available to download; a longer-running export returns its current status for subsequent checks.`,
   instructions: [
     'Use the template ID from the Adrapid editor or template library.',
     'Override items are referenced by their item name as defined in the Adrapid editor (e.g., "Text_item_1", "Image_item_1").',
@@ -41,7 +31,7 @@ The tool will wait for the banner to finish processing and return the resulting 
       modes: z
         .record(z.string(), z.any())
         .describe(
-          'Output format modes. Keys are format names (png, jpeg, webp, html5, video). Values are format-specific options (e.g., { "png": {}, "video": { "fps": 30, "crf": 18 } })'
+          'Output formats. Set image formats to true, for example { "png": true, "jpeg": true }; video accepts options such as { "video": { "fps": 30, "crf": 18 } }. PDF, GIF, WebP, and HTML5 are also documented.'
         ),
       sizeIds: z
         .union([z.string(), z.array(z.string())])
@@ -55,24 +45,29 @@ The tool will wait for the banner to finish processing and return the resulting 
         .describe(
           'Template content overrides. Keys are item names from the editor. Values can include text, url (for images), and css properties (e.g., { "Text_item_1": { "text": "Hello", "css": { "color": "red" } } })'
         ),
+      sizes: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Custom size definitions supported by Adrapid'),
+      clicktag: z
+        .string()
+        .optional()
+        .describe('Destination URL used when the banner is clicked'),
+      editable: z
+        .boolean()
+        .optional()
+        .describe('Create an editable copy of the banner as a template'),
+      excludeBaseSize: z
+        .boolean()
+        .optional()
+        .describe('Exclude the base size when exporting multiple sizes'),
       waitForCompletion: z
         .boolean()
         .optional()
         .describe('Whether to poll and wait for the banner to be ready. Defaults to true.')
     })
   )
-  .output(
-    z.object({
-      bannerId: z.string().describe('Unique identifier of the created banner'),
-      status: z
-        .string()
-        .describe('Current status of the banner (exporting, ready, or failed)'),
-      templateId: z.string().describe('Template ID used to create the banner'),
-      files: z
-        .array(bannerFileSchema)
-        .describe('List of generated banner files with download URLs')
-    })
-  )
+  .output(bannerSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -82,7 +77,11 @@ The tool will wait for the banner to finish processing and return the resulting 
       templateId: ctx.input.templateId,
       modes: ctx.input.modes,
       sizeIds: ctx.input.sizeIds,
-      overrides: ctx.input.overrides
+      overrides: ctx.input.overrides,
+      sizes: ctx.input.sizes,
+      clicktag: ctx.input.clicktag,
+      editable: ctx.input.editable,
+      excludeBaseSize: ctx.input.excludeBaseSize
     });
 
     let shouldWait = ctx.input.waitForCompletion !== false;
@@ -92,31 +91,24 @@ The tool will wait for the banner to finish processing and return the resulting 
       banner = await client.pollBannerUntilReady(banner.bannerId);
     }
 
-    let readyFiles = banner.files.filter(f => f.status === 'ready').length;
+    let readyFiles = banner.files.filter(
+      f => f.url && (banner.status === 'ready' || f.status === 'ready')
+    );
+    for (let file of readyFiles) {
+      if (file.url) {
+        await ctx.addAttachment({ type: 'url', url: file.url, filename: file.name });
+      }
+    }
 
     let statusMessage =
       banner.status === 'ready'
-        ? `Banner created successfully with **${readyFiles}** file(s) ready for download.`
+        ? `Banner created successfully with **${readyFiles.length}** file(s) ready for download.`
         : banner.status === 'failed'
           ? `Banner creation **failed**.`
           : `Banner is still **${banner.status}**. Poll the banner using Get Banner to check completion.`;
 
     return {
-      output: {
-        bannerId: banner.bannerId,
-        status: banner.status,
-        templateId: banner.templateId,
-        files: banner.files.map(f => ({
-          fileId: f.id,
-          url: f.url,
-          status: f.status,
-          name: f.name,
-          type: f.type,
-          size: f.size,
-          width: f.width,
-          height: f.height
-        }))
-      },
+      output: getBannerOutput(banner),
       message: statusMessage
     };
   })

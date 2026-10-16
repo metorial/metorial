@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,7 @@ export let manageItemGroup = SlateTool.create(spec, {
         .describe('Group ID to update (omit to create a new group)'),
       name: z.string().optional().describe('Group name'),
       description: z.string().optional().describe('Group description'),
-      sortOrder: z.number().optional().describe('Sort order position'),
+      sortOrder: z.number().optional().describe('Sort order position (creation only)'),
       autoExpand: z
         .boolean()
         .optional()
@@ -50,10 +50,13 @@ export let manageItemGroup = SlateTool.create(spec, {
         patches.push({ op: 'replace', path: '/name', value: ctx.input.name });
       if (ctx.input.description !== undefined)
         patches.push({ op: 'replace', path: '/description', value: ctx.input.description });
-      if (ctx.input.sortOrder !== undefined)
-        patches.push({ op: 'replace', path: '/sortorder', value: ctx.input.sortOrder });
+      if (ctx.input.sortOrder !== undefined) {
+        throw createApiServiceError(
+          'sortOrder is supported only when creating an item group.'
+        );
+      }
       if (ctx.input.autoExpand !== undefined)
-        patches.push({ op: 'replace', path: '/autoexpand', value: ctx.input.autoExpand });
+        patches.push({ op: 'replace', path: '/autoExpand', value: ctx.input.autoExpand });
 
       if (patches.length === 0) {
         let group = await client.getGroup(ctx.input.groupId);
@@ -63,14 +66,18 @@ export let manageItemGroup = SlateTool.create(spec, {
         };
       }
 
-      let updated = await client.updateGroup(ctx.input.groupId, patches);
+      await client.updateGroup(ctx.input.groupId, patches);
+      let updated = await client.getGroup(ctx.input.groupId);
       return {
         output: { ...updated, groupId: updated.id },
         message: `Updated item group **${updated.name}**`
       };
     } else {
+      if (!ctx.input.name?.trim()) {
+        throw createApiServiceError('Provide name when creating an item group.');
+      }
       let group = await client.createGroup({
-        name: ctx.input.name!,
+        name: ctx.input.name,
         description: ctx.input.description,
         sortOrder: ctx.input.sortOrder,
         autoExpand: ctx.input.autoExpand

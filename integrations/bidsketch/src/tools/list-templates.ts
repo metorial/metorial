@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import { readBidsketchList, readBidsketchNumber, readBidsketchString } from '../lib/response';
 import { spec } from '../spec';
 
 let templateSummarySchema = z.object({
@@ -35,13 +36,13 @@ export let listTemplates = SlateTool.create(spec, {
     let client = new BidsketchClient(ctx.auth.token);
     let data = await client.listTemplates(ctx.input.page, ctx.input.perPage);
 
-    let templates = (Array.isArray(data) ? data : []).map((t: any) => ({
-      templateId: t.id,
-      name: t.name,
-      url: t.url,
-      appUrl: t.app_url,
-      createdAt: t.created_at,
-      updatedAt: t.updated_at
+    let templates = data.map((t: any) => ({
+      templateId: readBidsketchNumber(t.id, 'id'),
+      name: readBidsketchString(t.name, 'name'),
+      url: readBidsketchString(t.url, 'url'),
+      appUrl: readBidsketchString(t.app_url, 'app_url'),
+      createdAt: readBidsketchString(t.created_at, 'created_at'),
+      updatedAt: readBidsketchString(t.updated_at, 'updated_at')
     }));
 
     return {
@@ -100,32 +101,32 @@ export let getTemplate = SlateTool.create(spec, {
     let client = new BidsketchClient(ctx.auth.token);
     let t = await client.getTemplate(ctx.input.templateId);
 
-    let sections = (t.sections || []).map((s: any) => ({
-      sectionId: s.id,
-      name: s.name,
-      sectionType: s.sectiontype,
-      url: s.url,
-      appUrl: s.app_url
+    let sections = readBidsketchList(t.sections, 'template sections').map((s: any) => ({
+      sectionId: readBidsketchNumber(s.id, 'id'),
+      name: readBidsketchString(s.name, 'name'),
+      sectionType: readBidsketchString(s.sectiontype, 'sectiontype'),
+      url: readBidsketchString(s.url, 'url'),
+      appUrl: readBidsketchString(s.app_url, 'app_url')
     }));
 
-    let fees = (t.fees || []).map((f: any) => ({
-      feeId: f.id,
-      name: f.name,
-      feeType: f.feetype,
-      url: f.url,
-      appUrl: f.app_url
+    let fees = readBidsketchList(t.fees, 'template fees').map((f: any) => ({
+      feeId: readBidsketchNumber(f.id, 'id'),
+      name: readBidsketchString(f.name, 'name'),
+      feeType: readBidsketchString(f.feetype, 'feetype'),
+      url: readBidsketchString(f.url, 'url'),
+      appUrl: readBidsketchString(f.app_url, 'app_url')
     }));
 
     return {
       output: {
-        templateId: t.id,
-        name: t.name,
+        templateId: readBidsketchNumber(t.id, 'id'),
+        name: readBidsketchString(t.name, 'name'),
         sections,
         fees,
-        url: t.url,
-        appUrl: t.app_url,
-        createdAt: t.created_at,
-        updatedAt: t.updated_at
+        url: readBidsketchString(t.url, 'url'),
+        appUrl: readBidsketchString(t.app_url, 'app_url'),
+        createdAt: readBidsketchString(t.created_at, 'created_at'),
+        updatedAt: readBidsketchString(t.updated_at, 'updated_at')
       },
       message: `Retrieved template **${t.name}** with ${sections.length} section(s) and ${fees.length} fee(s).`
     };

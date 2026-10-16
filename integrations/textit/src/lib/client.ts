@@ -1,278 +1,494 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
 
+const named = z.object({ uuid: z.string(), name: z.string() }).passthrough();
+const contactRef = z.object({ uuid: z.string(), name: z.string().nullable() }).passthrough();
+const contactSchema = z
+  .object({
+    uuid: z.string(),
+    name: z.string().nullable(),
+    status: z.string(),
+    language: z.string().nullable(),
+    urns: z.array(z.string()),
+    groups: z.array(named),
+    fields: z.record(z.string(), z.string().nullable()),
+    created_on: z.string(),
+    modified_on: z.string(),
+    last_seen_on: z.string().nullable()
+  })
+  .passthrough();
+const groupSchema = z
+  .object({
+    uuid: z.string(),
+    name: z.string(),
+    query: z.string().nullable(),
+    count: z.number(),
+    status: z.string().optional(),
+    system: z.boolean().optional()
+  })
+  .passthrough();
+const fieldSchema = z
+  .object({ key: z.string(), name: z.string(), type: z.string() })
+  .passthrough();
+const messageSchema = z
+  .object({
+    uuid: z.string(),
+    contact: contactRef,
+    urn: z.string(),
+    direction: z.enum(['incoming', 'outgoing', 'in', 'out']),
+    type: z.string(),
+    status: z.string(),
+    text: z.string(),
+    attachments: z.array(
+      z.union([
+        z.string(),
+        z.object({ url: z.string(), content_type: z.string().optional() }).passthrough()
+      ])
+    ),
+    labels: z.array(named),
+    created_on: z.string(),
+    sent_on: z.string().nullable()
+  })
+  .passthrough();
+const sentMessageSchema = z
+  .object({
+    uuid: z.string(),
+    contact: contactRef,
+    text: z.string(),
+    status: z.string(),
+    created_on: z.string()
+  })
+  .passthrough();
+const broadcastSchema = z
+  .object({ uuid: z.string(), status: z.string(), created_on: z.string() })
+  .passthrough();
+const flowSchema = z
+  .object({
+    uuid: z.string(),
+    name: z.string(),
+    type: z.string(),
+    archived: z.boolean(),
+    expires: z.number(),
+    runs: z
+      .object({
+        active: z.number(),
+        completed: z.number(),
+        interrupted: z.number(),
+        expired: z.number()
+      })
+      .passthrough(),
+    results: z.array(
+      z
+        .object({ key: z.string(), name: z.string(), categories: z.array(z.string()) })
+        .passthrough()
+    ),
+    created_on: z.string(),
+    modified_on: z.string()
+  })
+  .passthrough();
+const flowStartSchema = z
+  .object({ uuid: z.string(), flow: named, status: z.string(), created_on: z.string() })
+  .passthrough();
+const runSchema = z
+  .object({
+    uuid: z.string(),
+    flow: named,
+    contact: z.object({ uuid: z.string(), name: z.string(), urn: z.string() }).passthrough(),
+    responded: z.boolean(),
+    values: z.record(
+      z.string(),
+      z
+        .object({
+          value: z.string(),
+          category: z.string(),
+          name: z.string(),
+          time: z.string()
+        })
+        .passthrough()
+    ),
+    created_on: z.string(),
+    modified_on: z.string(),
+    exited_on: z.string().nullable(),
+    exit_type: z.string().nullable()
+  })
+  .passthrough();
+const campaignSchema = z
+  .object({
+    uuid: z.string(),
+    name: z.string(),
+    archived: z.boolean(),
+    group: named,
+    created_on: z.string()
+  })
+  .passthrough();
+const campaignEventSchema = z
+  .object({
+    uuid: z.string(),
+    campaign: named,
+    relative_to: z.object({ key: z.string(), name: z.string() }).passthrough(),
+    offset: z.number(),
+    unit: z.string(),
+    delivery_hour: z.number(),
+    message: z.record(z.string(), z.string()).nullable(),
+    flow: named.nullable(),
+    created_on: z.string()
+  })
+  .passthrough();
+const channelSchema = z
+  .object({
+    uuid: z.string(),
+    name: z.string(),
+    address: z.string(),
+    country: z.string().nullable(),
+    last_seen: z.string().nullable(),
+    created_on: z.string()
+  })
+  .passthrough();
+const labelSchema = z
+  .object({ uuid: z.string(), name: z.string(), count: z.number() })
+  .passthrough();
+const ticketSchema = z
+  .object({
+    uuid: z.string(),
+    contact: contactRef,
+    status: z.enum(['open', 'closed']),
+    topic: named.nullable(),
+    assignee: z.object({ email: z.string(), name: z.string() }).passthrough().nullable(),
+    opened_on: z.string(),
+    modified_on: z.string(),
+    closed_on: z.string().nullable()
+  })
+  .passthrough();
+const topicSchema = z
+  .object({
+    uuid: z.string(),
+    name: z.string(),
+    counts: z.object({ open: z.number(), closed: z.number() }).passthrough(),
+    system: z.boolean(),
+    created_on: z.string()
+  })
+  .passthrough();
+const workspaceSchema = z
+  .object({
+    uuid: z.string(),
+    name: z.string(),
+    country: z.string(),
+    languages: z.array(z.string()),
+    timezone: z.string(),
+    date_style: z.string(),
+    anon: z.boolean()
+  })
+  .passthrough();
+const globalSchema = z
+  .object({ key: z.string(), name: z.string(), value: z.string(), modified_on: z.string() })
+  .passthrough();
+const userSchema = z
+  .object({
+    email: z.string(),
+    first_name: z.string(),
+    last_name: z.string(),
+    role: z.string(),
+    created_on: z.string()
+  })
+  .passthrough();
+
+export type Contact = z.infer<typeof contactSchema>;
+export type QuickReply = {
+  type?: 'text' | 'form' | 'url' | 'location';
+  text: string;
+  extra?: string;
+};
 export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T[];
 }
+type PageParams = { cursor?: string };
+type ContactData = {
+  name?: string;
+  language?: string;
+  urns?: string[];
+  groups?: string[];
+  fields?: Record<string, string>;
+};
+type EventData = {
+  relative_to?: string;
+  offset?: number;
+  unit?: string;
+  delivery_hour?: number;
+  message?: Record<string, string>;
+  flow?: string;
+};
 
-export interface ContactGroup {
-  uuid: string;
-  name: string;
+export function requireText(
+  value: string | undefined,
+  field: string
+): asserts value is string {
+  if (!value?.trim())
+    throw createApiServiceError(`${field} is required.`, { reason: 'textit_invalid_input' });
 }
-
-export interface Contact {
-  uuid: string;
-  name: string | null;
-  status: 'active' | 'blocked' | 'stopped' | 'archived';
-  language: string | null;
-  urns: string[];
-  groups: ContactGroup[];
-  fields: Record<string, string | null>;
-  flow: { uuid: string; name: string } | null;
-  created_on: string;
-  modified_on: string;
-  last_seen_on: string | null;
+export function validateList(values: string[] | undefined, field: string, max = 100): void {
+  if (values && (values.length > max || values.some(v => !v.trim())))
+    throw createApiServiceError(`${field} must contain at most ${max} non-empty values.`, {
+      reason: 'textit_invalid_input'
+    });
 }
-
-export interface Group {
-  uuid: string;
-  name: string;
-  query: string | null;
-  status: string;
-  system: boolean;
-  count: number;
+export function validateRecipients(data: {
+  contacts?: string[];
+  groups?: string[];
+  urns?: string[];
+}): void {
+  for (const [key, values] of Object.entries(data)) validateList(values, key);
+  if (![data.contacts, data.groups, data.urns].some(v => v && v.length > 0))
+    throw createApiServiceError('Provide at least one contact, group, or URN.', {
+      reason: 'textit_invalid_input'
+    });
 }
-
-export interface Field {
-  key: string;
-  name: string;
-  type: string;
-}
-
-export interface Message {
-  uuid: string;
-  contact: { uuid: string; name: string | null };
-  urn: string;
-  channel: { uuid: string; name: string } | null;
-  direction: 'incoming' | 'outgoing';
-  type: string;
-  status: string;
-  visibility: string;
-  text: string;
-  attachments: string[];
-  labels: { uuid: string; name: string }[];
-  flow: { uuid: string; name: string } | null;
-  created_on: string;
-  sent_on: string | null;
-  modified_on: string;
-}
-
-export interface Broadcast {
-  uuid: string;
-  urns: string[];
-  contacts: { uuid: string; name: string }[];
-  groups: { uuid: string; name: string }[];
-  text: Record<string, string>;
-  status: string;
-  created_on: string;
-}
-
-export interface Flow {
-  uuid: string;
-  name: string;
-  type: string;
-  archived: boolean;
-  labels: { uuid: string; name: string }[];
-  expires: number;
-  runs: { active: number; completed: number; interrupted: number; expired: number };
-  results: Array<{ key: string; name: string; categories: string[]; node_uuids: string[] }>;
-  parent_refs: string[];
-  created_on: string;
-  modified_on: string;
-}
-
-export interface FlowStart {
-  uuid: string;
-  flow: { uuid: string; name: string };
-  contacts: { uuid: string; name: string }[];
-  groups: { uuid: string; name: string }[];
-  status: string;
-  params: Record<string, any> | null;
-  created_on: string;
-  modified_on: string;
-}
-
-export interface Run {
-  uuid: string;
-  flow: { uuid: string; name: string };
-  contact: { uuid: string; urn: string; name: string };
-  start: { uuid: string } | null;
-  responded: boolean;
-  values: Record<
-    string,
-    {
-      value: string;
-      category: string;
-      node: string;
-      time: string;
-      name: string;
-      input: string;
-    }
-  >;
-  created_on: string;
-  modified_on: string;
-  exited_on: string | null;
-  exit_type: string | null;
-}
-
-export interface Campaign {
-  uuid: string;
-  name: string;
-  archived: boolean;
-  group: { uuid: string; name: string };
-  created_on: string;
-}
-
-export interface CampaignEvent {
-  uuid: string;
-  campaign: { uuid: string; name: string };
-  relative_to: { key: string; name: string };
-  offset: number;
-  unit: 'minutes' | 'hours' | 'days' | 'weeks';
-  delivery_hour: number;
-  message: Record<string, string> | null;
-  flow: { uuid: string; name: string } | null;
-  created_on: string;
-}
-
-export interface Channel {
-  uuid: string;
-  name: string;
-  address: string;
-  country: string;
-  device: Record<string, any> | null;
-  last_seen: string;
-  created_on: string;
-}
-
-export interface Label {
-  uuid: string;
-  name: string;
-  count: number;
-}
-
-export interface Ticket {
-  uuid: string;
-  contact: { uuid: string; name: string | null };
-  status: 'open' | 'closed';
-  topic: { uuid: string; name: string } | null;
-  assignee: { email: string; name: string } | null;
-  opened_on: string;
-  modified_on: string;
-  closed_on: string | null;
-}
-
-export interface Topic {
-  uuid: string;
-  name: string;
-  counts: { open: number; closed: number };
-  system: boolean;
-  created_on: string;
-}
-
-export interface Workspace {
-  uuid: string;
-  name: string;
-  country: string;
-  languages: string[];
-  timezone: string;
-  date_style: string;
-  anon: boolean;
-}
-
-export interface Global {
-  key: string;
-  name: string;
-  value: string;
-  modified_on: string;
-}
-
-export interface Resthook {
-  resthook: string;
-  created_on: string;
-  modified_on: string;
-}
-
-export interface ResthookSubscriber {
-  id: number;
-  resthook: string;
-  target_url: string;
-  created_on: string;
-}
-
-export interface ResthookEvent {
-  resthook: string;
-  data: Record<string, any>;
-  created_on: string;
+function validateReply(reply: QuickReply): void {
+  requireText(reply.text, 'Quick reply text');
+  if (reply.text.length > 64 || (reply.extra?.length ?? 0) > 1000)
+    throw createApiServiceError(
+      'Quick reply text must be at most 64 characters and extra at most 1000 characters.'
+    );
 }
 
 export class Client {
   private axios;
-
-  constructor(token: string) {
-    this.axios = createAxios({
+  constructor(private token: string) {
+    requireText(token, 'API token');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://textit.com/api/v2',
-      headers: {
-        Authorization: `Token ${token}`
-      }
+      authHeader: { value: `Token ${token}` },
+      timeout: 30000,
+      maxRedirects: 0,
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'TextIt',
+          reason: 'textit_api_error',
+          extractResponse: (value, helpers) => {
+            const response = helpers.getResponseWithBody(value);
+            return response ? { ...response, data: this.redact(response.data) } : undefined;
+          },
+          extractMessage: (value, helpers) => {
+            const response = helpers.getResponseWithBody(value);
+            if (response?.data === undefined) return undefined;
+            const details: string[] = [];
+            const visit = (item: unknown, path: string, depth: number): void => {
+              if (depth > 5 || details.length >= 5) return;
+              if (Array.isArray(item)) {
+                item.forEach((entry, index) => visit(entry, `${path}[${index}]`, depth + 1));
+                return;
+              }
+              if (item && typeof item === 'object') {
+                Object.entries(item).forEach(([key, entry]) => {
+                  const field = this.redact(key).slice(0, 80);
+                  const segment = /^[A-Za-z_][A-Za-z0-9_]*$/.test(field)
+                    ? `${path ? '.' : ''}${field}`
+                    : `[${JSON.stringify(field)}]`;
+                  visit(entry, `${path}${segment}`.slice(0, 240), depth + 1);
+                });
+                return;
+              }
+              const messages: string[] = [];
+              helpers.collectDetails(item, messages, { includeNumbers: false });
+              for (const message of messages) {
+                const detail = path ? `${path}: ${message}` : message;
+                if (!details.includes(detail)) details.push(detail);
+              }
+            };
+            visit(this.redact(response.data), '', 0);
+            return details.length ? details.join('; ').slice(0, 1000) : undefined;
+          },
+          extractUpstreamCode: (value, _response, helpers) => {
+            const body = helpers.getResponseWithBody(value)?.data;
+            const code = helpers.isRecord(body) ? body.code : undefined;
+            return typeof code === 'string' || typeof code === 'number'
+              ? this.redact(String(code))
+              : undefined;
+          },
+          formatMessage: parts =>
+            this.redact(`TextIt API request failed: ${parts.statusLabel}${parts.message}`),
+          parent: {}
+        })
     });
   }
-
-  // Contacts
-  async listContacts(params?: {
-    uuid?: string;
-    urn?: string;
-    group?: string;
-    before?: string;
-    after?: string;
-    cursor?: string;
-  }): Promise<PaginatedResponse<Contact>> {
-    let url = '/contacts.json';
-    if (params?.cursor) {
-      let response = await this.axios.get(params.cursor);
-      return response.data;
+  redact<T>(value: T): T {
+    const clean = (item: unknown): unknown => {
+      if (typeof item === 'string') {
+        if (this.revealsToken(item)) return '[REDACTED]';
+        return item.replace(
+          /([?&](?:api[_-]?key|token|access_token|refresh_token|api[_-]?token|auth|authorization|password|secret)=)[^&#\s]*/gi,
+          '$1[REDACTED]'
+        );
+      }
+      if (Array.isArray(item)) return item.map(clean);
+      if (item && typeof item === 'object')
+        return Object.fromEntries(
+          Object.entries(item).map(([key, entry]) => [clean(key), clean(entry)])
+        );
+      return item;
+    };
+    return clean(value) as T;
+  }
+  private revealsToken(value: string): boolean {
+    let candidate = value;
+    // Inspect each complete decoding representation before decoding again.
+    // Every changing pass removes at least two characters, so nesting is
+    // bounded by the original input length rather than a fail-open cutoff.
+    while (true) {
+      const normalized = candidate.replace(/[\t\n\r]/g, '');
+      if (candidate.includes(this.token) || normalized.includes(this.token)) return true;
+      const urls = normalized.match(/https?:\/\/[^\s<>"']+/gi) ?? [];
+      for (const possibleUrl of [normalized, ...urls]) {
+        let url: URL;
+        try {
+          url = new URL(possibleUrl);
+        } catch {
+          continue;
+        }
+        if (url.href.includes(this.token) || url.hostname.includes(this.token.toLowerCase()))
+          return true;
+        const components = [url.username, url.password, url.pathname, url.hash];
+        for (const [key, entry] of url.searchParams) components.push(key, entry);
+        if (components.some(part => part.replace(/[\t\n\r]/g, '').includes(this.token)))
+          return true;
+      }
+      const decoded = candidate.replace(/(?:%[0-9a-f]{2})+/gi, encoded =>
+        Buffer.from(encoded.replaceAll('%', ''), 'hex').toString('utf8')
+      );
+      if (decoded === candidate) return false;
+      candidate = decoded;
     }
-    let response = await this.axios.get(url, { params });
-    return response.data;
+  }
+  private parse<S extends z.ZodType>(schema: S, value: unknown): z.infer<S> {
+    const parsed = schema.safeParse(this.redact(value));
+    if (!parsed.success)
+      throw createApiServiceError(
+        this.redact(
+          `TextIt returned an invalid response (${parsed.error.issues.map(issue => issue.path.join('.')).join(', ')}).`
+        ),
+        { reason: 'textit_invalid_response' }
+      );
+    return parsed.data;
+  }
+  private async read<S extends z.ZodType>(
+    path: string,
+    schema: S,
+    params?: Record<string, unknown>
+  ): Promise<z.infer<S>> {
+    return this.parse(
+      schema,
+      (await this.axios.get(path, { params: pickDefined(params ?? {}) })).data
+    );
+  }
+  private async write<S extends z.ZodType>(
+    path: string,
+    data: object,
+    schema: S,
+    params?: Record<string, unknown>
+  ): Promise<z.infer<S>> {
+    return this.parse(
+      schema,
+      (await this.axios.post(path, pickDefined(data), { params })).data
+    );
+  }
+  private async page<S extends z.ZodType>(
+    path: string,
+    schema: S,
+    params: Record<string, unknown> = {}
+  ): Promise<PaginatedResponse<z.infer<S>>> {
+    const { cursor, ...filters } = params;
+    if (
+      cursor !== undefined &&
+      (typeof cursor !== 'string' ||
+        !cursor.trim() ||
+        /^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(cursor))
+    )
+      throw createApiServiceError(
+        'cursor must be the opaque nextCursor value returned by this tool.'
+      );
+    const result = await this.read(
+      path,
+      z
+        .object({
+          next: z.string().nullable(),
+          previous: z.string().nullable(),
+          results: z.array(schema)
+        })
+        .passthrough(),
+      { ...filters, cursor }
+    );
+    for (const link of [result.next, result.previous])
+      if (link !== null) {
+        let url: URL;
+        try {
+          url = new URL(link, 'https://textit.com');
+        } catch {
+          throw createApiServiceError('TextIt returned an invalid pagination link.');
+        }
+        if (
+          url.origin !== 'https://textit.com' ||
+          url.username ||
+          url.password ||
+          url.pathname !== `/api/v2${path}` ||
+          url.hash ||
+          !url.searchParams.get('cursor') ||
+          [...url.searchParams.keys()].some(key =>
+            /^(?:token|api[_-]?key|api[_-]?token|authorization|access_token|refresh_token|secret|password|auth)$/i.test(
+              key
+            )
+          )
+        )
+          throw createApiServiceError('TextIt returned an unsafe pagination link.');
+      }
+    return result;
+  }
+  nextCursor(page: { next: string | null }): string | null {
+    return page.next === null
+      ? null
+      : new URL(page.next, 'https://textit.com').searchParams.get('cursor');
   }
 
-  async createContact(data: {
-    name?: string;
-    language?: string;
-    urns?: string[];
-    groups?: string[];
-    fields?: Record<string, string>;
-  }): Promise<Contact> {
-    let response = await this.axios.post('/contacts.json', data);
-    return response.data;
-  }
-
-  async updateContact(
-    identifier: { uuid?: string; urn?: string },
-    data: {
-      name?: string;
-      language?: string;
-      urns?: string[];
-      groups?: string[];
-      fields?: Record<string, string>;
+  listContacts(
+    params?: PageParams & {
+      uuid?: string;
+      urn?: string;
+      group?: string;
+      before?: string;
+      after?: string;
     }
-  ): Promise<Contact> {
-    let params: Record<string, string> = {};
-    if (identifier.uuid) params.uuid = identifier.uuid;
-    else if (identifier.urn) params.urn = identifier.urn;
-    let response = await this.axios.post('/contacts.json', data, { params });
-    return response.data;
+  ) {
+    return this.page('/contacts.json', contactSchema, params);
   }
-
-  async deleteContact(identifier: { uuid?: string; urn?: string }): Promise<void> {
-    let params: Record<string, string> = {};
-    if (identifier.uuid) params.uuid = identifier.uuid;
-    else if (identifier.urn) params.urn = identifier.urn;
-    await this.axios.delete('/contacts.json', { params });
+  createContact(data: ContactData) {
+    validateList(data.urns, 'urns');
+    validateList(data.groups, 'groups');
+    return this.write('/contacts.json', data, contactSchema);
   }
-
-  // Contact Actions
+  updateContact(identifier: { uuid?: string; urn?: string }, data: ContactData) {
+    this.contactIdentifier(identifier);
+    if (!identifier.uuid && identifier.urn && data.urns !== undefined)
+      throw createApiServiceError(
+        'Use contactUuid when changing URNs; contactUrn cannot be combined with urns.'
+      );
+    validateList(data.urns, 'urns');
+    validateList(data.groups, 'groups');
+    return this.write('/contacts.json', data, contactSchema, pickDefined(identifier));
+  }
+  async deleteContact(identifier: { uuid?: string; urn?: string }) {
+    this.contactIdentifier(identifier);
+    await this.axios.delete('/contacts.json', { params: pickDefined(identifier) });
+  }
+  private contactIdentifier(identifier: { uuid?: string; urn?: string }) {
+    if (Boolean(identifier.uuid) === Boolean(identifier.urn))
+      throw createApiServiceError('Provide exactly one of contactUuid or contactUrn.');
+  }
   async performContactAction(data: {
     contacts: string[];
     action:
@@ -285,335 +501,307 @@ export class Client {
       | 'interrupt'
       | 'delete';
     group?: string;
-  }): Promise<void> {
-    await this.axios.post('/contact_actions.json', data);
+  }) {
+    validateList(data.contacts, 'contactUuids');
+    if (!data.contacts.length)
+      throw createApiServiceError('Provide at least one contact UUID.');
+    if (['add', 'remove'].includes(data.action)) requireText(data.group, 'groupUuid');
+    else if (data.group !== undefined)
+      throw createApiServiceError('groupUuid is only used by add and remove.');
+    await this.axios.post('/contact_actions.json', pickDefined(data));
   }
-
-  // Groups
-  async listGroups(params?: {
-    uuid?: string;
-    name?: string;
-  }): Promise<PaginatedResponse<Group>> {
-    let response = await this.axios.get('/groups.json', { params });
-    return response.data;
+  listGroups(params?: PageParams & { uuid?: string; name?: string; manual_only?: number }) {
+    return this.page(
+      '/groups.json',
+      groupSchema.extend({ status: z.string(), system: z.boolean() }),
+      params
+    );
   }
-
-  async createGroup(data: { name: string }): Promise<Group> {
-    let response = await this.axios.post('/groups.json', data);
-    return response.data;
+  createGroup(data: { name: string }) {
+    requireText(data.name, 'name');
+    return this.write('/groups.json', data, groupSchema);
   }
-
-  async updateGroup(uuid: string, data: { name: string }): Promise<Group> {
-    let response = await this.axios.post('/groups.json', data, { params: { uuid } });
-    return response.data;
+  updateGroup(uuid: string, data: { name: string }) {
+    requireText(uuid, 'groupUuid');
+    requireText(data.name, 'name');
+    return this.write('/groups.json', data, groupSchema, { uuid });
   }
-
-  async deleteGroup(uuid: string): Promise<void> {
+  async deleteGroup(uuid: string) {
+    requireText(uuid, 'groupUuid');
     await this.axios.delete('/groups.json', { params: { uuid } });
   }
-
-  // Fields
-  async listFields(params?: { key?: string }): Promise<PaginatedResponse<Field>> {
-    let response = await this.axios.get('/fields.json', { params });
-    return response.data;
+  listFields(params?: PageParams & { key?: string }) {
+    return this.page('/fields.json', fieldSchema, params);
   }
-
-  async createField(data: { name: string; type: string }): Promise<Field> {
-    let response = await this.axios.post('/fields.json', data);
-    return response.data;
+  createField(data: { name: string; type: string }) {
+    requireText(data.name, 'name');
+    return this.write('/fields.json', data, fieldSchema);
   }
-
-  async updateField(key: string, data: { name: string; type: string }): Promise<Field> {
-    let response = await this.axios.post('/fields.json', data, { params: { key } });
-    return response.data;
+  updateField(key: string, data: { name: string; type: string }) {
+    requireText(key, 'fieldKey');
+    requireText(data.name, 'name');
+    return this.write('/fields.json', data, fieldSchema, { key });
   }
-
-  // Messages
-  async listMessages(params?: {
-    uuid?: string;
-    folder?: 'inbox' | 'flows' | 'archived' | 'outbox' | 'sent' | 'failed';
-    before?: string;
-    after?: string;
-    contact?: string;
-    label?: string;
-    cursor?: string;
-  }): Promise<PaginatedResponse<Message>> {
-    if (params?.cursor) {
-      let response = await this.axios.get(params.cursor);
-      return response.data;
+  listMessages(
+    params?: PageParams & {
+      uuid?: string;
+      folder?: string;
+      before?: string;
+      after?: string;
+      contact?: string;
+      label?: string;
     }
-    let response = await this.axios.get('/messages.json', { params });
-    return response.data;
+  ) {
+    return this.page('/messages.json', messageSchema, params);
   }
-
-  async sendMessage(data: {
+  sendMessage(data: {
     contact: string;
     text: string;
     attachments?: string[];
-    quick_replies?: string[];
-  }): Promise<Message> {
-    let response = await this.axios.post('/messages.json', data);
-    return response.data;
+    quick_replies?: QuickReply[];
+  }) {
+    requireText(data.contact, 'contactUuid');
+    validateList(data.attachments, 'attachments', 10);
+    if ((data.quick_replies?.length ?? 0) > 10)
+      throw createApiServiceError('Provide at most 10 quick replies.');
+    data.quick_replies?.forEach(validateReply);
+    return this.write('/messages.json', data, sentMessageSchema);
   }
-
-  // Message Actions
-  async performMessageAction(data: {
-    messages: number[];
-    action: 'label' | 'unlabel' | 'archive' | 'restore' | 'delete';
-    label?: string;
-  }): Promise<void> {
-    await this.axios.post('/message_actions.json', data);
+  listBroadcasts(params?: PageParams & { uuid?: string; before?: string; after?: string }) {
+    return this.page('/broadcasts.json', broadcastSchema, params);
   }
-
-  // Broadcasts
-  async listBroadcasts(params?: {
-    uuid?: string;
-    before?: string;
-    after?: string;
-  }): Promise<PaginatedResponse<Broadcast>> {
-    let response = await this.axios.get('/broadcasts.json', { params });
-    return response.data;
-  }
-
-  async sendBroadcast(data: {
+  sendBroadcast(data: {
     text: Record<string, string>;
     urns?: string[];
     contacts?: string[];
     groups?: string[];
     base_language?: string;
-  }): Promise<Broadcast> {
-    let response = await this.axios.post('/broadcasts.json', data);
-    return response.data;
+    attachments?: Record<string, string[]>;
+    quick_replies?: Record<string, QuickReply[]>;
+  }) {
+    validateRecipients({ urns: data.urns, contacts: data.contacts, groups: data.groups });
+    if (!Object.keys(data.text).length)
+      throw createApiServiceError('Provide at least one text translation.');
+    if (data.base_language && !(data.base_language in data.text))
+      throw createApiServiceError('baseLanguage must have a text translation.');
+    for (const values of Object.values(data.attachments ?? {}))
+      validateList(values, 'attachments', 10);
+    for (const values of Object.values(data.quick_replies ?? {})) {
+      if (values.length > 10)
+        throw createApiServiceError('Provide at most 10 quick replies per language.');
+      values.forEach(validateReply);
+    }
+    return this.write('/broadcasts.json', data, broadcastSchema);
   }
-
-  // Flows
-  async listFlows(params?: {
-    uuid?: string;
-    type?: string;
-    archived?: boolean;
-    before?: string;
-    after?: string;
-  }): Promise<PaginatedResponse<Flow>> {
-    let response = await this.axios.get('/flows.json', { params });
-    return response.data;
+  listFlows(
+    params?: PageParams & {
+      uuid?: string;
+      type?: string;
+      archived?: boolean;
+      before?: string;
+      after?: string;
+    }
+  ) {
+    return this.page('/flows.json', flowSchema, params);
   }
-
-  // Flow Starts
-  async listFlowStarts(params?: { uuid?: string }): Promise<PaginatedResponse<FlowStart>> {
-    let response = await this.axios.get('/flow_starts.json', { params });
-    return response.data;
+  listFlowStarts(params?: PageParams & { uuid?: string }) {
+    return this.page('/flow_starts.json', flowStartSchema, params);
   }
-
-  async startFlow(data: {
+  startFlow(data: {
     flow: string;
     groups?: string[];
     contacts?: string[];
     urns?: string[];
     restart_participants?: boolean;
     exclude_active?: boolean;
-    params?: Record<string, any>;
-  }): Promise<FlowStart> {
-    let response = await this.axios.post('/flow_starts.json', data);
-    return response.data;
-  }
-
-  // Runs
-  async listRuns(params?: {
-    uuid?: string;
-    flow?: string;
-    contact?: string;
-    responded?: boolean;
-    before?: string;
-    after?: string;
-    cursor?: string;
-  }): Promise<PaginatedResponse<Run>> {
-    if (params?.cursor) {
-      let response = await this.axios.get(params.cursor);
-      return response.data;
+    params?: Record<string, unknown>;
+  }) {
+    requireText(data.flow, 'flowUuid');
+    validateRecipients({ groups: data.groups, contacts: data.contacts, urns: data.urns });
+    if (data.params) {
+      let serialized: string;
+      try {
+        serialized = JSON.stringify(data.params);
+      } catch {
+        throw createApiServiceError('Flow params must be JSON serializable.');
+      }
+      if (serialized.length > 10240)
+        throw createApiServiceError('Flow params must not exceed 10KB.');
     }
-    let response = await this.axios.get('/runs.json', { params });
-    return response.data;
+    return this.write('/flow_starts.json', data, flowStartSchema);
   }
-
-  // Campaigns
-  async listCampaigns(params?: {
-    uuid?: string;
-    before?: string;
-    after?: string;
-  }): Promise<PaginatedResponse<Campaign>> {
-    let response = await this.axios.get('/campaigns.json', { params });
-    return response.data;
-  }
-
-  async createCampaign(data: { name: string; group: string }): Promise<Campaign> {
-    let response = await this.axios.post('/campaigns.json', data);
-    return response.data;
-  }
-
-  async updateCampaign(
-    uuid: string,
-    data: { name?: string; group?: string }
-  ): Promise<Campaign> {
-    let response = await this.axios.post('/campaigns.json', data, { params: { uuid } });
-    return response.data;
-  }
-
-  // Campaign Events
-  async listCampaignEvents(params?: {
-    uuid?: string;
-    campaign?: string;
-  }): Promise<PaginatedResponse<CampaignEvent>> {
-    let response = await this.axios.get('/campaign_events.json', { params });
-    return response.data;
-  }
-
-  async createCampaignEvent(data: {
-    campaign: string;
-    relative_to: string;
-    offset: number;
-    unit: string;
-    delivery_hour: number;
-    message?: Record<string, string>;
-    flow?: string;
-  }): Promise<CampaignEvent> {
-    let response = await this.axios.post('/campaign_events.json', data);
-    return response.data;
-  }
-
-  async updateCampaignEvent(
-    uuid: string,
-    data: {
-      relative_to?: string;
-      offset?: number;
-      unit?: string;
-      delivery_hour?: number;
-      message?: Record<string, string>;
+  listRuns(
+    params?: PageParams & {
+      uuid?: string;
       flow?: string;
+      contact?: string;
+      responded?: boolean;
+      before?: string;
+      after?: string;
     }
-  ): Promise<CampaignEvent> {
-    let response = await this.axios.post('/campaign_events.json', data, { params: { uuid } });
-    return response.data;
+  ) {
+    if (params?.flow && params?.contact)
+      throw createApiServiceError('Filter runs by either flowUuid or contactUuid, not both.');
+    return this.page('/runs.json', runSchema, params);
   }
-
-  async deleteCampaignEvent(uuid: string): Promise<void> {
+  listCampaigns(params?: PageParams & { uuid?: string; before?: string; after?: string }) {
+    return this.page('/campaigns.json', campaignSchema, params);
+  }
+  createCampaign(data: { name: string; group: string }) {
+    requireText(data.name, 'name');
+    requireText(data.group, 'groupUuid');
+    return this.write('/campaigns.json', data, campaignSchema);
+  }
+  async updateCampaign(uuid: string, data: { name?: string; group?: string }) {
+    requireText(uuid, 'campaignUuid');
+    const existing =
+      data.name === undefined || data.group === undefined
+        ? (await this.listCampaigns({ uuid })).results.find(item => item.uuid === uuid)
+        : undefined;
+    if ((data.name === undefined || data.group === undefined) && !existing)
+      throw createApiServiceError('Campaign was not found.');
+    const complete = {
+      name: data.name ?? existing?.name,
+      group: data.group ?? existing?.group.uuid
+    };
+    requireText(complete.name, 'name');
+    requireText(complete.group, 'groupUuid');
+    return this.write('/campaigns.json', complete, campaignSchema, { uuid });
+  }
+  listCampaignEvents(params?: PageParams & { uuid?: string; campaign?: string }) {
+    return this.page('/campaign_events.json', campaignEventSchema, params);
+  }
+  private validateEvent(data: EventData, create: boolean) {
+    if (create) {
+      requireText(data.relative_to, 'relativeTo');
+      requireText(data.unit, 'unit');
+      if (
+        data.offset === undefined ||
+        data.delivery_hour === undefined ||
+        (!data.message && !data.flow)
+      )
+        throw createApiServiceError(
+          'Creation requires offset, deliveryHour, and exactly one of message or flowUuid.'
+        );
+    }
+    if (data.message !== undefined && data.flow !== undefined)
+      throw createApiServiceError('Provide either message or flowUuid, not both.');
+    if (data.offset !== undefined && !Number.isInteger(data.offset))
+      throw createApiServiceError('offset must be an integer.');
+    if (
+      data.delivery_hour !== undefined &&
+      (!Number.isInteger(data.delivery_hour) ||
+        data.delivery_hour < -1 ||
+        data.delivery_hour > 24)
+    )
+      throw createApiServiceError('deliveryHour must be an integer from -1 to 24.');
+  }
+  createCampaignEvent(
+    data: EventData & {
+      campaign: string;
+      relative_to: string;
+      offset: number;
+      unit: string;
+      delivery_hour: number;
+    }
+  ) {
+    requireText(data.campaign, 'campaignUuid');
+    this.validateEvent(data, true);
+    return this.write('/campaign_events.json', data, campaignEventSchema);
+  }
+  async updateCampaignEvent(uuid: string, data: EventData) {
+    requireText(uuid, 'eventUuid');
+    this.validateEvent(data, false);
+    const existing = (await this.listCampaignEvents({ uuid })).results.find(
+      item => item.uuid === uuid
+    );
+    if (!existing) throw createApiServiceError('Campaign event was not found.');
+    const complete = {
+      campaign: existing.campaign.uuid,
+      relative_to: data.relative_to ?? existing.relative_to.key,
+      offset: data.offset ?? existing.offset,
+      unit: data.unit ?? existing.unit,
+      delivery_hour: data.delivery_hour ?? existing.delivery_hour,
+      ...(data.message !== undefined
+        ? { message: data.message }
+        : data.flow !== undefined
+          ? { flow: data.flow }
+          : existing.message !== null
+            ? { message: existing.message }
+            : { flow: existing.flow?.uuid })
+    };
+    this.validateEvent(complete, true);
+    return this.write('/campaign_events.json', complete, campaignEventSchema, { uuid });
+  }
+  async deleteCampaignEvent(uuid: string) {
+    requireText(uuid, 'eventUuid');
     await this.axios.delete('/campaign_events.json', { params: { uuid } });
   }
-
-  // Channels
-  async listChannels(params?: {
-    uuid?: string;
-    address?: string;
-  }): Promise<PaginatedResponse<Channel>> {
-    let response = await this.axios.get('/channels.json', { params });
-    return response.data;
+  listChannels(params?: PageParams & { uuid?: string; address?: string }) {
+    return this.page('/channels.json', channelSchema, params);
   }
-
-  // Labels
-  async listLabels(params?: {
-    uuid?: string;
-    name?: string;
-  }): Promise<PaginatedResponse<Label>> {
-    let response = await this.axios.get('/labels.json', { params });
-    return response.data;
+  listLabels(params?: PageParams & { uuid?: string; name?: string }) {
+    return this.page('/labels.json', labelSchema, params);
   }
-
-  async createLabel(data: { name: string }): Promise<Label> {
-    let response = await this.axios.post('/labels.json', data);
-    return response.data;
+  createLabel(data: { name: string }) {
+    requireText(data.name, 'name');
+    return this.write('/labels.json', data, labelSchema);
   }
-
-  async updateLabel(uuid: string, data: { name: string }): Promise<Label> {
-    let response = await this.axios.post('/labels.json', data, { params: { uuid } });
-    return response.data;
+  updateLabel(uuid: string, data: { name: string }) {
+    requireText(uuid, 'labelUuid');
+    requireText(data.name, 'name');
+    return this.write('/labels.json', data, labelSchema, { uuid });
   }
-
-  async deleteLabel(uuid: string): Promise<void> {
+  async deleteLabel(uuid: string) {
+    requireText(uuid, 'labelUuid');
     await this.axios.delete('/labels.json', { params: { uuid } });
   }
-
-  // Tickets
-  async listTickets(params?: {
-    uuid?: string;
-    contact?: string;
-  }): Promise<PaginatedResponse<Ticket>> {
-    let response = await this.axios.get('/tickets.json', { params });
-    return response.data;
+  listTickets(params?: PageParams & { uuid?: string; contact?: string }) {
+    return this.page('/tickets.json', ticketSchema, params);
   }
-
-  // Ticket Actions
   async performTicketAction(data: {
     tickets: string[];
     action: 'assign' | 'note' | 'close' | 'reopen';
     assignee?: string;
     note?: string;
-  }): Promise<void> {
-    await this.axios.post('/ticket_actions.json', data);
+  }) {
+    validateList(data.tickets, 'ticketUuids');
+    if (!data.tickets.length) throw createApiServiceError('Provide at least one ticket UUID.');
+    if (data.action === 'assign') requireText(data.assignee, 'assigneeEmail');
+    if (data.action === 'note') requireText(data.note, 'noteText');
+    await this.axios.post(
+      '/ticket_actions.json',
+      pickDefined({ ...data, action: data.action === 'note' ? 'add_note' : data.action })
+    );
   }
-
-  // Topics
-  async listTopics(): Promise<PaginatedResponse<Topic>> {
-    let response = await this.axios.get('/topics.json');
-    return response.data;
+  listTopics(params?: PageParams) {
+    return this.page('/topics.json', topicSchema, params);
   }
-
-  async createTopic(data: { name: string }): Promise<Topic> {
-    let response = await this.axios.post('/topics.json', data);
-    return response.data;
+  createTopic(data: { name: string }) {
+    requireText(data.name, 'name');
+    return this.write('/topics.json', data, topicSchema);
   }
-
-  // Workspace
-  async getWorkspace(): Promise<Workspace> {
-    let response = await this.axios.get('/workspace.json');
-    return response.data;
+  listUsers(params?: PageParams & { uuid?: string }) {
+    return this.page('/users.json', userSchema, params);
   }
-
-  // Globals
-  async listGlobals(): Promise<PaginatedResponse<Global>> {
-    let response = await this.axios.get('/globals.json');
-    return response.data;
+  getWorkspaceIdentity() {
+    return this.read(
+      '/workspace.json',
+      workspaceSchema.pick({ uuid: true, name: true }).passthrough()
+    );
   }
-
-  async createGlobal(data: { name: string; value: string }): Promise<Global> {
-    let response = await this.axios.post('/globals.json', data);
-    return response.data;
+  getWorkspace() {
+    return this.read('/workspace.json', workspaceSchema);
   }
-
-  async updateGlobal(key: string, data: { name?: string; value?: string }): Promise<Global> {
-    let response = await this.axios.post('/globals.json', data, { params: { key } });
-    return response.data;
+  listGlobals(params?: PageParams) {
+    return this.page('/globals.json', globalSchema, params);
   }
-
-  // Resthooks
-  async listResthooks(): Promise<PaginatedResponse<Resthook>> {
-    let response = await this.axios.get('/resthooks.json');
-    return response.data;
+  createGlobal(data: { name: string; value: string }) {
+    requireText(data.name, 'name');
+    return this.write('/globals.json', data, globalSchema);
   }
-
-  // Resthook Subscribers
-  async listResthookSubscribers(params?: {
-    resthook?: string;
-  }): Promise<PaginatedResponse<ResthookSubscriber>> {
-    let response = await this.axios.get('/resthook_subscribers.json', { params });
-    return response.data;
-  }
-
-  async createResthookSubscriber(data: {
-    resthook: string;
-    target_url: string;
-  }): Promise<ResthookSubscriber> {
-    let response = await this.axios.post('/resthook_subscribers.json', data);
-    return response.data;
-  }
-
-  async deleteResthookSubscriber(id: number): Promise<void> {
-    await this.axios.delete('/resthook_subscribers.json', { params: { id } });
-  }
-
-  // Resthook Events
-  async listResthookEvents(params?: {
-    resthook?: string;
-  }): Promise<PaginatedResponse<ResthookEvent>> {
-    let response = await this.axios.get('/resthook_events.json', { params });
-    return response.data;
+  updateGlobal(key: string, data: { name?: string; value?: string }) {
+    requireText(key, 'globalKey');
+    return this.write('/globals.json', data, globalSchema, { key });
   }
 }

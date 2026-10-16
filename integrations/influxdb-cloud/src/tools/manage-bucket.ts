@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 let retentionRuleSchema = z
@@ -11,7 +12,8 @@ let retentionRuleSchema = z
   })
   .passthrough();
 
-let bucketSchema = z.object({
+export let bucketSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   bucketId: z.string().describe('Unique bucket ID'),
   name: z.string().describe('Bucket name'),
   description: z.string().optional().describe('Bucket description'),
@@ -25,14 +27,22 @@ let bucketSchema = z.object({
 export let listBuckets = SlateTool.create(spec, {
   name: 'List Buckets',
   key: 'list_buckets',
-  description: `List all buckets in the organization. Buckets are named storage locations for time-series data with configurable retention periods.
+  description: `List a page of buckets in the organization. Buckets are named storage locations for time-series data with configurable retention periods.
 Supports filtering by name and pagination.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
+      after: z
+        .string()
+        .optional()
+        .describe('Resource ID to seek after; use instead of offset'),
       name: z.string().optional().describe('Filter buckets by exact name'),
       limit: z
         .number()
@@ -43,6 +53,7 @@ Supports filtering by name and pagination.`,
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       buckets: z.array(bucketSchema).describe('List of buckets')
     })
   )
@@ -51,23 +62,25 @@ Supports filtering by name and pagination.`,
 
     let result = await client.listBuckets({
       name: ctx.input.name,
+      after: ctx.input.after,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
 
-    let buckets = (result.buckets || []).map((b: any) => ({
-      bucketId: b.id,
+    let buckets = requireArray(result, 'buckets').map((b: any) => ({
+      raw: b,
+      bucketId: resource(b, ['id', 'name']).id,
       name: b.name,
-      description: b.description,
-      orgId: b.orgID,
-      retentionRules: b.retentionRules,
-      createdAt: b.createdAt,
-      updatedAt: b.updatedAt,
-      type: b.type
+      description: optionalString(b.description),
+      orgId: optionalString(b.orgID),
+      retentionRules: Array.isArray(b.retentionRules) ? b.retentionRules : undefined,
+      createdAt: optionalString(b.createdAt),
+      updatedAt: optionalString(b.updatedAt),
+      type: optionalString(b.type)
     }));
 
     return {
-      output: { buckets },
+      output: { buckets, raw: result },
       message: `Found **${buckets.length}** bucket(s).`
     };
   })
@@ -79,12 +92,16 @@ export let createBucket = SlateTool.create(spec, {
   description: `Create a new bucket in the organization for storing time-series data.
 A bucket is a named location with a configurable retention period that determines how long data is kept.`,
   constraints: ['InfluxDB Cloud Free Plan allows up to two buckets.'],
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       name: z.string().describe('Name for the new bucket'),
       description: z.string().optional().describe('Description of the bucket'),
       retentionSeconds: z
@@ -107,14 +124,17 @@ A bucket is a named location with a configurable retention period that determine
 
     return {
       output: {
-        bucketId: result.id,
+        raw: result,
+        bucketId: resource(result, ['id', 'name']).id,
         name: result.name,
-        description: result.description,
-        orgId: result.orgID,
-        retentionRules: result.retentionRules,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt,
-        type: result.type
+        description: optionalString(result.description),
+        orgId: optionalString(result.orgID),
+        retentionRules: Array.isArray(result.retentionRules)
+          ? result.retentionRules
+          : undefined,
+        createdAt: optionalString(result.createdAt),
+        updatedAt: optionalString(result.updatedAt),
+        type: optionalString(result.type)
       },
       message: `Created bucket **${result.name}** (ID: ${result.id}).`
     };
@@ -152,14 +172,17 @@ export let updateBucket = SlateTool.create(spec, {
 
     return {
       output: {
-        bucketId: result.id,
+        raw: result,
+        bucketId: resource(result, ['id', 'name']).id,
         name: result.name,
-        description: result.description,
-        orgId: result.orgID,
-        retentionRules: result.retentionRules,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt,
-        type: result.type
+        description: optionalString(result.description),
+        orgId: optionalString(result.orgID),
+        retentionRules: Array.isArray(result.retentionRules)
+          ? result.retentionRules
+          : undefined,
+        createdAt: optionalString(result.createdAt),
+        updatedAt: optionalString(result.updatedAt),
+        type: optionalString(result.type)
       },
       message: `Updated bucket **${result.name}** (ID: ${result.id}).`
     };

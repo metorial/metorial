@@ -31,6 +31,7 @@ export let updateCompany = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       companyId: z.number().describe('Company identifier'),
       name: z.string().describe('Company name'),
       legalName: z.string().nullable(),
@@ -52,6 +53,7 @@ export let updateCompany = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: company.raw,
         companyId: company.companyId,
         name: company.name,
         legalName: company.legalName,

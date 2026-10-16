@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { MxClient } from '../lib/client';
 import { spec } from '../spec';
 
-let statementSchema = z.object({
+export let statementSchema = z.object({
   guid: z.string().optional().describe('MX-assigned unique identifier'),
   memberGuid: z.string().optional().nullable().describe('GUID of the member'),
   userGuid: z.string().optional().describe('GUID of the owning user'),
@@ -30,7 +30,7 @@ export let listStatements = SlateTool.create(spec, {
       userGuid: z.string().describe('MX GUID of the user'),
       memberGuid: z.string().describe('MX GUID of the member'),
       page: z.number().optional().describe('Page number'),
-      recordsPerPage: z.number().optional().describe('Records per page (max: 100)')
+      recordsPerPage: z.number().optional().describe('Records per page (max: 1000)')
     })
   )
   .output(
@@ -53,16 +53,7 @@ export let listStatements = SlateTool.create(spec, {
       recordsPerPage: ctx.input.recordsPerPage
     });
 
-    let statements = (result.statements || []).map((s: any) => ({
-      guid: s.guid,
-      memberGuid: s.member_guid,
-      userGuid: s.user_guid,
-      accountGuid: s.account_guid,
-      contentHash: s.content_hash,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at,
-      uri: s.uri
-    }));
+    let statements = result.statements.map(mapStatement);
 
     return {
       output: {
@@ -111,9 +102,20 @@ export let fetchStatements = SlateTool.create(spec, {
       output: {
         memberGuid: member.guid,
         connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated
+        isBeingAggregated: member.is_being_aggregated ?? undefined
       },
       message: `Statement fetch initiated for member **${member.guid}**. Check status and then list statements when complete.`
     };
   })
   .build();
+
+export let mapStatement = (s: Record<string, any>) => ({
+  guid: s.guid ?? undefined,
+  memberGuid: s.member_guid,
+  userGuid: s.user_guid ?? undefined,
+  accountGuid: s.account_guid,
+  contentHash: s.content_hash,
+  createdAt: s.created_at,
+  updatedAt: s.updated_at,
+  uri: s.uri
+});

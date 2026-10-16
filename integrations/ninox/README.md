@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Ninox
 
-Manage workspaces, databases, tables, and records in Ninox's low-code database platform. Create, read, update, and delete records with filtering and upsert support. Execute Ninox query expressions and scripts to retrieve computed data and trigger custom logic. Upload, download, and delete file attachments on records. Retrieve and share views in PDF, HTML, CSV, XLSX, and JSON formats. Track changes across databases, tables, and records using sequence-based polling for synchronization workflows. Manage file and view sharing links.
+Discover teams, databases, and table schemas; create, read, update, upsert, and delete records; execute queries and writable scripts; inspect views; track database or table changes; and list, download, or delete record files.
+
+Use a Ninox Personal Access Token from **Ninox Settings → Integrations**. Public Cloud uses `https://api.ninox.com` by default. Supply your instance URL during authentication for Private Cloud or On-Premises, including any port or reverse-proxy path. Existing connections retain their saved endpoint setting. Private Cloud API roles can restrict operations beyond record reads and writes.
 
 ## License
 

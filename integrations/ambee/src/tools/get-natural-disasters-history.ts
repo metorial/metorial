@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateHistoryRange } from '../lib/validation';
 import { spec } from '../spec';
 
 let disasterHistoryRecordSchema = z.any().describe('Historical natural disaster record');
@@ -48,6 +49,8 @@ export let getNaturalDisastersHistory = SlateTool.create(spec, {
       language: ctx.config.language
     });
 
+    validateHistoryRange(ctx.input.from, ctx.input.to);
+
     let filterParams = {
       eventType: ctx.input.eventType,
       limit: ctx.input.limit,
@@ -79,7 +82,9 @@ export let getNaturalDisastersHistory = SlateTool.create(spec, {
         filterParams
       );
     } else {
-      throw new Error('Provide lat/lng coordinates, a continent code, or a country code.');
+      throw createApiServiceError(
+        'Provide lat/lng coordinates, a continent code, or a country code.'
+      );
     }
 
     let disasters = result.data || [];

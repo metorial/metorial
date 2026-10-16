@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProcFuClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let manageVariables = SlateTool.create(spec, {
 - **get**: Retrieve a variable by name.
 - **set**: Store a value under a variable name.
 - **list**: List all stored variable names.
-- **increment**: Atomically increment a numeric variable.`,
+- **increment**: Add an amount to a numeric variable.`,
   tags: {
     readOnly: false,
     destructive: false
@@ -25,7 +25,11 @@ export let manageVariables = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('The variable name (required for get, set, increment)'),
-      value: z.string().optional().describe('The value to store (required for set)')
+      value: z.string().optional().describe('The value to store (required for set)'),
+      incrementBy: z
+        .number()
+        .optional()
+        .describe('Amount to add for increment, including negative amounts. Defaults to 1.')
     })
   )
   .output(
@@ -41,7 +45,7 @@ export let manageVariables = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.variableName) {
-        throw new Error('variableName is required for get');
+        throw createApiServiceError('variableName is required for get');
       }
       let value = await client.getVariable(ctx.input.variableName);
       return {
@@ -52,7 +56,7 @@ export let manageVariables = SlateTool.create(spec, {
 
     if (ctx.input.action === 'set') {
       if (!ctx.input.variableName || ctx.input.value === undefined) {
-        throw new Error('variableName and value are required for set');
+        throw createApiServiceError('variableName and value are required for set');
       }
       let result = await client.setVariable(ctx.input.variableName, ctx.input.value);
       return {
@@ -71,15 +75,18 @@ export let manageVariables = SlateTool.create(spec, {
 
     if (ctx.input.action === 'increment') {
       if (!ctx.input.variableName) {
-        throw new Error('variableName is required for increment');
+        throw createApiServiceError('variableName is required for increment');
       }
-      let result = await client.incrementVariable(ctx.input.variableName);
+      let result = await client.incrementVariable(
+        ctx.input.variableName,
+        ctx.input.incrementBy ?? 1
+      );
       return {
         output: { variableName: ctx.input.variableName, result },
         message: `Incremented variable **${ctx.input.variableName}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

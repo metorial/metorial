@@ -1,4 +1,4 @@
-# Slates Specification for Fixer
+# Fixer Integration Specification
 
 ## Overview
 
@@ -12,13 +12,13 @@ Fixer API uses API keys to authenticate requests. There are two methods of passi
 
 2. **Via HTTP header (api.apilayer.com):** All requests made to the API must hold a custom HTTP header named `apikey`. Example: `--header 'apikey: YOUR_API_KEY'` with base URL `https://api.apilayer.com/fixer/`.
 
-To obtain an API key, sign up for an account at fixer.io. You can view and manage your API keys in the Accounts page. All API requests must be made over HTTPS. Calls made over plain HTTP will fail.
+The connection's optional `apiHost` selects `apilayer` (the default) or `fixer`. An APILayer Marketplace key uses the APILayer host and header; a fixer.io account key uses the direct host and query parameter. The selected host is saved with the connection. Connections created before this setting existed continue using APILayer. Keys and subscription entitlements are specific to the selected host; no automatic host fallback is performed. Both supported hosts use HTTPS.
 
 ## Features
 
 ### Latest Exchange Rates
 
-Returns real-time exchange rate data for all available or a specific set of currencies. Exchange rates delivered by the Fixer API are by default relative to EUR. You can specify a different base currency and filter output to specific currency symbols. Changing the base currency requires a paid plan.
+Returns real-time exchange rate data for all available or a specific set of currencies. Exchange rates delivered by the Fixer API are by default relative to EUR. You can specify a different base currency and filter output to specific currency symbols. Permitted base currencies and endpoint availability depend on the subscription for the selected API host.
 
 ### Currency Conversion
 
@@ -34,7 +34,7 @@ Returns daily historical exchange rate data between two specified dates for all 
 
 ### Fluctuation Data
 
-Returns fluctuation data between two specified dates for all available or a specific set of currencies. This provides information about how currencies fluctuate on a day-to-day basis, including change and change percentage values.
+Returns fluctuation data between two specified dates for all available or a specific set of currencies. This provides start and end rates, absolute change, and percentage change across the requested period.
 
 ### Supported Currencies List
 
@@ -43,3 +43,14 @@ The Fixer API comes with a constantly updated endpoint returning all available c
 ## Events
 
 The provider does not support events. Fixer is a data-retrieval API for exchange rates and does not offer webhooks or event subscription mechanisms.
+
+## Error Handling And Validation
+
+Provider errors, including HTTP-success responses containing `success: false`, are reported with the provider message, code, and available HTTP status. Empty API keys, malformed calendar dates, reversed date ranges, and time-series ranges longer than 365 days are rejected before sending a request. Existing input and output fields retain their original types, optionalness, and defaults.
+
+## Official References
+
+- [APILayer Marketplace Fixer API](https://marketplace.apilayer.com/fixer-api): APILayer host, API-key header, six endpoint families, response examples.
+- [Fixer API documentation](https://docs.apilayer.com/fixer/docs/api-documentation): direct-host authentication and endpoint query parameters.
+- [Fixer getting started](https://apilayer.portal.swaggerhub.com/fixer/docs/getting-started): direct base URL and provider error envelopes.
+- [APILayer Fixer Postman collection](https://www.postman.com/apilayer/apilayer/documentation/xvuply8/fixer): endpoint request and response details.

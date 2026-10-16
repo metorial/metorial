@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BTCPayClient } from '../lib/client';
+import { storeIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let refundInvoice = SlateTool.create(spec, {
@@ -18,7 +19,7 @@ export let refundInvoice = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      storeId: z.string().describe('Store ID'),
+      storeId: storeIdSchema,
       invoiceId: z.string().describe('Invoice ID to refund'),
       refundVariant: z
         .enum(['RateThen', 'CurrentRate', 'Fiat', 'OverpaidAmount', 'Custom'])
@@ -36,6 +37,12 @@ export let refundInvoice = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Percentage to subtract from the refund (0-100)'),
+      payoutMethods: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Payout method IDs accepted for claiming the refund, such as BTC-CHAIN or BTC-LN'
+        ),
       customAmount: z
         .number()
         .optional()
@@ -48,6 +55,10 @@ export let refundInvoice = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete refund pull payment data'),
       refundLink: z
         .string()
         .optional()
@@ -68,11 +79,13 @@ export let refundInvoice = SlateTool.create(spec, {
       description: ctx.input.description,
       subtractPercentage: ctx.input.subtractPercentage,
       customAmount: ctx.input.customAmount,
-      customCurrency: ctx.input.customCurrency
+      customCurrency: ctx.input.customCurrency,
+      payoutMethods: ctx.input.payoutMethods
     });
 
     return {
       output: {
+        raw: result,
         refundLink: result.viewLink as string | undefined,
         pullPaymentId: result.id as string | undefined
       },

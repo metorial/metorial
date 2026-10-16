@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'finage',
   name: 'Finage',
   description:
-    'Real-time and historical financial market data for stocks, forex, cryptocurrencies, indices, ETFs, commodities, bonds, and fundamentals.',
+    'Stock, forex, and cryptocurrency prices, historical bars, company fundamentals, symbol discovery, market news, calendars, and technical analysis.',
   metadata: {},
   config,
   auth

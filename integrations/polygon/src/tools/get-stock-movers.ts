@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import { polygonOutput, polygonRecords, polygonResponseFields } from '../lib/response';
 import { spec } from '../spec';
 
 export let getStockMovers = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let getStockMovers = SlateTool.create(spec, {
   key: 'get_market_movers',
   description: `Retrieve the top 20 gainers or losers of the day for stocks, forex, or crypto markets. Useful for identifying the day's biggest price movements and trending tickers.`,
   constraints: [
-    'Only includes tickers with a trading volume of 10,000 or more.',
+    'Stock movers include tickers with trading volume of 10,000 or more.',
     'Returns the top 20 tickers in the specified direction.'
   ],
   tags: {
@@ -25,6 +26,7 @@ export let getStockMovers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       movers: z
         .array(
           z.object({
@@ -59,7 +61,7 @@ export let getStockMovers = SlateTool.create(spec, {
       response = await client.getCryptoMovers(ctx.input.direction);
     }
 
-    let movers = (response.tickers || []).map((t: any) => ({
+    let movers = polygonRecords(response.tickers, 'tickers').map((t: any) => ({
       ticker: t.ticker,
       todaysChange: t.todaysChange,
       todaysChangePercent: t.todaysChangePerc,
@@ -76,7 +78,7 @@ export let getStockMovers = SlateTool.create(spec, {
     }));
 
     return {
-      output: { movers },
+      output: polygonOutput({ movers }, response),
       message: `Top ${ctx.input.direction} in ${ctx.input.market}: **${movers.length}** tickers returned.`
     };
   })

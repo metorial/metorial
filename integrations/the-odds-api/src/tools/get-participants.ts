@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getParticipantsTool = SlateTool.create(spec, {
   name: 'Get Participants',
   key: 'get_participants',
-  description: `Retrieve a list of known participants (teams or individual players) for a given sport. Useful for building reference data and mapping team/player names.`,
+  description: `Retrieve a list of known participants (teams or individual players) for a given sport. Team sports return teams, not their player rosters; individual sports return players. Includes known participants that may be inactive.`,
   constraints: ['Costs 1 API credit.'],
   tags: {
     readOnly: true
@@ -14,7 +14,7 @@ export let getParticipantsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      sport: z.string().describe('Sport key (e.g. "americanfootball_nfl")')
+      sport: z.string().describe('Sport key from list_sports (e.g. "americanfootball_nfl")')
     })
   )
   .output(

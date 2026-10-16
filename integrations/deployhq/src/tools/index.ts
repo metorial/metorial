@@ -1,3 +1,13 @@
+export {
+  cancelScheduledDeployment,
+  getProfile,
+  getServer,
+  listZones,
+  manageDeployment,
+  updateProject,
+  updateServer,
+  updateSshCommand
+} from './additional-tools';
 export * from './create-deployment';
 export * from './create-project';
 export * from './create-server';

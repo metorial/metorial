@@ -10,7 +10,7 @@ export let upsertCartTool = SlateTool.create(spec, {
   description: `Send a cart creation or update event to Remarkety to enable abandoned cart recovery campaigns. Cart data includes line items, pricing, customer information, and an optional abandoned checkout URL for recovery links. Keep the same cart ID across updates to avoid duplicates.`,
   instructions: [
     'Use the same cartId for all updates to a given cart to prevent duplicates.',
-    'For anonymous carts, the email and customer fields can be null.',
+    'For anonymous carts, email can be null and customer information can be omitted.',
     'Once a cart becomes an order, use the order tool instead.'
   ],
   tags: {

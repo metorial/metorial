@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, resultNumber, resultText, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let trendsSearch = SlateTool.create(spec, {
@@ -46,6 +46,7 @@ export let trendsSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       timelineData: z
         .array(
@@ -69,7 +70,16 @@ export let trendsSearch = SlateTool.create(spec, {
           z.object({
             location: z.string().optional().describe('Location name'),
             locationCode: z.string().optional().describe('Location code'),
-            value: z.number().optional().describe('Interest value')
+            value: z.number().optional().describe('Interest value for a single search term'),
+            values: z
+              .array(
+                z.object({
+                  query: z.string().optional().describe('Search term'),
+                  value: z.number().optional().describe('Interest value')
+                })
+              )
+              .optional()
+              .describe('Interest values for all compared search terms')
           })
         )
         .optional()
@@ -125,6 +135,22 @@ export let trendsSearch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.query.split(',').length > 5) {
+      throw createApiServiceError('Compare at most five Google Trends search terms.', {
+        reason: 'invalid_trends_query'
+      });
+    }
+    if (ctx.input.region && ctx.input.dataType !== 'GEO_MAP') {
+      throw createApiServiceError('region is only supported for GEO_MAP data.', {
+        reason: 'invalid_trends_region'
+      });
+    }
+    if (ctx.input.region === 'COUNTRY' && ctx.input.geo) {
+      throw createApiServiceError(
+        'COUNTRY granularity requires worldwide geography; omit geo.',
+        { reason: 'invalid_trends_region' }
+      );
+    }
     let client = new SearchApiClient({ token: ctx.auth.token });
 
     let gpropMap: Record<string, string> = {
@@ -147,52 +173,74 @@ export let trendsSearch = SlateTool.create(spec, {
     });
 
     let output: any = {
+      raw: data,
       searchQuery: data.search_parameters?.q || ctx.input.query
     };
 
     if (ctx.input.dataType === 'TIMESERIES') {
-      output.timelineData = (data.timeline_data || []).map((t: any) => ({
+      output.timelineData = resultArray(
+        data.interest_over_time?.timeline_data ?? data.timeline_data,
+        'interest_over_time.timeline_data'
+      ).map((t: any) => ({
         date: t.date,
-        values: (t.values || []).map((v: any) => ({
+        values: resultArray(t.values, 'timeline_data.values').map((v: any) => ({
           query: v.query,
-          value: v.value !== undefined ? v.value : v.extracted_value
+          value: resultNumber(v.extracted_value ?? v.value, 'timeline value')
         }))
       }));
     }
 
     if (ctx.input.dataType === 'GEO_MAP') {
-      output.geoData = (data.interest_by_region || []).map((g: any) => ({
-        location: g.location,
-        locationCode: g.geo || g.location_code,
-        value: g.value !== undefined ? g.value : g.extracted_value
-      }));
+      output.geoData = resultArray(data.interest_by_region, 'interest_by_region').map(
+        (g: any) => ({
+          location: g.name ?? g.location,
+          locationCode: g.geo || g.location_code,
+          value: resultNumber(
+            g.extracted_value ??
+              g.value ??
+              (g.values?.length === 1 ? g.values[0].extracted_value : undefined),
+            'regional value'
+          ),
+          values:
+            g.values === undefined
+              ? undefined
+              : resultArray(g.values, 'interest_by_region.values').map((v: any) => ({
+                  query: v.query,
+                  value: resultNumber(v.extracted_value, 'regional query value')
+                }))
+        })
+      );
     }
 
     if (ctx.input.dataType === 'RELATED_QUERIES') {
       output.relatedQueries = {
-        top: (data.related_queries?.top || []).map((q: any) => ({
+        top: resultArray(data.related_queries?.top, 'related_queries.top').map((q: any) => ({
           query: q.query,
-          value: q.value !== undefined ? q.value : q.extracted_value
+          value: resultNumber(q.extracted_value ?? q.value, 'related query value')
         })),
-        rising: (data.related_queries?.rising || []).map((q: any) => ({
-          query: q.query,
-          value: String(q.value !== undefined ? q.value : q.extracted_value)
-        }))
+        rising: resultArray(data.related_queries?.rising, 'related_queries.rising').map(
+          (q: any) => ({
+            query: q.query,
+            value: resultText(q.values ?? q.value ?? q.extracted_value, 'rising query value')
+          })
+        )
       };
     }
 
     if (ctx.input.dataType === 'RELATED_TOPICS') {
       output.relatedTopics = {
-        top: (data.related_topics?.top || []).map((t: any) => ({
-          title: t.topic?.title,
-          type: t.topic?.type,
-          value: t.value !== undefined ? t.value : t.extracted_value
+        top: resultArray(data.related_topics?.top, 'related_topics.top').map((t: any) => ({
+          title: t.title ?? t.topic?.title,
+          type: t.type ?? t.topic?.type,
+          value: resultNumber(t.extracted_value ?? t.value, 'related topic value')
         })),
-        rising: (data.related_topics?.rising || []).map((t: any) => ({
-          title: t.topic?.title,
-          type: t.topic?.type,
-          value: String(t.value !== undefined ? t.value : t.extracted_value)
-        }))
+        rising: resultArray(data.related_topics?.rising, 'related_topics.rising').map(
+          (t: any) => ({
+            title: t.title ?? t.topic?.title,
+            type: t.type ?? t.topic?.type,
+            value: resultText(t.values ?? t.value ?? t.extracted_value, 'rising topic value')
+          })
+        )
       };
     }
 

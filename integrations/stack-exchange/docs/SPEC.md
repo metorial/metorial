@@ -1,106 +1,45 @@
-Now I have enough information. Let me compile the specification.
+# Stack Exchange integration
 
-# Slates Specification for Stack Exchange
-
-## Overview
-
-Stack Exchange is a network of community-driven Q&A sites, including Stack Overflow and 170+ other topic-specific sites. It powers Stack Overflow and 170+ other community-powered Q&A sites. The API provides programmatic access to Stack Overflow and other sites on the Stack Exchange network, allowing you to fetch questions, answers, comments, user profiles, and other data.
+Use the Stack Exchange API v2.3 to work with Q&A content across its community sites. The connection's `site` defaults to `stackoverflow`; `list_sites` returns the identifiers and names of other sites.
 
 ## Authentication
 
-Stack Exchange supports two layers of authentication:
+- API key (`api_key`): the application key from Stack Apps; public read operations only.
+- OAuth (`oauth`): authorization-code grant via `https://stackoverflow.com/oauth` and `https://stackoverflow.com/oauth/access_token/json`, with the same application key. Requested scopes are `read_inbox`, `write_access`, and `no_expiry`. The integration does not request the unused `private_info` scope; existing grants remain usable.
+- Token responses are validated, and `expires` is persisted as `expiresAt` when present. Stack Exchange documents reauthorization, rather than a refresh-token grant. Expiring or revoked connections must reconnect. The connection profile is currently resolved on Stack Overflow; the identity tool can use the configured site.
+- Credentials remain in the API's documented `key` and `access_token` request parameters. The linked 2025 authentication help page documents this form; another official authentication page currently describes a bearer header instead.
 
-### API Key (Application Key)
+## Tools
 
-Register your application on Stack Apps (stackapps.com) to obtain an API key (also called a request key). This key is passed as a `key` query parameter on API requests. You need to pass this key parameter together with your access token to benefit from higher API quotas. The API key is not secret and can be embedded in client-side code. Many read-only, public endpoints can be called with just an API key (or even anonymously).
+| Tool | Capability |
+| --- | --- |
+| `search_questions` | Basic title/tag search and advanced text, status, count, and date filters |
+| `get_question` | Question detail with separately paginated answers and comments |
+| `get_answers` | Answers by question or batch of answer IDs, with pagination and sorting |
+| `get_user` | Profile by ID, `me`, or the first display-name search match; optional top answer tags |
+| `get_user_activity` | User questions, answers, or public reputation changes |
+| `browse_tags` | Tags, metadata, synonyms, related tags, and FAQs |
+| `get_inbox` | Connected user's global inbox, optionally unread only |
+| `get_notifications` | Connected user's notifications, optionally unread only |
+| `manage_comment` | Add, edit, or delete a comment |
+| `post_question` | Create a question |
+| `post_answer` | Answer a question |
+| `edit_question` | Replace a question title, body, and tags |
+| `edit_answer` | Replace an answer body |
+| `accept_answer` | Accept an answer or undo acceptance |
+| `get_post_revisions` | Post revision history |
+| `list_sites` | Discover community identifiers and metadata |
 
-### OAuth 2.0
+Reads return the requested page and provider pagination state. Page numbers start at 1; page size is an integer from 0 to 100 except that `list_sites` has no provider maximum. Dates are ISO 8601; provider timestamps are Unix seconds. Write operations are subject to provider permissions and content-quality checks. Successful comment deletion has no returned comment object.
 
-Stack Exchange uses OAuth 2.0 for authentication. OAuth is required for accessing private user data and performing write operations.
+Responses with missing required data or provider errors fail with a clear error instead of fabricated empty values. Backoff is respected within the running integration process. The integration returns structured data and provider links; it does not download or generate files. It registers no event triggers.
 
-**Registration:** Register your app on [Stack Apps](https://stackapps.com/apps/oauth/register) to obtain a `client_id` and `client_secret`.
+## Official references
 
-**Endpoints:**
-
-- **Authorization URL:** `https://stackoverflow.com/oauth`
-- **Token URL:** `https://stackoverflow.com/oauth/access_token`
-
-**Flow:**
-Stack Exchange offers two OAuth 2.0 variants: an explicit grant for server-side applications and an implicit one for pure browser-based ones.
-
-For the explicit (authorization code) flow:
-
-1. Redirect the user to `https://stackoverflow.com/oauth?client_id={YOUR_CLIENT_ID}&scope={SCOPE}&redirect_uri={REDIRECT_URI}`. The user will see a page asking to grant your app access. Once the user approves, Stack Exchange redirects them back to your redirect_uri with an authorization code.
-2. Exchange the authorization code for an access token by POSTing to `https://stackoverflow.com/oauth/access_token` with `client_id`, `client_secret`, `code`, and `redirect_uri`.
-
-**Scopes:**
-
-With an empty scope, authentication will only allow an application to identify a user via the `/me` method. Available scopes include:
-
-- `read_inbox` — Access to a user's global inbox.
-- `write_access` — Ability to perform write operations (e.g., posting comments, editing).
-- `private_info` — Access to a user's private information such as email address.
-- `no_expiry` — Produces an access token that does not expire. Unless you specify `no_expiry`, the token will expire 24 hours after creation.
-
-To specify multiple scopes, use a comma to delimit them with no spaces (e.g., `scope=no_expiry,write_access`).
-
-**Important:** When making authenticated API calls, the access token is passed as an `access_token` query parameter (or Bearer header), and you must also include your application's `key` parameter for proper quota attribution. Each request also requires a `site` parameter (e.g., `stackoverflow`, `superuser`) to specify which Stack Exchange site to query.
-
-## Features
-
-### Questions
-
-Retrieve, search, and browse questions across any Stack Exchange site. You can filter by tags, sort by activity/votes/creation date, and retrieve questions that are unanswered, featured, or linked/related to other questions. With `write_access`, authenticated users can create, edit, and close/reopen questions.
-
-- Requires the `site` parameter to specify the target Stack Exchange site.
-- Questions can be filtered by tags, keywords in the title, and date ranges.
-
-### Answers
-
-Access answers to specific questions, including details like score, acceptance status, and the answering user. With `write_access`, authenticated users can post, edit, and accept answers.
-
-### Comments
-
-Read comments on questions and answers. With `write_access`, authenticated users can post, edit, and delete their own comments.
-
-### Search
-
-Full-text search across questions using keywords, tags, and advanced filters. Supports searching by title keywords (`intitle`), tagged questions, and general search terms. An advanced search mode allows combining multiple criteria such as accepted answer status, minimum answer count, and date ranges.
-
-### Users and Profiles
-
-Access user profiles, reputation history, badges, top tags, associated accounts across the network, and activity timelines. With the `private_info` scope, access email and other private user details. Retrieve a user's questions, answers, comments, favorites, and reputation changes.
-
-### Tags
-
-Browse and look up tags on a site, including tag metadata, synonyms, related tags, and frequently asked questions for a tag. Access top answerers and askers for specific tags.
-
-### Inbox and Notifications
-
-With the `read_inbox` scope, access a user's global inbox and unread inbox items across the entire Stack Exchange network, as well as site-specific notifications.
-
-### Badges
-
-Retrieve available badges on a site, badges earned by specific users, and recently awarded badges. Supports filtering by badge name and type (named vs. tag-based).
-
-### Suggested Edits
-
-View pending and historical suggested edits on posts, including approval/rejection status.
-
-### Revisions
-
-Access the revision history of posts, showing how questions and answers have changed over time.
-
-### Network-wide Data
-
-Access information about all sites in the Stack Exchange network, including site metadata, statistics, and related sites. Retrieve a user's associated accounts across the network.
-
-### Filters
-
-Custom filters can be used to trim API responses to include only the fields needed. Filters are created via the API and identified by an encoded string, which can then be reused across requests to control exactly which fields are returned.
-
-## Events
-
-The official Stack Exchange API does not appear to have built-in webhook functionality. The lack of official webhook support means that real-time notifications directly from Stack Exchange are not available through their API.
-
-The provider does not support events.
+- [API documentation](https://api.stackexchange.com/docs)
+- [Current authentication help](https://stackapps.com/help/api-authentication)
+- [Authentication and scopes](https://api.stackexchange.com/docs/authentication)
+- [Pagination](https://api.stackexchange.com/docs/paging)
+- [Custom filters](https://api.stackexchange.com/docs/filters)
+- [Write requirements](https://api.stackexchange.com/docs/write)
+- [Rate limits](https://api.stackexchange.com/docs/throttle)

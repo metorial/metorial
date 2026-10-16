@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { AttachmentResponse } from '../lib/types';
 import { spec } from '../spec';
 
 export let getAttachment = SlateTool.create(spec, {
@@ -29,7 +30,9 @@ export let getAttachment = SlateTool.create(spec, {
   .output(
     z.object({
       attachmentId: z.string().describe('Attachment identifier'),
-      filename: z.string().describe('Original filename'),
+      filename: z
+        .string()
+        .describe('Filename, or the attachment ID when the original file has no name'),
       size: z.number().describe('File size in bytes'),
       contentType: z.string().optional().describe('MIME type'),
       downloadUrl: z.string().describe('Presigned URL for downloading the attachment'),
@@ -39,7 +42,7 @@ export let getAttachment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, podId: ctx.config.podId });
 
-    let attachment: any;
+    let attachment: AttachmentResponse;
     if (ctx.input.messageId) {
       attachment = await client.getMessageAttachment(
         ctx.input.inboxId,
@@ -53,19 +56,34 @@ export let getAttachment = SlateTool.create(spec, {
         ctx.input.attachmentId
       );
     } else {
-      throw new Error('Either messageId or threadId must be provided');
+      throw createApiServiceError('Either messageId or threadId must be provided');
     }
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: attachment.download_url,
+      mimeType: attachment.content_type,
+      filename: attachment.filename ?? attachment.attachment_id,
+      refreshAt: new Date(Date.parse(attachment.expires_at) - 60_000).toISOString(),
+      refreshReference: {
+        kind: 'attachment',
+        inboxId: ctx.input.inboxId,
+        messageId: ctx.input.messageId,
+        threadId: ctx.input.threadId,
+        attachmentId: ctx.input.attachmentId
+      }
+    });
 
     return {
       output: {
         attachmentId: attachment.attachment_id,
-        filename: attachment.filename,
+        filename: attachment.filename ?? attachment.attachment_id,
         size: attachment.size,
         contentType: attachment.content_type,
         downloadUrl: attachment.download_url,
         expiresAt: attachment.expires_at
       },
-      message: `Got download URL for **${attachment.filename}** (${attachment.size} bytes). URL expires at ${attachment.expires_at}.`
+      message: `Got download URL for **${attachment.filename ?? attachment.attachment_id}** (${attachment.size} bytes). URL expires at ${attachment.expires_at}.`
     };
   })
   .build();

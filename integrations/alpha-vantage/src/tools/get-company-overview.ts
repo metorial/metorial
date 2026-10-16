@@ -1,12 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseText } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCompanyOverview = SlateTool.create(spec, {
   name: 'Get Company Overview',
   key: 'get_company_overview',
   description: `Retrieve a comprehensive company overview including description, sector, industry, market capitalization, P/E ratio, EPS, dividend yield, 52-week range, and many more fundamental metrics. Covers US-listed equities.`,
+  constraints: ['Company overview data requires a premium API key.'],
   tags: {
     readOnly: true
   }
@@ -60,41 +62,50 @@ export let getCompanyOverview = SlateTool.create(spec, {
     let data = await client.companyOverview({ symbol: ctx.input.symbol });
 
     let output = {
-      symbol: data.Symbol || ctx.input.symbol,
-      name: data.Name || '',
-      description: data.Description || '',
-      exchange: data.Exchange || '',
-      currency: data.Currency || '',
-      country: data.Country || '',
-      sector: data.Sector || '',
-      industry: data.Industry || '',
-      marketCapitalization: data.MarketCapitalization || '',
-      peRatio: data.PERatio || '',
-      pegRatio: data.PEGRatio || '',
-      bookValue: data.BookValue || '',
-      dividendPerShare: data.DividendPerShare || '',
-      dividendYield: data.DividendYield || '',
-      eps: data.EPS || '',
-      revenuePerShareTTM: data.RevenuePerShareTTM || '',
-      profitMargin: data.ProfitMargin || '',
-      operatingMarginTTM: data.OperatingMarginTTM || '',
-      returnOnAssetsTTM: data.ReturnOnAssetsTTM || '',
-      returnOnEquityTTM: data.ReturnOnEquityTTM || '',
-      revenueTTM: data.RevenueTTM || '',
-      grossProfitTTM: data.GrossProfitTTM || '',
-      ebitda: data.EBITDA || '',
-      beta: data.Beta || '',
-      weekHigh52: data['52WeekHigh'] || '',
-      weekLow52: data['52WeekLow'] || '',
-      movingAverage50Day: data['50DayMovingAverage'] || '',
-      movingAverage200Day: data['200DayMovingAverage'] || '',
-      sharesOutstanding: data.SharesOutstanding || '',
-      analystTargetPrice: data.AnalystTargetPrice || '',
-      analystRatingStrongBuy: data.AnalystRatingStrongBuy || '',
-      analystRatingBuy: data.AnalystRatingBuy || '',
-      analystRatingHold: data.AnalystRatingHold || '',
-      analystRatingSell: data.AnalystRatingSell || '',
-      analystRatingStrongSell: data.AnalystRatingStrongSell || ''
+      symbol: responseText(data.Symbol, 'symbol'),
+      name: responseText(data.Name, 'Name'),
+      description: responseText(data.Description, 'Description'),
+      exchange: responseText(data.Exchange, 'Exchange'),
+      currency: responseText(data.Currency, 'Currency'),
+      country: responseText(data.Country, 'Country'),
+      sector: responseText(data.Sector, 'Sector'),
+      industry: responseText(data.Industry, 'Industry'),
+      marketCapitalization: responseText(data.MarketCapitalization, 'MarketCapitalization'),
+      peRatio: responseText(data.PERatio, 'PERatio'),
+      pegRatio: responseText(data.PEGRatio, 'PEGRatio'),
+      bookValue: responseText(data.BookValue, 'BookValue'),
+      dividendPerShare: responseText(data.DividendPerShare, 'DividendPerShare'),
+      dividendYield: responseText(data.DividendYield, 'DividendYield'),
+      eps: responseText(data.EPS, 'EPS'),
+      revenuePerShareTTM: responseText(data.RevenuePerShareTTM, 'RevenuePerShareTTM'),
+      profitMargin: responseText(data.ProfitMargin, 'ProfitMargin'),
+      operatingMarginTTM: responseText(data.OperatingMarginTTM, 'OperatingMarginTTM'),
+      returnOnAssetsTTM: responseText(data.ReturnOnAssetsTTM, 'ReturnOnAssetsTTM'),
+      returnOnEquityTTM: responseText(data.ReturnOnEquityTTM, 'ReturnOnEquityTTM'),
+      revenueTTM: responseText(data.RevenueTTM, 'RevenueTTM'),
+      grossProfitTTM: responseText(data.GrossProfitTTM, 'GrossProfitTTM'),
+      ebitda: responseText(data.EBITDA, 'EBITDA'),
+      beta: responseText(data.Beta, 'Beta'),
+      weekHigh52: responseText(data['52WeekHigh'], 'data52WeekHigh'),
+      weekLow52: responseText(data['52WeekLow'], 'data52WeekLow'),
+      movingAverage50Day: responseText(data['50DayMovingAverage'], 'data50DayMovingAverage'),
+      movingAverage200Day: responseText(
+        data['200DayMovingAverage'],
+        'data200DayMovingAverage'
+      ),
+      sharesOutstanding: responseText(data.SharesOutstanding, 'SharesOutstanding'),
+      analystTargetPrice: responseText(data.AnalystTargetPrice, 'AnalystTargetPrice'),
+      analystRatingStrongBuy: responseText(
+        data.AnalystRatingStrongBuy,
+        'AnalystRatingStrongBuy'
+      ),
+      analystRatingBuy: responseText(data.AnalystRatingBuy, 'AnalystRatingBuy'),
+      analystRatingHold: responseText(data.AnalystRatingHold, 'AnalystRatingHold'),
+      analystRatingSell: responseText(data.AnalystRatingSell, 'AnalystRatingSell'),
+      analystRatingStrongSell: responseText(
+        data.AnalystRatingStrongSell,
+        'AnalystRatingStrongSell'
+      )
     };
 
     return {

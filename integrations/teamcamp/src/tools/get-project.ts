@@ -1,19 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapGroup, mapProject, requireRecords } from '../lib/response';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getProject = SlateTool.create(spec, {
   name: 'Get Project',
   key: 'get_project',
-  description: `Retrieve detailed information about a specific project, including its description, dates, associated customer, owner, and assigned users. Optionally includes the project's task groups.`,
+  description: `Call list_projects to discover project IDs. Retrieve detailed information about a specific project, including its description, dates, associated customer, owner, and assigned users. Optionally includes the project's task groups.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to retrieve'),
+      projectId: projectIdSchema,
       includeGroups: z
         .boolean()
         .optional()
@@ -23,6 +25,12 @@ export let getProject = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       projectId: z.string().describe('Unique project identifier'),
       projectName: z.string().describe('Name of the project'),
       workspaceId: z.string().optional().describe('ID of the workspace'),
@@ -54,26 +62,14 @@ export let getProject = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let project = await client.getProject(ctx.input.projectId);
 
-    let result: any = {
-      projectId: project.projectId ?? '',
-      projectName: project.projectName ?? '',
-      workspaceId: project.workspaceId || undefined,
-      ownerId: project.ownerId || undefined,
-      description: project.description || undefined,
-      customerId: project.customerId || undefined,
-      startDate: project.startDate || undefined,
-      dueDate: project.dueDate || undefined,
-      favoriteUsers: Array.isArray(project.favoriteUsers) ? project.favoriteUsers : undefined,
-      projectUsers: Array.isArray(project.projectUsers) ? project.projectUsers : undefined
+    let groups = ctx.input.includeGroups
+      ? await client.getProjectGroups(ctx.input.projectId)
+      : undefined;
+    let result = {
+      ...mapProject(project),
+      groups: groups === undefined ? undefined : requireRecords(groups).map(mapGroup),
+      raw: groups === undefined ? project : { project, groups }
     };
-
-    if (ctx.input.includeGroups) {
-      let groups = await client.getProjectGroups(ctx.input.projectId);
-      result.groups = (Array.isArray(groups) ? groups : []).map((g: any) => ({
-        groupId: g.groupId ?? g.id ?? '',
-        groupName: g.groupName ?? g.name ?? ''
-      }));
-    }
 
     return {
       output: result,

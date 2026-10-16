@@ -10,7 +10,7 @@ export let imageToJson = SlateTool.create(spec, {
 
 Useful for extracting data from screenshots, photos of documents, product images, charts, and other visual content.`,
   instructions: [
-    'Provide either a file URL or a base64-encoded image string.',
+    'Provide exactly one file source: a file URL or a base64-encoded image string.',
     'Define a schema describing the JSON structure you want to extract from the image.'
   ],
   tags: {
@@ -22,7 +22,7 @@ Useful for extracting data from screenshots, photos of documents, product images
       schema: z
         .string()
         .describe(
-          'JSON schema or template describing the structure of data to extract from the image'
+          'A JSON object encoded as a string describing the structure of data to extract from the image'
         ),
       fileUrl: z.string().optional().describe('Public URL of the image file'),
       base64String: z.string().optional().describe('Base64-encoded image file content')

@@ -33,21 +33,23 @@ export let getInvoice = SlateTool.create(spec, {
       createdAt: z.string().optional().describe('Invoice creation timestamp'),
       paidAt: z.string().optional().describe('Payment timestamp'),
       total: z.string().optional().describe('Invoice total in USD'),
-      items: z.array(invoiceItemSchema).optional().describe('Line items on the invoice')
+      items: z.array(invoiceItemSchema).optional().describe('Line items on the invoice'),
+      state: z.string().optional().describe('Invoice payment or preparation state'),
+      raw: z.unknown().describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let result = await client.getInvoice(ctx.input.invoiceId);
+    let { result, raw } = await client.getInvoice(ctx.input.invoiceId);
 
-    let items = (result.items ?? []).map((item: Record<string, unknown>) => ({
-      itemId: item.id as number | undefined,
-      sku: item.sku as string | undefined,
-      quantity: item.quantity as number | undefined,
-      price: item.price as string | undefined,
-      audiofileId: item.audiofile as number | undefined,
-      total: item.total as string | undefined
+    let items = result.items?.map(item => ({
+      itemId: item.id,
+      sku: item.sku,
+      quantity: item.quantity,
+      price: item.price,
+      audiofileId: item.audiofile,
+      total: item.total
     }));
 
     let output = {
@@ -56,12 +58,14 @@ export let getInvoice = SlateTool.create(spec, {
       createdAt: result.createtime,
       paidAt: result.paidtime,
       total: result.total,
-      items
+      items,
+      state: result.state,
+      raw
     };
 
     return {
       output,
-      message: `Invoice **${output.invoiceId}** — total: **$${output.total ?? 'N/A'}**, ${items.length} line item(s).`
+      message: `Invoice **${output.invoiceId}** — total: **$${output.total ?? 'N/A'}**, ${items ? `${items.length} line item(s)` : 'line items were not returned'}.`
     };
   })
   .build();

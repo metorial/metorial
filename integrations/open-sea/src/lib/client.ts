@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   limit?: number;
@@ -31,12 +31,18 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.opensea.io/api/v2',
       headers: {
         'X-API-KEY': config.token,
         Accept: 'application/json'
-      }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'OpenSea',
+          reason: 'opensea_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
   }
 
@@ -46,45 +52,54 @@ export class Client {
 
   async getNft(chain: string, contractAddress: string, identifier: string) {
     let response = await this.axios.get(
-      `/chain/${chain}/contract/${contractAddress}/nfts/${identifier}`
+      `/chain/${encodeURIComponent(chain)}/contract/${encodeURIComponent(contractAddress)}/nfts/${encodeURIComponent(identifier)}`
     );
     return response.data;
   }
 
   async getNftsByCollection(collectionSlug: string, params?: NftsByCollectionParams) {
-    let response = await this.axios.get(`/collection/${collectionSlug}/nfts`, {
-      params: {
-        limit: params?.limit,
-        next: params?.next
+    let response = await this.axios.get(
+      `/collection/${encodeURIComponent(collectionSlug)}/nfts`,
+      {
+        params: {
+          limit: params?.limit,
+          next: params?.next
+        }
       }
-    });
+    );
     return response.data;
   }
 
   async getNftsByContract(chain: string, contractAddress: string, params?: PaginationParams) {
-    let response = await this.axios.get(`/chain/${chain}/contract/${contractAddress}/nfts`, {
-      params: {
-        limit: params?.limit,
-        next: params?.next
+    let response = await this.axios.get(
+      `/chain/${encodeURIComponent(chain)}/contract/${encodeURIComponent(contractAddress)}/nfts`,
+      {
+        params: {
+          limit: params?.limit,
+          next: params?.next
+        }
       }
-    });
+    );
     return response.data;
   }
 
   async getNftsByAccount(chain: string, address: string, params?: NftsByAccountParams) {
-    let response = await this.axios.get(`/chain/${chain}/account/${address}/nfts`, {
-      params: {
-        limit: params?.limit,
-        next: params?.next,
-        collection: params?.collection
+    let response = await this.axios.get(
+      `/chain/${encodeURIComponent(chain)}/account/${encodeURIComponent(address)}/nfts`,
+      {
+        params: {
+          limit: params?.limit,
+          next: params?.next,
+          collection: params?.collection
+        }
       }
-    });
+    );
     return response.data;
   }
 
   async refreshNftMetadata(chain: string, contractAddress: string, identifier: string) {
     let response = await this.axios.post(
-      `/chain/${chain}/contract/${contractAddress}/nfts/${identifier}/refresh`
+      `/chain/${encodeURIComponent(chain)}/contract/${encodeURIComponent(contractAddress)}/nfts/${encodeURIComponent(identifier)}/refresh`
     );
     return response.data;
   }
@@ -94,14 +109,14 @@ export class Client {
   // =====================
 
   async getCollection(collectionSlug: string) {
-    let response = await this.axios.get(`/collections/${collectionSlug}`);
+    let response = await this.axios.get(`/collections/${encodeURIComponent(collectionSlug)}`);
     return response.data;
   }
 
   async listCollections(params?: CollectionsParams) {
     let response = await this.axios.get('/collections', {
       params: {
-        chain_identifier: params?.chainIdentifier,
+        chain: params?.chainIdentifier,
         include_hidden: params?.includeHidden,
         order_by: params?.orderBy,
         limit: params?.limit,
@@ -112,12 +127,16 @@ export class Client {
   }
 
   async getCollectionStats(collectionSlug: string) {
-    let response = await this.axios.get(`/collections/${collectionSlug}/stats`);
+    let response = await this.axios.get(
+      `/collections/${encodeURIComponent(collectionSlug)}/stats`
+    );
     return response.data;
   }
 
   async getCollectionTraits(collectionSlug: string) {
-    let response = await this.axios.get(`/collection/${collectionSlug}/traits`);
+    let response = await this.axios.get(
+      `/collection/${encodeURIComponent(collectionSlug)}/traits`
+    );
     return response.data;
   }
 
@@ -126,7 +145,7 @@ export class Client {
   // =====================
 
   async getAccount(addressOrUsername: string) {
-    let response = await this.axios.get(`/accounts/${addressOrUsername}`);
+    let response = await this.axios.get(`/accounts/${encodeURIComponent(addressOrUsername)}`);
     return response.data;
   }
 
@@ -135,15 +154,18 @@ export class Client {
   // =====================
 
   async getEventsByCollection(collectionSlug: string, params?: EventsParams) {
-    let response = await this.axios.get(`/events/collection/${collectionSlug}`, {
-      params: {
-        event_type: params?.eventType,
-        after: params?.after,
-        before: params?.before,
-        limit: params?.limit,
-        next: params?.next
+    let response = await this.axios.get(
+      `/events/collection/${encodeURIComponent(collectionSlug)}`,
+      {
+        params: {
+          event_type: params?.eventType,
+          after: params?.after,
+          before: params?.before,
+          limit: params?.limit,
+          next: params?.next
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -154,7 +176,7 @@ export class Client {
     params?: EventsParams
   ) {
     let response = await this.axios.get(
-      `/events/chain/${chain}/contract/${contractAddress}/nfts/${identifier}`,
+      `/events/chain/${encodeURIComponent(chain)}/contract/${encodeURIComponent(contractAddress)}/nfts/${encodeURIComponent(identifier)}`,
       {
         params: {
           event_type: params?.eventType,
@@ -169,7 +191,7 @@ export class Client {
   }
 
   async getEventsByAccount(address: string, params?: EventsParams) {
-    let response = await this.axios.get(`/events/accounts/${address}`, {
+    let response = await this.axios.get(`/events/accounts/${encodeURIComponent(address)}`, {
       params: {
         event_type: params?.eventType,
         after: params?.after,
@@ -186,28 +208,34 @@ export class Client {
   // =====================
 
   async getAllListingsByCollection(collectionSlug: string, params?: ListingsParams) {
-    let response = await this.axios.get(`/listings/collection/${collectionSlug}/all`, {
-      params: {
-        limit: params?.limit,
-        next: params?.next
+    let response = await this.axios.get(
+      `/listings/collection/${encodeURIComponent(collectionSlug)}/all`,
+      {
+        params: {
+          limit: params?.limit,
+          next: params?.next
+        }
       }
-    });
+    );
     return response.data;
   }
 
   async getBestListingsByCollection(collectionSlug: string, params?: ListingsParams) {
-    let response = await this.axios.get(`/listings/collection/${collectionSlug}/best`, {
-      params: {
-        limit: params?.limit,
-        next: params?.next
+    let response = await this.axios.get(
+      `/listings/collection/${encodeURIComponent(collectionSlug)}/best`,
+      {
+        params: {
+          limit: params?.limit,
+          next: params?.next
+        }
       }
-    });
+    );
     return response.data;
   }
 
   async getBestListingByNft(collectionSlug: string, identifier: string) {
     let response = await this.axios.get(
-      `/listings/collection/${collectionSlug}/nfts/${identifier}/best`
+      `/listings/collection/${encodeURIComponent(collectionSlug)}/nfts/${encodeURIComponent(identifier)}/best`
     );
     return response.data;
   }
@@ -217,29 +245,35 @@ export class Client {
   // =====================
 
   async getOffersByCollection(collectionSlug: string, params?: OffersParams) {
-    let response = await this.axios.get(`/offers/collection/${collectionSlug}`, {
-      params: {
-        limit: params?.limit,
-        next: params?.next
+    let response = await this.axios.get(
+      `/offers/collection/${encodeURIComponent(collectionSlug)}`,
+      {
+        params: {
+          limit: params?.limit,
+          next: params?.next
+        }
       }
-    });
+    );
     return response.data;
   }
 
   async getBestOfferByNft(collectionSlug: string, identifier: string) {
     let response = await this.axios.get(
-      `/offers/collection/${collectionSlug}/nfts/${identifier}/best`
+      `/offers/collection/${encodeURIComponent(collectionSlug)}/nfts/${encodeURIComponent(identifier)}/best`
     );
     return response.data;
   }
 
   async getTraitOffers(collectionSlug: string, params?: PaginationParams) {
-    let response = await this.axios.get(`/offers/collection/${collectionSlug}/traits`, {
-      params: {
-        limit: params?.limit,
-        next: params?.next
+    let response = await this.axios.get(
+      `/offers/collection/${encodeURIComponent(collectionSlug)}/traits`,
+      {
+        params: {
+          limit: params?.limit,
+          next: params?.next
+        }
       }
-    });
+    );
     return response.data;
   }
 }

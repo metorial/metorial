@@ -41,6 +41,14 @@ export let userSchema = z
   })
   .optional();
 
+export let analyticsSchema = z
+  .object({
+    onload: z.object({ url: z.string() }).passthrough().optional(),
+    onclick: z.object({ url: z.string() }).passthrough().optional(),
+    onsent: z.object({ url: z.string() }).passthrough().optional()
+  })
+  .passthrough();
+
 export let gifSchema = z.object({
   gifId: z.string(),
   type: z.string().optional(),
@@ -55,7 +63,11 @@ export let gifSchema = z.object({
   importDatetime: z.string().optional(),
   trendingDatetime: z.string().optional(),
   images: gifImageSchema.optional(),
-  user: userSchema
+  user: userSchema,
+  altText: z.string().optional(),
+  variationCount: z.number().optional(),
+  analytics: analyticsSchema.optional(),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider GIF metadata')
 });
 
 export let paginationSchema = z.object({
@@ -68,3 +80,24 @@ export type GifObject = z.infer<typeof gifSchema>;
 export type PaginationInfo = z.infer<typeof paginationSchema>;
 
 export let ratingEnum = z.enum(['g', 'pg', 'pg-13', 'r']).optional();
+
+export let requestContextFields = {
+  customerId: z
+    .string()
+    .optional()
+    .describe(
+      'Stable end-user identifier, or randomId from Create Random ID; this is not a GIPHY account ID'
+    ),
+  countryCode: z
+    .string()
+    .optional()
+    .describe('End-user country as an ISO 3166-1 alpha-2 code'),
+  region: z.string().optional().describe('End-user country subdivision as an ISO 3166-2 code')
+};
+
+export let responseMetadataFields = {
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Complete provider response, including metadata and unmodified results')
+};

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getMemberspotList, getMemberspotNextPage } from '../lib/responses';
 import { spec } from '../spec';
 
 export let listUsersTool = SlateTool.create(spec, {
@@ -13,16 +14,32 @@ export let listUsersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      offerId: z.string().optional().describe('Filter users by offer ID'),
-      courseId: z.string().optional().describe('Filter users by course ID'),
+      offerId: z
+        .string()
+        .optional()
+        .describe('Filter by offer ID. Call list_offers to discover offer IDs.'),
+      courseId: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by course ID and include that course progress. Call list_courses to discover course IDs.'
+        ),
       active: z.boolean().optional().describe('Filter by active status'),
-      pageLength: z.number().optional().describe('Number of users to return per page'),
+      pageLength: z
+        .number()
+        .optional()
+        .describe('Number of users per page, from 1 to 100; defaults to 10'),
       lastLoadedId: z.string().optional().describe('ID of the last loaded user for pagination')
     })
   )
   .output(
     z.object({
-      users: z.array(z.record(z.string(), z.any())).describe('List of user objects')
+      users: z.array(z.record(z.string(), z.any())).describe('List of user objects'),
+      nextPage: z
+        .string()
+        .optional()
+        .describe('Pass this cursor as lastLoadedId for the next page'),
+      raw: z.any().optional().describe('Unmodified provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,10 +53,10 @@ export let listUsersTool = SlateTool.create(spec, {
       lastLoadedId: ctx.input.lastLoadedId
     });
 
-    let users = Array.isArray(result) ? result : (result?.users ?? [result]);
+    let users = getMemberspotList(result, ['data', 'users']);
 
     return {
-      output: { users },
+      output: { users, nextPage: getMemberspotNextPage(result), raw: result },
       message: `Retrieved **${users.length}** user(s) from Memberspot.`
     };
   })

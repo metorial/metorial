@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface ODataQueryOptions {
   filter?: string;
@@ -7,11 +12,22 @@ export interface ODataQueryOptions {
   orderby?: string;
   top?: number;
   skip?: number;
+  nextLink?: string;
 }
+
+let baseUrl = 'https://www.21risk.com/odata/v5/';
 
 let buildODataParams = (options?: ODataQueryOptions): Record<string, string | number> => {
   let params: Record<string, string | number> = {};
   if (!options) return params;
+  for (let key of ['top', 'skip'] as const) {
+    let value = options[key];
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+      throw createApiServiceError(`${key} must be a non-negative safe integer.`, {
+        reason: 'invalid_pagination'
+      });
+    }
+  }
   if (options.filter) params.$filter = options.filter;
   if (options.select) params.$select = options.select;
   if (options.expand) params.$expand = options.expand;
@@ -25,8 +41,13 @@ export class Client {
   private axios: ReturnType<typeof createAxios>;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A 21RISK API key is required.', {
+        reason: 'missing_api_key'
+      });
+    }
     this.axios = createAxios({
-      baseURL: 'https://www.21risk.com/odata/v5/',
+      baseURL: baseUrl,
       headers: {
         Authorization: `Bearer ${config.token}`,
         Accept: 'application/json'
@@ -34,115 +55,176 @@ export class Client {
     });
   }
 
-  async getOrganizations(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Organizations', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  private async get(path: string, options?: ODataQueryOptions) {
+    let params = buildODataParams(options);
+    let requestUrl = new URL(path.replace(/^\//, ''), baseUrl);
+    if (options?.nextLink !== undefined) {
+      if (Object.keys(params).length) {
+        throw createApiServiceError('Use nextLink on its own, without other query options.', {
+          reason: 'conflicting_pagination'
+        });
+      }
+      let nextUrl: URL;
+      try {
+        nextUrl = new URL(options.nextLink, requestUrl);
+      } catch {
+        throw createApiServiceError('nextLink must be a URL returned by this collection.', {
+          reason: 'invalid_next_link'
+        });
+      }
+      if (
+        nextUrl.origin !== requestUrl.origin ||
+        nextUrl.pathname.toLowerCase() !== requestUrl.pathname.toLowerCase() ||
+        nextUrl.username ||
+        nextUrl.password ||
+        nextUrl.hash ||
+        !options.nextLink.trim()
+      ) {
+        throw createApiServiceError('nextLink must refer to the same 21RISK collection.', {
+          reason: 'invalid_next_link'
+        });
+      }
+      requestUrl = nextUrl;
+    }
+
+    try {
+      let response = await this.axios.get<unknown>(requestUrl.toString(), { params });
+      if (
+        isApiErrorRecord(response.data) &&
+        response.data.error !== undefined &&
+        response.data.error !== null
+      ) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: '21RISK',
+            reason: 'api_error',
+            operation: `read ${path}`,
+            nestedKeys: ['error', 'errors', 'details', 'innererror', 'message'],
+            detailKeys: ['message', 'detail', 'error', 'error_description', 'code', 'value']
+          }
+        );
+      }
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: '21RISK',
+        reason: 'api_error',
+        operation: `read ${path}`,
+        nestedKeys: ['error', 'errors', 'details', 'innererror', 'message'],
+        detailKeys: ['message', 'detail', 'error', 'error_description', 'code', 'value'],
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+      });
+    }
   }
 
-  async getSites(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Sites', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  private async getCollection(path: string, options?: ODataQueryOptions) {
+    let data = await this.get(path, options);
+    let wrapped = isApiErrorRecord(data) && 'value' in data;
+    let value = isApiErrorRecord(data) && wrapped ? data.value : data;
+    // Keep the legacy bare-object response form without turning malformed OData envelopes into records.
+    let records = Array.isArray(value)
+      ? value
+      : !wrapped && isApiErrorRecord(value)
+        ? [value]
+        : undefined;
+    if (!records?.every(isApiErrorRecord)) {
+      throw createApiServiceError(`21RISK returned an invalid collection for ${path}.`, {
+        reason: 'invalid_response'
+      });
+    }
+    let nextLink = isApiErrorRecord(data)
+      ? (data['@odata.nextLink'] ?? data['@nextLink'])
+      : undefined;
+    let totalCount = isApiErrorRecord(data)
+      ? (data['@odata.count'] ?? data['@count'])
+      : undefined;
+    return {
+      records,
+      nextLink: typeof nextLink === 'string' && nextLink ? nextLink : undefined,
+      totalCount:
+        typeof totalCount === 'number' && Number.isSafeInteger(totalCount) && totalCount >= 0
+          ? totalCount
+          : undefined
+    };
   }
 
-  async getSite(siteId: string, options?: ODataQueryOptions) {
-    let response = await this.axios.get(`/Sites(${siteId})`, {
-      params: buildODataParams(options)
-    });
-    return response.data;
+  private async getEntity(path: string, id: string, options?: ODataQueryOptions) {
+    if (!id.trim()) {
+      throw createApiServiceError('A resource ID is required.', {
+        reason: 'missing_resource_id'
+      });
+    }
+    let data = await this.get(`${path}(${encodeURIComponent(id)})`, options);
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError(`21RISK returned an invalid entity for ${path}.`, {
+        reason: 'invalid_response'
+      });
+    }
+    return data;
   }
 
-  async getAudits(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Audits', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getOrganizations(options?: ODataQueryOptions) {
+    return this.getCollection('/Organizations', options);
   }
 
-  async getAudit(auditId: string, options?: ODataQueryOptions) {
-    let response = await this.axios.get(`/Audits(${auditId})`, {
-      params: buildODataParams(options)
-    });
-    return response.data;
+  getSites(options?: ODataQueryOptions) {
+    return this.getCollection('/Sites', options);
   }
 
-  async getRiskModels(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/RiskModels', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getSite(siteId: string, options?: ODataQueryOptions) {
+    return this.getEntity('/Sites', siteId, options);
   }
 
-  async getRiskModel(riskModelId: string, options?: ODataQueryOptions) {
-    let response = await this.axios.get(`/RiskModels(${riskModelId})`, {
-      params: buildODataParams(options)
-    });
-    return response.data;
+  getAudits(options?: ODataQueryOptions) {
+    return this.getCollection('/Audits', options);
   }
 
-  async getCategories(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Categories', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getAudit(auditId: string, options?: ODataQueryOptions) {
+    return this.getEntity('/Audits', auditId, options);
   }
 
-  async getActions(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Actions', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getRiskModels(options?: ODataQueryOptions) {
+    return this.getCollection('/RiskModels', options);
   }
 
-  async getAction(actionId: string, options?: ODataQueryOptions) {
-    let response = await this.axios.get(`/Actions(${actionId})`, {
-      params: buildODataParams(options)
-    });
-    return response.data;
+  getRiskModel(riskModelId: string, options?: ODataQueryOptions) {
+    return this.getEntity('/RiskModels', riskModelId, options);
   }
 
-  async getCompliance(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Compliance', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getCategories(options?: ODataQueryOptions) {
+    return this.getCollection('/Categories', options);
   }
 
-  async getMembers(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Members', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getActions(options?: ODataQueryOptions) {
+    return this.getCollection('/Actions', options);
   }
 
-  async getPropertyInsuranceItems(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/PropertyInsuranceItems', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getAction(actionId: string, options?: ODataQueryOptions) {
+    return this.getEntity('/Actions', actionId, options);
   }
 
-  async getItemsPerMonth(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/ItemsPerMonth', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getCompliance(options?: ODataQueryOptions) {
+    return this.getCollection('/Compliance', options);
   }
 
-  async getCope(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Cope', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getMembers(options?: ODataQueryOptions) {
+    return this.getCollection('/Members', options);
   }
 
-  async getReports(options?: ODataQueryOptions) {
-    let response = await this.axios.get('/Reports', {
-      params: buildODataParams(options)
-    });
-    return response.data.value ?? response.data;
+  getPropertyInsuranceItems(options?: ODataQueryOptions) {
+    return this.getCollection('/PropertyInsuranceItems', options);
+  }
+
+  getItemsPerMonth(options?: ODataQueryOptions) {
+    return this.getCollection('/ItemsPerMonth', options);
+  }
+
+  getCope(options?: ODataQueryOptions) {
+    return this.getCollection('/Cope', options);
+  }
+
+  getReports(options?: ODataQueryOptions) {
+    return this.getCollection('/Reports', options);
   }
 }

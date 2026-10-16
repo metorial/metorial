@@ -26,7 +26,9 @@ export let manageServiceQuestions = SlateTool.create(spec, {
       required: z
         .boolean()
         .optional()
-        .describe('Whether the question is required (only for "add" operation)')
+        .describe(
+          'For add: true makes the selected question IDs mandatory. False or omitted sends no mandatory-question list.'
+        )
     })
   )
   .output(

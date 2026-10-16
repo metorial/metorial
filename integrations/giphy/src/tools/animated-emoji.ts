@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { gifSchema, paginationSchema } from '../lib/types';
+import {
+  gifSchema,
+  paginationSchema,
+  requestContextFields,
+  responseMetadataFields
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let animatedEmoji = SlateTool.create(spec, {
@@ -14,6 +19,7 @@ export let animatedEmoji = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: requestContextFields.customerId,
       emojiGifId: z
         .string()
         .optional()
@@ -35,6 +41,7 @@ export let animatedEmoji = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       emojis: z.array(gifSchema).describe('Array of animated emoji or emoji variations'),
       pagination: paginationSchema
         .optional()
@@ -42,14 +49,12 @@ export let animatedEmoji = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
 
     if (ctx.input.emojiGifId) {
       let result = await client.getEmojiVariations(ctx.input.emojiGifId);
       return {
-        output: {
-          emojis: result.variations
-        },
+        output: { raw: result.raw, emojis: result.variations },
         message: `Found ${result.variations.length} variations for emoji ${ctx.input.emojiGifId}.`
       };
     }
@@ -59,10 +64,7 @@ export let animatedEmoji = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
     return {
-      output: {
-        emojis: result.emojis,
-        pagination: result.pagination
-      },
+      output: { raw: result.raw, emojis: result.emojis, pagination: result.pagination },
       message: `Fetched ${result.emojis.length} animated emojis.`
     };
   })

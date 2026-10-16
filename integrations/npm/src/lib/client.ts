@@ -1,7 +1,10 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { npmApiError } from './errors';
+import { record } from './response';
 
 export class NpmRegistryClient {
-  private http;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
+  private secrets: (string | undefined)[] = [];
 
   constructor(config: { token?: string }) {
     let headers: Record<string, string> = {
@@ -12,9 +15,11 @@ export class NpmRegistryClient {
       headers.Authorization = `Bearer ${config.token}`;
     }
 
-    this.http = createAxios({
+    this.secrets = [config.token];
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://registry.npmjs.org',
-      headers
+      headers,
+      errorAdapter: error => npmApiError(error, this.secrets)
     });
   }
 
@@ -22,18 +27,23 @@ export class NpmRegistryClient {
 
   async getPackageMetadata(
     packageName: string,
-    options?: { abbreviated?: boolean }
-  ): Promise<any> {
+    options?: { abbreviated?: boolean; write?: boolean }
+  ): Promise<unknown> {
     let headers: Record<string, string> = {};
     if (options?.abbreviated) {
       headers.Accept = 'application/vnd.npm.install-v1+json';
     }
-    let res = await this.http.get(`/${encodePackageName(packageName)}`, { headers });
+    let res = await this.http.get(`/${encodePackageName(packageName)}`, {
+      headers,
+      params: options?.write ? { write: true } : undefined
+    });
     return res.data;
   }
 
-  async getPackageVersion(packageName: string, version: string): Promise<any> {
-    let res = await this.http.get(`/${encodePackageName(packageName)}/${version}`);
+  async getPackageVersion(packageName: string, version: string): Promise<unknown> {
+    let res = await this.http.get(
+      `/${encodePackageName(packageName)}/${encodeURIComponent(version)}`
+    );
     return res.data;
   }
 
@@ -46,7 +56,7 @@ export class NpmRegistryClient {
     quality?: number;
     popularity?: number;
     maintenance?: number;
-  }): Promise<any> {
+  }): Promise<unknown> {
     let query: Record<string, string | number> = { text: params.text };
     if (params.size !== undefined) query.size = params.size;
     if (params.from !== undefined) query.from = params.from;
@@ -65,17 +75,25 @@ export class NpmRegistryClient {
     return res.data;
   }
 
-  async addDistTag(packageName: string, tag: string, version: string): Promise<void> {
+  async addDistTag(
+    packageName: string,
+    tag: string,
+    version: string,
+    otp?: string
+  ): Promise<void> {
+    this.requireAuthentication();
     await this.http.put(
       `/-/package/${encodePackageName(packageName)}/dist-tags/${encodeURIComponent(tag)}`,
       JSON.stringify(version),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: this.otpHeaders(otp) }
     );
   }
 
-  async removeDistTag(packageName: string, tag: string): Promise<void> {
+  async removeDistTag(packageName: string, tag: string, otp?: string): Promise<void> {
+    this.requireAuthentication();
     await this.http.delete(
-      `/-/package/${encodePackageName(packageName)}/dist-tags/${encodeURIComponent(tag)}`
+      `/-/package/${encodePackageName(packageName)}/dist-tags/${encodeURIComponent(tag)}`,
+      { headers: this.otpHeaders(otp) }
     );
   }
 
@@ -84,28 +102,47 @@ export class NpmRegistryClient {
   async deprecatePackageVersion(
     packageName: string,
     version: string,
-    message: string
+    message: string,
+    otp?: string
   ): Promise<void> {
-    let metadata = await this.getPackageMetadata(packageName);
-    let versionData = metadata.versions?.[version];
-    if (!versionData) {
-      throw new Error(`Version ${version} not found for package ${packageName}`);
+    this.requireAuthentication();
+    let metadata = record(
+      await this.getPackageMetadata(packageName, { write: true }),
+      'package metadata'
+    );
+    let versions = record(metadata.versions, 'package versions');
+    if (!Object.hasOwn(versions, version)) {
+      throw createApiServiceError(
+        `Version ${version} was not found for package ${packageName}.`
+      );
     }
-    versionData.deprecated = message;
+    let versionData = record(versions[version], 'package version');
+    await this.http.put(
+      `/${encodePackageName(packageName)}`,
+      {
+        ...metadata,
+        versions: { ...versions, [version]: { ...versionData, deprecated: message } }
+      },
+      { headers: this.otpHeaders(otp) }
+    );
+  }
 
-    await this.http.put(`/${encodePackageName(packageName)}`, {
-      _id: metadata._id,
-      _rev: metadata._rev,
-      name: metadata.name,
-      versions: {
-        [version]: versionData
-      }
-    });
+  private requireAuthentication() {
+    if (!this.secrets[0])
+      throw createApiServiceError(
+        'Connect an npm account with a valid token to use this operation.'
+      );
+  }
+
+  private otpHeaders(otp?: string): Record<string, string> {
+    this.secrets.push(otp);
+    return otp ? { 'npm-otp': otp } : {};
   }
 
   // --- Token Management ---
 
-  async listTokens(page?: number, perPage?: number): Promise<any> {
+  async listTokens(page?: number, perPage?: number): Promise<unknown> {
+    this.requireAuthentication();
     let params: Record<string, number> = {};
     if (page !== undefined) params.page = page;
     if (perPage !== undefined) params.perPage = perPage;
@@ -124,25 +161,29 @@ export class NpmRegistryClient {
     scopes?: string[];
     orgs?: string[];
     permission?: 'read-only' | 'read-write';
+    orgPermission?: 'read-only' | 'read-write' | 'no-access';
     bypass2fa?: boolean;
     otp?: string;
-  }): Promise<any> {
-    let headers: Record<string, string> = {};
-    if (params.otp) {
-      headers['npm-otp'] = params.otp;
-    }
+  }): Promise<unknown> {
+    this.requireAuthentication();
+    this.secrets.push(params.password, params.otp);
+    let headers = this.otpHeaders(params.otp);
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       password: params.password
     };
     if (params.name) body.name = params.name;
     if (params.description) body.token_description = params.description;
-    if (params.expires) body.expires = params.expires;
-    if (params.cidrWhitelist) body.cidr_whitelist = params.cidrWhitelist;
+    if (params.expires) {
+      let days = /^(\d+)d$/.exec(params.expires);
+      body.expires = days ? Number(days[1]) : params.expires;
+    }
+    if (params.cidrWhitelist) body.cidr = params.cidrWhitelist;
     if (params.packages) body.packages = params.packages;
     if (params.scopes) body.scopes = params.scopes;
     if (params.orgs) body.orgs = params.orgs;
-    if (params.permission) body.permission = params.permission;
+    if (params.permission) body.packages_and_scopes_permission = params.permission;
+    if (params.orgPermission) body.orgs_permission = params.orgPermission;
     if (params.bypass2fa !== undefined) body.bypass_2fa = params.bypass2fa;
 
     let res = await this.http.post('/-/npm/v1/tokens', body, { headers });
@@ -150,20 +191,19 @@ export class NpmRegistryClient {
   }
 
   async deleteToken(tokenKey: string, otp?: string): Promise<void> {
-    let headers: Record<string, string> = {};
-    if (otp) {
-      headers['npm-otp'] = otp;
-    }
-    await this.http.delete(`/-/npm/v1/tokens/token/${tokenKey}`, { headers });
+    this.requireAuthentication();
+    let headers = this.otpHeaders(otp);
+    this.secrets.push(tokenKey);
+    await this.http.delete(`/-/npm/v1/tokens/token/${encodeURIComponent(tokenKey)}`, {
+      headers
+    });
   }
 
   // --- Trusted Publishers ---
 
-  async getTrustedPublishers(packageName: string, otp?: string): Promise<any> {
-    let headers: Record<string, string> = {};
-    if (otp) {
-      headers['npm-otp'] = otp;
-    }
+  async getTrustedPublishers(packageName: string, otp?: string): Promise<unknown> {
+    this.requireAuthentication();
+    let headers = this.otpHeaders(otp);
     let res = await this.http.get(`/-/package/${encodePackageName(packageName)}/trust`, {
       headers
     });
@@ -172,13 +212,11 @@ export class NpmRegistryClient {
 
   async addTrustedPublisher(
     packageName: string,
-    configurations: any[],
+    configurations: Record<string, unknown>[],
     otp?: string
-  ): Promise<any> {
-    let headers: Record<string, string> = {};
-    if (otp) {
-      headers['npm-otp'] = otp;
-    }
+  ): Promise<unknown> {
+    this.requireAuthentication();
+    let headers = this.otpHeaders(otp);
     let res = await this.http.post(
       `/-/package/${encodePackageName(packageName)}/trust`,
       configurations,
@@ -192,62 +230,67 @@ export class NpmRegistryClient {
     configurationId: string,
     otp?: string
   ): Promise<void> {
-    let headers: Record<string, string> = {};
-    if (otp) {
-      headers['npm-otp'] = otp;
-    }
+    this.requireAuthentication();
+    let headers = this.otpHeaders(otp);
     await this.http.delete(
-      `/-/package/${encodePackageName(packageName)}/trust/${configurationId}`,
+      `/-/package/${encodePackageName(packageName)}/trust/${encodeURIComponent(configurationId)}`,
       { headers }
     );
   }
 
+  async getSecurityAdvisories(packages: Record<string, string[]>): Promise<unknown> {
+    let res = await this.http.post('/-/npm/v1/security/advisories/bulk', packages);
+    return res.data;
+  }
+
   // --- User Profile ---
 
-  async getUserProfile(): Promise<any> {
+  async getUserProfile(): Promise<unknown> {
+    this.requireAuthentication();
     let res = await this.http.get('/-/npm/v1/user');
     return res.data;
   }
 }
 
 export class NpmDownloadsClient {
-  private http;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor() {
-    this.http = createAxios({
-      baseURL: 'https://api.npmjs.org'
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.npmjs.org',
+      errorAdapter: error => npmApiError(error)
     });
   }
 
-  async getPointDownloads(period: string, packageName?: string): Promise<any> {
+  async getPointDownloads(period: string, packageName?: string): Promise<unknown> {
     let path = packageName
-      ? `/downloads/point/${period}/${encodePackageName(packageName)}`
-      : `/downloads/point/${period}`;
+      ? `/downloads/point/${encodeURIComponent(period)}/${encodePackageName(packageName)}`
+      : `/downloads/point/${encodeURIComponent(period)}`;
     let res = await this.http.get(path);
     return res.data;
   }
 
-  async getRangeDownloads(period: string, packageName?: string): Promise<any> {
+  async getRangeDownloads(period: string, packageName?: string): Promise<unknown> {
     let path = packageName
-      ? `/downloads/range/${period}/${encodePackageName(packageName)}`
-      : `/downloads/range/${period}`;
+      ? `/downloads/range/${encodeURIComponent(period)}/${encodePackageName(packageName)}`
+      : `/downloads/range/${encodeURIComponent(period)}`;
     let res = await this.http.get(path);
     return res.data;
   }
 
-  async getBulkPointDownloads(period: string, packages: string[]): Promise<any> {
-    let joined = packages.join(',');
-    let res = await this.http.get(`/downloads/point/${period}/${joined}`);
+  async getBulkPointDownloads(period: string, packages: string[]): Promise<unknown> {
+    let joined = packages.map(encodePackageName).join(',');
+    let res = await this.http.get(`/downloads/point/${encodeURIComponent(period)}/${joined}`);
     return res.data;
   }
 
-  async getBulkRangeDownloads(period: string, packages: string[]): Promise<any> {
-    let joined = packages.join(',');
-    let res = await this.http.get(`/downloads/range/${period}/${joined}`);
+  async getBulkRangeDownloads(period: string, packages: string[]): Promise<unknown> {
+    let joined = packages.map(encodePackageName).join(',');
+    let res = await this.http.get(`/downloads/range/${encodeURIComponent(period)}/${joined}`);
     return res.data;
   }
 
-  async getVersionDownloads(packageName: string): Promise<any> {
+  async getVersionDownloads(packageName: string): Promise<unknown> {
     let res = await this.http.get(`/versions/${encodePackageName(packageName)}/last-week`);
     return res.data;
   }

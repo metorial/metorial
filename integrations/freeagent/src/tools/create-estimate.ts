@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let estimateItemSchema = z.object({
@@ -45,7 +45,15 @@ export let createEstimate = SlateTool.create(spec, {
       projectId: z.string().optional().describe('Project ID to associate with'),
       currency: z.string().optional().describe('Currency code'),
       paymentTermsInDays: z.number().optional().describe('Payment terms in days'),
-      comments: z.string().optional().describe('Comments on the estimate'),
+      comments: z.string().optional().describe('Additional notes on the estimate'),
+      estimateType: z
+        .enum(['Estimate', 'Quote', 'Proposal'])
+        .optional()
+        .describe('Type of estimate'),
+      status: z
+        .enum(['Draft', 'Sent', 'Open', 'Approved', 'Rejected', 'Invoiced'])
+        .optional()
+        .describe('Estimate status'),
       estimateItems: z
         .array(estimateItemSchema)
         .optional()
@@ -58,27 +66,37 @@ export let createEstimate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    if (ctx.input.paymentTermsInDays !== undefined) {
+      throw createApiServiceError(
+        'FreeAgent estimates do not document payment terms. Omit paymentTermsInDays and set terms when creating the invoice.'
+      );
+    }
+
+    let client = createClient(ctx);
 
     let estimateData: Record<string, any> = {
       contact: ctx.input.contactId,
       dated_on: ctx.input.datedOn
     };
 
+    if (ctx.input.estimateType) estimateData.estimate_type = ctx.input.estimateType;
+    if (ctx.input.status) estimateData.status = ctx.input.status;
     if (ctx.input.reference) estimateData.reference = ctx.input.reference;
     if (ctx.input.projectId) estimateData.project = ctx.input.projectId;
     if (ctx.input.currency) estimateData.currency = ctx.input.currency;
-    if (ctx.input.paymentTermsInDays !== undefined)
-      estimateData.payment_terms_in_days = ctx.input.paymentTermsInDays;
-    if (ctx.input.comments) estimateData.comments = ctx.input.comments;
+
+    if (ctx.input.comments) estimateData.notes = ctx.input.comments;
 
     if (ctx.input.estimateItems && ctx.input.estimateItems.length > 0) {
       estimateData.estimate_items = ctx.input.estimateItems.map(item => {
         let mapped: Record<string, any> = {};
-        if (item.itemType) mapped.item_type = item.itemType;
+        if (item.itemType)
+          mapped.item_type =
+            item.itemType === 'No Unit'
+              ? '-no unit-'
+              : item.itemType === 'Comment'
+                ? 'Comments'
+                : item.itemType;
         if (item.quantity !== undefined) mapped.quantity = item.quantity;
         if (item.price) mapped.price = item.price;
         if (item.description) mapped.description = item.description;

@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let supplierSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   supplierId: z.number().describe('Altoviz supplier ID'),
   companyName: z.string().nullable().optional(),
   firstName: z.string().nullable().optional(),
@@ -23,11 +24,13 @@ export let listSuppliers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageIndex: z.number().optional().describe('Page number (starts at 1)'),
-      pageSize: z
-        .number()
+      query: z.string().optional().describe('Full-text search query'),
+      orderBy: z
+        .string()
         .optional()
-        .describe('Number of results per page (1-100, default 10)')
+        .describe('Provider ordering expression, for example name desc'),
+      pageIndex: z.number().optional().describe('Page index (starts at 1)'),
+      pageSize: z.number().optional().describe('Number of results per page')
     })
   )
   .output(
@@ -38,13 +41,16 @@ export let listSuppliers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let suppliers = await client.listSuppliers({
+      query: ctx.input.query,
+      orderBy: ctx.input.orderBy,
       pageIndex: ctx.input.pageIndex,
       pageSize: ctx.input.pageSize
     });
 
     let mapped = suppliers.map((s: any) => ({
+      raw: s,
       supplierId: s.id,
-      companyName: s.companyName,
+      companyName: s.name ?? s.companyName,
       firstName: s.firstName,
       lastName: s.lastName,
       email: s.email,

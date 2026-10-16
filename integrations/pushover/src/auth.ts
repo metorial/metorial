@@ -15,11 +15,13 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       appToken: z
         .string()
+        .regex(/^[A-Za-z0-9]{30}$/, 'Enter a 30-character alphanumeric key.')
         .describe(
           'Application API token (30-character alphanumeric string from https://pushover.net/apps/build)'
         ),
       userKey: z
         .string()
+        .regex(/^[A-Za-z0-9]{30}$/, 'Enter a 30-character alphanumeric key.')
         .describe(
           'User key or group key (30-character alphanumeric string from https://pushover.net/dashboard)'
         )

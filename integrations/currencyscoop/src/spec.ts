@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'currencyscoop',
   name: 'Currency Scoop',
   description:
-    'Real-time and historical exchange rates for 168 fiat currencies and 2,000+ cryptocurrencies. Provides currency conversion, time-series data, and a comprehensive list of supported currencies.',
+    'Retrieve currency exchange rates, historical rates, conversions, time-series data, and supported currency metadata through the CurrencyBeacon API.',
   metadata: {},
   config,
   auth

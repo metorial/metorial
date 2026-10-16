@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCalendarEventTool = SlateTool.create(spec, {
@@ -33,6 +33,7 @@ export let manageCalendarEventTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       eventId: z.string().describe('Calendar event ID'),
       title: z.string().optional().describe('Event title'),
       startAt: z.string().optional().nullable().describe('Start date/time'),
@@ -43,19 +44,20 @@ export let manageCalendarEventTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
+    if (ctx.input.action === 'create' && !ctx.input.contextCode) {
+      throw createApiServiceError('contextCode is required when creating a calendar event.');
+    }
     let eventData: Record<string, any> = {};
     if (ctx.input.contextCode) eventData.context_code = ctx.input.contextCode;
-    if (ctx.input.title) eventData.title = ctx.input.title;
-    if (ctx.input.description) eventData.description = ctx.input.description;
-    if (ctx.input.startAt) eventData.start_at = ctx.input.startAt;
-    if (ctx.input.endAt) eventData.end_at = ctx.input.endAt;
-    if (ctx.input.locationName) eventData.location_name = ctx.input.locationName;
-    if (ctx.input.locationAddress) eventData.location_address = ctx.input.locationAddress;
+    if (ctx.input.title !== undefined) eventData.title = ctx.input.title;
+    if (ctx.input.description !== undefined) eventData.description = ctx.input.description;
+    if (ctx.input.startAt !== undefined) eventData.start_at = ctx.input.startAt;
+    if (ctx.input.endAt !== undefined) eventData.end_at = ctx.input.endAt;
+    if (ctx.input.locationName !== undefined) eventData.location_name = ctx.input.locationName;
+    if (ctx.input.locationAddress !== undefined)
+      eventData.location_address = ctx.input.locationAddress;
 
     let result: any;
     let actionDesc: string;
@@ -64,17 +66,18 @@ export let manageCalendarEventTool = SlateTool.create(spec, {
       result = await client.createCalendarEvent(eventData);
       actionDesc = 'Created';
     } else if (ctx.input.action === 'update') {
-      if (!ctx.input.eventId) throw new Error('eventId is required for update');
+      if (!ctx.input.eventId) throw createApiServiceError('eventId is required for update');
       result = await client.updateCalendarEvent(ctx.input.eventId, eventData);
       actionDesc = 'Updated';
     } else {
-      if (!ctx.input.eventId) throw new Error('eventId is required for delete');
+      if (!ctx.input.eventId) throw createApiServiceError('eventId is required for delete');
       result = await client.deleteCalendarEvent(ctx.input.eventId, ctx.input.cancelReason);
       actionDesc = 'Deleted';
     }
 
     return {
       output: {
+        raw: result,
         eventId: String(result.id),
         title: result.title,
         startAt: result.start_at,

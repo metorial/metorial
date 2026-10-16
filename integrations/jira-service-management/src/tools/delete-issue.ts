@@ -33,10 +33,7 @@ export let deleteIssueTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     await client.deleteIssue(ctx.input.issueIdOrKey, ctx.input.deleteSubtasks);
 

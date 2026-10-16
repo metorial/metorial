@@ -1,170 +1,44 @@
-# Slates Specification for Yandex
+# Yandex Cloud integration
 
-## Overview
+This integration exposes 43 tools for 10 Yandex Cloud products, plus a shared operation-status tool. Product categories group the implemented APIs so connections can select relevant services.
 
-Yandex Cloud is a public cloud platform developed by the Russian internet company Yandex, providing private and corporate users with infrastructure and computing resources in an "as a service" format. It includes infrastructure and data management services, tools for developing cloud applications and machine learning models, as well as proprietary ML-based services.
+## Authentication and discovery
 
-## Authentication
+The `iam_token_oauth` method exchanges a Yandex ID OAuth token for an IAM token at `POST https://iam.api.cloud.yandex.net/iam/v1/tokens`. It persists the provider's RFC 3339 `expiresAt` and renews the IAM token by exchanging the saved OAuth token again. The `api_key` method preserves the supplied service-account API key. API keys have service, scope, and optional validity limits; use IAM authentication for infrastructure management.
 
-Yandex Cloud supports multiple authentication methods:
+Existing optional `cloudId` and `folderId` defaults remain supported. Tools accept explicit resource IDs. Use `list_clouds`, then `list_folders`, to discover the authorized resource scope. No credential-independent current-user endpoint was verified for both authentication methods.
 
-### 1. IAM Token (Recommended)
+## Implemented capabilities
 
-The recommended authentication method uses IAM tokens, though they have a short lifetime, making this method best for applications that can request tokens automatically. The IAM token lifetime does not exceed 12 hours.
+| Product | Tools |
+| --- | --- |
+| Compute Cloud | List/get/create/update/control instances; list/create/delete disks; list compute images |
+| Object Storage | Legacy raw S3 bucket/object listings; create/get/update/delete bucket settings; list folder buckets through the IAM management API |
+| Cloud Functions | List/get/create/delete/invoke functions; list deployed versions |
+| Translate | Translate text, detect language, list supported languages |
+| IAM | List/get/create/delete service accounts; list/create/delete API keys, including pagination and optional expiration |
+| VPC | List/create/delete networks and subnets |
+| Cloud DNS | List/create/delete zones; list and merge resource record sets |
+| Resource Manager | List clouds and folders; create/update/delete folders |
+| Container Registry | List/create/delete registries; list Docker images |
+| Cloud Logging | List log groups; preserve legacy read/write requests |
+| Operations | Read asynchronous operation status and provider result |
 
-IAM tokens are passed in the `Authorization` header as: `Authorization: Bearer <IAM_TOKEN>`
+Mutating methods commonly return an operation ID. Call `get_operation` to check completion. Failed operation envelopes are reported as errors even when the HTTP status is 200. Submitted changes are not evidence that a resource is ready.
 
-**For user accounts (Yandex ID):**
-An OAuth token is used to authenticate users with a Yandex account: the user exchanges an OAuth token for an IAM token. To obtain an IAM token, POST the OAuth token to `https://iam.api.cloud.yandex.net/iam/v1/tokens` with body `{"yandexPassportOauthToken":"<OAuth_token>"}`.
+## Compatibility and limits
 
-**For service accounts:**
-You can create a JSON Web Token (JWT) signed with an authorized key and exchange it for an IAM token, which allows you to control IAM token generation at every step. The JWT is signed using the PS256 algorithm with the service account's private key and exchanged at the same IAM token endpoint.
+Existing tool keys, field types, defaults, optionalness, enum choices, and raw S3 results remain available. IAM renewal is additive; saved token/API-key connections and optional scope defaults retain their existing fields. No event triggers are registered.
 
-### 2. API Key (Simplified)
+Current Cloud Logging read/write documentation describes gRPC services rather than the legacy `/logging/v1/read` and `/logging/v1/write` HTTP requests. Those requests remain unchanged pending a verified transport migration. Likewise, legacy S3 listings preserve their raw responses and request/auth contracts; use `list_folder_buckets` for documented IAM-authenticated bucket discovery. No static-access-key signing or new arbitrary-URL download transport is implemented.
 
-The API key is a private key used for simplified authorization. API keys are only used for service accounts. API keys do not expire, meaning this method is simpler but less secure. Use it if you can't automatically request an IAM token.
+Function creation creates a function resource; it does not deploy code. Function version deployment, managed databases, Kubernetes, SpeechKit, Vision, Message Queue, Data Streams, Monitoring, API Gateway, Search, Disk, Direct, and event-trigger provisioning are outside the implemented surface.
 
-API keys are passed in the header as: `Authorization: Api-Key <API_key>`
+No file download/export tool is registered. Existing structured/raw responses are preserved. No live provider calls, E2E, or eval execution was performed during this refresh.
 
-When creating an API key, you can specify one or more scopes. A scope is the total of the actions a service account is allowed to perform. You cannot use an API key with specified scopes in other services or scopes.
+## Official references
 
-### 3. Static Access Keys (AWS-compatible)
-
-Static access keys should be used in services with an AWS-compatible API, such as Object Storage and Message Queue. These consist of a key ID and secret key, and follow AWS Signature V4 signing.
-
-### 4. SAML Identity Federations
-
-The authentication process for federated users depends on the IdP server settings. Yandex Cloud supports SAML-compatible identity federations.
-
-### Required Context
-
-All API requests require a **Cloud ID** and/or **Folder ID** to scope operations to the correct resources. A Folder ID identifies the project within the cloud and, if specified, will be used by default when creating resources.
-
-## Features
-
-### Compute (Virtual Machines)
-
-Yandex Compute Cloud provides scalable computing capacity to create and manage virtual machines, supporting preemptible VMs and fault-tolerant instance groups. Users can create, start, stop, restart, and delete VM instances, manage disks, snapshots, and images.
-
-### Object Storage (S3-compatible)
-
-Provides cloud object storage with an AWS S3-compatible API. Users can create and manage buckets, upload/download objects, set access policies, and configure lifecycle rules. Authentication supports IAM tokens, static access keys, and temporary Security Token Service keys.
-
-### Serverless Functions
-
-Cloud Functions is a serverless compute service that executes user-provided code in response to HTTP requests or trigger events. Supports Node.js, Python, Go, Java, .NET, and other runtimes. Functions can be invoked via HTTP, triggers, or API Gateway.
-
-### Managed Databases
-
-Yandex Cloud offers managed database services for PostgreSQL, MySQL, ClickHouse, MongoDB, Redis, and more. Users can create clusters, manage backups, configure replicas, and scale resources without managing the underlying infrastructure.
-
-### Machine Learning Services
-
-- **Translate**: Machine translation between languages.
-- **SpeechKit**: Speech synthesis (text-to-speech) and speech recognition (speech-to-text).
-- **Vision**: Image analysis and OCR.
-- **DataSphere**: Managed environment for ML development.
-
-### Identity and Access Management (IAM)
-
-Manage service accounts, roles, and access bindings for cloud resources. Create and manage API keys, authorized keys, and static access keys. Supports role-based access control at the organization, cloud, and folder levels.
-
-### Resource Management
-
-Organize resources into clouds and folders. Manage cloud metadata, quotas, and organizational structure.
-
-### Virtual Private Cloud (VPC)
-
-Create and manage virtual networks, subnets, route tables, security groups, and IP addresses.
-
-### Container Registry
-
-Store and manage Docker images. Create registries, push/pull images, and manage image lifecycle policies.
-
-### Managed Kubernetes
-
-Deploy and manage Kubernetes clusters with automatic scaling, updates, and integration with other Yandex Cloud services.
-
-### Message Queue
-
-Message Queue provides queues for messaging between applications. AWS SQS-compatible API for managing message queues.
-
-### Data Streams
-
-Yandex Data Streams is a scalable service for managing data streams in real time, continuously collecting data from various sources. The service API is compatible with the Amazon Kinesis Data Streams API.
-
-### Monitoring
-
-Collect, store, and visualize metrics for cloud resources. Set up alerts and dashboards. You can integrate Cloud Functions into Yandex Monitoring for automatic processing of incidents. Functions can be invoked when an alert fires.
-
-### Cloud Logging
-
-Yandex Cloud Logging allows you to read and write logs of services and user applications by grouping messages into log groups.
-
-### Audit Trails
-
-Yandex Audit Trails is a service that collects and uploads audit logs from Yandex Cloud resources, letting you use analytical tools and rapidly respond to events.
-
-### DNS Management
-
-Yandex Cloud DNS is a DNS zone and domain name management tool for your resources.
-
-### API Gateway
-
-Yandex API Gateway is an API gateway management service supporting OpenAPI 3.0 and extensions for compatibility with other cloud services.
-
-### Search API
-
-Programmatic access to Yandex search results for integration into applications.
-
-### Yandex Disk (via separate API)
-
-The Disk REST API can be used in mobile and desktop applications and web services. Users can work with their data on Yandex Disk from any device, including saving files directly without using local storage. You can also use the API to store system and user settings in the cloud.
-
-### Yandex Direct (Advertising API)
-
-The Yandex Direct API allows creating applications for managing advertising campaigns, such as automating routine operations, using custom bid management algorithms, and downloading statistics.
-
-## Events
-
-Yandex Cloud supports event-driven architectures through its **Triggers** system in Cloud Functions and Serverless Containers.
-
-### Object Storage Triggers
-
-Triggers for Object Storage activate a function when a certain event happens to an object in Yandex Object Storage. Trackable events include creating an object, editing an object ACL, and deleting an object. Events can be filtered using prefixes and suffixes for an object key.
-
-### Container Registry Triggers
-
-Triggers for Container Registry run a function when certain events occur with a Docker image from Yandex Container Registry. Trackable events: creating a Docker image, deleting a Docker image, creating a Docker image tag, and deleting a Docker image tag.
-
-### Message Queue Triggers
-
-Triggers that fire when messages arrive in a Yandex Message Queue, enabling serverless processing of queued messages.
-
-### Data Streams Triggers
-
-Triggers that activate when new data arrives in a Yandex Data Streams stream, allowing real-time stream processing.
-
-### Timer Triggers
-
-Timer is a trigger that calls a Cloud Functions function on a schedule, set as a cron expression.
-
-### Cloud Logging Triggers
-
-Triggers that invoke functions when new log entries appear in a specified Cloud Logging log group.
-
-### IoT Core Triggers
-
-Triggers that fire on messages from IoT Core MQTT topics.
-
-### Budget Triggers
-
-You can set conditions in the budget settings that act as trigger conditions, such as notification thresholds.
-
-### Monitoring Alert Triggers
-
-You can invoke a Cloud Functions function when an alert fires in Yandex Monitoring.
-
-### Audit Trails Events
-
-Audit Trails collects and delivers audit logs of Yandex Cloud resources to a bucket in Object Storage or a log group in Cloud Logging. These can be chained with Cloud Logging triggers for real-time event processing. Events cover management operations (create, update, delete) across all Yandex Cloud services.
+- [IAM token creation](https://yandex.cloud/en/docs/iam/api-ref/IamToken/create) and [API key limits](https://yandex.cloud/en/docs/iam/concepts/authorization/api-key).
+- [Compute instance API](https://yandex.cloud/en/docs/compute/api-ref/Instance/) and [image discovery](https://yandex.cloud/en/docs/compute/api-ref/Image/list).
+- [Object Storage bucket management](https://yandex.cloud/en/docs/storage/api-ref/Bucket/list) and [S3 bucket listings](https://yandex.cloud/en/docs/storage/s3/api-ref/bucket/list).
+- [Function versions](https://yandex.cloud/en/docs/functions/functions/api-ref/Function/listVersions), [log groups](https://yandex.cloud/en/docs/logging/api-ref/LogGroup/list), and [operation status](https://yandex.cloud/en/docs/api-design-guide/concepts/operation).

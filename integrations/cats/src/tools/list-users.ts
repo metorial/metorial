@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -40,18 +41,18 @@ export let listUsers = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let users = (data?._embedded?.users ?? []).map((u: any) => ({
-      userId: u.id?.toString() ?? '',
-      firstName: u.first_name,
-      lastName: u.last_name,
-      email: u.email,
-      isActive: u.is_active
+    let users = collection(data, 'users').map((u: any) => ({
+      userId: requiredId(u.id, 'record'),
+      firstName: u.first_name ?? undefined,
+      lastName: u.last_name ?? undefined,
+      email: u.username ?? undefined,
+      isActive: u.is_active ?? undefined
     }));
 
     return {
       output: {
         users,
-        totalCount: data?.total ?? users.length
+        totalCount: data?.total ?? undefined
       },
       message: `Listed **${users.length}** user(s).`
     };

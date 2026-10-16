@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { domainIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createLink = SlateTool.create(spec, {
@@ -27,7 +28,7 @@ export let createLink = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Domain hostname to create the link on (e.g., "example.short.gy"). Falls back to config default.'
+          'Domain hostname from list_domains (e.g., "example.short.gy"). Falls back to config default.'
         ),
       originalURL: z.string().describe('The destination URL to shorten.'),
       path: z
@@ -58,7 +59,22 @@ export let createLink = SlateTool.create(spec, {
       utmCampaign: z.string().optional().describe('UTM campaign parameter.'),
       utmTerm: z.string().optional().describe('UTM term parameter.'),
       utmContent: z.string().optional().describe('UTM content parameter.'),
-      folderId: z.string().optional().describe('Folder ID to place the link in.')
+      passwordContact: z
+        .boolean()
+        .optional()
+        .describe('Offer visitors the owner contact email to request the password.'),
+      splitURL: z.string().optional().describe('Alternate destination for split testing.'),
+      splitPercent: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Percentage of traffic sent to splitURL.'),
+      folderId: z
+        .string()
+        .optional()
+        .describe('Folder ID to place the link in. Call list_folders to discover IDs.')
     })
   )
   .output(
@@ -73,13 +89,13 @@ export let createLink = SlateTool.create(spec, {
       cloaking: z.boolean().nullable().describe('Whether cloaking is enabled.'),
       archived: z.boolean().describe('Whether the link is archived.'),
       createdAt: z.string().describe('Creation timestamp.'),
-      domainId: z.number().describe('The domain ID the link belongs to.')
+      domainId: domainIdSchema
     })
   )
   .handleInvocation(async ctx => {
     let domain = ctx.input.domain || ctx.config.domain;
     if (!domain) {
-      throw new Error(
+      throw createApiServiceError(
         'Domain is required. Provide it in the input or set a default domain in config.'
       );
     }
@@ -108,7 +124,10 @@ export let createLink = SlateTool.create(spec, {
       utmCampaign: ctx.input.utmCampaign,
       utmTerm: ctx.input.utmTerm,
       utmContent: ctx.input.utmContent,
-      folderId: ctx.input.folderId
+      folderId: ctx.input.folderId,
+      splitURL: ctx.input.splitURL,
+      splitPercent: ctx.input.splitPercent,
+      passwordContact: ctx.input.passwordContact
     });
 
     return {

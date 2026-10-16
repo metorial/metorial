@@ -1,5 +1,8 @@
+export * from './batch';
 export * from './create-deployment';
 export * from './create-project';
+export * from './discovery';
+export * from './downloads';
 export * from './get-dataset';
 export * from './get-deployment';
 export * from './get-deployment-monitoring';
@@ -15,4 +18,5 @@ export * from './manage-dataset';
 export * from './manage-deployment';
 export * from './manage-project';
 export * from './register-model';
+export * from './request-feature-impact';
 export * from './start-autopilot';

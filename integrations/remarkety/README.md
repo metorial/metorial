@@ -1,6 +1,10 @@
 # Remarkety
 
-Manage eCommerce marketing automation for email and SMS campaigns. Create and update customer contacts, track orders and carts, sync product catalogs, manage newsletter subscriptions and unsubscriptions, send custom events to trigger automations, upload contacts in batch, and generate personalized coupons.
+Send customer, order, product, cart, and custom events to Remarkety. Manage newsletter subscriptions, unsubscribe email and SMS contacts, and upload contact batches with per-contact outcomes.
+
+Connect with a Remarkety API key and Store ID from **Settings > API Keys**. Batch uploads use the user API token in `X-Token`; contact unsubscription uses `x-api-key`.
+
+The integration does not expose outgoing engagement notifications or coupon generation. See the [API specification](./docs/SPEC.md) for supported tools and documentation limits.
 
 ## License
 

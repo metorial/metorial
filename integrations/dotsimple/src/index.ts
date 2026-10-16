@@ -6,8 +6,10 @@ import {
   deleteMediaFiles,
   deletePosts,
   deleteTag,
+  getAccount,
   getMediaFile,
   getPost,
+  getTag,
   listAccounts,
   listAutoresponders,
   listMedia,
@@ -15,7 +17,8 @@ import {
   listReports,
   listTags,
   schedulePost,
-  updatePost
+  updatePost,
+  uploadMedia
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -27,6 +30,9 @@ export let provider = Slate.create({
     schedulePost,
     deletePosts,
     listAccounts,
+    getAccount,
+    getTag,
+    uploadMedia,
     listMedia,
     getMediaFile,
     deleteMediaFiles,

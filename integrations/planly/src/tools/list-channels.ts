@@ -1,6 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  nullableString,
+  optionalNumber,
+  optionalString,
+  rawSchema,
+  requiredString,
+  responseArray,
+  responseData,
+  responseRecord,
+  scalarString,
+  teamIdSchema
+} from '../lib/responses';
 import { spec } from '../spec';
 
 let channelSchema = z.object({
@@ -15,13 +27,14 @@ let channelSchema = z.object({
   scheduleCount: z.number().optional().describe('Number of scheduled posts'),
   isGroup: z.boolean().optional().describe('Whether this is a group channel'),
   externalId: z.string().optional().describe('External social network account ID'),
-  url: z.string().nullable().optional().describe('URL to the social media profile')
+  url: z.string().nullable().optional().describe('URL to the social media profile'),
+  raw: rawSchema
 });
 
 export let listChannels = SlateTool.create(spec, {
   name: 'List Channels',
   key: 'list_channels',
-  description: `List all connected social media channels for a team. Returns channel details including name, social network type, and connection status. Supports Instagram, Facebook, Twitter/X, LinkedIn, Pinterest, TikTok, YouTube, Threads, Mastodon, and Bluesky.`,
+  description: `List all connected social media channels for a team. Returns channel details including name, social network type, and connection status. Supports Instagram, Facebook, Twitter/X, LinkedIn, Pinterest, TikTok, YouTube, Threads, Mastodon, and Bluesky. Call list_teams to discover the team ID.`,
   instructions: [
     'Use the returned channelId values when scheduling posts.',
     'New channels must be connected through the Planly web interface; the API only lists existing channels.'
@@ -33,7 +46,7 @@ export let listChannels = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team to list channels for'),
+      teamId: teamIdSchema,
       excludeCompetitors: z
         .boolean()
         .optional()
@@ -48,21 +61,21 @@ export let listChannels = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listChannels(ctx.input.teamId, ctx.input.excludeCompetitors);
-    let channels = (result.data || result || []).map((c: any) => ({
-      channelId: c.id,
-      name: c.name || '',
-      picture: c.picture || null,
-      socialNetwork: c.social_network || '',
-      method: c.method,
-      status: c.status,
-      scheduleCount: c.schedules,
-      isGroup: c.is_group,
-      externalId: c.external_id,
-      url: c.url || null
-    }));
-
-    return {
-      output: { channels },
-      message: `Found ${channels.length} connected channel(s).`
-    };
+    let channels = responseArray(responseData(result), 'channels').map(value => {
+      let channel = responseRecord(value, 'channel');
+      return {
+        channelId: requiredString(channel.id, 'channel ID'),
+        name: requiredString(channel.name, 'channel name'),
+        picture: nullableString(channel.picture),
+        socialNetwork: requiredString(channel.social_network, 'channel social network'),
+        method: optionalString(channel.method),
+        status: scalarString(channel.status),
+        scheduleCount: optionalNumber(channel.schedules),
+        isGroup: typeof channel.is_group === 'boolean' ? channel.is_group : undefined,
+        externalId: optionalString(channel.external_id),
+        url: nullableString(channel.url),
+        raw: channel
+      };
+    });
+    return { output: { channels }, message: `Found ${channels.length} connected channel(s).` };
   });

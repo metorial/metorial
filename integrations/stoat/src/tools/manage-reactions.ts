@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -41,11 +41,12 @@ export let manageReactions = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'add':
-        if (!ctx.input.emoji) throw new Error('Emoji is required for add action');
+        if (!ctx.input.emoji) throw createApiServiceError('Emoji is required for add action');
         await client.addReaction(ctx.input.channelId, ctx.input.messageId, ctx.input.emoji);
         break;
       case 'remove':
-        if (!ctx.input.emoji) throw new Error('Emoji is required for remove action');
+        if (!ctx.input.emoji)
+          throw createApiServiceError('Emoji is required for remove action');
         await client.removeReaction(
           ctx.input.channelId,
           ctx.input.messageId,
@@ -56,7 +57,8 @@ export let manageReactions = SlateTool.create(spec, {
         );
         break;
       case 'clear_emoji':
-        if (!ctx.input.emoji) throw new Error('Emoji is required for clear_emoji action');
+        if (!ctx.input.emoji)
+          throw createApiServiceError('Emoji is required for clear_emoji action');
         await client.removeReaction(
           ctx.input.channelId,
           ctx.input.messageId,

@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'opengraphio',
   name: 'OpenGraph.io',
   description:
-    'Web data extraction service for retrieving Open Graph metadata, scraping HTML, capturing screenshots, extracting structured content, and AI-powered page querying.',
+    'Retrieve Open Graph metadata, scrape HTML, download screenshots and Markdown documents, extract page content, ask AI-powered questions, and retrieve embeddable preview cards.',
   metadata: {},
   config,
   auth

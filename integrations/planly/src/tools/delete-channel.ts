@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireConfirmed } from '../lib/responses';
 import { spec } from '../spec';
 
 export let deleteChannel = SlateTool.create(spec, {
@@ -27,7 +28,7 @@ export let deleteChannel = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.deleteChannel(ctx.input.channelId);
+    requireConfirmed(await client.deleteChannel(ctx.input.channelId));
 
     return {
       output: { success: true },

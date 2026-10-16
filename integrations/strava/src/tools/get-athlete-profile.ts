@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAthleteProfile = SlateTool.create(spec, {
   name: 'Get Athlete Profile',
   key: 'get_athlete_profile',
-  description: `Retrieve the authenticated athlete's full profile, including personal details, training zones (heart rate and power), and aggregate statistics across sport types (ride, run, swim). Optionally include zones and stats alongside the profile.`,
+  description: `Retrieve the authenticated athlete's full profile, including the profile data visible to the connection, training zones (heart rate and power), and aggregate statistics across sport types (ride, run, swim). Optionally include zones and stats alongside the profile.`,
   tags: {
     readOnly: true
   }
@@ -14,11 +14,15 @@ export let getAthleteProfile = SlateTool.create(spec, {
   .input(
     z.object({
       includeZones: z.boolean().optional().describe('Include heart rate and power zones'),
-      includeStats: z.boolean().optional().describe('Include aggregate activity statistics')
+      includeStats: z
+        .boolean()
+        .optional()
+        .describe('Include aggregate statistics from activities visible to Everyone')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       athleteId: z.number().describe('Unique athlete identifier'),
       username: z.string().nullable().optional().describe('Athlete username'),
       firstName: z.string().nullable().optional().describe('First name'),
@@ -54,6 +58,7 @@ export let getAthleteProfile = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: athlete,
         athleteId: athlete.id,
         username: athlete.username,
         firstName: athlete.firstname,
@@ -70,7 +75,7 @@ export let getAthleteProfile = SlateTool.create(spec, {
         zones,
         stats
       },
-      message: `Retrieved profile for **${athlete.firstname} ${athlete.lastname}** (${athlete.username || 'no username'}).${ctx.input.includeZones ? ' Zones included.' : ''}${ctx.input.includeStats ? ' Stats included.' : ''}`
+      message: 'Retrieved the authenticated athlete profile.'
     };
   })
   .build();

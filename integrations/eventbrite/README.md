@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Eventbrite
 
-Create, retrieve, update, publish, and unpublish events within an organization. Manage ticket classes, orders, and attendee registrations. Track attendee check-ins and check-outs. Create and manage venues, organizer profiles, and discount codes. Retrieve authenticated user details and associated organizations. Access structured content for rich event descriptions.
+Create, retrieve, update, publish, unpublish, cancel, and delete events. Manage ticket classes, venues, organizer profiles, and discount codes. Retrieve orders, attendees, check-in status, and full HTML event descriptions. Discover authenticated user details and organizations, with pagination for organization, event, ticket, order, attendee, venue, and discount lists.
 
 ## License
 

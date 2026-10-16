@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type Attribute, Client, type PaginatedResponse } from '../lib/client';
 import { spec } from '../spec';
 
 let attributeValueSchema = z.object({
@@ -20,7 +20,7 @@ let attributeSchema = z.object({
   valueType: z
     .number()
     .describe(
-      'Value type code (0=quantity, 1=decimal, 2=string, 3=duration, 4=time of day, 5=percentage, 7=boolean, 8=scale)'
+      'Value type code (0=quantity, 1=decimal, 2=string, 3=duration, 4=time from midnight, 5=percentage, 6=time from midday, 7=boolean, 8=scale)'
     ),
   valueTypeDescription: z.string().describe('Human-readable value type'),
   serviceName: z.string().nullable().describe('Name of the owning service'),
@@ -68,6 +68,32 @@ export let getAttributesTool = SlateTool.create(spec, {
         .describe(
           'Most recent date to include values for (YYYY-MM-DD). Only used when includeValues is true.'
         ),
+      templateNames: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated template names. Requires includeValues and cannot be combined with attributeNames. Discover names with get_attribute_templates.'
+        ),
+      manual: z
+        .boolean()
+        .optional()
+        .describe(
+          'Filter by manual tracking; when includeValues is true only true is supported.'
+        ),
+      excludeCustom: z
+        .boolean()
+        .optional()
+        .describe('Exclude custom attributes. Available when includeValues is false.'),
+      includeInactive: z
+        .boolean()
+        .optional()
+        .describe('Include inactive attributes. Available when includeValues is false.'),
+      includeLowPriority: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include attributes with priority 10 or higher. Available when includeValues is false.'
+        ),
       ownedOnly: z
         .boolean()
         .optional()
@@ -78,6 +104,17 @@ export let getAttributesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the next page, when returned'),
+      previousPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the previous page, when returned'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       totalCount: z.number().describe('Total number of matching attributes'),
       attributes: z.array(attributeSchema).describe('List of attributes'),
       hasMore: z.boolean().describe('Whether there are more pages of results')
@@ -86,12 +123,28 @@ export let getAttributesTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
 
-    let result: any;
+    if (
+      ctx.input.includeValues &&
+      (ctx.input.ownedOnly ||
+        ctx.input.excludeCustom !== undefined ||
+        ctx.input.includeInactive !== undefined ||
+        ctx.input.includeLowPriority !== undefined ||
+        ctx.input.manual === false)
+    ) {
+      throw createApiServiceError(
+        'When includeValues is true, use groups, attributeNames or templateNames, days, dateMax, manual=true, and pagination. To retrieve values for owned attributes, list owned attributes first and pass their names in a separate values request.'
+      );
+    }
+    if (ctx.input.templateNames !== undefined && !ctx.input.includeValues)
+      throw createApiServiceError('templateNames requires includeValues=true.');
+    let result: PaginatedResponse<Attribute>;
     if (ctx.input.includeValues) {
       result = await client.getAttributesWithValues({
         groups: ctx.input.groups,
         attributes: ctx.input.attributeNames,
         days: ctx.input.days,
+        templates: ctx.input.templateNames,
+        manual: ctx.input.manual,
         dateMax: ctx.input.dateMax,
         limit: ctx.input.limit,
         page: ctx.input.page
@@ -100,6 +153,10 @@ export let getAttributesTool = SlateTool.create(spec, {
       result = await client.getOwnedAttributes({
         groups: ctx.input.groups,
         attributes: ctx.input.attributeNames,
+        manual: ctx.input.manual,
+        excludeCustom: ctx.input.excludeCustom,
+        includeInactive: ctx.input.includeInactive,
+        includeLowPriority: ctx.input.includeLowPriority,
         limit: ctx.input.limit,
         page: ctx.input.page
       });
@@ -107,12 +164,16 @@ export let getAttributesTool = SlateTool.create(spec, {
       result = await client.getAttributes({
         groups: ctx.input.groups,
         attributes: ctx.input.attributeNames,
+        manual: ctx.input.manual,
+        excludeCustom: ctx.input.excludeCustom,
+        includeInactive: ctx.input.includeInactive,
+        includeLowPriority: ctx.input.includeLowPriority,
         limit: ctx.input.limit,
         page: ctx.input.page
       });
     }
 
-    let attributes = result.results.map((attr: any) => ({
+    let attributes = result.results.map(attr => ({
       templateName: attr.template,
       attributeName: attr.name,
       label: attr.label,
@@ -125,11 +186,14 @@ export let getAttributesTool = SlateTool.create(spec, {
       valueTypeDescription: attr.value_type_description,
       serviceName: attr.service?.name ?? null,
       serviceLabel: attr.service?.label ?? null,
-      values: attr.values?.map((v: any) => ({ date: v.date, value: v.value }))
+      values: attr.values?.map(v => ({ date: v.date, value: v.value }))
     }));
 
     return {
       output: {
+        nextPageUrl: result.next,
+        previousPageUrl: result.previous,
+        raw: result,
         totalCount: result.count,
         attributes,
         hasMore: result.next !== null

@@ -22,6 +22,13 @@ let planSchema = z.object({
   createdAt: z.string().nullable().describe('When the plan was created')
 });
 
+let listPlansOutputSchema = z.object({
+  plans: z.array(planSchema).describe('List of recurring plans'),
+  totalCount: z.number().describe('Total number of plans'),
+  currentPage: z.number().describe('Current page'),
+  lastPage: z.number().describe('Last page')
+});
+
 export let listPlans = SlateTool.create(spec, {
   name: 'List Plans',
   key: 'list_plans',
@@ -32,49 +39,47 @@ export let listPlans = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination')
+      page: z.number().optional().describe('Page number for pagination'),
+      perPage: z.number().optional().describe('Items per page, from 1 to 100')
     })
   )
-  .output(
-    z.object({
-      plans: z.array(planSchema).describe('List of recurring plans'),
-      totalCount: z.number().describe('Total number of plans'),
-      currentPage: z.number().describe('Current page'),
-      lastPage: z.number().describe('Last page')
-    })
-  )
+  .output(listPlansOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.listPlans({ page: ctx.input.page });
+    let result = await client.listPlans({ page: ctx.input.page, per_page: ctx.input.perPage });
 
     let plans = result.data.map((p: any) => ({
       planId: String(p.id),
-      firstName: p.first_name ?? null,
-      lastName: p.last_name ?? null,
-      email: p.email ?? null,
-      phone: p.phone ?? null,
-      frequency: p.frequency ?? null,
-      status: p.status ?? null,
-      method: p.method ?? null,
-      amount: p.amount ?? null,
-      feeCovered: p.fee_covered ?? null,
-      startAt: p.start_at ?? null,
-      nextBillDate: p.next_bill_date ?? null,
-      createdAt: p.created_at ?? null
+      firstName: p.first_name,
+      lastName: p.last_name,
+      email: p.email,
+      phone: p.phone,
+      frequency: p.frequency,
+      status: p.status,
+      method: p.method,
+      amount: p.amount,
+      feeCovered: p.fee_covered,
+      startAt: p.start_at,
+      nextBillDate: p.next_bill_date,
+      createdAt: p.created_at
     }));
 
     return {
-      output: {
+      output: client.output(listPlansOutputSchema, {
         plans,
         totalCount: result.meta.total,
         currentPage: result.meta.current_page,
         lastPage: result.meta.last_page
-      },
-      message: `Found **${result.meta.total}** recurring plans (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      }),
+      message: client.publicData(
+        `Found **${result.meta.total}** recurring plans (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      )
     };
   })
   .build();
+
+let getPlanOutputSchema = planSchema;
 
 export let getPlan = SlateTool.create(spec, {
   name: 'Get Plan',
@@ -89,29 +94,29 @@ export let getPlan = SlateTool.create(spec, {
       planId: z.string().describe('ID of the plan to retrieve')
     })
   )
-  .output(planSchema)
+  .output(getPlanOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let p = await client.getPlan(ctx.input.planId);
 
     return {
-      output: {
+      output: client.output(getPlanOutputSchema, {
         planId: String(p.id),
-        firstName: p.first_name ?? null,
-        lastName: p.last_name ?? null,
-        email: p.email ?? null,
-        phone: p.phone ?? null,
-        frequency: p.frequency ?? null,
-        status: p.status ?? null,
-        method: p.method ?? null,
-        amount: p.amount ?? null,
-        feeCovered: p.fee_covered ?? null,
-        startAt: p.start_at ?? null,
-        nextBillDate: p.next_bill_date ?? null,
-        createdAt: p.created_at ?? null
-      },
-      message: `Retrieved plan **${p.id}** — ${p.amount ?? 0} ${p.frequency ?? ''} from ${[p.first_name, p.last_name].filter(Boolean).join(' ') || 'unknown donor'}.`
+        firstName: p.first_name,
+        lastName: p.last_name,
+        email: p.email,
+        phone: p.phone,
+        frequency: p.frequency,
+        status: p.status,
+        method: p.method,
+        amount: p.amount,
+        feeCovered: p.fee_covered,
+        startAt: p.start_at,
+        nextBillDate: p.next_bill_date,
+        createdAt: p.created_at
+      }),
+      message: client.publicData(`Retrieved plan **${p.id}**.`)
     };
   })
   .build();

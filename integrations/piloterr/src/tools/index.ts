@@ -1,4 +1,5 @@
 export * from './amazon-product';
+export * from './capture-screenshot';
 export * from './check-usage';
 export * from './contact-extractor';
 export * from './crunchbase';
@@ -10,6 +11,7 @@ export * from './github-profile';
 export * from './google-search';
 export * from './instagram';
 export * from './linkedin-company';
+export * from './linkedin-discovery';
 export * from './linkedin-job';
 export * from './linkedin-job-search';
 export * from './linkedin-post';

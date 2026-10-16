@@ -13,7 +13,10 @@ export let listGroups = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Number of groups per page (default: 20)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of groups per page (whole number 1–100; default: 20)'),
       cursor: z.string().optional().describe('Pagination cursor for fetching the next page')
     })
   )
@@ -24,8 +27,22 @@ export let listGroups = SlateTool.create(spec, {
           z.object({
             groupId: z.string().describe('ID of the group'),
             name: z.string().describe('Name of the group'),
-            certificateDesignId: z.string().nullable().describe('Certificate design ID'),
-            badgeDesignId: z.string().nullable().describe('Badge design ID'),
+            designIds: z
+              .array(z.string())
+              .optional()
+              .describe('Ordered design IDs associated with this credential template'),
+            certificateDesignId: z
+              .string()
+              .nullable()
+              .describe(
+                'Legacy certificate design ID when returned by Certifier; otherwise null. Use designIds for the ordered designs.'
+              ),
+            badgeDesignId: z
+              .string()
+              .nullable()
+              .describe(
+                'Legacy badge design ID when returned by Certifier; otherwise null. Use designIds for the ordered designs.'
+              ),
             learningEventUrl: z.string().nullable().describe('Learning event URL'),
             createdAt: z.string().describe('Creation timestamp')
           })
@@ -41,9 +58,10 @@ export let listGroups = SlateTool.create(spec, {
 
     let groups = result.data.map(g => ({
       groupId: g.id,
+      designIds: g.designIds,
       name: g.name,
-      certificateDesignId: g.certificateDesignId,
-      badgeDesignId: g.badgeDesignId,
+      certificateDesignId: g.certificateDesignId ?? null,
+      badgeDesignId: g.badgeDesignId ?? null,
       learningEventUrl: g.learningEventUrl,
       createdAt: g.createdAt
     }));
@@ -51,10 +69,10 @@ export let listGroups = SlateTool.create(spec, {
     return {
       output: {
         groups,
-        nextCursor: result.pagination.next,
-        prevCursor: result.pagination.prev
+        nextCursor: result.pagination?.next ?? null,
+        prevCursor: result.pagination?.prev ?? null
       },
-      message: `Retrieved **${groups.length}** group(s).${result.pagination.next ? ' More results available.' : ''}`
+      message: `Retrieved **${groups.length}** group(s).${result.pagination?.next ? ' More results available.' : ''}`
     };
   })
   .build();

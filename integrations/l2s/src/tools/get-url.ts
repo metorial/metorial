@@ -36,7 +36,7 @@ export let getUrl = SlateTool.create(spec, {
     return {
       output: {
         ok: result.ok,
-        message: result.response?.message ?? 'URL details retrieved',
+        message: result.response.message,
         urlData: result.response?.data
       },
       message: `Retrieved details for URL **${ctx.input.urlId}**.`

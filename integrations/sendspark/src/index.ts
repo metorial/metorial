@@ -5,9 +5,16 @@ import {
   addProspectsBulk,
   checkHealth,
   createCampaign,
+  downloadTranscript,
   getCampaign,
+  getDynamicsSettings,
   getProspect,
-  listCampaigns
+  getTranscript,
+  getTranscriptStatus,
+  getWorkspace,
+  listCampaigns,
+  listWorkspaces,
+  updateCampaignSettings
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -18,7 +25,14 @@ export let provider = Slate.create({
     addProspect,
     addProspectsBulk,
     getProspect,
-    checkHealth
+    checkHealth,
+    getWorkspace,
+    listWorkspaces,
+    getDynamicsSettings,
+    updateCampaignSettings,
+    getTranscript,
+    getTranscriptStatus,
+    downloadTranscript
   ],
   triggers: []
 });

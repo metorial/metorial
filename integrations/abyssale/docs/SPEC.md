@@ -1,4 +1,4 @@
-# Slates Specification for Abyssale
+# Abyssale Integration Specification
 
 ## Overview
 
@@ -19,9 +19,9 @@ Access to the API key requires at least an Admin role.
 
 All Abyssale requests must contain an `x-api-key` header with your API Key.
 
-You can verify your key works by calling `GET /ready` with the `x-api-key` header.
+Connection validation uses `POST /auth`, which verifies the key and returns its workspace name. `GET /ready` is an unauthenticated health check and cannot validate a key. The `get_workspace` tool exposes the actual workspace name without inventing a user or account ID.
 
-API access is available on Pro plan and above. It is not available on the Start plan.
+The workspace plan must include API access. Invalid or revoked keys and plans without API access fail authentication.
 
 ## Features
 
@@ -58,7 +58,7 @@ All elements have their own properties that can be customized (color, text paylo
 
 ### Font Management
 
-Manage fonts available in your workspace through the API.
+Search available fonts by name, category, weight, style, and source.
 
 ### Project and Workspace Template Management
 
@@ -66,7 +66,7 @@ List and manage projects and workspace templates programmatically.
 
 ### AI-Powered Features
 
-Generate images, remove backgrounds, translate content — AI capabilities are available as API calls.
+Asynchronous image element overrides support documented AI properties such as text-to-image and background removal. AI usage consumes the workspace AI credit balance. Synchronous text-to-image is unsupported; synchronous background removal is deprecated by the provider.
 
 ## Events
 
@@ -87,3 +87,22 @@ Triggered when a design export (e.g., a ZIP file of multiple banners) has finish
 ### Design Status Updated (TEMPLATE_STATUS)
 
 Triggered when the workflow/approval status on a design is updated (e.g., changed to APPROVED, REJECTED, etc.). Useful for integrating approval workflows into external systems.
+
+## Available Workflows
+
+- Discover workspace identity and generation/AI credit balances.
+- Search, sort, and optionally page designs; search and optionally page fonts and projects. Omitting page and perPage retains the provider's original all-results behavior.
+- Inspect whole designs, including multipage content and optional advanced group layers.
+- Discover workspace templates and their categories, then duplicate a template into a discovered project.
+- Generate static images, animated GIF/MP4/HTML5 output, and print PDFs with documented format, compression, frame-rate, loop, and print settings.
+- Generate multipage PDFs with per-page layer overrides.
+- Retrieve generation status and generated files with complete original provider metadata and downloadable results.
+
+Existing URL output fields remain available whenever the provider returns them. HTML5 ZIP output has no CDN URL; multipage PDFs have no format name. Optional metadata is omitted when absent from the provider response rather than synthesized. Export ZIP delivery remains asynchronous via the caller's callback URL. Dynamic images are static-design only. No automatic webhook registration or event triggers are provided by this integration.
+
+## Official References
+
+- [API reference](https://developers.abyssale.com/api-reference/)
+- [Machine-readable API contract](https://developers.abyssale.com/api.yaml)
+- [Authentication](https://developers.abyssale.com/rest-api/authentication)
+- [Generation](https://developers.abyssale.com/rest-api/generation/)

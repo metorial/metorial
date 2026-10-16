@@ -1,6 +1,10 @@
 # Givebutter
 
-Manage nonprofit fundraising campaigns, donor contacts, and transactions. Create and update campaigns (donation forms, fundraising pages, events), manage donor/supporter contacts with custom fields and tags, retrieve and create transactions, track recurring giving plans, manage funds for donation categorization, retrieve event tickets and attendee details, and access payout records. Supports webhooks for real-time notifications on campaigns, transactions, contacts, tickets, and recurring plans.
+Manage nonprofit fundraising campaigns, donor contacts, manual transactions, funds, recurring plans, event tickets, payouts, and campaign member/team lists. Identify the connected account, update campaign publication and visibility, filter contacts and transactions, manage contact tags, and retrieve ticket PDFs as downloadable files.
+
+Authenticate with an API key created under **Settings → Integrations → API Keys**. List tools support page numbers and page sizes up to 100. This integration does not register webhook triggers.
+
+See [the specification](./docs/SPEC.md) for capabilities and compatibility notes, and the [official API documentation](https://docs.givebutter.com/api-reference/authentication) for API-key permissions.
 
 ## License
 

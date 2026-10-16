@@ -1,7 +1,34 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
+
+let searchOutputSchema = z.object({
+  hits: z.array(z.any()).describe('Array of hit objects matching the query'),
+  nbHits: z.number().optional().describe('Total number of matching hits'),
+  page: z.number().optional().describe('Current page number (0-based)'),
+  nbPages: z.number().optional().describe('Total number of pages'),
+  hitsPerPage: z.number().optional().describe('Number of hits per page'),
+  processingTimeMs: z.number().optional().describe('Query processing time in milliseconds'),
+  query: z.string().optional().describe('The query text that was searched, when returned'),
+  facets: z
+    .any()
+    .optional()
+    .describe('Facet counts per attribute (object of attribute -> value -> count)'),
+  exhaustiveNbHits: z
+    .boolean()
+    .optional()
+    .describe('Whether the hit count is exhaustive or approximate, when returned'),
+  params: z
+    .string()
+    .optional()
+    .describe('URL-encoded query parameters used for the search, when returned'),
+  queryId: z
+    .string()
+    .optional()
+    .describe('Query ID for send_events when clickAnalytics is true.'),
+  raw: z.any().optional().describe('Complete search response, including additional metadata.')
+});
 
 export let search = SlateTool.create(spec, {
   name: 'Search Index',
@@ -84,28 +111,23 @@ Supports filtering, faceting, typo tolerance, attribute selection, and paginatio
       analytics: z
         .boolean()
         .optional()
-        .describe('Whether to include this query in analytics (default: true)')
-    })
-  )
-  .output(
-    z.object({
-      hits: z.array(z.any()).describe('Array of hit objects matching the query'),
-      nbHits: z.number().describe('Total number of matching hits'),
-      page: z.number().describe('Current page number (0-based)'),
-      nbPages: z.number().describe('Total number of pages'),
-      hitsPerPage: z.number().describe('Number of hits per page'),
-      processingTimeMs: z.number().describe('Query processing time in milliseconds'),
-      query: z.string().describe('The query text that was searched'),
-      facets: z
-        .any()
-        .optional()
-        .describe('Facet counts per attribute (object of attribute -> value -> count)'),
-      exhaustiveNbHits: z
+        .describe('Whether to include this query in analytics (default: true)'),
+      clickAnalytics: z
         .boolean()
-        .describe('Whether the hit count is exhaustive or approximate'),
-      params: z.string().describe('URL-encoded query parameters used for the search')
+        .optional()
+        .describe('Set true to return queryId for after-search click and conversion events.'),
+      userToken: z
+        .string()
+        .optional()
+        .describe('User identifier for personalization and analytics.'),
+      analyticsTags: z.array(z.string()).optional().describe('Tags for filtering analytics.'),
+      facetFilters: z
+        .array(z.union([z.string(), z.array(z.string())]))
+        .optional()
+        .describe('Facet filters. Nested arrays combine alternatives with OR.')
     })
   )
+  .output(searchOutputSchema)
   .handleInvocation(async ctx => {
     let client = new AlgoliaClient({
       applicationId: ctx.auth.applicationId,
@@ -128,20 +150,49 @@ Supports filtering, faceting, typo tolerance, attribute selection, and paginatio
 
     let result = await client.search(indexName, params);
 
+    let exhaustive = result?.exhaustive;
+    if (
+      exhaustive !== undefined &&
+      (typeof exhaustive !== 'object' || exhaustive === null || Array.isArray(exhaustive))
+    ) {
+      throw createApiServiceError('Algolia returned invalid search exhaustiveness metadata.', {
+        reason: 'algolia_invalid_response'
+      });
+    }
+    let normalized = searchOutputSchema.safeParse({
+      hits: result?.hits,
+      nbHits: result?.nbHits,
+      page: result?.page,
+      nbPages: result?.nbPages,
+      hitsPerPage: result?.hitsPerPage,
+      processingTimeMs: result?.processingTimeMS,
+      query: result?.query,
+      facets: result?.facets,
+      exhaustiveNbHits:
+        result?.exhaustiveNbHits !== undefined ? result.exhaustiveNbHits : exhaustive?.nbHits,
+      params: result?.params,
+      queryId: result?.queryID,
+      raw: result
+    });
+    if (!normalized.success) {
+      throw createApiServiceError(
+        'Algolia returned an invalid search response. Ensure the index responseFields includes hits and that returned search metadata has the documented types.',
+        { reason: 'algolia_invalid_response' }
+      );
+    }
+    let output = normalized.data;
+    let summary =
+      output.nbHits !== undefined
+        ? `Found **${output.nbHits}** hits`
+        : `Retrieved **${output.hits.length}** hits`;
+    let pagination =
+      output.page !== undefined && output.nbPages !== undefined
+        ? ` (page ${output.page + 1} of ${output.nbPages})`
+        : '';
+
     return {
-      output: {
-        hits: result.hits || [],
-        nbHits: result.nbHits ?? 0,
-        page: result.page ?? 0,
-        nbPages: result.nbPages ?? 0,
-        hitsPerPage: result.hitsPerPage ?? 20,
-        processingTimeMs: result.processingTimeMS ?? 0,
-        query: result.query ?? query,
-        facets: result.facets,
-        exhaustiveNbHits: result.exhaustiveNbHits ?? true,
-        params: result.params ?? ''
-      },
-      message: `Found **${result.nbHits ?? 0}** hits for "${query}" in index "${indexName}" (page ${(result.page ?? 0) + 1} of ${result.nbPages ?? 1}).`
+      output,
+      message: `${summary} for "${query}" in index "${indexName}"${pagination}.`
     };
   })
   .build();

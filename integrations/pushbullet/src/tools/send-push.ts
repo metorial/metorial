@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,9 @@ Pushes can be targeted to a specific device, an email address, or a channel tag.
       targetDeviceIden: z
         .string()
         .optional()
-        .describe('Device identifier to send the push to'),
+        .describe(
+          'Device identifier to send the push to. Call list_devices to discover devices'
+        ),
       targetEmail: z.string().optional().describe('Email address to send the push to'),
       channelTag: z
         .string()
@@ -59,6 +61,28 @@ Pushes can be targeted to a specific device, an email address, or a channel tag.
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      [ctx.input.targetDeviceIden, ctx.input.targetEmail, ctx.input.channelTag].filter(
+        value => value !== undefined
+      ).length > 1
+    ) {
+      throw createApiServiceError(
+        'Specify only one target: targetDeviceIden, targetEmail, or channelTag.'
+      );
+    }
+    if (ctx.input.type === 'link' && !ctx.input.url?.trim()) {
+      throw createApiServiceError('url is required for a link push.');
+    }
+    if (
+      ctx.input.type === 'file' &&
+      (!ctx.input.fileName?.trim() ||
+        !ctx.input.fileType?.trim() ||
+        !ctx.input.fileUrl?.trim())
+    ) {
+      throw createApiServiceError(
+        'fileName, fileType, and fileUrl are required for a file push. Upload the file with request_file_upload first.'
+      );
+    }
     let push = await client.createPush({
       type: ctx.input.type,
       title: ctx.input.title,
@@ -71,6 +95,10 @@ Pushes can be targeted to a specific device, an email address, or a channel tag.
       email: ctx.input.targetEmail,
       channelTag: ctx.input.channelTag
     });
+
+    if (push.type === 'file' && push.file_url) {
+      await ctx.addAttachment({ type: 'url', url: push.file_url, mimeType: push.file_type });
+    }
 
     let target = ctx.input.targetDeviceIden
       ? `device \`${ctx.input.targetDeviceIden}\``

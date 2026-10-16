@@ -18,7 +18,10 @@ export let enhanceTransactions = SlateTool.create(spec, {
         .array(
           z.object({
             transactionId: z.string().describe('Your unique identifier for this transaction'),
-            description: z.string().optional().describe('Original transaction description'),
+            description: z
+              .string()
+              .optional()
+              .describe('Original transaction description; required by MX for enhancement'),
             amount: z.number().optional().describe('Transaction amount'),
             merchantCategoryCode: z
               .number()
@@ -70,12 +73,12 @@ export let enhanceTransactions = SlateTool.create(spec, {
     );
 
     let transactions = (enhanced || []).map((t: any) => ({
-      transactionId: t.id,
+      transactionId: t.id ?? undefined,
       amount: t.amount,
       category: t.category,
       categoryGuid: t.category_guid,
-      description: t.description,
-      cleanedDescription: t.cleansed_description,
+      description: t.original_description,
+      cleanedDescription: t.description ?? t.cleansed_description,
       extendedTransactionType: t.extended_transaction_type,
       isExpense: t.is_expense,
       isIncome: t.is_income,

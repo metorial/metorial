@@ -8,7 +8,7 @@ export let createTemplate = SlateTool.create(spec, {
   key: 'create_template',
   description: `Create a new pass template in PassSlot. Templates define the appearance and configuration of passes including style, colors, text fields, and barcode settings. All passes generated from a template inherit its configuration.`,
   instructions: [
-    'The passType must be an existing pass type identifier from your account.',
+    'The passType must be an existing pass type identifier from your account. Call list_pass_types to discover identifiers.',
     'The passDescription object follows the Apple Wallet pass.json structure with fields like logoText, foregroundColor, backgroundColor, barcode, and pass-style-specific sections (coupon, generic, eventTicket, boardingPass, storeCard).'
   ]
 })

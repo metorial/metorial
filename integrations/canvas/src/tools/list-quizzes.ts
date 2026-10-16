@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listQuizzesTool = SlateTool.create(spec, {
@@ -19,6 +19,7 @@ export let listQuizzesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       quizzes: z.array(
         z.object({
           quizId: z.string().describe('Quiz ID'),
@@ -41,10 +42,7 @@ export let listQuizzesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let raw = await client.listQuizzes(ctx.input.courseId, {
       searchTerm: ctx.input.searchTerm
@@ -66,7 +64,7 @@ export let listQuizzesTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { quizzes },
+      output: { raw: raw, quizzes },
       message: `Found **${quizzes.length}** quiz(zes) in course ${ctx.input.courseId}.`
     };
   })

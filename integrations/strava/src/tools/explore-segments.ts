@@ -34,6 +34,7 @@ export let exploreSegments = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       segments: z
         .array(
           z.object({
@@ -76,7 +77,10 @@ export let exploreSegments = SlateTool.create(spec, {
     }));
 
     return {
-      output: { segments },
+      output: {
+        raw: result,
+        segments
+      },
       message: `Found **${segments.length}** segments in the specified area.`
     };
   })

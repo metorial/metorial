@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Detrack
 
-Create, manage, and track delivery and collection jobs for logistics operations. Assign drivers and vehicles to jobs, optimize delivery routes, and monitor real-time job statuses including dispatched, in-transit, arrived, completed, and failed. Capture electronic proof of delivery including signatures, photos, and timestamps. Download POD documents and signature images. Search jobs by driver, status, customer, or time period. Manage vehicle and driver records with GPS location tracking.
+Create, update, search and track delivery and collection jobs. Assign drivers, manage vehicles, retrieve full job details and prepare downloadable proof-of-delivery or shipping-label PDFs. Discover depots and inspect routes with their available jobs, drivers and planning details.
 
 ## License
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getModuleFileUrl } from '../lib/files';
 import { spec } from '../spec';
 
 export let textToFlowDiagram = SlateTool.create(spec, {
@@ -35,6 +36,9 @@ Useful for creating process flows, decision trees, system diagrams, and organiza
     let result = await client.textToFlowDiagram({
       instructions: ctx.input.instructions
     });
+
+    let fileUrl = getModuleFileUrl(result);
+    if (fileUrl) await ctx.addAttachment({ type: 'url', url: fileUrl });
 
     return {
       output: {

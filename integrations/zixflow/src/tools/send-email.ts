@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { operationOutput, requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let sendEmail = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let sendEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      reportUrl: z.string().optional().describe('URL to receive provider delivery reports'),
       to: z.array(z.string()).describe('Recipient email addresses (max 10)'),
       subject: z.string().describe('Email subject line'),
       fromEmail: z.string().describe('Verified sender email address'),
@@ -37,14 +39,29 @@ export let sendEmail = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the email was sent successfully'),
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
+      messageId: z.string().optional().describe('Message ID when returned by Zixflow'),
+      campaignId: z.string().optional().describe('Campaign ID when returned by Zixflow'),
+      success: z
+        .boolean()
+        .describe('Whether Zixflow acknowledged successful email submission'),
       responseMessage: z.string().describe('Response message from the API')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ZixflowClient({ token: ctx.auth.token });
 
+    if (ctx.input.to.length < 1 || ctx.input.to.length > 10)
+      throw createApiServiceError('Provide between 1 and 10 recipients.', {
+        reason: 'zixflow_invalid_input'
+      });
+    if (!ctx.input.bodyHtml && !ctx.input.bodyText)
+      throw createApiServiceError('Provide bodyHtml or bodyText.', {
+        reason: 'zixflow_invalid_input'
+      });
+    requireInput(ctx.input.fromEmail, 'fromEmail');
     let result = await client.sendEmail({
+      reportUrl: ctx.input.reportUrl,
       to: ctx.input.to,
       subject: ctx.input.subject,
       from: ctx.input.fromEmail,
@@ -60,12 +77,12 @@ export let sendEmail = SlateTool.create(spec, {
 
     return {
       output: {
-        success: result.status === true,
-        responseMessage: result.message ?? 'Unknown response'
+        ...operationOutput(result),
+        messageId: typeof result.messageId === 'string' ? result.messageId : undefined,
+        campaignId: typeof result.campaignId === 'string' ? result.campaignId : undefined
       },
-      message: result.status
-        ? `Email sent to ${ctx.input.to.join(', ')}.`
-        : `Failed to send email: ${result.message}`
+      message:
+        'Zixflow accepted the message request; use a delivery report to check recipient delivery.'
     };
   })
   .build();

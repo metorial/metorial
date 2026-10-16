@@ -1,6 +1,6 @@
 {
   "name": "@metorial/finerworks",
-  "description": "Submit, manage, and track print-on-demand orders for fine art prints, canvas, greeting cards, posters, and other products. Upload and manage image files for printing. Browse product catalogs, media types, and pricing. Configure framing options with mat and glazing selections and preview frame packages. Manage virtual inventory SKUs linking products to fulfillment. Retrieve shipping options, validate recipient addresses, and update customer information.",
+  "description": "Submit, discover, manage and track print-on-demand orders. Identify the connected account, browse virtual inventory SKUs and product catalogs, price products and shipping, validate addresses, manage image files, and generate downloadable frame previews.",
   "categories": ["document-processing", "e-commerce-and-retail"],
   "skills": [
     "submit print-on-demand orders",
@@ -8,7 +8,7 @@
     "upload and manage images",
     "browse product catalog pricing",
     "configure framing options",
-    "manage virtual inventory SKUs",
+    "discover virtual inventory SKUs",
     "retrieve shipping options",
     "validate recipient addresses",
     "update customer information"

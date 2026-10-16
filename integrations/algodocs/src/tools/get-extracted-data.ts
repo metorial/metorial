@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client, type ExtractedRecord } from '../lib/client';
 import { spec } from '../spec';
@@ -6,11 +6,11 @@ import { spec } from '../spec';
 export let getExtractedData = SlateTool.create(spec, {
   name: 'Get Extracted Data',
   key: 'get_extracted_data',
-  description: `Retrieves structured data extracted from processed documents. Query by a single **documentId** to get results for one document, or by **extractorId** to retrieve results across multiple documents. Optionally filter by folder and date range when querying by extractor.`,
+  description: `Retrieves structured data extracted from processed documents. Query by a single **documentId** to get results for one document, or by **extractorId** to retrieve results across multiple documents. Optionally filter by folder and upload date when querying by extractor. Processing is asynchronous; call again if data is not populated.`,
   instructions: [
     'Provide either **documentId** or **extractorId** — not both.',
     'When using extractorId, you may optionally filter by folderId, limit, or date.',
-    'The **date** parameter filters for documents uploaded in the last N days (e.g., "10" for the last 10 days).'
+    'The **date** parameter is forwarded unchanged to AlgoDocs to filter documents uploaded after that date.'
   ],
   tags: {
     readOnly: true
@@ -42,7 +42,7 @@ export let getExtractedData = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Number of days to look back for uploaded documents (e.g., "10" for last 10 days, only when using extractorId)'
+          'Upload-date filter forwarded unchanged to AlgoDocs (only when using extractorId)'
         )
     })
   )
@@ -53,14 +53,26 @@ export let getExtractedData = SlateTool.create(spec, {
           z.object({
             recordId: z.string().describe('Unique identifier of the extracted record'),
             documentId: z.string().describe('ID of the source document'),
-            extractorId: z.string().describe('ID of the extractor used'),
+            extractorId: z
+              .string()
+              .optional()
+              .describe('ID of the extractor when returned by AlgoDocs'),
             folderId: z.string().describe('ID of the folder containing the document'),
             uploadedAt: z.string().describe('Timestamp when the document was uploaded'),
             fileName: z.string().describe('Name of the source file'),
-            pageNumber: z.number().describe('Page number the data was extracted from'),
+            pageNumber: z
+              .number()
+              .optional()
+              .describe('Page number when provided; may be absent for classifier failures'),
             extractedFields: z
               .record(z.string(), z.unknown())
-              .describe('User-defined extracted fields and their values')
+              .describe(
+                'Provider fields outside the standard document metadata, including the data object'
+              ),
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Complete original extraction record')
           })
         )
         .describe('List of extracted data records')
@@ -74,12 +86,23 @@ export let getExtractedData = SlateTool.create(spec, {
 
     let { documentId, extractorId, folderId, limit, date } = ctx.input;
 
+    if ((documentId !== undefined) === (extractorId !== undefined)) {
+      throw createApiServiceError('Provide exactly one of documentId or extractorId.');
+    }
+    if (
+      documentId !== undefined &&
+      (folderId !== undefined || limit !== undefined || date !== undefined)
+    ) {
+      throw createApiServiceError(
+        'folderId, limit, and date can only be used with extractorId.'
+      );
+    }
     let rawRecords: ExtractedRecord[];
 
-    if (documentId) {
+    if (documentId !== undefined) {
       ctx.info(`Fetching extracted data for document ${documentId}`);
       rawRecords = await client.getExtractedDataByDocument(documentId);
-    } else if (extractorId) {
+    } else if (extractorId !== undefined) {
       ctx.info(`Fetching extracted data for extractor ${extractorId}`);
       rawRecords = await client.getExtractedDataByExtractor(extractorId, {
         folderId,
@@ -87,7 +110,7 @@ export let getExtractedData = SlateTool.create(spec, {
         date
       });
     } else {
-      throw new Error('Provide either "documentId" or "extractorId".');
+      throw createApiServiceError('Provide either documentId or extractorId.');
     }
 
     let systemFields = [
@@ -111,11 +134,12 @@ export let getExtractedData = SlateTool.create(spec, {
       return {
         recordId: String(record.id),
         documentId: String(record.documentId),
-        extractorId: String(record.extractorId),
+        extractorId: record.extractorId,
         folderId: String(record.folderId),
         uploadedAt: String(record.uploadedAt),
         fileName: String(record.fileName),
-        pageNumber: Number(record.pageNumber),
+        pageNumber: record.pageNumber,
+        raw: record,
         extractedFields
       };
     });

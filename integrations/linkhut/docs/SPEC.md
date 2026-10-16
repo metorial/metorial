@@ -1,63 +1,37 @@
-# Slates Specification for Linkhut
+# Linkhut Integration Specification
 
-## Overview
-
-Linkhut is an open-source social bookmarking service that allows users to save, tag, manage, and share web bookmarks. It is API-compatible with Pinboard and can be self-hosted. The flagship instance is hosted at ln.ht.
+Linkhut is a social bookmarking service. This integration targets the hosted API at `https://api.ln.ht/v1` and uses JSON responses and Bearer authentication.
 
 ## Authentication
 
-Linkhut supports two authentication methods:
+OAuth uses `https://ln.ht/_/oauth/authorize` and the form-encoded token endpoint `https://api.ln.ht/v1/oauth/token`. Requested scopes are `posts:read`, `posts:write`, `tags:read`, and `tags:write`. Users may change granted scopes during consent; insufficient scope errors come from the provider. The returned scope string is retained. Refresh uses the same token endpoint, preserves the previous refresh token if a replacement is absent, and updates expiry from `expires_in`. A connection without a refresh token must reconnect.
 
-### Personal Access Tokens
+Personal access tokens can be created at `https://ln.ht/_/oauth/personal-token`. OAuth is preferable when connecting someone else's account. No workspace or account identifier is required at setup.
 
-Users can create a personal access token at `https://ln.ht/_/oauth/personal-token`. This token has unrestricted access to all API methods and is used as a Bearer token (see below). Suitable for personal use only — should not be shared with third parties.
+## Tools
 
-### OAuth 2.0 (Authorization Code Flow)
+| Tool | API method | Behavior |
+| --- | --- | --- |
+| Add Bookmark | `posts/add` | Creates or replaces a bookmark with title, notes, comma-delimited tags, timestamp, visibility, and unread status. |
+| Delete Bookmark | `posts/delete` | Deletes a bookmark by URL. |
+| Get Bookmarks | `posts/get` | Fetches bookmarks by day, URL, URL hashes, or tag; can request change signatures. |
+| List Recent Bookmarks | `posts/recent` | Fetches up to 100 recent bookmarks, optionally by tag. |
+| List All Bookmarks | `posts/all` | Retrieves a page of bookmarks using offset, result count, tag, and inclusive date range filters; can request change signatures. |
+| Get Bookmark Hashes | `posts/all?hashes` | Retrieves URL MD5 hashes and change signatures for comparing a local collection with the remote account. |
+| Get Tag Suggestions | `posts/suggest` | Returns popular and personalized tag suggestions. |
+| List Tags | `tags/get` | Returns each tag and its numeric usage count. |
+| Manage Tag | `tags/delete`, `tags/rename` | Removes or renames tags across bookmarks. |
+| Check for Updates | `posts/update` | Returns the latest bookmark modification timestamp. |
+| Get Bookmark Dates | `posts/dates` | Returns numeric bookmark counts by date. |
 
-For third-party applications, Linkhut supports the standard OAuth 2.0 authorization code flow.
+All bookmark and tag API methods use GET, including mutations. Mutation responses must contain `result_code: done`; provider failure codes produce structured errors instead of success messages. Optional empty note and tag values are forwarded so callers can clear those fields when replacing a bookmark.
 
-**Registration:** Register an OAuth application at `https://ln.ht/_/oauth/register` to obtain a **client ID** and **client secret**.
+The JSON bookmark property `tags` is exposed through the existing `tag` field. Missing required bookmark data is rejected rather than replaced with placeholder strings or invented visibility/read-later values. Optional `meta` preserves a provider null. Get and recent JSON examples omit response-level `date` and `user`; these fields are optional and are returned only when supplied. Bookmark retrieval tools also retain the original JSON response in `raw`.
 
-**Authorization URL:**
+Numbers keep their numeric public types. Runtime validation checks pagination ranges and UTC timestamp formats. A date-only Get Bookmarks filter is sent as midnight UTC. API clients space requests using the same token by at least one second within a process. The service's 500/999 throttle responses tell callers to wait before retrying; mutations are not automatically retried.
 
-```
-https://ln.ht/_/oauth/authorize?response_type=code&client_id=<CLIENT_ID>&scope=<SCOPES>&redirect_uri=<REDIRECT_URI>
-```
+## Scope and limitations
 
-**Token URL:** `https://api.ln.ht/v1/oauth/token`
+The documented public API contains posts and tags operations, with no suitable current-user/profile endpoint; no identity tool is invented. Website bookmark import/export does not establish a supported API export endpoint, so no file export tool is advertised. No event subscription endpoint is documented; there are no triggers.
 
-**Token Refresh:** Supported via the same token endpoint using `grant_type=refresh_token`. Requesting a new access token automatically revokes the previous one. Access tokens expire after one year (31,536,000 seconds).
-
-**Scopes:** Scopes follow the format `context:access`, where `context` is the API resource (e.g., `posts`, `tags`) and `access` is either `read` or `write`. Multiple scopes are space-separated. Note: users can edit requested scopes before consenting, so applications must handle scope mismatches.
-
-**Using tokens:** Set the `Authorization` header to `Bearer <access-token>`, or pass as the `auth_token` query parameter.
-
-## Features
-
-### Bookmark Management
-
-Create, retrieve, update, and delete bookmarks (referred to as "posts" in the API). Each bookmark has a URL, title (description), optional notes (extended), tags (comma-delimited), a timestamp, and visibility settings. Bookmarks can be marked as private (`shared=no`) or as unread (`toread=yes`). When adding a bookmark, replacement of an existing bookmark at the same URL can be disabled.
-
-### Bookmark Retrieval and Filtering
-
-Retrieve bookmarks filtered by tag, date, URL, or URL hash (MD5). Supports fetching recent bookmarks (up to 100), bookmarks for a specific day, or all bookmarks with date range filters. A change detection endpoint returns MD5 hashes and meta signatures for all bookmarks, enabling efficient sync without downloading full data.
-
-### Tag Management
-
-List all tags with usage counts, delete a tag from all bookmarks, or rename a tag across all bookmarks.
-
-### Tag Suggestions
-
-Get popular (site-wide) and recommended (user-specific) tag suggestions for any given URL, useful for consistent tagging.
-
-### Change Detection
-
-Check the timestamp of the most recent bookmark modification to determine if a full data sync is needed, avoiding unnecessary API calls.
-
-### Data Export
-
-Bookmarks can be exported for portability. The platform supports the Netscape bookmark format for import/export.
-
-## Events
-
-The provider does not support events. Linkhut does not offer webhooks or built-in event subscription mechanisms. It provides a change detection endpoint (`/v1/posts/update`) that returns the timestamp of the last modification, but this is a standard API call rather than a purpose-built polling mechanism.
+Official references: [Overview and authentication](https://docs.linkhut.org/overview.html), [Posts](https://docs.linkhut.org/posts.html), [Tags](https://docs.linkhut.org/tags.html).

@@ -1,92 +1,44 @@
-# Slates Specification for Alpha Vantage
+# Alpha Vantage API Specification
 
-## Overview
+Alpha Vantage provides financial market data through HTTPS GET requests to
+`https://www.alphavantage.co/query`. The `function` query parameter selects the
+API operation, and `apikey` supplies the API key. Obtain a key from the
+[official support page](https://www.alphavantage.co/support/#api-key).
+There is no OAuth flow, refresh token, or account/profile endpoint in the
+[documented API](https://www.alphavantage.co/documentation/).
 
-Alpha Vantage is a financial data API provider that delivers stock prices, fundamental data, technical indicators, forex, crypto, commodities, and economic indicators through a simple REST API. Backed by Y Combinator and officially licensed by NASDAQ as a US market data provider, it provides data in JSON and CSV formats. The platform covers 20+ global exchanges including NYSE, NASDAQ, London Stock Exchange, and major markets in Europe and Asia.
+The integration provides 20 read-only tools:
 
-## Authentication
+| Workflow | Tools and behavior |
+| --- | --- |
+| Equity prices | `get_stock_price` retrieves intraday, daily, weekly, or monthly OHLCV. Intraday supports adjusted data, extended hours, historical months, and premium data entitlements. Daily/weekly/monthly adjusted endpoints retain raw OHLCV and expose adjusted close separately. |
+| Quote and discovery | `get_quote` retrieves one ticker quote; `search_symbol` discovers supported symbols; `get_market_status` returns market hours and open/closed states. |
+| Company research | `get_company_overview`, `get_financial_statements`, `get_earnings`, and `get_dividends_and_splits` expose fundamentals, quarterly/annual reports, earnings, and corporate actions. |
+| Additional research | `get_etf_profile` returns ETF metrics and holdings; `get_insider_transactions` supports an optional starting date; `get_earnings_estimates` returns EPS/revenue forecasts and revisions; `get_earnings_call_transcript` returns speaker turns and provider sentiment for a quarter from 2010Q1 onward. These tools retain the complete provider response. |
+| Currencies | `get_forex_rate` returns an exchange-rate snapshot or intraday/daily/weekly/monthly history. `get_crypto_price` returns daily/weekly/monthly prices in the requested market currency. |
+| Commodities | `get_commodity_price` covers energy, metals, agricultural commodities, and the global commodities index. Energy supports daily/weekly/monthly data; the other supported series use monthly/quarterly/annual intervals. |
+| Economics | `get_economic_indicator` covers GDP, GDP per capita, treasury yields, federal funds, CPI, inflation, retail sales, durable goods, unemployment, and payrolls. Interval support depends on the selected series; CPI includes semiannual data and treasury yields support maturity selection. |
+| Technical analysis | `get_technical_indicator` supports documented moving averages, momentum/volume indicators, oscillators, volatility measures, and Hilbert transforms. It validates required period/price inputs and supports the documented MACDEXT, stochastic, ULTOSC, SAR, and MAMA parameters. |
+| Market intelligence | `get_news_sentiment` filters by ticker, topic, time, order, and limit. Comma-separated filters require simultaneous matches. `get_top_movers` returns gainers, losers, and active tickers. |
+| Options | `get_options_chain` returns realtime or historical contracts, with contract/expiration filtering in either mode and optional realtime Greeks. |
 
-Alpha Vantage uses **API key** authentication. It requires a free API key, that can be requested from http://www.alphavantage.co/support/#api-key.
+Availability depends on the API key and subscribed plan. Intraday stocks,
+adjusted daily stocks, intraday FX, company overview, market news, options,
+and selected technical indicators require premium access. Equity quotes and
+top movers update at the end of the trading day by default; realtime and
+15-minute delayed US data require the corresponding entitlement. Full daily
+history also requires premium access. Consult the provider for current limits
+and commercial licensing.
 
-To authenticate, include the API key as a query parameter named `apikey` in every request. All requests go through a single base endpoint:
+Provider decimal strings, real zeros, and supplied missing-value strings are
+preserved. Unexpected missing required values produce an error. Annual
+`get_earnings` records omit analyst estimates and surprise metrics when absent.
+Reported dates and crypto market capitalization remain required: annual
+earnings records without reportedDate, or crypto observations without the
+USD market-cap value, produce a structured error. Realtime
+options implied volatility may be absent when Greeks are not requested.
+These three tools also return the complete provider response in `raw`.
+Commodity/economic observations marked `.` by the provider are excluded from
+price/value arrays rather than converted to zero.
 
-```
-https://www.alphavantage.co/query?function=FUNCTION_NAME&symbol=SYMBOL&apikey=YOUR_API_KEY
-```
-
-There are no OAuth flows, scopes, or additional credentials. The API key is the sole authentication mechanism.
-
-The majority of API endpoints can be accessed for free. For use cases that exceed the standard API usage limit (25 API requests per day) or require certain premium API functions, a premium plan is available.
-
-## Features
-
-### Core Time Series Stock Data
-
-This suite of APIs provides global equity data in 4 different temporal resolutions: (1) daily, (2) weekly, (3) monthly, and (4) intraday, with 20+ years of historical depth. Data includes open, high, low, close, and volume (OHLCV) values. Both raw (as-traded) and split/dividend-adjusted data are available.
-
-- **Parameters:** Stock symbol, interval (1/5/15/30/60 min for intraday), output size (compact or full).
-- Realtime and 15-minute delayed US market data is regulated by the stock exchanges, FINRA, and the SEC and requires a premium subscription.
-
-### Ticker Quote and Search
-
-A lightweight ticker quote endpoint and several utility functions such as ticker search and market open/closure status are also included.
-
-- Retrieve the latest price and trading information for a single symbol.
-- Search for ticker symbols by keyword.
-
-### US Options Data
-
-Retrieve current and historical options chain data for US-listed equities.
-
-- **Parameters:** Underlying symbol, optional expiration date.
-
-### Fundamental Data
-
-Company overviews, income statements, balance sheets, cash flow statements, earnings reports (actual vs estimates), dividend history, and stock splits.
-
-- Data is available in both annual and quarterly granularity.
-- Covers publicly listed US equities.
-
-### Alpha Intelligence (AI-Powered Insights)
-
-This API returns live and historical market news & sentiment data from a large & growing selection of premier news outlets around the world, covering stocks, cryptocurrencies, forex and more. Also includes insider transactions, and earnings call transcripts.
-
-- **Parameters:** Filter by ticker symbols, news topics, and time ranges.
-- Sentiment scores are provided per article and per mentioned ticker.
-
-### Foreign Exchange (Forex)
-
-Retrieve real-time and historical exchange rates for physical currency pairs.
-
-- **Parameters:** From/to currency codes, interval for intraday data.
-- Supports daily, weekly, and monthly historical data.
-
-### Cryptocurrency
-
-Access real-time and historical price data for digital currencies (e.g., Bitcoin, Ethereum).
-
-- **Parameters:** Cryptocurrency symbol, market (e.g., USD, EUR).
-- Supports daily, weekly, and monthly time series.
-
-### Commodities
-
-Retrieve price data for key commodities such as crude oil, natural gas, copper, wheat, corn, cotton, sugar, and coffee.
-
-- Data is typically available at daily or monthly intervals.
-
-### Economic Indicators
-
-GDP, CPI, inflation, and treasury yields along with other macroeconomic data such as federal funds rate, unemployment rate, and consumer sentiment.
-
-- Primarily covers US economic data.
-
-### Technical Indicators
-
-Alpha Vantage provides 50+ pre-computed technical indicators, from basic moving averages (SMA, EMA) to advanced oscillators (RSI, MACD, Stochastic, Bollinger Bands, and dozens more).
-
-- **Parameters:** Symbol, interval, time period, series type (close, open, high, low).
-- Designed to support equities, cryptocurrencies, and forex.
-
-## Events
-
-The provider does not support events. Alpha Vantage is a data-retrieval API only and does not offer webhooks, event subscriptions, or any built-in push/polling notification mechanism.
+All tools return JSON data. No webhook or event trigger is registered.

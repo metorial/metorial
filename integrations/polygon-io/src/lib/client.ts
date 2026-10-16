@@ -1,15 +1,72 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  extractApiErrorMessage,
+  getApiErrorStatus,
+  isApiErrorRecord
+} from 'slates';
 
 export class Client {
   private http: ReturnType<typeof createAxios>;
 
   constructor(config: { token: string }) {
+    if (typeof config.token !== 'string' || !config.token.trim())
+      throw createApiServiceError('A Polygon.io API key is required.');
+    let scrub = (message: string) => {
+      for (let secret of [config.token, encodeURIComponent(config.token)]) {
+        message = message.split(secret).join('[REDACTED]');
+      }
+      return message.replace(/([?&]apiKey=)[^&\s]+/gi, '$1[REDACTED]');
+    };
+    let apiError = (error: unknown, status?: number | string, code?: string) =>
+      buildApiServiceError(
+        {
+          response: {
+            status: status ?? getApiErrorStatus(error),
+            data: { message: scrub(extractApiErrorMessage(error)) }
+          }
+        },
+        {
+          providerLabel: 'Polygon.io',
+          reason: 'polygon_api_error',
+          extractUpstreamCode: () => code
+        }
+      );
     this.http = createAxios({
-      baseURL: 'https://api.polygon.io',
+      baseURL: 'https://api.massive.com',
+      timeout: 30000,
       headers: {
         Authorization: `Bearer ${config.token}`
       }
     });
+    this.http.interceptors.response.use(
+      response => {
+        let body = response.data;
+        if (
+          isApiErrorRecord(body) &&
+          (body.error ||
+            ['ERROR', 'NOT_AUTHORIZED', 'NOT_FOUND'].includes(
+              String(body.status).toUpperCase()
+            ))
+        ) {
+          throw apiError(
+            { response: { data: body } },
+            response.status,
+            typeof body.status === 'string' ? scrub(body.status) : undefined
+          );
+        }
+        if (
+          response.config.url?.endsWith('/marketstatus/upcoming')
+            ? !Array.isArray(body)
+            : !isApiErrorRecord(body)
+        ) {
+          throw createApiServiceError('Polygon.io returned an invalid response body.');
+        }
+        return response;
+      },
+      error => Promise.reject(apiError(error))
+    );
   }
 
   // --- Reference Data ---
@@ -31,7 +88,9 @@ export class Client {
   }
 
   async getTickerDetails(ticker: string, params?: { date?: string }) {
-    let res = await this.http.get(`/v3/reference/tickers/${ticker}`, { params });
+    let res = await this.http.get(`/v3/reference/tickers/${encodeURIComponent(ticker)}`, {
+      params
+    });
     return res.data;
   }
 
@@ -72,6 +131,7 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
     let res = await this.http.get('/v3/reference/conditions', {
       params: {
@@ -80,6 +140,7 @@ export class Client {
         sip: params?.sip,
         order: params?.order,
         sort: params?.sort,
+        cursor: params?.cursor,
         limit: params?.limit
       }
     });
@@ -104,6 +165,7 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
     let res = await this.http.get('/vX/reference/financials', {
       params: {
@@ -121,6 +183,7 @@ export class Client {
         include_sources: params.includeSources,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit
       }
     });
@@ -142,6 +205,7 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
     let res = await this.http.get('/v3/reference/dividends', {
       params: {
@@ -156,7 +220,33 @@ export class Client {
         dividend_type: params?.dividendType,
         order: params?.order,
         sort: params?.sort,
+        cursor: params?.cursor,
         limit: params?.limit
+      }
+    });
+    return res.data;
+  }
+
+  async getAdjustedCorporateActions(
+    type: 'dividends' | 'splits',
+    params: {
+      ticker?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      order?: string;
+      limit?: number;
+      cursor?: string;
+    }
+  ) {
+    let dateField = type === 'dividends' ? 'ex_dividend_date' : 'execution_date';
+    let res = await this.http.get(`/stocks/v1/${type}`, {
+      params: {
+        ticker: params.ticker,
+        [`${dateField}.gte`]: params.dateFrom,
+        [`${dateField}.lte`]: params.dateTo,
+        sort: `${dateField}.${params.order ?? 'desc'}`,
+        limit: params.limit,
+        cursor: params.cursor
       }
     });
     return res.data;
@@ -173,6 +263,7 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
     let res = await this.http.get('/v3/reference/splits', {
       params: {
@@ -183,6 +274,7 @@ export class Client {
         reverse_split: params?.reverseStock,
         order: params?.order,
         sort: params?.sort,
+        cursor: params?.cursor,
         limit: params?.limit
       }
     });
@@ -200,13 +292,15 @@ export class Client {
     adjusted?: boolean;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
     let res = await this.http.get(
-      `/v2/aggs/ticker/${params.ticker}/range/${params.multiplier}/${params.timespan}/${params.from}/${params.to}`,
+      `/v2/aggs/ticker/${encodeURIComponent(params.ticker)}/range/${params.multiplier}/${encodeURIComponent(params.timespan)}/${encodeURIComponent(params.from)}/${encodeURIComponent(params.to)}`,
       {
         params: {
           adjusted: params.adjusted,
           sort: params.sort,
+          cursor: params.cursor,
           limit: params.limit
         }
       }
@@ -221,30 +315,39 @@ export class Client {
     adjusted?: boolean;
     includeOtc?: boolean;
   }) {
-    let res = await this.http.get(`/v2/aggs/grouped/locale/us/market/stocks/${params.date}`, {
-      params: {
-        adjusted: params.adjusted,
-        include_otc: params.includeOtc
+    let res = await this.http.get(
+      `/v2/aggs/grouped/locale/us/market/stocks/${encodeURIComponent(params.date)}`,
+      {
+        params: {
+          adjusted: params.adjusted,
+          include_otc: params.includeOtc
+        }
       }
-    });
+    );
     return res.data;
   }
 
   // --- Market Data: Daily Open/Close ---
 
   async getDailyOpenClose(params: { ticker: string; date: string; adjusted?: boolean }) {
-    let res = await this.http.get(`/v1/open-close/${params.ticker}/${params.date}`, {
-      params: { adjusted: params.adjusted }
-    });
+    let res = await this.http.get(
+      `/v1/open-close/${encodeURIComponent(params.ticker)}/${encodeURIComponent(params.date)}`,
+      {
+        params: { adjusted: params.adjusted }
+      }
+    );
     return res.data;
   }
 
   // --- Market Data: Previous Close ---
 
   async getPreviousClose(params: { ticker: string; adjusted?: boolean }) {
-    let res = await this.http.get(`/v2/aggs/ticker/${params.ticker}/prev`, {
-      params: { adjusted: params.adjusted }
-    });
+    let res = await this.http.get(
+      `/v2/aggs/ticker/${encodeURIComponent(params.ticker)}/prev`,
+      {
+        params: { adjusted: params.adjusted }
+      }
+    );
     return res.data;
   }
 
@@ -258,14 +361,16 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
-    let res = await this.http.get(`/v3/trades/${params.ticker}`, {
+    let res = await this.http.get(`/v3/trades/${encodeURIComponent(params.ticker)}`, {
       params: {
         timestamp: params.timestamp,
         'timestamp.gte': params.timestampGte,
         'timestamp.lte': params.timestampLte,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit
       }
     });
@@ -282,14 +387,16 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
-    let res = await this.http.get(`/v3/quotes/${params.ticker}`, {
+    let res = await this.http.get(`/v3/quotes/${encodeURIComponent(params.ticker)}`, {
       params: {
         timestamp: params.timestamp,
         'timestamp.gte': params.timestampGte,
         'timestamp.lte': params.timestampLte,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit
       }
     });
@@ -309,7 +416,9 @@ export class Client {
   }
 
   async getTickerSnapshot(ticker: string) {
-    let res = await this.http.get(`/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}`);
+    let res = await this.http.get(
+      `/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(ticker)}`
+    );
     return res.data;
   }
 
@@ -321,13 +430,15 @@ export class Client {
   }
 
   async getOptionContractSnapshot(underlyingAsset: string, optionContract: string) {
-    let res = await this.http.get(`/v3/snapshot/options/${underlyingAsset}/${optionContract}`);
+    let res = await this.http.get(
+      `/v3/snapshot/options/${encodeURIComponent(underlyingAsset)}/${encodeURIComponent(optionContract)}`
+    );
     return res.data;
   }
 
   async getCryptoSnapshot(ticker: string) {
     let res = await this.http.get(
-      `/v2/snapshot/locale/global/markets/crypto/tickers/${ticker}`
+      `/v2/snapshot/locale/global/markets/crypto/tickers/${encodeURIComponent(ticker)}`
     );
     return res.data;
   }
@@ -339,7 +450,7 @@ export class Client {
 
   async getForexSnapshot(ticker: string) {
     let res = await this.http.get(
-      `/v2/snapshot/locale/global/markets/forex/tickers/${ticker}`
+      `/v2/snapshot/locale/global/markets/forex/tickers/${encodeURIComponent(ticker)}`
     );
     return res.data;
   }
@@ -362,6 +473,7 @@ export class Client {
     tickerAnyOf?: string[];
     type?: string;
     limit?: number;
+    cursor?: string;
     order?: string;
     sort?: string;
   }) {
@@ -369,6 +481,7 @@ export class Client {
       params: {
         'ticker.any_of': params?.tickerAnyOf?.join(','),
         type: params?.type,
+        cursor: params?.cursor,
         limit: params?.limit,
         order: params?.order,
         sort: params?.sort
@@ -392,6 +505,7 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
     let res = await this.http.get('/v3/reference/options/contracts', {
       params: {
@@ -406,6 +520,7 @@ export class Client {
         expired: params.expired,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit
       }
     });
@@ -425,22 +540,27 @@ export class Client {
       order?: string;
       sort?: string;
       limit?: number;
+      cursor?: string;
     }
   ) {
-    let res = await this.http.get(`/v3/snapshot/options/${underlyingAsset}`, {
-      params: {
-        contract_type: params?.contractType,
-        expiration_date: params?.expirationDate,
-        'expiration_date.gte': params?.expirationDateGte,
-        'expiration_date.lte': params?.expirationDateLte,
-        strike_price: params?.strikePrice,
-        'strike_price.gte': params?.strikePriceGte,
-        'strike_price.lte': params?.strikePriceLte,
-        order: params?.order,
-        sort: params?.sort,
-        limit: params?.limit
+    let res = await this.http.get(
+      `/v3/snapshot/options/${encodeURIComponent(underlyingAsset)}`,
+      {
+        params: {
+          contract_type: params?.contractType,
+          expiration_date: params?.expirationDate,
+          'expiration_date.gte': params?.expirationDateGte,
+          'expiration_date.lte': params?.expirationDateLte,
+          strike_price: params?.strikePrice,
+          'strike_price.gte': params?.strikePriceGte,
+          'strike_price.lte': params?.strikePriceLte,
+          order: params?.order,
+          sort: params?.sort,
+          cursor: params?.cursor,
+          limit: params?.limit
+        }
       }
-    });
+    );
     return res.data;
   }
 
@@ -458,9 +578,10 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
     expandUnderlying?: boolean;
   }) {
-    let res = await this.http.get(`/v1/indicators/sma/${params.ticker}`, {
+    let res = await this.http.get(`/v1/indicators/sma/${encodeURIComponent(params.ticker)}`, {
       params: {
         timestamp: params.timestamp,
         'timestamp.gte': params.timestampGte,
@@ -471,6 +592,7 @@ export class Client {
         series_type: params.seriesType,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit,
         expand_underlying: params.expandUnderlying
       }
@@ -490,9 +612,10 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
     expandUnderlying?: boolean;
   }) {
-    let res = await this.http.get(`/v1/indicators/ema/${params.ticker}`, {
+    let res = await this.http.get(`/v1/indicators/ema/${encodeURIComponent(params.ticker)}`, {
       params: {
         timestamp: params.timestamp,
         'timestamp.gte': params.timestampGte,
@@ -503,6 +626,7 @@ export class Client {
         series_type: params.seriesType,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit,
         expand_underlying: params.expandUnderlying
       }
@@ -524,9 +648,10 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
     expandUnderlying?: boolean;
   }) {
-    let res = await this.http.get(`/v1/indicators/macd/${params.ticker}`, {
+    let res = await this.http.get(`/v1/indicators/macd/${encodeURIComponent(params.ticker)}`, {
       params: {
         timestamp: params.timestamp,
         'timestamp.gte': params.timestampGte,
@@ -539,6 +664,7 @@ export class Client {
         series_type: params.seriesType,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit,
         expand_underlying: params.expandUnderlying
       }
@@ -558,9 +684,10 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
     expandUnderlying?: boolean;
   }) {
-    let res = await this.http.get(`/v1/indicators/rsi/${params.ticker}`, {
+    let res = await this.http.get(`/v1/indicators/rsi/${encodeURIComponent(params.ticker)}`, {
       params: {
         timestamp: params.timestamp,
         'timestamp.gte': params.timestampGte,
@@ -571,6 +698,7 @@ export class Client {
         series_type: params.seriesType,
         order: params.order,
         sort: params.sort,
+        cursor: params.cursor,
         limit: params.limit,
         expand_underlying: params.expandUnderlying
       }
@@ -587,6 +715,7 @@ export class Client {
     order?: string;
     sort?: string;
     limit?: number;
+    cursor?: string;
   }) {
     let res = await this.http.get('/v2/reference/news', {
       params: {
@@ -595,6 +724,7 @@ export class Client {
         'published_utc.lte': params?.publishedUtcLte,
         order: params?.order,
         sort: params?.sort,
+        cursor: params?.cursor,
         limit: params?.limit
       }
     });
@@ -614,7 +744,7 @@ export class Client {
     limit?: number;
   }) {
     let res = await this.http.get(
-      `/v2/aggs/ticker/${params.ticker}/range/${params.multiplier}/${params.timespan}/${params.from}/${params.to}`,
+      `/v2/aggs/ticker/${encodeURIComponent(params.ticker)}/range/${params.multiplier}/${encodeURIComponent(params.timespan)}/${encodeURIComponent(params.from)}/${encodeURIComponent(params.to)}`,
       {
         params: {
           adjusted: params.adjusted,
@@ -627,7 +757,7 @@ export class Client {
   }
 
   async getForexPreviousClose(ticker: string, params?: { adjusted?: boolean }) {
-    let res = await this.http.get(`/v2/aggs/ticker/${ticker}/prev`, {
+    let res = await this.http.get(`/v2/aggs/ticker/${encodeURIComponent(ticker)}/prev`, {
       params: { adjusted: params?.adjusted }
     });
     return res.data;
@@ -646,7 +776,7 @@ export class Client {
     limit?: number;
   }) {
     let res = await this.http.get(
-      `/v2/aggs/ticker/${params.ticker}/range/${params.multiplier}/${params.timespan}/${params.from}/${params.to}`,
+      `/v2/aggs/ticker/${encodeURIComponent(params.ticker)}/range/${params.multiplier}/${encodeURIComponent(params.timespan)}/${encodeURIComponent(params.from)}/${encodeURIComponent(params.to)}`,
       {
         params: {
           adjusted: params.adjusted,
@@ -659,7 +789,7 @@ export class Client {
   }
 
   async getCryptoPreviousClose(ticker: string, params?: { adjusted?: boolean }) {
-    let res = await this.http.get(`/v2/aggs/ticker/${ticker}/prev`, {
+    let res = await this.http.get(`/v2/aggs/ticker/${encodeURIComponent(ticker)}/prev`, {
       params: { adjusted: params?.adjusted }
     });
     return res.data;

@@ -13,6 +13,10 @@ export let listContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
       contactUuid: z.string().optional().describe('Filter by a specific contact UUID'),
       contactUrn: z
         .string()
@@ -50,6 +54,8 @@ export let listContacts = SlateTool.create(spec, {
           lastSeenOn: z.string().nullable()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean().describe('Whether there are more results to fetch')
     })
   )
@@ -57,6 +63,7 @@ export let listContacts = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listContacts({
+      cursor: ctx.input.cursor,
       uuid: ctx.input.contactUuid,
       urn: ctx.input.contactUrn,
       group: ctx.input.groupUuidOrName,
@@ -80,6 +87,8 @@ export let listContacts = SlateTool.create(spec, {
     return {
       output: {
         contacts,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${contacts.length}** contact(s)${result.next ? ' (more results available)' : ''}.`

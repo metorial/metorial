@@ -24,24 +24,7 @@ export const itemApiError = (error: unknown, operation: string, apiKey: string) 
     operation,
     reason: 'item_api_error',
     parent: createSanitizedDiagnosticError(error, apiKey),
-    extractResponse: (input, helpers) => {
-      let response = helpers.getResponse(input);
-      if (
-        !helpers.isRecord(input) ||
-        input.name !== 'SlateError' ||
-        !helpers.isRecord(input.data)
-      ) {
-        return response;
-      }
-
-      let baggage = helpers.isRecord(input.data.baggage) ? input.data.baggage : undefined;
-      if (baggage?.response === undefined) return response;
-
-      return {
-        ...response,
-        data: baggage.response
-      };
-    },
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
     formatMessage: ({ providerLabel, operation: requestOperation, statusLabel, message }) =>
       sanitizeSecret(
         `${providerLabel} API ${requestOperation} failed: ${statusLabel}${message}`,

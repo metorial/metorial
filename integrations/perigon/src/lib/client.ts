@@ -1,360 +1,162 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  getApiErrorResponseWithBody,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+import {
+  articleResponse,
+  companyResponse,
+  journalistResponse,
+  limitsResponse,
+  personResponse,
+  sourceResponse,
+  storyResponse,
+  topicResponse,
+  wikipediaResponse
+} from './responses';
 
-let BASE_URL = 'https://api.perigon.io/v1';
+let searchResponse = <T extends z.ZodType>(item: T) =>
+  z
+    .object({ status: z.number(), numResults: z.number(), results: z.array(item) })
+    .passthrough();
+let articlesResponse = z
+  .object({
+    status: z.number(),
+    numResults: z.number(),
+    articles: z.array(articleResponse)
+  })
+  .passthrough();
+let topicsResponse = z
+  .object({ total: z.number(), data: z.array(topicResponse) })
+  .passthrough();
+
+type SearchParams = Record<string, string | number | boolean | string[] | undefined>;
 
 export class PerigonClient {
   private axios;
 
-  constructor(token: string) {
-    this.axios = createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-  }
-
-  async searchArticles(params: ArticleSearchParams) {
-    let response = await this.axios.get('/all', { params: this.cleanParams(params) });
-    return response.data as ArticlesResponse;
-  }
-
-  async searchStories(params: StorySearchParams) {
-    let response = await this.axios.get('/stories/all', { params: this.cleanParams(params) });
-    return response.data as StoriesResponse;
-  }
-
-  async searchPeople(params: PeopleSearchParams) {
-    let response = await this.axios.get('/people/all', { params: this.cleanParams(params) });
-    return response.data as PeopleResponse;
-  }
-
-  async searchCompanies(params: CompanySearchParams) {
-    let response = await this.axios.get('/companies/all', {
-      params: this.cleanParams(params)
-    });
-    return response.data as CompaniesResponse;
-  }
-
-  async searchJournalists(params: JournalistSearchParams) {
-    let response = await this.axios.get('/journalists/all', {
-      params: this.cleanParams(params)
-    });
-    return response.data as JournalistsResponse;
-  }
-
-  async getJournalistById(journalistId: string) {
-    let response = await this.axios.get(`/journalists/${journalistId}`);
-    return response.data as JournalistDetail;
-  }
-
-  async searchSources(params: SourceSearchParams) {
-    let response = await this.axios.get('/sources', { params: this.cleanParams(params) });
-    return response.data as SourcesResponse;
-  }
-
-  async searchTopics(params: TopicSearchParams) {
-    let response = await this.axios.get('/topics', { params: this.cleanParams(params) });
-    return response.data as TopicsResponse;
-  }
-
-  async searchWikipedia(params: WikipediaSearchParams) {
-    let response = await this.axios.get('/wikipedia', { params: this.cleanParams(params) });
-    return response.data as WikipediaResponse;
-  }
-
-  private cleanParams(params: object): Record<string, unknown> {
-    let cleaned: Record<string, unknown> = {};
-    for (let [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && value !== '') {
-        cleaned[key] = value;
-      }
+  constructor(private token: string) {
+    if (!token.trim()) {
+      throw createApiServiceError('Enter a Perigon API key to connect.', {
+        reason: 'missing_api_key'
+      });
     }
-    return cleaned;
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.perigon.io/v1',
+      authHeader: { value: `Bearer ${token}` },
+      timeout: 30000,
+      // Inspect the provider body before translating an HTTP failure.
+      validateStatus: () => true,
+      paramsSerializer: { indexes: null }
+    });
   }
-}
 
-// --- Request parameter types ---
+  private async request<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    params: SearchParams = {}
+  ): Promise<T> {
+    let response: { status: number; data: unknown };
+    try {
+      response = await this.axios.get(path, { params: pickDefined(params) });
+    } catch (error) {
+      let upstream = getApiErrorResponseWithBody(error);
+      throw this.apiError(
+        upstream?.status,
+        extractApiErrorMessage(error, { response: upstream })
+      );
+    }
 
-export interface ArticleSearchParams {
-  q?: string;
-  title?: string;
-  description?: string;
-  from?: string;
-  to?: string;
-  addDateFrom?: string;
-  addDateTo?: string;
-  source?: string;
-  excludeSource?: string;
-  sourceGroup?: string;
-  category?: string;
-  excludeCategory?: string;
-  topic?: string;
-  country?: string;
-  excludeCountry?: string;
-  language?: string;
-  label?: string;
-  excludeLabel?: string;
-  personName?: string;
-  companyName?: string;
-  companyDomain?: string;
-  city?: string;
-  state?: string;
-  clusterId?: string;
-  showReprints?: boolean;
-  sortBy?: string;
-  page?: number;
-  size?: number;
-}
+    let bodyStatus =
+      isApiErrorRecord(response.data) && typeof response.data.status === 'number'
+        ? response.data.status
+        : undefined;
+    if (response.status >= 400 || (bodyStatus !== undefined && bodyStatus >= 400)) {
+      throw this.apiError(
+        response.status >= 400 ? response.status : bodyStatus,
+        extractApiErrorMessage({ response: { data: response.data } })
+      );
+    }
 
-export interface StorySearchParams {
-  q?: string;
-  from?: string;
-  to?: string;
-  source?: string;
-  sourceGroup?: string;
-  category?: string;
-  topic?: string;
-  country?: string;
-  language?: string;
-  personName?: string;
-  companyName?: string;
-  showDuplicates?: boolean;
-  sortBy?: string;
-  page?: number;
-  size?: number;
-}
+    let parsed = schema.safeParse(response.data);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'Perigon returned an invalid response. Try the request again or contact Perigon support.',
+        {
+          reason: 'invalid_response',
+          upstreamStatus: response.status
+        }
+      );
+    }
+    return parsed.data;
+  }
 
-export interface PeopleSearchParams {
-  name?: string;
-  page?: number;
-  size?: number;
-}
+  private apiError(status: number | string | undefined, message: string) {
+    let safeMessage = message
+      .replaceAll(this.token, '[REDACTED]')
+      .replaceAll(encodeURIComponent(this.token), '[REDACTED]')
+      .replace(/Bearer\s+[^\s"'<>]+/gi, 'Bearer [REDACTED]');
+    return buildApiServiceError(
+      { response: { status, data: { message: safeMessage } } },
+      {
+        providerLabel: 'Perigon',
+        reason: 'perigon_api_error',
+        operation: 'request'
+      }
+    );
+  }
 
-export interface CompanySearchParams {
-  name?: string;
-  page?: number;
-  size?: number;
-}
+  searchArticles(params: SearchParams) {
+    return this.request('/articles/all', articlesResponse, params);
+  }
 
-export interface JournalistSearchParams {
-  name?: string;
-  page?: number;
-  size?: number;
-}
+  searchStories(params: SearchParams) {
+    return this.request('/stories/all', searchResponse(storyResponse), params);
+  }
 
-export interface SourceSearchParams {
-  name?: string;
-  domain?: string;
-  country?: string;
-  category?: string;
-  language?: string;
-  paywall?: boolean;
-  sortBy?: string;
-  page?: number;
-  size?: number;
-}
+  searchPeople(params: SearchParams) {
+    return this.request('/people/all', searchResponse(personResponse), params);
+  }
 
-export interface TopicSearchParams {
-  page?: number;
-  size?: number;
-}
+  searchCompanies(params: SearchParams) {
+    return this.request('/companies/all', searchResponse(companyResponse), params);
+  }
 
-export interface WikipediaSearchParams {
-  q?: string;
-  language?: string;
-  sortBy?: string;
-  pageviewsFrom?: number;
-  wikidataId?: string;
-  wikidataInstanceOfLabel?: string;
-  category?: string;
-  withPageviews?: boolean;
-  page?: number;
-  size?: number;
-}
+  searchJournalists(params: SearchParams) {
+    return this.request('/journalists/all', searchResponse(journalistResponse), params);
+  }
 
-// --- Response types ---
+  getJournalistById(journalistId: string) {
+    if (!journalistId.trim()) {
+      throw createApiServiceError(
+        'Provide a journalist ID from Search Articles or Search Journalists.',
+        { reason: 'invalid_journalist_id' }
+      );
+    }
+    return this.request(
+      `/journalists/${encodeURIComponent(journalistId)}`,
+      journalistResponse
+    );
+  }
 
-export interface ArticlesResponse {
-  status: number;
-  numResults: number;
-  articles: Article[];
-}
+  searchSources(params: SearchParams) {
+    return this.request('/sources/all', searchResponse(sourceResponse), params);
+  }
 
-export interface Article {
-  articleId: string;
-  title: string;
-  description: string;
-  url: string;
-  imageUrl: string;
-  authorsByline: string;
-  matchedAuthors: Array<{ id: string | null; name: string }>;
-  pubDate: string;
-  addDate: string;
-  source: { domain: string; paywall: boolean | null };
-  country: string;
-  language: string;
-  score: number;
-  clusterId: string;
-  reprint: boolean;
-  reprintGroupId: string;
-  categories: Array<{ name: string }>;
-  topics: Array<{ name: string }>;
-  companies: Array<{ id: string; name: string; domains: string[]; mentions: number }>;
-  people: Array<{ wikidataId: string; name: string; mentions: number }>;
-  sentiment: { positive: number; negative: number; neutral: number };
-  labels: string[];
-  keywords: Array<{ name: string; weight: number }>;
-  entities: Array<{ data: string; type: string; mentions: number }>;
-  summary: string;
-}
+  searchTopics(params: SearchParams) {
+    return this.request('/topics/all', topicsResponse, params);
+  }
 
-export interface StoriesResponse {
-  status: number;
-  numResults: number;
-  results: Story[];
-}
+  searchWikipedia(params: SearchParams) {
+    return this.request('/wikipedia/all', searchResponse(wikipediaResponse), params);
+  }
 
-export interface Story {
-  id: string;
-  name: string;
-  summary: string;
-  description: string;
-  createdAt: string;
-  updatedAt: string;
-  initializedAt: string;
-  uniqueCount: number;
-  reprintCount: number;
-  totalCount: number;
-  categories: Array<{ name: string; count: number }>;
-  topics: Array<{ name: string; count: number }>;
-  people: Array<{ wikidataId: string; name: string; count: number }>;
-  companies: Array<{ id: string; name: string; count: number }>;
-  countries: Array<{ name: string; count: number }>;
-  keyArticle: Article | null;
-}
-
-export interface PeopleResponse {
-  status: number;
-  numResults: number;
-  results: Person[];
-}
-
-export interface Person {
-  wikidataId: string;
-  name: string;
-  description: string;
-  aliases: string[];
-  occupation: Array<{ wikidataId: string; label: string }>;
-  position: Array<{
-    wikidataId: string;
-    label: string;
-    startTime: string;
-    endTime: string;
-    employer: { wikidataId: string; label: string } | null;
-  }>;
-}
-
-export interface CompaniesResponse {
-  status: number;
-  numResults: number;
-  results: Company[];
-}
-
-export interface Company {
-  id: string;
-  name: string;
-  altNames: string[];
-  domains: string[];
-  description: string;
-  ceo: string;
-  industry: string;
-  sector: string;
-  country: string;
-  fullTimeEmployees: number;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-}
-
-export interface JournalistsResponse {
-  status: number;
-  numResults: number;
-  results: Journalist[];
-}
-
-export interface Journalist {
-  id: string;
-  name: string;
-  title: string;
-  bio: string;
-  twitterHandle: string;
-  location: string;
-  topSources: Array<{ name: string; domain: string; count: number }>;
-  topCountries: Array<{ name: string; count: number }>;
-  topCategories: Array<{ name: string; count: number }>;
-  topTopics: Array<{ name: string; count: number }>;
-  avgMonthlyPosts: number;
-}
-
-export interface JournalistDetail {
-  status: number;
-  id: string;
-  name: string;
-  title: string;
-  bio: string;
-  twitterHandle: string;
-  location: string;
-  topSources: Array<{ name: string; domain: string; count: number }>;
-  topCountries: Array<{ name: string; count: number }>;
-  topCategories: Array<{ name: string; count: number }>;
-  topTopics: Array<{ name: string; count: number }>;
-  avgMonthlyPosts: number;
-}
-
-export interface SourcesResponse {
-  status: number;
-  numResults: number;
-  results: Source[];
-}
-
-export interface Source {
-  id: string;
-  domain: string;
-  name: string;
-  altNames: string[];
-  description: string;
-  paywall: boolean | null;
-  avgMonthlyPosts: number;
-  topCategories: Array<{ name: string; count: number }>;
-  topTopics: Array<{ name: string; count: number }>;
-}
-
-export interface TopicsResponse {
-  status: number;
-  numResults: number;
-  results: Topic[];
-}
-
-export interface Topic {
-  name: string;
-}
-
-export interface WikipediaResponse {
-  status: number;
-  numResults: number;
-  results: WikipediaPage[];
-}
-
-export interface WikipediaPage {
-  title: string;
-  summary: string;
-  content: string;
-  pageviews: number;
-  wikidataId: string;
-  wikiCode: string;
-  wikiRevisionTs: string;
-  wikidataInstanceOf: string[];
-  categories: string[];
+  getAccountUsage() {
+    return this.request('/limits', limitsResponse);
+  }
 }

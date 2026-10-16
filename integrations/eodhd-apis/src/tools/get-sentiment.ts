@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EodhdClient } from '../lib/client';
 import { spec } from '../spec';
@@ -45,7 +45,7 @@ export let getSentiment = SlateTool.create(spec, {
 
     return {
       output: {
-        sentiments: data ?? {}
+        sentiments: isApiErrorRecord(data?.ticker) ? data.ticker : data
       },
       message: `Retrieved sentiment data for **${ctx.input.symbols}**.`
     };

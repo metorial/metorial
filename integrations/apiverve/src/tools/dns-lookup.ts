@@ -20,6 +20,7 @@ export let dnsLookup = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: z.any().optional().describe('Complete provider result'),
       domain: z.string().describe('The queried domain'),
       aRecords: z.array(z.string()).optional().describe('IPv4 address records'),
       aaaaRecords: z.array(z.string()).optional().describe('IPv6 address records'),
@@ -53,22 +54,19 @@ export let dnsLookup = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.dnsLookup(ctx.input.domain);
 
-    if (result.status === 'error' || !result.data) {
-      throw new Error(result.error || 'DNS lookup failed');
-    }
-
     let data = result.data;
     let records = data.records;
 
     let output = {
+      rawData: data,
       domain: data.domain,
-      aRecords: records.A,
-      aaaaRecords: records.AAAA,
-      mxRecords: records.MX,
-      nsRecords: records.NS,
-      txtRecords: records.TXT,
-      cnameRecords: records.CNAME,
-      soaRecord: records.SOA
+      aRecords: records.A ?? undefined,
+      aaaaRecords: records.AAAA ?? undefined,
+      mxRecords: records.MX ?? undefined,
+      nsRecords: records.NS ?? undefined,
+      txtRecords: records.TXT ?? undefined,
+      cnameRecords: records.CNAME ?? undefined,
+      soaRecord: records.SOA ?? undefined
     };
 
     let recordSummary: string[] = [];
@@ -78,8 +76,10 @@ export let dnsLookup = SlateTool.create(spec, {
     if (records.TXT?.length) recordSummary.push(`${records.TXT.length} TXT`);
 
     return {
-      output,
-      message: `DNS records for **${data.domain}**: ${recordSummary.join(', ') || 'no records found'}.`
+      output: client.sanitize(output),
+      message: client.sanitize(
+        `DNS records for **${data.domain}**: ${recordSummary.join(', ') || 'no records found'}.`
+      )
     };
   })
   .build();

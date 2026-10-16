@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -21,7 +21,7 @@ let teamSchema = z.object({
 export let listTeams = SlateTool.create(spec, {
   name: 'List Teams',
   key: 'list_teams',
-  description: `List teams accessible to the authenticated user. Optionally includes team members for each team. Use this to discover team names for filtering meetings or managing team data.`,
+  description: `List teams accessible to the authenticated user. Optionally includes team members for each team. Use this to discover team names for filtering meetings.`,
   tags: {
     readOnly: true
   }
@@ -41,17 +41,24 @@ export let listTeams = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
-    // Fetch all teams with pagination
     let allTeams: Array<{ name: string; created_at: string }> = [];
     let cursor: string | undefined;
+    let seen = new Set<string>();
 
     do {
+      if (cursor !== undefined) {
+        if (seen.has(cursor))
+          throw createApiServiceError(
+            'Fathom repeated a team pagination cursor. Retry the request.'
+          );
+        seen.add(cursor);
+      }
       let result = await client.listTeams(cursor);
       allTeams.push(...result.items);
-      cursor = result.next_cursor || undefined;
-    } while (cursor);
+      cursor = result.next_cursor === null ? undefined : result.next_cursor;
+    } while (cursor !== undefined);
 
     let teams: z.infer<typeof teamSchema>[] = [];
 
@@ -64,12 +71,21 @@ export let listTeams = SlateTool.create(spec, {
       if (ctx.input.includeMembers) {
         let allMembers: Array<{ name: string; email: string; created_at: string }> = [];
         let memberCursor: string | undefined;
+        let memberCursors = new Set<string>();
 
         do {
+          if (memberCursor !== undefined) {
+            if (memberCursors.has(memberCursor))
+              throw createApiServiceError(
+                'Fathom repeated a team-member pagination cursor. Retry the request.'
+              );
+            memberCursors.add(memberCursor);
+          }
           let membersResult = await client.listTeamMembers(team.name, memberCursor);
           allMembers.push(...membersResult.items);
-          memberCursor = membersResult.next_cursor || undefined;
-        } while (memberCursor);
+          memberCursor =
+            membersResult.next_cursor === null ? undefined : membersResult.next_cursor;
+        } while (memberCursor !== undefined);
 
         teamEntry.members = allMembers.map(m => ({
           name: m.name,

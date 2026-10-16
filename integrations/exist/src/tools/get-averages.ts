@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAveragesTool = SlateTool.create(spec, {
   name: 'Get Averages',
   key: 'get_averages',
-  description: `Retrieve the most recent weekly average values for tracked attributes, including an overall average and per-day-of-week breakdowns (Monday through Sunday). Optionally retrieve historical averages to see trends over time.`,
+  description: `Retrieve the most recent weekly average values for tracked attributes, computed from the last 60 days of data, including an overall average and per-day-of-week breakdowns (Monday through Sunday). Optionally retrieve historical averages to see trends over time.`,
   instructions: [
     'Set includeHistorical to true to get past weekly averages for trend analysis.',
     'Filter by groups or specific attribute names to narrow results.'
@@ -37,13 +37,24 @@ export let getAveragesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the next page, when returned'),
+      previousPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the previous page, when returned'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       totalCount: z.number().describe('Total number of average records'),
       averages: z
         .array(
           z.object({
             attributeName: z.string().describe('Attribute name'),
             date: z.string().describe('Week date for the average'),
-            overall: z.number().describe('Overall weekly average'),
+            overall: z.number().describe('Overall rolling average'),
             monday: z.number().describe('Monday average'),
             tuesday: z.number().describe('Tuesday average'),
             wednesday: z.number().describe('Wednesday average'),
@@ -84,6 +95,9 @@ export let getAveragesTool = SlateTool.create(spec, {
 
     return {
       output: {
+        nextPageUrl: result.next,
+        previousPageUrl: result.previous,
+        raw: result,
         totalCount: result.count,
         averages,
         hasMore: result.next !== null

@@ -1,4 +1,5 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   badWordFilterTool,
@@ -7,10 +8,16 @@ import {
   domainLookupTool,
   geocodeAddressTool,
   geocodeReverseTool,
+  getDomainDetailsTool,
   hostReputationTool,
   ipBlocklistTool,
   ipInfoTool,
   ipProbeTool,
+  lookupUserAgentTool,
+  phoneVerifyTool,
+  qrCodeTool,
+  renderHtmlTool,
+  resizeImageTool,
   smsVerifyTool,
   urlInfoTool,
   validateEmailTool,
@@ -21,7 +28,14 @@ import {
 
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
+    getDomainDetailsTool,
+    lookupUserAgentTool,
+    phoneVerifyTool,
+    qrCodeTool,
+    renderHtmlTool,
+    resizeImageTool,
     validateEmailTool,
     verifyEmailTool,
     validatePhoneTool,

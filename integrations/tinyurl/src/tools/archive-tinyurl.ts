@@ -34,7 +34,12 @@ export let archiveTinyUrl = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.archiveTinyUrl(ctx.input.domain, ctx.input.alias);
+    let archived = await client.archiveTinyUrl(ctx.input.domain, ctx.input.alias);
+    let result = await client.getTinyUrl(
+      archived.domain,
+      archived.alias,
+      'retrieve TinyURL after toggling archive status (the status may already have changed)'
+    );
 
     return {
       output: {

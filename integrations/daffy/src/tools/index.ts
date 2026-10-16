@@ -1,4 +1,5 @@
 export * from './get-causes';
+export * from './get-donation';
 export * from './get-fund-balance';
 export * from './get-user-profile';
 export * from './list-contributions';

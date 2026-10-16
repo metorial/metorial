@@ -1,12 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTask } from '../lib/response';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTask = SlateTool.create(spec, {
   name: 'Create Task',
   key: 'create_task',
-  description: `Create a new task in a project. Supports setting name, description, priority, due date, assignees, group, milestone, status, estimated time, and file attachments.`,
+  description: `Call list_projects to discover project IDs. Create a new task in a project. Supports setting name, description, priority, due date, assignees, group, milestone, status, estimated time, and file attachments.`,
   instructions: [
     'Priority values: 0 = No Priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low.',
     'Dates should be in yyyy-MM-dd format.',
@@ -15,7 +17,7 @@ export let createTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to create the task in'),
+      projectId: projectIdSchema,
       name: z.string().optional().describe('Name/title of the task'),
       description: z.string().optional().describe('Detailed description of the task'),
       priority: z
@@ -23,7 +25,10 @@ export let createTask = SlateTool.create(spec, {
         .optional()
         .describe('Priority level: 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low'),
       dueDate: z.string().optional().describe('Due date in yyyy-MM-dd format'),
-      groupId: z.string().optional().describe('ID of the task group to place the task in'),
+      groupId: z
+        .string()
+        .optional()
+        .describe('Task group ID. Call list_project_groups to discover groups.'),
       taskUsers: z
         .array(z.string())
         .optional()
@@ -41,11 +46,20 @@ export let createTask = SlateTool.create(spec, {
         .describe('File attachments for the task'),
       estimateTime: z.number().optional().describe('Estimated time in hours'),
       milestoneId: z.number().optional().describe('ID of the milestone to link'),
-      statusId: z.string().optional().describe('ID of the custom status to set')
+      statusId: z
+        .string()
+        .optional()
+        .describe('Custom status ID. Call get_project_details to discover statuses.')
     })
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       taskId: z.string().describe('ID of the newly created task'),
       taskName: z.string().describe('Name of the newly created task'),
       projectId: z.string().optional().describe('ID of the parent project'),
@@ -84,26 +98,10 @@ export let createTask = SlateTool.create(spec, {
       statusId: ctx.input.statusId
     });
 
+    let output = mapTask(task);
     return {
-      output: {
-        taskId: task.taskId ?? '',
-        taskName: task.taskName ?? '',
-        projectId: task.projectId || undefined,
-        groupId: task.groupId || undefined,
-        group: task.group || undefined,
-        description: task.description || undefined,
-        status: task.status,
-        priority: task.priority,
-        dueDate: task.dueDate || undefined,
-        estimateTime: task.estimateTime,
-        subscribers: Array.isArray(task.subscribers) ? task.subscribers : undefined,
-        taskUsers: Array.isArray(task.taskUsers)
-          ? task.taskUsers.map((u: any) => ({
-              taskUserId: u.taskUserId ?? ''
-            }))
-          : undefined
-      },
-      message: `Created task **${task.taskName || ctx.input.name || 'Untitled'}** (ID: ${task.taskId}) in project ${ctx.input.projectId}.`
+      output,
+      message: `Created task **${output.taskName}** (ID: ${output.taskId}).`
     };
   })
   .build();

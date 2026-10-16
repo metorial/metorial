@@ -1,6 +1,8 @@
-# <img src="logo.png" height="20"> Tinyurl
+# <img src="logo.png" height="20"> TinyURL
 
-Create, manage, and analyze shortened URLs. Shorten long URLs with custom aliases, branded domains, tags, and expiration dates. Retrieve, update, archive, and delete existing short links. View link analytics including click counts, geographic distribution, referrers, devices, and browsers. Perform bulk link operations and manage branded domains for custom short links.
+Create, retrieve, list, count, update, archive, and delete shortened URLs. Use custom aliases and branded domains, organize links with tags, control analytics collection and sharing, and retrieve click reports. Paid capabilities require the appropriate subscription and API token permissions.
+
+List results include each link's destination and click count, which requires a detail request per link. Use the count tool when only a total is needed.
 
 ## License
 

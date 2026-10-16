@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getDataPoints } from '../lib/client';
 import { spec } from '../spec';
 
 let dataPointSchema = z
@@ -20,7 +20,7 @@ Supports three temporal modes:
 Requires a PV Power Site to be created first using the "Manage PV Power Site" tool.`,
   instructions: [
     "A PV Power Site must be created before using this tool. Use the site's resourceId.",
-    'Operational adjustments (snow soiling, dust soiling, constraints, availability) can be toggled on/off.',
+    'Use availabilityPercent, constraintPowerMw, dustSoilingLoss, and snowSoilingLoss for numeric operational overrides. Legacy constraint flags do not remove configured site export limits.',
     'For historic mode, "start" is required. Duration must be within 31 days.'
   ],
   tags: {
@@ -32,26 +32,73 @@ Requires a PV Power Site to be created first using the "Manage PV Power Site" to
       mode: z
         .enum(['forecast', 'live', 'historic'])
         .describe('Temporal mode: forecast, live, or historic'),
-      resourceId: z.string().describe('Resource ID of the PV Power Site'),
+      resourceId: z
+        .string()
+        .describe(
+          'Resource ID of the PV Power Site. Use list_pv_power_sites to discover sites.'
+        ),
       outputParameters: z
         .array(z.string())
         .optional()
         .describe('Specific output parameters to include'),
       period: z
-        .enum(['PT5M', 'PT10M', 'PT15M', 'PT30M', 'PT60M'])
+        .enum(['PT5M', 'PT10M', 'PT15M', 'PT20M', 'PT30M', 'PT60M'])
         .optional()
         .describe('Time resolution'),
       hours: z.number().optional().describe('Number of hours of data to return'),
+      availabilityPercent: z
+        .number()
+        .min(0)
+        .max(100)
+        .optional()
+        .describe(
+          'Availability override as a percentage of AC capacity (0 to 100); takes precedence over applyAvailability'
+        ),
+      constraintPowerMw: z
+        .number()
+        .min(0)
+        .optional()
+        .describe('Optional AC power cap in MW; configured site export limits still apply'),
+      dustSoilingLoss: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe(
+          'Dust soiling loss fraction (0 to 1); takes precedence over applyDustSoiling'
+        ),
+      snowSoilingLoss: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe(
+          'Snow soiling loss fraction (0 to 1); takes precedence over applySnowSoiling'
+        ),
       applyAvailability: z
         .boolean()
         .optional()
-        .describe('Apply reduced availability adjustments'),
+        .describe(
+          'Use default availability when true; false requests 100% availability unless availabilityPercent is provided'
+        ),
       applyConstraint: z
         .boolean()
         .optional()
-        .describe('Apply constraint/curtailment adjustments'),
-      applyDustSoiling: z.boolean().optional().describe('Apply dust soiling losses'),
-      applySnowSoiling: z.boolean().optional().describe('Apply snow soiling losses'),
+        .describe(
+          'Legacy flag retained for compatibility; use constraintPowerMw for an explicit cap. Configured site limits remain active'
+        ),
+      applyDustSoiling: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use default dust soiling when true; false requests zero dust loss unless dustSoilingLoss is provided'
+        ),
+      applySnowSoiling: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use default snow soiling when true; false requests zero snow loss unless snowSoilingLoss is provided'
+        ),
       applyTrackerInactive: z
         .boolean()
         .optional()
@@ -82,6 +129,10 @@ Requires a PV Power Site to be created first using the "Manage PV Power Site" to
       outputParameters,
       period,
       hours,
+      availabilityPercent,
+      constraintPowerMw,
+      dustSoilingLoss,
+      snowSoilingLoss,
       applyAvailability,
       applyConstraint,
       applyDustSoiling,
@@ -99,6 +150,10 @@ Requires a PV Power Site to be created first using the "Manage PV Power Site" to
       outputParameters,
       period,
       hours,
+      availabilityPercent,
+      constraintPowerMw,
+      dustSoilingLoss,
+      snowSoilingLoss,
       applyAvailability,
       applyConstraint,
       applyDustSoiling,
@@ -114,7 +169,7 @@ Requires a PV Power Site to be created first using the "Manage PV Power Site" to
       result = await client.getLiveAdvancedPvPower(baseParams);
     } else {
       if (!start) {
-        throw new Error('The "start" parameter is required for historic mode.');
+        throw createApiServiceError('The "start" parameter is required for historic mode.');
       }
       result = await client.getHistoricAdvancedPvPower({
         ...baseParams,
@@ -126,7 +181,7 @@ Requires a PV Power Site to be created first using the "Manage PV Power Site" to
     }
 
     let dataKey = mode === 'forecast' ? 'forecasts' : 'estimated_actuals';
-    let dataPoints = result[dataKey] ?? result.estimated_actuals ?? result.forecasts ?? [];
+    let dataPoints = getDataPoints(result, dataKey);
 
     return {
       output: {

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,11 @@ export let auth = SlateAuth.create()
       token: z.string().describe('ImgBB API key obtained from api.imgbb.com')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Enter your ImgBB API key.', {
+          reason: 'imgbb_missing_api_key'
+        });
+      }
       return {
         output: {
           token: ctx.input.token

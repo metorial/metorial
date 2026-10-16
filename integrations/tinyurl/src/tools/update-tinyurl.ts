@@ -47,7 +47,11 @@ Changing the destination URL requires the **Change URL** token permission (paid 
       analyticsEnabled: z
         .boolean()
         .optional()
-        .describe('Enable or disable analytics collection')
+        .describe('Enable or disable analytics collection'),
+      analyticsPublic: z
+        .boolean()
+        .optional()
+        .describe('Enable or disable public analytics sharing')
     })
   )
   .output(
@@ -59,24 +63,23 @@ Changing the destination URL requires the **Change URL** token permission (paid 
       createdAt: z.string().describe('ISO 8601 creation timestamp'),
       expiresAt: z.string().nullable().describe('ISO 8601 expiration timestamp or null'),
       tags: z.array(z.string()).describe('Tags assigned to the link'),
-      description: z.string().nullable().describe('Description of the link')
+      description: z.string().nullable().describe('Description of the link'),
+      analyticsEnabled: z.boolean().describe('Whether analytics collection is enabled'),
+      analyticsPublic: z.boolean().describe('Whether analytics are publicly shared')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let domain = ctx.input.domain;
+    let alias = ctx.input.alias;
+    let changed = false;
 
-    // Change destination URL if requested (uses separate endpoint)
-    if (ctx.input.newUrl) {
-      result = await client.changeUrl({
-        domain: ctx.input.domain,
-        alias: ctx.input.alias,
-        url: ctx.input.newUrl
-      });
+    if (ctx.input.newUrl !== undefined) {
+      await client.changeUrl({ domain, alias, url: ctx.input.newUrl });
+      changed = true;
       ctx.info('Destination URL updated');
     }
 
-    // Update other properties if any are specified
     let hasMetadataUpdate =
       ctx.input.newAlias !== undefined ||
       ctx.input.newDomain !== undefined ||
@@ -85,32 +88,40 @@ Changing the destination URL requires the **Change URL** token permission (paid 
       ctx.input.newDescription !== undefined;
 
     if (hasMetadataUpdate) {
-      result = await client.updateTinyUrl({
-        domain: ctx.input.domain,
-        alias: ctx.input.alias,
+      let metadata = await client.updateTinyUrl({
+        domain,
+        alias,
         newAlias: ctx.input.newAlias,
         newDomain: ctx.input.newDomain,
         newTags: ctx.input.newTags,
         newExpiresAt: ctx.input.newExpiresAt,
         newDescription: ctx.input.newDescription
       });
+      domain = metadata.domain;
+      alias = metadata.alias;
+      changed = true;
       ctx.info('TinyURL metadata updated');
     }
 
-    // Update analytics status if requested
     if (ctx.input.analyticsEnabled !== undefined) {
-      result = await client.setAnalyticsStatus({
-        domain: ctx.input.newDomain || ctx.input.domain,
-        alias: ctx.input.newAlias || ctx.input.alias,
-        enabled: ctx.input.analyticsEnabled
-      });
+      await client.setAnalyticsStatus({ domain, alias, enabled: ctx.input.analyticsEnabled });
+      changed = true;
       ctx.info(`Analytics ${ctx.input.analyticsEnabled ? 'enabled' : 'disabled'}`);
     }
 
-    // If no updates were specified, just fetch current state
-    if (!result) {
-      result = await client.getTinyUrl(ctx.input.domain, ctx.input.alias);
+    if (ctx.input.analyticsPublic !== undefined) {
+      await client.setAnalyticsSharing({ domain, alias, public: ctx.input.analyticsPublic });
+      changed = true;
+      ctx.info(`Analytics sharing ${ctx.input.analyticsPublic ? 'enabled' : 'disabled'}`);
     }
+
+    let result = await client.getTinyUrl(
+      domain,
+      alias,
+      changed
+        ? 'retrieve updated TinyURL (changes may already have been applied)'
+        : 'retrieve TinyURL'
+    );
 
     return {
       output: {
@@ -121,9 +132,11 @@ Changing the destination URL requires the **Change URL** token permission (paid 
         createdAt: result.created_at,
         expiresAt: result.expires_at,
         tags: result.tags || [],
-        description: result.description
+        description: result.description ?? null,
+        analyticsEnabled: result.analytics?.enabled ?? false,
+        analyticsPublic: result.analytics?.public ?? false
       },
-      message: `Updated TinyURL **${result.tiny_url}**`
+      message: `${changed ? 'Updated' : 'Retrieved'} TinyURL **${result.tiny_url}**`
     };
   })
   .build();

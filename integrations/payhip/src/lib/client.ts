@@ -1,8 +1,10 @@
-import { createAxios } from 'slates';
-
-let http = createAxios({
-  baseURL: 'https://payhip.com/api/v2'
-});
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export interface CouponCreateParams {
   code: string;
@@ -31,6 +33,7 @@ export interface CouponResponse {
   minimumPurchaseAmount: number | null;
   usageLimit: number | null;
   notes: string | null;
+  raw: Record<string, unknown>;
 }
 
 export interface LicenseResponse {
@@ -41,146 +44,253 @@ export interface LicenseResponse {
   uses: number;
   productName: string;
   date: string;
+  variantName?: string;
+  variantId?: string;
+  raw: Record<string, unknown>;
 }
 
-let mapCouponFromApi = (raw: any): CouponResponse => ({
-  couponId: raw.id ?? raw.coupon_id ?? '',
-  code: raw.code ?? '',
-  couponType: raw.coupon_type ?? '',
-  percentOff: raw.percent_off ?? null,
-  amountOff: raw.amount_off ?? null,
-  productKey: raw.product_key ?? null,
-  collectionId: raw.collection_id ?? null,
-  startDate: raw.start_date ?? null,
-  endDate: raw.end_date ?? null,
-  minimumPurchaseAmount: raw.minimum_purchase_amount ?? null,
-  usageLimit: raw.usage_limit ?? null,
-  notes: raw.notes ?? null
-});
+let createPayhipHttp = (header: string, key: string) => {
+  if (!key.trim()) {
+    throw createApiServiceError(
+      'Configure the required Payhip API key or product secret key.'
+    );
+  }
 
-let mapLicenseFromApi = (raw: any): LicenseResponse => ({
-  enabled: raw.enabled ?? false,
-  licenseKey: raw.license_key ?? '',
-  productLink: raw.product_link ?? '',
-  buyerEmail: raw.buyer_email ?? '',
-  uses: raw.uses ?? 0,
-  productName: raw.product_name ?? '',
-  date: raw.date ?? ''
-});
+  return createAuthenticatedAxios({
+    baseURL: 'https://payhip.com/api/v2',
+    timeout: 30_000,
+    authHeader: { name: header, value: key },
+    contentType: 'application/x-www-form-urlencoded',
+    headers: { Accept: 'application/json' },
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'Payhip',
+        reason: 'payhip_api_error',
+        extractResponse: (value, helpers) => helpers.getResponseWithBody(value)
+      })
+  });
+};
+
+let unwrapData = (response: unknown) =>
+  isApiErrorRecord(response) && 'data' in response ? response.data : response;
+
+let mapCouponFromApi = (value: unknown): CouponResponse => {
+  if (
+    !isApiErrorRecord(value) ||
+    (typeof value.id !== 'number' &&
+      typeof value.id !== 'string' &&
+      typeof value.coupon_id !== 'string')
+  ) {
+    throw createApiServiceError(
+      'Payhip did not return a coupon. Check the coupon ID and API key.'
+    );
+  }
+
+  return {
+    couponId: String(value.id ?? value.coupon_id),
+    code: typeof value.code === 'string' ? value.code : '',
+    couponType: typeof value.coupon_type === 'string' ? value.coupon_type : '',
+    percentOff: typeof value.percent_off === 'number' ? value.percent_off : null,
+    amountOff: typeof value.amount_off === 'number' ? value.amount_off : null,
+    productKey: typeof value.product_key === 'string' ? value.product_key : null,
+    collectionId: typeof value.collection_id === 'string' ? value.collection_id : null,
+    startDate: typeof value.start_date === 'string' ? value.start_date : null,
+    endDate: typeof value.end_date === 'string' ? value.end_date : null,
+    minimumPurchaseAmount:
+      typeof value.minimum_purchase_amount === 'number' ? value.minimum_purchase_amount : null,
+    usageLimit: typeof value.usage_limit === 'number' ? value.usage_limit : null,
+    notes: typeof value.notes === 'string' ? value.notes : null,
+    raw: value
+  };
+};
+
+let mapLicenseFromApi = (value: unknown): LicenseResponse => {
+  if (
+    !isApiErrorRecord(value) ||
+    typeof value.license_key !== 'string' ||
+    !value.license_key ||
+    typeof value.enabled !== 'boolean'
+  ) {
+    throw createApiServiceError(
+      'Payhip did not return a license key. Check that the license key belongs to the configured product secret key.'
+    );
+  }
+
+  return {
+    enabled: value.enabled,
+    licenseKey: value.license_key,
+    productLink: typeof value.product_link === 'string' ? value.product_link : '',
+    buyerEmail: typeof value.buyer_email === 'string' ? value.buyer_email : '',
+    uses: typeof value.uses === 'number' ? value.uses : 0,
+    productName: typeof value.product_name === 'string' ? value.product_name : '',
+    date: typeof value.date === 'string' ? value.date : '',
+    ...pickDefined({
+      variantName: typeof value.variant_name === 'string' ? value.variant_name : undefined,
+      variantId: typeof value.variant_id === 'string' ? value.variant_id : undefined
+    }),
+    raw: value
+  };
+};
+
+let validateCoupon = (params: CouponCreateParams) => {
+  if (!params.code.trim()) throw createApiServiceError('Provide a non-empty coupon code.');
+  if ((params.percentOff === undefined) === (params.amountOff === undefined)) {
+    throw createApiServiceError('Provide exactly one of percentOff or amountOff.');
+  }
+  if (
+    params.percentOff !== undefined &&
+    (!Number.isFinite(params.percentOff) || params.percentOff <= 0 || params.percentOff > 100)
+  ) {
+    throw createApiServiceError('percentOff must be greater than 0 and at most 100.');
+  }
+  for (let [field, value] of Object.entries({
+    amountOff: params.amountOff,
+    minimumPurchaseAmount: params.minimumPurchaseAmount,
+    usageLimit: params.usageLimit
+  })) {
+    if (value !== undefined && (!Number.isInteger(value) || value <= 0)) {
+      throw createApiServiceError(`${field} must be a positive whole number.`);
+    }
+  }
+  if (params.couponType === 'single' && !params.productKey?.trim()) {
+    throw createApiServiceError('Provide productKey when couponType is "single".');
+  }
+  if (params.couponType === 'collection' && !params.collectionId?.trim()) {
+    throw createApiServiceError('Provide collectionId when couponType is "collection".');
+  }
+  for (let [field, value] of Object.entries({
+    startDate: params.startDate,
+    endDate: params.endDate
+  })) {
+    if (
+      value !== undefined &&
+      (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ||
+        !Number.isFinite(Date.parse(value)))
+    ) {
+      throw createApiServiceError(
+        `${field} must be an RFC 3339 date and time with a timezone.`
+      );
+    }
+  }
+  if (
+    params.startDate &&
+    params.endDate &&
+    Date.parse(params.startDate) > Date.parse(params.endDate)
+  ) {
+    throw createApiServiceError('endDate must be on or after startDate.');
+  }
+};
 
 export class CouponClient {
-  private apiKey: string;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(params: { apiKey: string }) {
-    this.apiKey = params.apiKey;
+    this.http = createPayhipHttp('payhip-api-key', params.apiKey);
   }
 
   async createCoupon(params: CouponCreateParams): Promise<CouponResponse> {
-    let body: Record<string, any> = {
+    validateCoupon(params);
+    let fields = pickDefined({
       code: params.code,
-      coupon_type: params.couponType
-    };
-
-    if (params.percentOff !== undefined) body.percent_off = params.percentOff;
-    if (params.amountOff !== undefined) body.amount_off = params.amountOff;
-    if (params.productKey) body.product_key = params.productKey;
-    if (params.collectionId) body.collection_id = params.collectionId;
-    if (params.startDate) body.start_date = params.startDate;
-    if (params.endDate) body.end_date = params.endDate;
-    if (params.minimumPurchaseAmount !== undefined)
-      body.minimum_purchase_amount = params.minimumPurchaseAmount;
-    if (params.usageLimit !== undefined) body.usage_limit = params.usageLimit;
-    if (params.notes) body.notes = params.notes;
-
-    let response = await http.post('/coupons', body, {
-      headers: { 'payhip-api-key': this.apiKey }
+      coupon_type: params.couponType,
+      percent_off: params.percentOff,
+      amount_off: params.amountOff,
+      product_key: params.productKey,
+      collection_id: params.collectionId,
+      start_date: params.startDate,
+      end_date: params.endDate,
+      minimum_purchase_amount: params.minimumPurchaseAmount,
+      usage_limit: params.usageLimit,
+      notes: params.notes
     });
-
-    return mapCouponFromApi(response.data?.data ?? response.data);
+    let body = new URLSearchParams();
+    for (let [key, value] of Object.entries(fields)) body.set(key, String(value));
+    let response = await this.http.post('/coupons', body.toString());
+    return mapCouponFromApi(unwrapData(response.data));
   }
 
   async listCoupons(params?: {
     limit?: number;
     offset?: number;
-  }): Promise<{ coupons: CouponResponse[]; total: number }> {
-    let queryParams: Record<string, any> = {};
-    if (params?.limit !== undefined) queryParams.limit = params.limit;
-    if (params?.offset !== undefined) queryParams.offset = params.offset;
-
-    let response = await http.get('/coupons', {
-      headers: { 'payhip-api-key': this.apiKey },
-      params: queryParams
-    });
-
-    let data = response.data?.data ?? response.data;
-    let coupons = Array.isArray(data) ? data.map(mapCouponFromApi) : [];
-    let total = response.data?.total ?? coupons.length;
-
-    return { coupons, total };
+  }): Promise<{ coupons: CouponResponse[]; total: number; raw: unknown }> {
+    if (
+      params?.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 100)
+    ) {
+      throw createApiServiceError('limit must be a whole number from 1 to 100.');
+    }
+    if (
+      params?.offset !== undefined &&
+      (!Number.isInteger(params.offset) || params.offset < 0)
+    ) {
+      throw createApiServiceError('offset must be a non-negative whole number.');
+    }
+    let response = await this.http.get('/coupons', { params: pickDefined(params ?? {}) });
+    let data = unwrapData(response.data);
+    let values = Array.isArray(data)
+      ? data
+      : isApiErrorRecord(data)
+        ? data.coupons
+        : undefined;
+    if (!Array.isArray(values)) {
+      throw createApiServiceError('Payhip did not return a coupon list. Check the API key.');
+    }
+    let coupons = values.map(mapCouponFromApi);
+    let total =
+      isApiErrorRecord(data) && typeof data.total === 'number'
+        ? data.total
+        : isApiErrorRecord(response.data) && typeof response.data.total === 'number'
+          ? response.data.total
+          : coupons.length;
+    return { coupons, total, raw: response.data };
   }
 
   async getCoupon(couponId: string): Promise<CouponResponse> {
-    let response = await http.get(`/coupons/${couponId}`, {
-      headers: { 'payhip-api-key': this.apiKey }
-    });
-
-    return mapCouponFromApi(response.data?.data ?? response.data);
+    if (!couponId.trim()) throw createApiServiceError('Provide a non-empty coupon ID.');
+    let response = await this.http.get(`/coupons/${encodeURIComponent(couponId)}`);
+    return mapCouponFromApi(unwrapData(response.data));
   }
 }
 
 export class LicenseClient {
-  private productSecretKey: string;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(params: { productSecretKey: string }) {
-    this.productSecretKey = params.productSecretKey;
+    this.http = createPayhipHttp('product-secret-key', params.productSecretKey);
   }
 
-  async verifyLicense(licenseKey: string): Promise<LicenseResponse> {
-    let response = await http.get('/license/verify', {
-      headers: { 'product-secret-key': this.productSecretKey },
-      params: { license_key: licenseKey }
-    });
-
-    return mapLicenseFromApi(response.data?.data ?? response.data);
+  private async requestLicense(
+    endpoint: 'verify' | 'enable' | 'disable' | 'usage' | 'decrease',
+    licenseKey: string
+  ): Promise<LicenseResponse> {
+    if (!licenseKey.trim()) throw createApiServiceError('Provide a non-empty license key.');
+    let response =
+      endpoint === 'verify'
+        ? await this.http.get('/license/verify', { params: { license_key: licenseKey } })
+        : await this.http.put(
+            `/license/${endpoint}`,
+            new URLSearchParams({ license_key: licenseKey }).toString()
+          );
+    return mapLicenseFromApi(unwrapData(response.data));
   }
 
-  async enableLicense(licenseKey: string): Promise<LicenseResponse> {
-    let response = await http.put(
-      '/license/enable',
-      { license_key: licenseKey },
-      { headers: { 'product-secret-key': this.productSecretKey } }
-    );
-
-    return mapLicenseFromApi(response.data?.data ?? response.data);
+  verifyLicense(licenseKey: string): Promise<LicenseResponse> {
+    return this.requestLicense('verify', licenseKey);
   }
 
-  async disableLicense(licenseKey: string): Promise<LicenseResponse> {
-    let response = await http.put(
-      '/license/disable',
-      { license_key: licenseKey },
-      { headers: { 'product-secret-key': this.productSecretKey } }
-    );
-
-    return mapLicenseFromApi(response.data?.data ?? response.data);
+  enableLicense(licenseKey: string): Promise<LicenseResponse> {
+    return this.requestLicense('enable', licenseKey);
   }
 
-  async increaseUsage(licenseKey: string): Promise<LicenseResponse> {
-    let response = await http.put(
-      '/license/usage',
-      { license_key: licenseKey },
-      { headers: { 'product-secret-key': this.productSecretKey } }
-    );
-
-    return mapLicenseFromApi(response.data?.data ?? response.data);
+  disableLicense(licenseKey: string): Promise<LicenseResponse> {
+    return this.requestLicense('disable', licenseKey);
   }
 
-  async decreaseUsage(licenseKey: string): Promise<LicenseResponse> {
-    let response = await http.put(
-      '/license/decrease',
-      { license_key: licenseKey },
-      { headers: { 'product-secret-key': this.productSecretKey } }
-    );
+  increaseUsage(licenseKey: string): Promise<LicenseResponse> {
+    return this.requestLicense('usage', licenseKey);
+  }
 
-    return mapLicenseFromApi(response.data?.data ?? response.data);
+  decreaseUsage(licenseKey: string): Promise<LicenseResponse> {
+    return this.requestLicense('decrease', licenseKey);
   }
 }

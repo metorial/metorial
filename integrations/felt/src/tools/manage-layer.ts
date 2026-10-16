@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,7 @@ export let manageLayer = SlateTool.create(spec, {
     'To delete a layer, set delete to true.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -56,6 +56,18 @@ export let manageLayer = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { mapId, layerId } = ctx.input;
 
+    if (
+      (ctx.input.delete &&
+        Object.entries(ctx.input).some(
+          ([key, value]) =>
+            !['mapId', 'layerId', 'delete', 'refresh'].includes(key) && value !== undefined
+        )) ||
+      (ctx.input.delete && ctx.input.refresh)
+    ) {
+      throw createApiServiceError(
+        'Delete the layer separately from property, style, or refresh changes.'
+      );
+    }
     if (ctx.input.delete) {
       await client.deleteLayer(mapId, layerId);
       return {
@@ -100,11 +112,21 @@ export let manageLayer = SlateTool.create(spec, {
 
     // Refresh
     if (ctx.input.refresh) {
-      await client.refreshLayer(mapId, layerId);
+      let result = await client.refreshLayer(mapId, layerId);
+      if (result.url && result.presigned_attributes) {
+        throw createApiServiceError(
+          'This layer requires a replacement file upload. Complete the file refresh in Felt, or refresh a URL-backed layer instead.'
+        );
+      }
       actions.push('refreshed');
     }
 
-    let action = actions.length > 0 ? actions.join(', ') : 'no changes';
+    if (actions.length === 0) {
+      throw createApiServiceError(
+        'Provide layer properties, style, refresh: true, or delete: true.'
+      );
+    }
+    let action = actions.join(', ');
 
     return {
       output: { layerId, action },

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,7 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a tag');
+      if (!ctx.input.name) throw createApiServiceError('name is required for creating a tag');
       let tag = await client.createTag({ name: ctx.input.name, color: ctx.input.color });
 
       return {
@@ -84,7 +84,10 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.tagId) throw new Error('tagId is required for updating a tag');
+      if (!ctx.input.tagId)
+        throw createApiServiceError('tagId is required for updating a tag');
+      if (ctx.input.name === undefined && ctx.input.color === undefined)
+        throw createApiServiceError('Provide a name or color to update the tag.');
       let tag = await client.updateTag(ctx.input.tagId, {
         name: ctx.input.name,
         color: ctx.input.color
@@ -99,7 +102,8 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.tagId) throw new Error('tagId is required for deleting a tag');
+      if (!ctx.input.tagId)
+        throw createApiServiceError('tagId is required for deleting a tag');
       let result = await client.deleteTag(ctx.input.tagId);
 
       return {
@@ -110,6 +114,6 @@ export let manageTags = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

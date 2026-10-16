@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { validateHistoryRange } from './validation';
 
 let BASE_URL = 'https://api.ambeedata.com';
 
@@ -9,17 +10,55 @@ export interface ClientConfig {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
-    this.http = createAxios({
-      baseURL: BASE_URL
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a valid Ambee API key.');
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      authHeader: { name: 'x-api-key', value: config.token.trim() },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Ambee',
+          reason: 'ambee_api_error',
+          nestedKeys: ['error', 'errors'],
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          extractUpstreamCode: (_error, response, helpers) => {
+            let body = response?.data;
+            if (!helpers.isRecord(body) || !helpers.isRecord(body.error)) return;
+            let code = body.error.code;
+            return typeof code === 'string' || typeof code === 'number'
+              ? String(code)
+              : undefined;
+          }
+        })
     });
-    this.http.defaults.headers.common['x-api-key'] = config.token;
-    this.http.defaults.headers.common['Content-Type'] = 'application/json';
     if (config.language) {
       this.http.defaults.headers.common['Accept-Language'] = config.language;
     }
+    this.http.interceptors.request.use(request => {
+      for (let key of ['limit', 'page']) {
+        let value = request.params?.[key];
+        if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) {
+          throw createApiServiceError(`${key} must be a positive whole number.`);
+        }
+      }
+      return request;
+    });
+    this.http.interceptors.response.use(response => {
+      if (response.status === 299) {
+        throw createApiServiceError(
+          'Ambee reports this endpoint is deprecated. Check the current API documentation for the supported dataset endpoint.',
+          {
+            reason: 'ambee_deprecated_endpoint',
+            upstreamStatus: response.status
+          }
+        );
+      }
+      return response;
+    });
   }
 
   // ─── Air Quality ───────────────────────────────────────────────
@@ -49,6 +88,7 @@ export class Client {
   }
 
   async getAirQualityHistoryByLatLng(lat: number, lng: number, from: string, to: string) {
+    validateHistoryRange(from, to, 48);
     let res = await this.http.get('/history/by-lat-lng', { params: { lat, lng, from, to } });
     return res.data;
   }
@@ -59,6 +99,7 @@ export class Client {
     from: string,
     to: string
   ) {
+    validateHistoryRange(from, to, 48);
     let res = await this.http.get('/history/by-postal-code', {
       params: { postalCode, countryCode, from, to }
     });
@@ -80,6 +121,7 @@ export class Client {
   }
 
   async getWeatherHistory(lat: number, lng: number, from: string, to: string, units?: string) {
+    validateHistoryRange(from, to, 48);
     let res = await this.http.get('/weather/history/by-lat-lng', {
       params: { lat, lng, from, to, units }
     });
@@ -116,6 +158,7 @@ export class Client {
     to: string,
     speciesRisk?: boolean
   ) {
+    validateHistoryRange(from, to, 48);
     let res = await this.http.get('/history/pollen/by-lat-lng', {
       params: { lat, lng, from, to, speciesRisk }
     });
@@ -128,6 +171,7 @@ export class Client {
     to: string,
     speciesRisk?: boolean
   ) {
+    validateHistoryRange(from, to, 48);
     let res = await this.http.get('/history/pollen/by-place', {
       params: { place, from, to, speciesRisk }
     });
@@ -253,6 +297,7 @@ export class Client {
   }
 
   async getSoilHistory(lat: number, lng: number, from: string, to: string) {
+    validateHistoryRange(from, to);
     let res = await this.http.get('/soil/history/by-lat-lng', {
       params: { lat, lng, from, to }
     });
@@ -267,6 +312,7 @@ export class Client {
   }
 
   async getWaterVaporHistory(lat: number, lng: number, from: string, to: string) {
+    validateHistoryRange(from, to);
     let res = await this.http.get('/waterVapor/history/by-lat-lng', {
       params: { lat, lng, from, to }
     });
@@ -281,6 +327,7 @@ export class Client {
   }
 
   async getNdviHistory(lat: number, lng: number, from: string, to: string) {
+    validateHistoryRange(from, to);
     let res = await this.http.get('/ndvi/history/by-lat-lng', {
       params: { lat, lng, from, to }
     });
@@ -308,6 +355,44 @@ export class Client {
 
   async reverseGeocodeByLatLng(lat: number, lng: number) {
     let res = await this.http.get('/geocode/reverse/by-lat-lng', { params: { lat, lng } });
+    return res.data;
+  }
+
+  async queryEnvironment(
+    dataset: 'aq' | 'pollen' | 'weather',
+    period: 'latest' | 'history' | 'forecast',
+    hours: 48 | 120,
+    params: {
+      lat?: number;
+      lng?: number;
+      place?: string;
+      from?: string;
+      to?: string;
+      locale?: boolean;
+      aqiStandard?: string;
+      speciesRisk?: boolean;
+      units?: string;
+    }
+  ) {
+    let path = period === 'forecast' ? `forecast/${hours}hrs` : period;
+    let res = await this.http.get(`/v3/${dataset}/${path}`, { params });
+    return res.data;
+  }
+
+  async queryDisasters(
+    path: 'latest/by-lat-lng' | 'latest/by-country-code' | 'latest/by-continent' | 'polygon',
+    params: {
+      lat?: number;
+      lng?: number;
+      countryCode?: string;
+      continent?: string;
+      eventType?: string;
+      limit?: number;
+      page?: number;
+      eventId?: string;
+    }
+  ) {
+    let res = await this.http.get(`/disasters/processed/${path}`, { params });
     return res.data;
   }
 }

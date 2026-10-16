@@ -69,6 +69,17 @@ export let lookupAsnTool = SlateTool.create(spec, {
           .array(asnPeerSchema)
           .optional()
           .describe('Autonomous Systems receiving traffic from this ASN'),
+        totalReceivingFrom: z
+          .number()
+          .optional()
+          .describe('Total upstream peer relationships'),
+        totalTransitTo: z.number().optional().describe('Total downstream peer relationships'),
+        confidenceArea: z
+          .array(z.object({ latitude: z.number(), longitude: z.number() }).passthrough())
+          .optional()
+          .describe(
+            'Provider geographic activity polygon; split rings where their first point repeats'
+          ),
         mostActiveArea: z
           .array(
             z

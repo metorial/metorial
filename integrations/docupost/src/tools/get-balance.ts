@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getBalance = SlateTool.create(spec, {
   name: 'Get Account Balance',
   key: 'get_account_balance',
-  description: `Retrieve your current DocuPost account balance. Use this to verify you have sufficient funds before sending letters or postcards, as mailings are charged against your prepaid balance.`,
+  description: `Request account balance information using the existing balance endpoint. This legacy endpoint is not described in the current public API guide; if unavailable, review Funds in the DocuPost dashboard before sending mail.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -24,14 +24,20 @@ export let getBalance = SlateTool.create(spec, {
 
     let result = await client.getBalance();
 
-    ctx.info('Balance retrieved successfully');
+    ctx.info('Balance request completed');
 
     return {
       output: {
-        balance: result?.response?.balance ?? result,
+        balance:
+          isApiErrorRecord(result) &&
+          isApiErrorRecord(result.response) &&
+          'balance' in result.response
+            ? result.response.balance
+            : result,
         response: result
       },
-      message: `Account balance retrieved successfully.`
+      message:
+        'Account balance request completed. Inspect the returned response or the Funds section in DocuPost.'
     };
   })
   .build();

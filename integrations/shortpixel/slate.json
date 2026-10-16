@@ -1,6 +1,6 @@
 {
   "name": "@metorial/shortpixel",
-  "description": "Compress, resize, and convert images and PDFs to reduce file sizes. Optimize images via URL or direct upload with lossy, glossy, or lossless compression. Convert images to next-gen formats like WebP and AVIF. Resize and smart-crop images, upscale images by 2x-4x, and remove or replace image backgrounds. Deliver optimized images on-the-fly via CDN with adaptive parameters. Manage account domains, check CDN usage statistics, and monitor available API credits.",
+  "description": "Compress, resize, and convert images and PDFs to reduce file sizes. Optimize images via publicly accessible URLs with lossy, glossy, or lossless compression. Convert images to next-gen formats like WebP and AVIF. Resize and smart-crop images, upscale images by 2x-4x, and remove or replace image backgrounds. Deliver optimized images on-the-fly via CDN with adaptive parameters. Manage account domains, check CDN usage statistics, and monitor available API credits.",
   "categories": ["document-processing"],
   "skills": [
     "compress and optimize images",
@@ -9,7 +9,6 @@
     "upscale images",
     "remove image backgrounds",
     "optimize images via CDN",
-    "upload and process images",
     "manage CDN domains",
     "check API credit usage",
     "process PDF files"

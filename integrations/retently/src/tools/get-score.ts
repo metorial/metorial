@@ -41,6 +41,10 @@ Includes the score value, rating distribution, and respondent category breakdown
 
     let metricLabel = ctx.input.metric.toUpperCase();
     let scoreValue = data[ctx.input.metric] ?? data.score;
+    let responseCount =
+      typeof data.totalResponses === 'number'
+        ? ` (${data.totalResponses} total responses)`
+        : '';
 
     return {
       output: {
@@ -54,7 +58,7 @@ Includes the score value, rating distribution, and respondent category breakdown
         passivesCount: data.passivesCount,
         detractorsCount: data.detractorsCount
       },
-      message: `**${metricLabel}** score: **${scoreValue}** (${data.totalResponses ?? 0} total responses).`
+      message: `**${metricLabel}** score: **${scoreValue}**${responseCount}.`
     };
   })
   .build();

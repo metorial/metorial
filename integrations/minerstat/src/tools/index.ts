@@ -3,6 +3,7 @@ export * from './get-coins';
 export * from './get-hardware';
 export * from './get-mining-statistics';
 export * from './get-pools';
+export * from './get-worker-configuration';
 export * from './get-worker-history';
 export * from './list-workers';
 export * from './manage-clocktune';

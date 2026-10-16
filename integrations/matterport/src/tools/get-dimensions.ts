@@ -74,24 +74,24 @@ export let getDimensions = SlateTool.create(spec, {
 
     let model = await client.getDimensions(ctx.input.modelId, ctx.input.units);
 
-    let floors = (model.floors || []).map((f: any) => ({
+    let floors = model.floors.map((f: any) => ({
       floorId: f.id,
-      floorLabel: f.label || null,
-      dimensions: f.dimensions || null
+      floorLabel: f.label ?? null,
+      dimensions: f.dimensions
     }));
 
-    let rooms = (model.rooms || []).map((r: any) => ({
+    let rooms = model.rooms.map((r: any) => ({
       roomId: r.id,
-      roomLabel: r.label || null,
-      roomTags: r.tags || null,
-      dimensions: r.dimensions || null
+      roomLabel: r.label ?? null,
+      roomTags: r.tags ?? null,
+      dimensions: r.dimensions
     }));
 
     return {
       output: {
-        modelName: model.name || null,
-        modelDescription: model.description || null,
-        overallDimensions: model.dimensions || null,
+        modelName: model.name,
+        modelDescription: model.description,
+        overallDimensions: model.dimensions,
         floors,
         rooms
       },

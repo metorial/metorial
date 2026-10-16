@@ -1,80 +1,39 @@
-# Slates Specification for OpenSea
+# OpenSea Integration
 
-## Overview
-
-OpenSea is the largest NFT marketplace, supporting buying, selling, and trading of NFTs (ERC721 and ERC1155 tokens) across multiple blockchains. OpenSea currently supports Ethereum, Polygon, Arbitrum, Optimism, Avalanche, Zora, Base, Blast, Sei, B3, Berachain, Flow, ApeChain, Soneium, Shape, Unichain, Ronin, Abstract, Solana, GUNZ, HyperEVM, Somnia, and Monad blockchains. The API helps developers build experiences using NFTs and marketplace data, including events, collections, listings, offers, and more.
+Retrieve NFT metadata, collections, wallet holdings, public account profiles, marketplace events, listings, and offers. Request asynchronous NFT metadata refreshes.
 
 ## Authentication
 
-OpenSea uses **API Key** authentication.
+Supply an OpenSea API key from Settings > Developer. Public REST requests send the key in the `X-API-KEY` header. The key supplies application access and quota, rather than an authenticated wallet identity. This integration does not request wallet JWTs or sign or broadcast blockchain transactions.
 
-- The API key allows access to the Stream API and all V2 endpoints.
-- Each account can generate up to three API keys. On opensea.io, hover over the left-hand sidebar and click Settings then Developer to generate a key.
-- The API key is passed as a request header: `X-API-KEY: <your_api_key>`.
-- There is no OAuth flow or user-level authorization; all access is scoped to the API key holder.
+## Available tools
 
-## Features
+| Tool | Capability |
+| --- | --- |
+| `get_nft` | Retrieve one NFT by chain, contract address, and token identifier, including traits and owners. |
+| `list_nfts` | Browse a collection, contract, or wallet with cursor pagination. |
+| `get_collection` | Retrieve collection details, optionally including collection statistics or legacy trait counts. |
+| `list_collections` | Browse collections with optional chain and sort filters; OpenSea currently documents a maximum of 100 per page. |
+| `get_events` | Retrieve collection, NFT, or account events with type, time, and cursor filters. Existing legacy event filter values remain available. |
+| `get_listings` | Retrieve all or best collection listings, or one NFT's best listing. |
+| `get_offers` | Retrieve collection or trait offers, or one NFT's best offer. |
+| `get_account` | Look up a public profile by wallet address or username. |
+| `refresh_nft_metadata` | Request an asynchronous metadata refresh. |
 
-### NFT Data Retrieval
+For NFT operations, an explicit chain takes precedence over the optional default chain in connection configuration; otherwise Ethereum is used. NFT media fields are provider metadata URLs rather than file download operations.
 
-Fetch metadata for any NFT on any OpenSea-supported blockchain. NFTs can be fetched by collection, smart contract, or owner address. This includes traits, ownership information, and media URLs. You can also validate and refresh NFT metadata to ensure it reflects the latest on-chain state.
+## Compatibility and limits
 
-### Collection Management
+The optional `get_collection.includeTraits` behavior retains its existing `/api/v2/collection/{slug}/traits` route. OpenSea now documents `/api/v2/traits/{slug}`, where `categories` describes trait types and `counts` supplies value counts. The legacy route has not been verified against a live account. If the response includes `counts`, the existing numeric trait-count output uses that field.
 
-Retrieve detailed information about NFT collections, including descriptions, fees, social links, and traits. Fetch floor price, volume, and other statistics for any collection.
+Legacy event filter values `cancel`, `order`, and `redemption` remain available for compatibility. The current REST reference lists `sale`, `transfer`, `mint`, `listing`, `offer`, `trait_offer`, and `collection_offer`; order invalidation and revalidation use the Stream API. This integration does not subscribe to streams.
 
-### Marketplace Operations — Listings
+No order creation, fulfillment, cancellation, token swaps, or unified search tools are exposed. API availability, key quota, and provider rate limits apply.
 
-Programmatically create listings and offers on NFTs. Offers are supported on individual NFTs, as well as on a collection or on a particular trait. You can retrieve best listings and all listings for a collection or individual NFT, and generate fulfillment data to complete purchases on-chain. Orders can be cancelled off-chain when protected by the SignedZone.
+## Official documentation
 
-### Marketplace Operations — Offers
-
-Create item-level offers or criteria-based offers (collection offers and trait offers). Retrieve the best offer or all offers for a specific NFT, collection, or trait. Fulfill offers by generating the required on-chain transaction data.
-
-### Account & Ownership Lookup
-
-Retrieve OpenSea account profiles and query NFTs owned by a specific wallet address across supported chains.
-
-### Analytics & Events History
-
-Query historical marketplace events such as sales, listings, offers, transfers, and cancellations. Events can be filtered by collection, specific NFT, account, event type, and time range.
-
-### Token Data (Fungible)
-
-Retrieve trending and top fungible tokens, get token details and balances by account, and obtain swap quotes.
-
-### Search
-
-Search across OpenSea for collections, NFTs, and accounts via a unified search interface.
-
-## Events
-
-The OpenSea Stream API is a websocket-based service that enables developers to receive events as they occur. With the Stream API, your service can subscribe to receive a range of different types of events, either globally or for specific collections.
-
-Authentication with the Stream API uses the same API key as the other APIs.
-
-Each subscription function includes a `collectionSlug` parameter which can be used to subscribe to an event from a specific collection. To subscribe to events across all collections, use the `*` wildcard for the `collectionSlug` parameter.
-
-### Item Listed
-
-An item listed for sale on the OpenSea marketplace.
-
-### Item Sold
-
-A sale of an item on the OpenSea marketplace.
-
-### Item Transferred
-
-Transfer of an item between wallets.
-
-### Item Metadata Updated
-
-Update detected on the metadata provided in `tokenURI` for an item.
-
-### Item Cancelled
-
-Cancellation of an order on the OpenSea marketplace.
-
-### Item Received Bid
-
-Bid received on an item in the OpenSea marketplace.
+- [Authentication](https://docs.opensea.io/reference/auth)
+- [API reference](https://docs.opensea.io/reference/api-overview)
+- [OpenAPI schema](https://api.opensea.io/api/v2/openapi.json)
+- [Collection traits](https://docs.opensea.io/reference/get_collection_traits)
+- [Marketplace events](https://docs.opensea.io/reference/list_events_by_collection)

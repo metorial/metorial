@@ -48,6 +48,7 @@ export let createDubbingTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       dubbingId: z.string().describe('ID of the created dubbing project'),
       expectedDurationSec: z.number().describe('Estimated processing duration in seconds')
     })

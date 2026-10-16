@@ -5,6 +5,7 @@ import {
   deleteRecord,
   getAppMetadata,
   getRecord,
+  getRecordFile,
   getRecords,
   updateRecord,
   uploadFile
@@ -14,6 +15,7 @@ export let provider = Slate.create({
   tools: [
     getRecords,
     getRecord,
+    getRecordFile,
     createRecord,
     updateRecord,
     deleteRecord,

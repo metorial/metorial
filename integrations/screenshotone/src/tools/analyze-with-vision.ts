@@ -10,9 +10,12 @@ export let analyzeWithVision = SlateTool.create(spec, {
 
 Useful for visual QA, accessibility auditing, content analysis, competitive analysis, and any task that requires understanding what a rendered page looks like.`,
   instructions: [
+    'For a downloadable image, PDF, HTML, or Markdown file, use render_file directly. This tool preserves the original metadata and temporary-link response.',
+    'Each explicit capture can consume provider quota; no extra capture is performed automatically.',
     'An **openaiApiKey** is required for this tool.',
     'Provide a descriptive **visionPrompt** explaining what to analyze in the screenshot.',
-    'Use **visionMaxTokens** to control the length of the AI response.'
+    'Use **visionMaxTokens** to control the length of the AI response.',
+    'Download the captured screenshot promptly because its URL is temporary.'
   ],
   tags: {
     readOnly: true
@@ -95,7 +98,7 @@ Useful for visual QA, accessibility auditing, content analysis, competitive anal
     return {
       output: {
         screenshotUrl: result.screenshotUrl,
-        visionResult: result.metadata
+        visionResult: result.vision ?? result.metadata
       },
       message: `Vision analysis completed for ${source}. Prompt: "${ctx.input.visionPrompt}"`
     };

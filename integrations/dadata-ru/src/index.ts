@@ -1,9 +1,11 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   cleanAddress,
   cleanContactData,
   findAffiliatedCompanies,
+  findNearbyPostalOffices,
   geocodeAddress,
   getAccountInfo,
   ipGeolocate,
@@ -15,11 +17,14 @@ import {
   searchReferenceDirectory,
   suggestAddress,
   suggestBank,
-  suggestCompany
+  suggestCompany,
+  suggestEmail,
+  suggestName
 } from './tools';
 
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
     suggestAddress,
     cleanAddress,
@@ -35,7 +40,10 @@ export let provider = Slate.create({
     ipGeolocate,
     searchReferenceDirectory,
     getAccountInfo,
-    lookupAddress
+    lookupAddress,
+    suggestName,
+    suggestEmail,
+    findNearbyPostalOffices
   ],
   triggers: []
 });

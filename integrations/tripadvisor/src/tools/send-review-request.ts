@@ -1,10 +1,14 @@
-import { SlateTool } from 'slates';
+import { buildApiServiceError, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReviewExpressClient } from '../lib/client';
+import { optionalString, providerList, ReviewExpressClient } from '../lib/client';
 import { spec } from '../spec';
 
 let guestRequestSchema = z.object({
-  locationId: z.string().describe('Tripadvisor location ID of the hotel'),
+  locationId: z
+    .string()
+    .describe(
+      'Mapped hotel identifier expected by your Review Express account. Connectivity partners generally use their own partner property ID; call list_location_mappings to discover it.'
+    ),
   partnerRequestId: z
     .string()
     .optional()
@@ -37,7 +41,7 @@ export let sendReviewRequest = SlateTool.create(spec, {
   key: 'send_review_request',
   description: `Send review collection emails to recent hotel guests via Tripadvisor Review Express. Creates email requests that will be sent to guests after their check-out date, encouraging them to write a review. Supports batch requests (up to the 10,000 character body limit). Requires a Review Express API key and the hotel must be opted in to the program.`,
   instructions: [
-    'The hotel must be opted in to Review Express. Use the Check Review Express Opt-In tool first to verify.',
+    'The hotel must be opted in to Review Express. Use list_location_mappings to verify the mapped partner property ID and opt-in status.',
     'Emails can be created from booking date up to 1 day after check-out.'
   ],
   constraints: [
@@ -56,12 +60,20 @@ export let sendReviewRequest = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      results: z.array(responseEntrySchema)
+      results: z.array(responseEntrySchema),
+      failedResults: z
+        .array(
+          z.object({
+            message: z.string(),
+            code: z.string().optional()
+          })
+        )
+        .optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new ReviewExpressClient({
-      token: ctx.auth.token
+      token: ctx.auth.reviewExpressToken ?? ctx.auth.token
     });
 
     let result = await client.createEmailRequest(
@@ -76,18 +88,44 @@ export let sendReviewRequest = SlateTool.create(spec, {
       }))
     );
 
-    let results = (Array.isArray(result) ? result : [result]).map((r: any) => ({
-      requestId: r.request_id,
-      partnerRequestId: r.partner_request_id,
-      status: r.status,
-      errors: r.errors
-    }));
+    let failedResults: Array<{ message: string; code?: string }> = [];
+    let results = providerList(Array.isArray(result) ? result : [result]).flatMap((r: any) => {
+      if (typeof r?.request_id !== 'number' || typeof r?.status !== 'string') {
+        if (r?.error != null || r?.errors?.length) {
+          let error = buildApiServiceError(
+            { response: { data: r } },
+            {
+              providerLabel: 'Tripadvisor',
+              reason: 'tripadvisor_review_request_error',
+              nestedKeys: ['error', 'errors']
+            }
+          );
+          let message = error.message;
+          for (let token of [ctx.auth.token, ctx.auth.reviewExpressToken]) {
+            if (token) message = message.split(token).join('[redacted]');
+          }
+          failedResults.push({ message, code: optionalString(r.error?.code ?? r.code) });
+          return [];
+        }
+        throw createApiServiceError(
+          'Tripadvisor did not return an email request identifier and status.'
+        );
+      }
+      return [
+        {
+          requestId: r.request_id,
+          partnerRequestId: optionalString(r.partner_request_id),
+          status: r.status,
+          errors: r.errors
+        }
+      ];
+    });
 
     let successCount = results.filter(r => r.status === 'queued').length;
 
     return {
-      output: { results },
-      message: `Sent **${successCount}** review request(s) out of ${ctx.input.guests.length}. Status: ${results.map(r => `#${r.requestId}: ${r.status}`).join(', ')}.`
+      output: { results, failedResults: failedResults.length > 0 ? failedResults : undefined },
+      message: `Queued **${successCount}** review request(s) out of ${ctx.input.guests.length}.${failedResults.length > 0 ? ` ${failedResults.length} request(s) failed; see failedResults.` : ''} Status: ${results.map(r => `#${r.requestId}: ${r.status}`).join(', ')}.`
     };
   })
   .build();

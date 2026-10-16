@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { buildClientConfig, flattenResourceList } from '../lib/helpers';
+import { buildClientConfig, flattenResourceList, getTotalCount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listPayments = SlateTool.create(spec, {
   name: 'List Payments',
   key: 'list_payments',
-  description: `List payments including charges, authorizations, and refunds. Filter by order or payment status.`,
+  description: `List payments including charges, authorizations, and refunds. Filter by order on the server. Status filtering applies only to the selected page; totalCount is omitted when a status is supplied.`,
   tags: {
     readOnly: true
   }
@@ -21,7 +21,7 @@ export let listPayments = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter by payment status (e.g. payment_due, paid, partially_paid, overpaid)'
+          'Filter the selected page by payment lifecycle status, for example succeeded, created, or failed'
         ),
       sort: z.string().optional().describe('Sort field')
     })
@@ -37,7 +37,6 @@ export let listPayments = SlateTool.create(spec, {
 
     let filters: Record<string, string> = {};
     if (ctx.input.filterOrderId) filters.order_id = ctx.input.filterOrderId;
-    if (ctx.input.filterStatus) filters.status = ctx.input.filterStatus;
 
     let response = await client.listPayments({
       pagination: {
@@ -49,13 +48,15 @@ export let listPayments = SlateTool.create(spec, {
     });
 
     let payments = flattenResourceList(response);
+    if (ctx.input.filterStatus)
+      payments = payments.filter(payment => payment.status === ctx.input.filterStatus);
 
     return {
       output: {
         payments,
-        totalCount: response?.meta?.total_count
+        totalCount: ctx.input.filterStatus ? undefined : getTotalCount(response)
       },
-      message: `Found ${payments.length} payment(s).`
+      message: `Found ${payments.length} payment(s) on the selected page${ctx.input.filterStatus ? ` matching status ${ctx.input.filterStatus}` : ''}.`
     };
   })
   .build();

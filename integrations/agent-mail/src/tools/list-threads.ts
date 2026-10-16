@@ -29,6 +29,10 @@ export let listThreads = SlateTool.create(spec, {
         .describe('Only return threads after this ISO 8601 timestamp'),
       includeSpam: z.boolean().optional().describe('Include spam threads'),
       includeBlocked: z.boolean().optional().describe('Include blocked threads'),
+      includeUnauthenticated: z
+        .boolean()
+        .optional()
+        .describe('Include messages that failed sender authentication.'),
       includeTrash: z.boolean().optional().describe('Include trashed threads')
     })
   )
@@ -65,6 +69,7 @@ export let listThreads = SlateTool.create(spec, {
       after: ctx.input.after,
       includeSpam: ctx.input.includeSpam,
       includeBlocked: ctx.input.includeBlocked,
+      includeUnauthenticated: ctx.input.includeUnauthenticated,
       includeTrash: ctx.input.includeTrash
     });
 

@@ -1,4 +1,4 @@
-import { SlateTool } from '@slates/provider';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { resolveMetorialRuntimeConfig } from '../config';
 import { MetorialClient } from '../lib/client';

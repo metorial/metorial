@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 let financialEntrySchema = z.object({
@@ -53,17 +54,17 @@ export let getFinancialStatements = SlateTool.create(spec, {
     }
 
     let reportsKey = period === 'annual' ? 'annualReports' : 'quarterlyReports';
-    let rawReports: any[] = data[reportsKey] || [];
+    let rawReports: any[] = responseRows(data[reportsKey], 'data[reportsKey]');
 
     let reports = rawReports.map((report: any) => {
       let { fiscalDateEnding, reportedCurrency, ...fields } = report;
       let stringFields: Record<string, string> = {};
       for (let [key, value] of Object.entries(fields)) {
-        stringFields[key] = String(value ?? '');
+        stringFields[key] = responseText(value, key);
       }
       return {
-        fiscalDateEnding: fiscalDateEnding || '',
-        reportedCurrency: reportedCurrency || '',
+        fiscalDateEnding: responseText(fiscalDateEnding, 'fiscalDateEnding'),
+        reportedCurrency: responseText(reportedCurrency, 'reportedCurrency'),
         fields: stringFields
       };
     });

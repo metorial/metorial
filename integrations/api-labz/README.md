@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> API Labz
 
-Access a marketplace of AI-powered API modules for document processing, data extraction, and content generation. Convert documents between formats (e.g., PDF to JSON), extract structured data from ID cards for KYC, track and analyze expenses, generate AI-driven business reports, and create social media content from product descriptions. Convert text to diagrams or images, perform AI-powered deep research and search queries, and extract organized JSON from PDFs and images using custom schemas. Manage OAuth integrations for 100+ third-party applications without maintaining your own OAuth infrastructure.
+Use API Labz marketplace modules for document extraction, business reports, AI search, research, images, diagrams, and social media content. Discover public module IDs and example parameters, or call a module directly. Existing document conversion, expense tracking, and base64-only PDF/image requests are retained for compatibility; their legacy routes are not listed in the current public catalog.
 
 ## License
 

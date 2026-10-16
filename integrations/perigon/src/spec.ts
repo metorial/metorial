@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'perigon',
   name: 'Perigon',
   description:
-    'AI-powered news data API providing structured access to real-time and historical news articles from 200,000+ global sources with 25+ enriched metadata points.',
+    'Search news and story clusters, discover entities and media sources, query Wikipedia, and check connected account usage.',
   metadata: {},
   config,
   auth

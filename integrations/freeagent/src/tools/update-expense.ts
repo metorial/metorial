@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateExpense = SlateTool.create(spec, {
@@ -28,10 +28,7 @@ export let updateExpense = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createClient(ctx);
 
     let expenseData: Record<string, any> = {};
     if (ctx.input.category) expenseData.category = ctx.input.category;
@@ -44,7 +41,7 @@ export let updateExpense = SlateTool.create(spec, {
     let expense = await client.updateExpense(ctx.input.expenseId, expenseData);
 
     return {
-      output: { expense: expense || {} },
+      output: { expense },
       message: `Updated expense **${ctx.input.expenseId}**`
     };
   })

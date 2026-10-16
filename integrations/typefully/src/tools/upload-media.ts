@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TypefullyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let uploadMedia = SlateTool.create(spec, {
   description: `Initiate a media upload to Typefully. Returns a presigned upload URL and media ID. After uploading the file to the presigned URL via PUT, use the media ID when creating or updating drafts. You can also check the processing status of previously uploaded media.`,
   instructions: [
     'Set action to "initiate" to start a new upload, or "check-status" to check an existing upload.',
-    'After initiating, upload the file to the returned uploadUrl via a PUT request with raw file bytes.',
+    'After initiating, upload the file to the returned uploadUrl via a PUT request with raw file bytes and no additional headers, including Content-Type or Authorization.',
     'Wait for the media status to become "ready" before attaching it to a draft.'
   ],
   constraints: [
@@ -23,7 +23,9 @@ export let uploadMedia = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      socialSetId: z.string().describe('ID of the social set'),
+      socialSetId: z
+        .string()
+        .describe('Social set ID. Call list_social_sets to discover accessible social sets.'),
       action: z
         .enum(['initiate', 'check-status'])
         .describe('Action: "initiate" a new upload or "check-status" of an existing one'),
@@ -31,6 +33,14 @@ export let uploadMedia = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('File name with extension (required for "initiate")'),
+      altText: z
+        .string()
+        .max(1000)
+        .nullable()
+        .optional()
+        .describe(
+          'Accessibility description for a new upload; set before attaching media to a draft.'
+        ),
       mediaId: z
         .string()
         .optional()
@@ -61,10 +71,14 @@ export let uploadMedia = SlateTool.create(spec, {
 
     if (ctx.input.action === 'initiate') {
       if (!ctx.input.fileName) {
-        throw new Error('fileName is required when action is "initiate"');
+        throw createApiServiceError('fileName is required when action is "initiate"');
       }
 
-      let result = await client.initiateMediaUpload(ctx.input.socialSetId, ctx.input.fileName);
+      let result = await client.initiateMediaUpload(
+        ctx.input.socialSetId,
+        ctx.input.fileName,
+        ctx.input.altText
+      );
 
       return {
         output: {
@@ -78,7 +92,7 @@ export let uploadMedia = SlateTool.create(spec, {
     }
 
     if (!ctx.input.mediaId) {
-      throw new Error('mediaId is required when action is "check-status"');
+      throw createApiServiceError('mediaId is required when action is "check-status"');
     }
 
     let status = await client.getMediaStatus(ctx.input.socialSetId, ctx.input.mediaId);

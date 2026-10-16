@@ -6,9 +6,11 @@ import { spec } from '../spec';
 export let getTimeSeries = SlateTool.create(spec, {
   name: 'Get Time Series',
   key: 'get_time_series',
-  description: `Retrieve daily exchange rates between two dates for a base currency. Returns a rate for each day in the specified range.
+  description: `Retrieve daily historical exchange rates between two dates for a base currency. The provider controls available dates and date-range limits.
 Ideal for plotting currency charts, analyzing volatility, and performing trend analysis over time.`,
-  constraints: ['Available on Startup and Pro subscription plans only.'],
+  constraints: [
+    'Requires a subscription plan that includes time-series access. Date-range limits depend on the plan.'
+  ],
   tags: {
     readOnly: true
   }
@@ -39,8 +41,9 @@ Ideal for plotting currency charts, analyzing volatility, and performing trend a
       rates: z
         .record(z.string(), z.record(z.string(), z.number()))
         .describe(
-          'Map of dates to currency rate objects. Each date maps to a record of currency codes and their rates.'
-        )
+          'Map of dates to currency rate objects. Each date maps to units of each quoted currency per one unit of the base currency.'
+        ),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -61,7 +64,8 @@ Ideal for plotting currency charts, analyzing volatility, and performing trend a
         baseCurrency: result.base,
         startDate: result.startDate,
         endDate: result.endDate,
-        rates: result.rates
+        rates: result.rates,
+        raw: result.raw
       },
       message: `Retrieved time-series data for **${result.base}** covering **${dayCount}** days from ${result.startDate} to ${result.endDate}.`
     };

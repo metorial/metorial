@@ -1,10 +1,12 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getAudioBible,
   getAudioChapter,
   getBible,
   getBooks,
   getChapter,
+  getFileUrl,
   getPassage,
   getSections,
   getVerse,
@@ -25,7 +27,9 @@ export let provider = Slate.create({
     searchBible,
     getSections,
     listAudioBibles,
-    getAudioChapter
+    getAudioChapter,
+    getAudioBible,
+    getFileUrl
   ],
   triggers: []
 });

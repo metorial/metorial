@@ -17,6 +17,11 @@ Also supports adding or removing tags from the template.`,
     z.object({
       templateId: z.string().describe('Template ID to update'),
       name: z.string().optional().describe('New template name'),
+      externalId: z.string().optional().describe('External identifier for this template'),
+      safeZoneWidth: z
+        .number()
+        .optional()
+        .describe('Print-safe margin in pixels; zero removes the guide'),
       description: z.string().optional().describe('New template description'),
       width: z.number().optional().describe('New width in pixels (max 5000)'),
       height: z.number().optional().describe('New height in pixels (max 5000)'),
@@ -35,6 +40,7 @@ Also supports adding or removing tags from the template.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       templateId: z.string().optional(),
       name: z.string().optional(),
       description: z.string().optional(),
@@ -72,6 +78,7 @@ Also supports adding or removing tags from the template.`,
 
     return {
       output: {
+        raw: result,
         templateId: result.id,
         name: result.name,
         description: result.description,

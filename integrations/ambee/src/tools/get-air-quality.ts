@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -85,12 +85,16 @@ export let getAirQuality = SlateTool.create(spec, {
         ctx.input.postalCode,
         ctx.input.countryCode
       );
-    } else if (ctx.input.countryCode && !ctx.input.lat) {
+    } else if (
+      ctx.input.countryCode &&
+      ctx.input.lat === undefined &&
+      ctx.input.lng === undefined
+    ) {
       result = await client.getAirQualityByCountryCode(ctx.input.countryCode, ctx.input.limit);
     } else if (ctx.input.lat !== undefined && ctx.input.lng !== undefined) {
       result = await client.getAirQualityByLatLng(ctx.input.lat, ctx.input.lng);
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide lat/lng coordinates, a city name, a postalCode with countryCode, or a countryCode.'
       );
     }
@@ -98,7 +102,7 @@ export let getAirQuality = SlateTool.create(spec, {
     let stations = result.stations || [];
     let summary =
       stations.length > 0
-        ? `Retrieved air quality data for **${stations.length}** station(s). Average AQI: **${Math.round(stations.reduce((s: number, st: any) => s + (st.AQI || 0), 0) / stations.length)}**.`
+        ? `Retrieved air quality data for **${stations.length}** station(s).`
         : 'No air quality stations found for the specified location.';
 
     return {

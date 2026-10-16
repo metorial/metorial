@@ -1,9 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DataRobotClient } from '../lib/client';
+import { DataRobotClient, responseItems } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let datasetSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
   datasetId: z.string().describe('Unique dataset identifier'),
   name: z.string().optional().describe('Dataset name'),
   categories: z.array(z.string()).optional().describe('Dataset categories'),
@@ -13,6 +18,11 @@ let datasetSchema = z.object({
   rowCount: z.number().optional().nullable().describe('Number of rows'),
   columnCount: z.number().optional().nullable().describe('Number of columns'),
   processingState: z.string().optional().describe('Processing state of the dataset')
+});
+
+let outputSchema = z.object({
+  datasets: z.array(datasetSchema).describe('List of datasets in the catalog'),
+  totalCount: z.number().optional().describe('Total number of datasets available')
 });
 
 export let listDatasets = SlateTool.create(spec, {
@@ -29,16 +39,11 @@ export let listDatasets = SlateTool.create(spec, {
       limit: z.number().optional().describe('Maximum number of datasets to return')
     })
   )
-  .output(
-    z.object({
-      datasets: z.array(datasetSchema).describe('List of datasets in the catalog'),
-      totalCount: z.number().optional().describe('Total number of datasets available')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     let result = await client.listDatasets({
@@ -46,13 +51,14 @@ export let listDatasets = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let items = result.data || result;
-    let datasets = (Array.isArray(items) ? items : []).map((d: any) => ({
-      datasetId: d.datasetId || d.id,
+    let items = responseItems(result, 'datasets');
+    let datasets = items.map((d: any) => ({
+      raw: d,
+      datasetId: d.datasetId ?? d.id,
       name: d.name,
       categories: d.categories,
-      createdBy: d.createdBy,
-      createdAt: d.createdAt,
+      createdBy: d.createdBy === null ? undefined : d.createdBy,
+      createdAt: d.creationDate ?? d.createdAt,
       datasetSize: d.datasetSize,
       rowCount: d.rowCount,
       columnCount: d.columnCount,
@@ -60,10 +66,10 @@ export let listDatasets = SlateTool.create(spec, {
     }));
 
     return {
-      output: {
+      output: parseOutput(outputSchema, {
         datasets,
-        totalCount: result.totalCount || result.count || datasets.length
-      },
+        totalCount: result.totalCount
+      }),
       message: `Found **${datasets.length}** dataset(s) in the AI Catalog.`
     };
   })

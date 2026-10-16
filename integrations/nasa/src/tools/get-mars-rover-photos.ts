@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateDate, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 let roverPhotoSchema = z.object({
@@ -18,6 +18,9 @@ export let getMarsRoverPhotos = SlateTool.create(spec, {
   name: 'Get Mars Rover Photos',
   key: 'get_mars_rover_photos',
   description: `Retrieve photos taken by NASA's Mars rovers (Curiosity, Opportunity, Spirit). Filter by Martian sol, Earth date, and camera type. Returns image URLs and metadata for each photo.`,
+  constraints: [
+    'NASA marks the Mars Rover API archived; availability of historical data is not guaranteed.'
+  ],
   instructions: [
     'Available cameras vary by rover. Common cameras include: FHAZ (Front Hazard), RHAZ (Rear Hazard), MAST (Mast Camera), CHEMCAM, MAHLI, MARDI, NAVCAM, PANCAM, MINITES.',
     'Use sol OR earthDate, not both simultaneously.'
@@ -49,11 +52,18 @@ export let getMarsRoverPhotos = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       photos: z.array(roverPhotoSchema).describe('List of Mars rover photos'),
       photoCount: z.number().describe('Number of photos returned')
     })
   )
   .handleInvocation(async ctx => {
+    validateDate(ctx.input.earthDate, 'Earth date');
+    validateInteger(ctx.input.sol, 'Sol', 0);
+    validateInteger(ctx.input.page, 'Page', 1);
+    if ((ctx.input.sol === undefined) === (ctx.input.earthDate === undefined)) {
+      throw createApiServiceError('Provide either sol or earthDate.');
+    }
     let client = new NasaClient({ token: ctx.auth.token });
 
     let result = await client.getMarsRoverPhotos({
@@ -75,8 +85,12 @@ export let getMarsRoverPhotos = SlateTool.create(spec, {
       roverStatus: p.rover?.status
     }));
 
+    for (let photo of photos) {
+      await ctx.addAttachment({ type: 'url', url: photo.imgSrc });
+    }
+
     return {
-      output: { photos, photoCount: photos.length },
+      output: { raw: result, photos, photoCount: photos.length },
       message: `Retrieved **${photos.length}** photos from the **${ctx.input.rover}** rover${ctx.input.camera ? ` (${ctx.input.camera} camera)` : ''}.`
     };
   })

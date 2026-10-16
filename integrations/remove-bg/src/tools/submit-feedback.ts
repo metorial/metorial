@@ -9,9 +9,12 @@ export let submitFeedback = SlateTool.create(spec, {
   description: `Submit an image to Remove.bg's improvement program to help improve the AI model's accuracy. Use this after processing an image where the background removal result was unsatisfactory. The submitted image will be used to train and improve future results for similar images.`,
   instructions: [
     'Provide exactly one image source: either imageUrl or imageFileB64.',
-    'Use the tag field to categorize the type of issue encountered.'
+    'Use the tag field to group related submissions.',
+    'Submitting images agrees to the provider Improvement Program Conditions at https://www.remove.bg/ipc.'
   ],
-  constraints: ['Limited to 100 submissions per day.'],
+  constraints: [
+    'Limited to 100 submissions per day; images may be up to 22 MB and 50 megapixels.'
+  ],
   tags: {
     destructive: false,
     readOnly: false

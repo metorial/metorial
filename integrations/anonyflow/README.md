@@ -1,6 +1,12 @@
 # <img src="logo.png" height="20"> Anonyflow
 
-Anonymize and deanonymize sensitive data (PII) using encryption-based protection. Encrypt specific fields in data objects via single-value or batch anonymization endpoints. Decrypt previously protected data back to its original form. Share encrypted data securely with colleagues or third parties. Handle personal data deletion requests for "Right to be Forgotten" compliance. Redact PII from PDF documents using AI-powered detection. Supports GDPR, CCPA, and HIPAA compliance workflows.
+Encrypt and decrypt sensitive strings and selected fields in data objects using the AnonyFlow cloud API. Includes an API key connection check.
+
+The existing `encryptedValue`, `protectedFields`, and `fields` outputs contain the full provider response. Use `protect_value` output `value` for `unprotect_value`, and `protect_data` output `values` for `unprotect_data`.
+
+An empty `keys` array processes the entire data object. Packet decryption can return the string `Error` for an individual field that could not be decrypted; inspect the returned values.
+
+This integration follows the [published cloud API reference](https://documenter.getpostman.com/view/12641271/TVCjvkLG). The [current AnonyFlow website](https://anonyflow.com/) focuses on local document redaction products. Current cloud API availability has not been verified. Document redaction, sharing, deletion, and key management are not exposed by this integration.
 
 ## License
 

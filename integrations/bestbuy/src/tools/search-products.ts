@@ -13,7 +13,8 @@ Use the **query** field for attribute filters using Best Buy query syntax (e.g. 
     'Use keyword for free-text product search, e.g. "laptop".',
     'Combine query and keyword for precise results.',
     'Use the sort field like "salePrice.asc" or "customerReviewAverage.dsc".',
-    'Use the show field to limit returned fields, e.g. "sku,name,salePrice,manufacturer".'
+    'Use the show field to limit returned fields, e.g. "sku,name,salePrice,manufacturer".',
+    'Use browse_catalog with resource=products for cursor pagination through more than ten pages.'
   ],
   constraints: [
     'Maximum 100 results per page.',
@@ -81,7 +82,9 @@ Use the **query** field for attribute filters using Best Buy query syntax (e.g. 
         totalPages: result.totalPages,
         products: result.products
       },
-      message: `Found **${result.total}** products (page ${result.currentPage} of ${result.totalPages}, showing ${result.products.length} results).`
+      message: client.redactMessage(
+        `Found **${result.total}** products (page ${result.currentPage} of ${result.totalPages}, showing ${result.products.length} results).`
+      )
     };
   })
   .build();

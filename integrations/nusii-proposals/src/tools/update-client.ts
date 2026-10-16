@@ -32,6 +32,7 @@ export let updateClient = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       clientId: z.string(),
       email: z.string(),
       name: z.string(),
@@ -41,18 +42,18 @@ export let updateClient = SlateTool.create(spec, {
       business: z.string(),
       locale: z.string(),
       pdfPageSize: z.string(),
-      web: z.string(),
-      telephone: z.string(),
-      address: z.string(),
-      city: z.string(),
-      postcode: z.string(),
-      country: z.string(),
-      state: z.string()
+      web: z.string().optional(),
+      telephone: z.string().optional(),
+      address: z.string().optional(),
+      city: z.string().optional(),
+      postcode: z.string().optional(),
+      country: z.string().optional(),
+      state: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
     let { clientId, ...updateData } = ctx.input;
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.updateClient(clientId, updateData);
 
     return {

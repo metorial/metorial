@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -19,7 +19,8 @@ let billingAddressSchema = z.object({
 
 let paymentSettingsSchema = z.object({
   typePayment: z.string().optional().describe('Payment method type'),
-  isAutoBilling: z.boolean().optional().describe('Whether auto-billing is enabled'),
+  isAutoBilling: z.boolean().optional().describe('Whether automatic invoicing is enabled'),
+  modeBilling: z.string().optional().describe('Billing mode: Auto, Manual, or Never'),
   isGreyListed: z.boolean().optional().describe('Suspicious activity flag'),
   noteInvoice: z.string().optional().describe('Custom invoice note'),
   dateNextBilling: z.string().optional().describe('Next billing date')
@@ -56,7 +57,16 @@ Payment settings control auto-billing, grey list status, invoice notes, and paym
         .describe('Billing address fields to update'),
       paymentSettings: z
         .object({
-          isAutoBilling: z.boolean().optional().describe('Enable/disable auto-billing'),
+          isAutoBilling: z
+            .boolean()
+            .optional()
+            .describe('Enable automatic invoicing, or switch to Manual billing when false'),
+          modeBilling: z
+            .string()
+            .optional()
+            .describe(
+              'Explicit billing mode: Auto, Manual, or Never. Must agree with isAutoBilling when both are supplied.'
+            ),
           isGreyListed: z.boolean().optional().describe('Set grey list flag'),
           noteInvoice: z.string().optional().describe('Invoice footer note'),
           dateNextBilling: z.string().optional().describe('Next billing date (ISO 8601)'),
@@ -95,7 +105,8 @@ Payment settings control auto-billing, grey list status, invoice notes, and paym
     }
 
     if (action === 'update_billing_address') {
-      if (!ctx.input.billingAddress) throw new Error('billingAddress is required for update');
+      if (!ctx.input.billingAddress)
+        throw createApiServiceError('billingAddress is required for update');
       let addr = ctx.input.billingAddress;
       let result = await client.updateBillingAddress(referenceCustomer, {
         Company: addr.company,
@@ -128,10 +139,25 @@ Payment settings control auto-billing, grey list status, invoice notes, and paym
 
     if (action === 'update_payment_settings') {
       if (!ctx.input.paymentSettings)
-        throw new Error('paymentSettings is required for update');
+        throw createApiServiceError('paymentSettings is required for update');
       let ps = ctx.input.paymentSettings;
+      if (
+        ps.modeBilling !== undefined &&
+        !['Auto', 'Manual', 'Never'].includes(ps.modeBilling)
+      ) {
+        throw createApiServiceError('modeBilling must be Auto, Manual, or Never.');
+      }
+      if (
+        ps.modeBilling !== undefined &&
+        ps.isAutoBilling !== undefined &&
+        (ps.modeBilling === 'Auto') !== ps.isAutoBilling
+      ) {
+        throw createApiServiceError('modeBilling and isAutoBilling must agree.');
+      }
       let result = await client.updatePaymentSettings(referenceCustomer, {
-        IsAutoBilling: ps.isAutoBilling,
+        ModeBilling:
+          ps.modeBilling ??
+          (ps.isAutoBilling === undefined ? undefined : ps.isAutoBilling ? 'Auto' : 'Manual'),
         IsGreyListed: ps.isGreyListed,
         NoteInvoice: ps.noteInvoice,
         DateNextBilling: ps.dateNextBilling,
@@ -144,7 +170,7 @@ Payment settings control auto-billing, grey list status, invoice notes, and paym
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
 
@@ -164,7 +190,10 @@ let mapBillingAddress = (raw: any) => ({
 
 let mapPaymentSettings = (raw: any) => ({
   typePayment: raw?.TypePayment,
-  isAutoBilling: raw?.IsAutoBilling,
+  isAutoBilling:
+    raw?.IsAutoBilling ??
+    (raw?.ModeBilling === undefined ? undefined : raw.ModeBilling === 'Auto'),
+  modeBilling: raw?.ModeBilling,
   isGreyListed: raw?.IsGreyListed,
   noteInvoice: raw?.NoteInvoice,
   dateNextBilling: raw?.DateNextBilling

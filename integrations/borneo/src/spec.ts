@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'borneo',
   name: 'Borneo',
   description:
-    'Data security and privacy platform for sensitive data discovery, classification, remediation, and compliance across cloud infrastructure, SaaS applications, and APIs.',
+    'Manage sensitive-data scans, inspection results, connected accounts, privacy operations records, and downloadable Borneo reports.',
   metadata: {},
   config,
   auth

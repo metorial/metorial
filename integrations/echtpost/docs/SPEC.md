@@ -1,41 +1,34 @@
-That page redirected to a different site. Let me fetch the actual EchtPost API documentation.Now I have enough information to write the specification. Note: many of the EasyPost results are for a different company (EasyPost, a shipping API). The relevant results are about EchtPost, the German postcard service.
+# EchtPost integration specification
 
-# Slates Specification for Echtpost
+This integration uses [EchtPost REST API v2](https://api.echtpost.de/v2/docs), with the [official OpenAPI document](https://api.echtpost.de/v2/openapi.json) as its endpoint and schema reference.
 
-## Overview
+## Connection
 
-EchtPost is a German online platform that enables businesses to send real, physical postcards programmatically. The EchtPost Postcards API allows you to programmatically send real, physical postcards. EchtPost offers online postcard sending services tailored for businesses, allowing them to design personalized postcards to effectively reach their target audience. The company provides various services including individual postcard creation, automated mailing for special occasions, and postcard marketing campaigns.
+Create an API key under **Account → API keys**. Requests use the `X-Api-Key` header against `https://api.echtpost.de/v2`; credentials are never added to URLs. The current API-key connection supports server-side automation. OAuth-based user authorization is not included.
 
-## Authentication
+Sandbox keys do not bill or print postcards and isolate contacts, groups, and cards from live data. Live mailings require prepaid credit.
 
-EchtPost uses API key authentication. EchtPost Postcards uses API keys for authentication.
+## Tools
 
-- **API Key**: The API key is created within your EchtPost account under Account Settings (gear icon, top right) and then under "API-Schlüssel zum Datenaustausch" (API key for data exchange).
-- **Base URL**: `https://api.echtpost.de/v1/`
-- **Passing the key**: The API key is passed as a query parameter named `apikey`. For example: `https://api.echtpost.de/v1/contacts?apikey=your-echtpost-api-key`
-- Requests use JSON (`Content-Type: application/json`).
+- `who_am_i` and `get_credits`: identify the connected account and read balance and pricing.
+- `list_contacts`, `get_contact`, `create_contact`, `update_contact`, and `delete_contact`: manage recipients, addresses, external references, and group membership.
+- `list_groups`, `get_group`, `create_group`, `update_group`, and `delete_group`: discover and manage recipient groups.
+- `list_templates` and `get_template`: find saved templates and their content, font, motive, and preview links when available.
+- `send_postcard`: schedule postcards from a saved template using inline recipients, existing contact IDs, recipient groups, or a combination.
+- `list_cards`, `get_card`, and `cancel_card`: inspect mailing status and queue asynchronous cancellation when still possible.
 
-## Features
+List operations return one page and expose the provider's total count, total pages, and pagination links when present. Contacts support search, country/group/external-reference filters, sorting, and related group/card IDs. Cards support status/date/motive filters. Group memberships can be replaced with `groupIds` or augmented with `groupNames`. New contacts using a custom greeting need a custom salutation. On update, omitting the salutation retains its stored value; the provider validates the resulting contact.
 
-### Postcard Creation and Scheduling
+## Recipient and scheduling behavior
 
-Create and schedule postcards for physical delivery. A prerequisite for sending postcards via the EchtPost API is that you have created a template within your EchtPost account in addition to having an API key.
+Inline recipients and new contacts need a last name, street, postal code, city, and two-letter country code. Existing optional input fields remain optional for compatibility; missing values required by the current provider API produce a clear validation error. No country is assumed.
 
-- **Template-based**: Postcards are created using a `template_id` referencing a pre-designed template in the EchtPost web interface. Due to varying character limits depending on the font, it is not possible to create a postcard with individually customized text via the API. The text and design must be defined in the template beforehand.
-- **Scheduling**: A `deliver_at` date parameter controls when the postcard is sent.
-- **Notifications**: Optional email notifications can be configured with `notification_type` (either `before_send` or `after_send`), `notification_date`, and `notification_email`.
-- **Recipients**: Recipients can be specified inline using `contacts_attributes` (with fields like `title`, `company_name`, `first`, `name`, `street`, `zip`, `city`, `country_code`) or by referencing an existing contact or group.
-- **Group sending**: You can pass the ID of an EchtPost recipient group using `group_id`.
-- If the available balance in your account is not sufficient, the API responds with 402 Payment Required. A prepaid account balance is required.
+The scheduled date controls printing, not arrival at the recipient. Templates supply the text and design. A notification uses `notificationType` and `notificationEmail`, plus an optional reminder date; the existing `after_send` option maps to the provider's `after_sent` notification type.
 
-### Contact Management
+Cancellation is queued asynchronously. A successful cancellation request confirms acceptance; inspect the postcard again for its resulting status. Contact and group deletion require a confirmed no-content response. Provider errors retain status and corrective detail, with credential echoes redacted.
 
-Manage recipient contacts within EchtPost. Creates a new contact within the EchtPost app. Contacts can be listed and created via the API at the `/v1/contacts` endpoint. Contacts include address details such as company name, first name, last name, street, ZIP code, city, and country code.
+## Returned data and boundaries
 
-### Template Management
+Existing tool keys and field types remain available. Contact, group, template, and card results include the complete provider response for metadata and relationship IDs. Documented null company names and template preview links are omitted from legacy string fields and remain null in the complete response. Malformed objects, lists, required identifiers, and incompatible field values produce errors instead of fabricated successful results.
 
-You can show all postcard templates available, list templates for specific purposes, and get preview links for templates. Templates are created via the EchtPost web interface and referenced by ID in API calls. A template for your postcard is created by starting to write a postcard in the web interface.
-
-## Events
-
-The provider does not support events. There is no documented webhook or event subscription mechanism in the EchtPost API. Notifications about postcard sending are limited to optional email notifications configured per postcard.
+Preview links remain links. No tool downloads or generates image or print files. Custom-content cards, text-fit checks, motive browsing/uploads, OAuth setup, and webhook triggers are outside this integration's current scope. EchtPost advertises account-configured `card.sent` webhooks; this package does not register or receive them.

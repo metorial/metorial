@@ -24,12 +24,15 @@ export let voteFeatureRequestTool = SlateTool.create(spec, {
   .output(
     z.object({
       voted: z.boolean().describe('Whether the vote was recorded'),
+      voteId: z.number().describe('ID of the recorded vote'),
+      date: z.string().describe('Vote creation date'),
+      url: z.string().nullable().describe('Vote URL in the dashboard'),
       requestId: z.number().describe('ID of the feature request')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.createFeatureRequestVote(ctx.input.requestId, {
+    let vote = await client.createFeatureRequestVote(ctx.input.requestId, {
       userId: ctx.input.userId,
       userEmail: ctx.input.userEmail,
       userFirstname: ctx.input.userFirstname,
@@ -39,6 +42,9 @@ export let voteFeatureRequestTool = SlateTool.create(spec, {
     return {
       output: {
         voted: true,
+        voteId: vote.id,
+        date: vote.date,
+        url: vote.url,
         requestId: ctx.input.requestId
       },
       message: `Voted on feature request **#${ctx.input.requestId}**.`

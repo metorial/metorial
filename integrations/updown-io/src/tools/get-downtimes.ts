@@ -18,23 +18,39 @@ export let getDowntimes = SlateTool.create(spec, {
       page: z
         .number()
         .optional()
-        .describe('Page number for pagination (100 results per page, default: 1)')
+        .describe('Page number for pagination (100 results per page, default: 1)'),
+      results: z
+        .boolean()
+        .optional()
+        .describe('Include detailed requests before downtime and recovery')
     })
   )
   .output(
     z.object({
-      downtimes: z.array(downtimeSchema).describe('List of downtime events')
+      downtimes: z.array(downtimeSchema).describe('List of downtime events'),
+      page: z.number().optional().describe('Requested page, when explicitly provided'),
+      nextPage: z
+        .number()
+        .optional()
+        .describe(
+          'Next page to try when this page is full; a full page does not guarantee another result'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let downtimes = await client.getDowntimes(ctx.input.checkToken, {
-      page: ctx.input.page
+      page: ctx.input.page,
+      results: ctx.input.results
     });
 
     let ongoing = downtimes.filter(d => !d.endedAt).length;
     return {
-      output: { downtimes },
+      output: {
+        downtimes,
+        page: ctx.input.page,
+        nextPage: downtimes.length === 100 ? (ctx.input.page ?? 1) + 1 : undefined
+      },
       message: `Found **${downtimes.length}** downtime event(s) for check \`${ctx.input.checkToken}\`.${ongoing > 0 ? ` ${ongoing} ongoing.` : ''}`
     };
   })

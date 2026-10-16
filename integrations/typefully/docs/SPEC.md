@@ -1,79 +1,33 @@
-The docs page is a shell page that likely loads via JavaScript. Let me check the actual API reference.Now I have enough information to write the specification. The Zapier triggers page gave me a comprehensive list of webhook event types.
+# Typefully integration specification
 
-# Slates Specification for Typefully
+The integration uses [Typefully API v2](https://typefully.com/docs/api) at `https://api.typefully.com/v2`. API keys are created in Settings → API and sent as `Authorization: Bearer <key>`. Keys inherit the user permissions; v1 keys are incompatible with v2. No OAuth refresh or account-scoping configuration is required. See the [official v1 → v2 guide](https://support.typefully.com/en/articles/13133296-typefully-api-v1-v2-migration-guide).
 
-## Overview
+## Discovery and identity
 
-Typefully is a social media management platform for creating, scheduling, and publishing content across X (Twitter), LinkedIn, Threads, Bluesky, and Mastodon. It provides a writing editor, scheduling queue, analytics, and AI-powered content optimization tools. The API allows programmatic content management across all supported platforms.
+`get_current_user` reads `/me` and returns only documented identity fields. `list_social_sets` supports limit/offset pagination; `get_social_set` exposes connected platform details. Pass discovered social set IDs to content tools. Public draft and social set IDs remain strings, including when Typefully returns numeric IDs.
 
-## Authentication
+## Drafts
 
-The API uses API keys for authentication. You can create and manage API keys from Settings → API in Typefully.
+Create, read, list, update, and delete drafts for X, LinkedIn, Threads, Bluesky, and Mastodon. Supply each platform posts array explicitly; each platform may carry its documented settings. List filters include draft, planned, scheduled, publishing, published, and error states. Tag inputs accept provider tag slugs returned by `manage_tags`. Use optional `orderBy` for documented draft ordering (`created_at`, `updated_at`, `scheduled_date`, or `published_at`, with a leading minus for descending order). Omission leaves the provider default intact. The legacy `sort` field still forwards unchanged; its current provider acceptance is unverified. Supplying both fields is rejected to avoid ambiguous precedence.
 
-For the current v2 API, include the API key as a Bearer token in the `Authorization` header:
+`publishAt` accepts `now`, `next-free-slot`, or an ISO datetime. Publishing with `now` is asynchronous; inspect `publishState` and poll `get_draft` until finished before checking status and URLs. `planAt` supports a future datetime or `next-free-slot` without auto-publication. It is mutually exclusive with `publishAt`. Updating with `planAt: null` clears an existing planned or scheduled date, subject to provider permissions.
 
-```
-Authorization: Bearer YOUR_API_KEY
-```
+Draft edits preserve comment-thread markers by default. `get_draft` can request plain display text with `excludeCommentMarkers`, but that text should not be sent back for editing. `forceOverwriteComments` explicitly allows resolving threads whose anchor markers were removed. The complete provider draft response is available in `rawDraft`.
 
-Note: The legacy v1 API used a different header format (`X-API-KEY: Bearer YOUR_KEY`), but v2 is the recommended version.
+## Queue
 
-No OAuth flow is required. There are no scopes — an API key grants full access to the associated Typefully account.
+`get_queue` retrieves date-range slots and scheduled/planned drafts; dates use the social set timezone and ranges cannot exceed 62 days. Planned drafts remain inert. `get_queue_schedule` reads timezone and local posting rules; the provider may initialize defaults on first read. `replace_queue_schedule` atomically replaces all rules, requires ADMIN access, and accepts an empty rule list. Duplicate weekday/time combinations and fractional hours/minutes are rejected.
 
-## Features
+## Media and tags
 
-### Multi-Platform Draft Creation
+`upload_media` initiates uploads or checks processing. Send raw file bytes to the returned presigned URL using PUT with no extra headers. Optional alt text can be provided at initiation. `update_media` sets or clears alt text before media is attached; existing draft media must be sent again through draft update to refresh every platform snapshot. Processing URLs are actual provider values; this workflow does not download or host files.
 
-Create draft posts for one or more platforms (X, LinkedIn, Threads, Bluesky, Mastodon) in a single API call. In v2, you have full control over thread structure — instead of relying on auto-splitting, explicitly define each post in the posts array. Each platform can have its own tailored content within the same draft. Drafts are scoped to a "Social Set," which represents a group of connected platform accounts.
+`manage_tags` creates tags or lists a limit/offset page. Current v2 tags expose a slug instead of a numeric ID. The public `tagId` retains a legacy `id` when present and otherwise returns the actual provider slug; `tagSlug` makes draft assignment explicit. No identifier is synthesized.
 
-### Scheduling and Publishing
+## Collaboration
 
-Drafts can be published immediately, scheduled for a specific date/time, or queued into the next available time slot. You can add an existing draft to the publishing queue in the next available slot to maintain consistent posting without specifying exact times.
+List comment threads (unresolved by default), create anchored threads, reply, and resolve discussions. Anchors use exact selected text, a zero-based post index, and an optional occurrence. Use post index 0 for X Articles. LinkedIn mentions must remain atomic. Auto-synced platforms do not permit new threads; resolved threads do not accept replies. Resolution is one-way.
 
-### Media Uploads
+## Boundaries
 
-Upload images, videos, GIFs, and PDFs to include in your posts. Media is uploaded separately and returns a media ID, which can then be attached to posts within a draft. You can check media processing status (processing, ready, or failed) before attaching.
-
-### Tags Management
-
-Organize your content with tags for better workflow management. You can list existing tags, create new tags, and assign tags to drafts at creation time. Tags can be used for content categorization and approval workflows.
-
-### Social Sets
-
-API v2 introduces Social Sets — groups of connected platform accounts. All draft operations are scoped under a social set and require a social_set_id. You can list available social sets and retrieve details about their connected platforms.
-
-### Draft Management
-
-Retrieve, list, and filter drafts by status (draft, scheduled, published) or other criteria. Manage tags and filter by status or analytics.
-
-### Notifications (v1 only)
-
-Notification endpoints are only available in v1. If you need notifications, continue using the v1 `/api/v1/notifications/` endpoint. However, it will be deprecated on 15th June 2026.
-
-## Events
-
-Typefully supports webhooks for real-time event notifications. Configure webhook URLs in Settings → API by clicking + Add webhook.
-
-### Draft Created
-
-Fires when a new draft is created in Typefully. Can be filtered by Social Set.
-
-### Draft Published
-
-Fires when a draft goes live on social platforms. Can be filtered by Social Set.
-
-### Draft Scheduled
-
-Fires when a draft is scheduled for future publication. Can be filtered by Social Set.
-
-### Draft Status Changed
-
-Fires when a draft's status changes (draft → scheduled, scheduled → published, etc.). Can be filtered by Social Set.
-
-### Draft Tags Changed
-
-Fires when tags are added to or removed from a draft. Can be filtered by Social Set.
-
-### Draft Deleted
-
-Fires when a draft is deleted from Typefully. Can be filtered by Social Set.
+Existing tool IDs, scalar types, defaults, and routes remain available. Additional API capabilities such as LinkedIn organization resolution, comment editing/deletion, and specialized Substack/X Article draft authoring are not exposed as dedicated actions. Webhook configuration is available in the Typefully UI; this integration does not register triggers. No API v1 tool is replaced or redirected.

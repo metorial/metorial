@@ -1,19 +1,44 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export const API_BASE_URL = 'https://api.passslot.com/v1';
 
 export class Client {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
-      baseURL: 'https://api.passslot.com/v1',
+    if (!token?.trim()) {
+      throw createApiServiceError('A PassSlot App Key is required.');
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: API_BASE_URL,
       auth: {
         username: token,
         password: ''
       },
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'PassSlot',
+          reason: 'passslot_api_error'
+        })
     });
+  }
+
+  private resourceId(id: number, name: string): number {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw createApiServiceError(`${name} must be a positive integer.`);
+    }
+    return id;
+  }
+
+  private passPath(passTypeIdentifier: string, serialNumber: string): string {
+    if (!passTypeIdentifier.trim() || !serialNumber.trim()) {
+      throw createApiServiceError('passTypeIdentifier and serialNumber are required.');
+    }
+    return `/passes/${encodeURIComponent(passTypeIdentifier)}/${encodeURIComponent(serialNumber)}`;
+  }
+
+  getPassDownloadUrl(passTypeIdentifier: string, serialNumber: string): string {
+    return `${API_BASE_URL}${this.passPath(passTypeIdentifier, serialNumber)}`;
   }
 
   // ── Templates ──
@@ -24,7 +49,9 @@ export class Client {
   }
 
   async getTemplate(templateId: number): Promise<any> {
-    let response = await this.axios.get(`/templates/${templateId}`);
+    let response = await this.axios.get(
+      `/templates/${this.resourceId(templateId, 'templateId')}`
+    );
     return response.data;
   }
 
@@ -38,46 +65,60 @@ export class Client {
   }
 
   async updateTemplate(templateId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/templates/${templateId}`, data);
+    let response = await this.axios.put(
+      `/templates/${this.resourceId(templateId, 'templateId')}`,
+      data
+    );
     return response.data;
   }
 
   async deleteTemplate(templateId: number): Promise<void> {
-    await this.axios.delete(`/templates/${templateId}`);
+    await this.axios.delete(`/templates/${this.resourceId(templateId, 'templateId')}`);
   }
 
   async getTemplateUrl(templateId: number): Promise<{ url: string }> {
-    let response = await this.axios.get(`/templates/${templateId}/url`);
+    let response = await this.axios.get(
+      `/templates/${this.resourceId(templateId, 'templateId')}/url`
+    );
     return response.data;
   }
 
   // ── Template Actions ──
 
   async getTemplateActions(templateId: number): Promise<any> {
-    let response = await this.axios.get(`/templates/${templateId}/actions`);
+    let response = await this.axios.get(
+      `/templates/${this.resourceId(templateId, 'templateId')}/actions`
+    );
     return response.data;
   }
 
   async updateTemplateActions(templateId: number, actions: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/templates/${templateId}/actions`, actions);
+    let response = await this.axios.put(
+      `/templates/${this.resourceId(templateId, 'templateId')}/actions`,
+      actions
+    );
     return response.data;
   }
 
   // ── Template Images ──
 
   async getTemplateImages(templateId: number): Promise<any> {
-    let response = await this.axios.get(`/templates/${templateId}/images`);
+    let response = await this.axios.get(
+      `/templates/${this.resourceId(templateId, 'templateId')}/images`
+    );
     return response.data;
   }
 
   async deleteTemplateImages(templateId: number): Promise<void> {
-    await this.axios.delete(`/templates/${templateId}/images`);
+    await this.axios.delete(`/templates/${this.resourceId(templateId, 'templateId')}/images`);
   }
 
   // ── Template Branding ──
 
   async getTemplateBranding(templateId: number): Promise<any> {
-    let response = await this.axios.get(`/templates/${templateId}/branding`);
+    let response = await this.axios.get(
+      `/templates/${this.resourceId(templateId, 'templateId')}/branding`
+    );
     return response.data;
   }
 
@@ -85,14 +126,19 @@ export class Client {
     templateId: number,
     branding: Record<string, any>
   ): Promise<any> {
-    let response = await this.axios.put(`/templates/${templateId}/branding`, branding);
+    let response = await this.axios.put(
+      `/templates/${this.resourceId(templateId, 'templateId')}/branding`,
+      branding
+    );
     return response.data;
   }
 
   // ── Template Restrictions ──
 
   async getTemplateRestrictions(templateId: number): Promise<any> {
-    let response = await this.axios.get(`/templates/${templateId}/restrictions`);
+    let response = await this.axios.get(
+      `/templates/${this.resourceId(templateId, 'templateId')}/restrictions`
+    );
     return response.data;
   }
 
@@ -100,19 +146,27 @@ export class Client {
     templateId: number,
     restrictions: Record<string, any>
   ): Promise<any> {
-    let response = await this.axios.put(`/templates/${templateId}/restrictions`, restrictions);
+    let response = await this.axios.put(
+      `/templates/${this.resourceId(templateId, 'templateId')}/restrictions`,
+      restrictions
+    );
     return response.data;
   }
 
   // ── Template Payment ──
 
   async getTemplatePayment(templateId: number): Promise<any> {
-    let response = await this.axios.get(`/templates/${templateId}/payment`);
+    let response = await this.axios.get(
+      `/templates/${this.resourceId(templateId, 'templateId')}/payment`
+    );
     return response.data;
   }
 
   async updateTemplatePayment(templateId: number, payment: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/templates/${templateId}/payment`, payment);
+    let response = await this.axios.put(
+      `/templates/${this.resourceId(templateId, 'templateId')}/payment`,
+      payment
+    );
     return response.data;
   }
 
@@ -126,7 +180,10 @@ export class Client {
     passTypeIdentifier: string;
     url: string;
   }> {
-    let response = await this.axios.post(`/templates/${templateId}/pass`, values);
+    let response = await this.axios.post(
+      `/templates/${this.resourceId(templateId, 'templateId')}/pass`,
+      values
+    );
     return response.data;
   }
 
@@ -138,6 +195,9 @@ export class Client {
     passTypeIdentifier: string;
     url: string;
   }> {
+    if (!templateName.trim()) {
+      throw createApiServiceError('templateName must not be empty.');
+    }
     let encodedName = encodeURIComponent(templateName);
     let response = await this.axios.post(`/templates/names/${encodedName}/pass`, values);
     return response.data;
@@ -151,6 +211,9 @@ export class Client {
   }
 
   async listPassesByType(passTypeIdentifier: string): Promise<any[]> {
+    if (!passTypeIdentifier.trim()) {
+      throw createApiServiceError('passTypeIdentifier must not be empty.');
+    }
     let response = await this.axios.get(`/passes/${encodeURIComponent(passTypeIdentifier)}`);
     return response.data;
   }
@@ -160,22 +223,20 @@ export class Client {
     serialNumber: string
   ): Promise<{ url: string }> {
     let response = await this.axios.get(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/url`
+      `${this.passPath(passTypeIdentifier, serialNumber)}/url`
     );
     return response.data;
   }
 
   async getPassJson(passTypeIdentifier: string, serialNumber: string): Promise<any> {
     let response = await this.axios.get(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/passjson`
+      `${this.passPath(passTypeIdentifier, serialNumber)}/passjson`
     );
     return response.data;
   }
 
   async deletePass(passTypeIdentifier: string, serialNumber: string): Promise<void> {
-    await this.axios.delete(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}`
-    );
+    await this.axios.delete(`${this.passPath(passTypeIdentifier, serialNumber)}`);
   }
 
   async emailPass(
@@ -183,16 +244,13 @@ export class Client {
     serialNumber: string,
     email: string
   ): Promise<void> {
-    await this.axios.post(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/email`,
-      { email }
-    );
+    await this.axios.post(`${this.passPath(passTypeIdentifier, serialNumber)}/email`, {
+      email
+    });
   }
 
   async pushPass(passTypeIdentifier: string, serialNumber: string): Promise<void> {
-    await this.axios.post(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/push`
-    );
+    await this.axios.post(`${this.passPath(passTypeIdentifier, serialNumber)}/push`);
   }
 
   // ── Pass Values ──
@@ -202,7 +260,7 @@ export class Client {
     serialNumber: string
   ): Promise<Record<string, any>> {
     let response = await this.axios.get(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/values`
+      `${this.passPath(passTypeIdentifier, serialNumber)}/values`
     );
     return response.data;
   }
@@ -213,7 +271,7 @@ export class Client {
     values: Record<string, any>
   ): Promise<Record<string, any>> {
     let response = await this.axios.put(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/values`,
+      `${this.passPath(passTypeIdentifier, serialNumber)}/values`,
       values
     );
     return response.data;
@@ -226,7 +284,7 @@ export class Client {
     value: string
   ): Promise<Record<string, any>> {
     let response = await this.axios.put(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/value/${encodeURIComponent(placeholderName)}`,
+      `${this.passPath(passTypeIdentifier, serialNumber)}/values/${encodeURIComponent(placeholderName)}`,
       { value }
     );
     return response.data;
@@ -239,7 +297,7 @@ export class Client {
     serialNumber: string
   ): Promise<{ status: string }> {
     let response = await this.axios.get(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/status`
+      `${this.passPath(passTypeIdentifier, serialNumber)}/status`
     );
     return response.data;
   }
@@ -250,7 +308,7 @@ export class Client {
     status: string
   ): Promise<{ status: string }> {
     let response = await this.axios.put(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/status`,
+      `${this.passPath(passTypeIdentifier, serialNumber)}/status`,
       { status }
     );
     return response.data;
@@ -260,22 +318,20 @@ export class Client {
 
   async getPassImages(passTypeIdentifier: string, serialNumber: string): Promise<any> {
     let response = await this.axios.get(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/images`
+      `${this.passPath(passTypeIdentifier, serialNumber)}/images`
     );
     return response.data;
   }
 
   async deletePassImages(passTypeIdentifier: string, serialNumber: string): Promise<void> {
-    await this.axios.delete(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/images`
-    );
+    await this.axios.delete(`${this.passPath(passTypeIdentifier, serialNumber)}/images`);
   }
 
   // ── Pass Price ──
 
   async getPassPrice(passTypeIdentifier: string, serialNumber: string): Promise<any> {
     let response = await this.axios.get(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/price`
+      `${this.passPath(passTypeIdentifier, serialNumber)}/price`
     );
     return response.data;
   }
@@ -286,16 +342,14 @@ export class Client {
     price: Record<string, any>
   ): Promise<any> {
     let response = await this.axios.put(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/price`,
+      `${this.passPath(passTypeIdentifier, serialNumber)}/price`,
       price
     );
     return response.data;
   }
 
   async deletePassPrice(passTypeIdentifier: string, serialNumber: string): Promise<void> {
-    await this.axios.delete(
-      `/passes/${encodeURIComponent(passTypeIdentifier)}/${serialNumber}/price`
-    );
+    await this.axios.delete(`${this.passPath(passTypeIdentifier, serialNumber)}/price`);
   }
 
   // ── Pass Type IDs ──
@@ -318,7 +372,9 @@ export class Client {
   }
 
   async getScanner(scannerId: number): Promise<any> {
-    let response = await this.axios.get(`/scanners/${scannerId}`);
+    let response = await this.axios.get(
+      `/scanners/${this.resourceId(scannerId, 'scannerId')}`
+    );
     return response.data;
   }
 
@@ -328,16 +384,25 @@ export class Client {
     fullAccess: boolean;
     allowedTemplates?: number[];
   }): Promise<any> {
+    for (let templateId of data.allowedTemplates ?? []) {
+      this.resourceId(templateId, 'allowedTemplates entry');
+    }
     let response = await this.axios.post('/scanners', data);
     return response.data;
   }
 
   async updateScanner(scannerId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/scanners/${scannerId}`, data);
+    for (let templateId of data.allowedTemplates ?? []) {
+      this.resourceId(templateId, 'allowedTemplates entry');
+    }
+    let response = await this.axios.put(
+      `/scanners/${this.resourceId(scannerId, 'scannerId')}`,
+      data
+    );
     return response.data;
   }
 
   async deleteScanner(scannerId: number): Promise<void> {
-    await this.axios.delete(`/scanners/${scannerId}`);
+    await this.axios.delete(`/scanners/${this.resourceId(scannerId, 'scannerId')}`);
   }
 }

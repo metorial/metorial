@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { UploadClient } from '../lib/upload-client';
@@ -44,6 +44,10 @@ export let listGroups = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
 
+    if (ctx.input.limit !== undefined && !Number.isInteger(ctx.input.limit)) {
+      throw createApiServiceError('limit must be a whole number.');
+    }
+
     let result = await client.listGroups({
       limit: ctx.input.limit,
       ordering: ctx.input.ordering,
@@ -88,6 +92,7 @@ export let getGroup = SlateTool.create(spec, {
       datetimeStored: z
         .string()
         .nullable()
+        .optional()
         .describe('ISO 8601 store timestamp, null if not stored'),
       filesCount: z.number().describe('Number of files in the group'),
       cdnUrl: z.string().describe('CDN URL for the group'),
@@ -101,7 +106,15 @@ export let getGroup = SlateTool.create(spec, {
             isImage: z.boolean().describe('Whether the file is an image')
           })
         )
-        .describe('Files in the group')
+        .optional()
+        .describe(
+          'Available file details in the group; removed-file slots are retained in rawFiles'
+        ),
+      rawFiles: z
+        .array(z.unknown())
+        .nullable()
+        .optional()
+        .describe('Original provider file list, including null slots for removed files')
     })
   )
   .handleInvocation(async ctx => {
@@ -115,13 +128,16 @@ export let getGroup = SlateTool.create(spec, {
         datetimeStored: group.datetime_stored,
         filesCount: group.files_count,
         cdnUrl: group.cdn_url,
-        files: group.files.map(f => ({
-          fileId: f.uuid,
-          originalFilename: f.original_filename,
-          size: f.size,
-          mimeType: f.mime_type,
-          isImage: f.is_image
-        }))
+        rawFiles: group.files,
+        files: group.files
+          ?.filter(f => f !== null)
+          .map(f => ({
+            fileId: f.uuid,
+            originalFilename: f.original_filename,
+            size: f.size,
+            mimeType: f.mime_type,
+            isImage: f.is_image
+          }))
       },
       message: `Group **${group.id}** has **${group.files_count}** files.`
     };
@@ -149,7 +165,7 @@ export let createGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let uploadClient = new UploadClient(ctx.auth.publicKey);
+    let uploadClient = new UploadClient(ctx.auth.publicKey, ctx.auth.secretKey);
     let group = await uploadClient.createGroup(ctx.input.fileIds);
 
     return {

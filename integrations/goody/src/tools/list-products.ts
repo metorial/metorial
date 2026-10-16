@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let productVariantSchema = z.object({
@@ -79,10 +79,7 @@ export let listProducts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let result = await client.listProducts({
       page: ctx.input.page,
@@ -97,26 +94,27 @@ export let listProducts = SlateTool.create(spec, {
         brandId: p.brand?.id,
         name: p.brand?.name,
         shippingPrice: p.brand?.shipping_price,
-        freeShippingMinimum: p.brand?.free_shipping_minimum
+        freeShippingMinimum: p.brand?.free_shipping_minimum ?? null
       },
-      subtitle: p.subtitle,
-      recipientDescription: p.recipient_description,
+      subtitle: p.subtitle ?? null,
+      recipientDescription: p.recipient_description ?? null,
       price: p.price,
       priceIsVariable: p.price_is_variable,
-      priceMin: p.price_min,
-      priceMax: p.price_max,
+      priceMin: p.price_min ?? null,
+      priceMax: p.price_max ?? null,
       images: (p.images || []).map((img: any) => ({
-        url: img.url,
-        width: img.width,
-        height: img.height
+        url: img.image_large?.url ?? img.url,
+        width: img.image_large?.width ?? img.width,
+        height: img.image_large?.height ?? img.height
       })),
       variants: (p.variants || []).map((v: any) => ({
         variantId: v.id,
         name: v.name,
-        subtitle: v.subtitle,
-        imageLarge: v.image_large
+        subtitle: v.subtitle ?? null,
+        imageLarge:
+          (typeof v.image_large === 'string' ? v.image_large : v.image_large?.url) ?? null
       })),
-      variantsLabel: p.variants_label,
+      variantsLabel: p.variants_label ?? null,
       status: p.status
     }));
 

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/pushover",
-  "description": "Send real-time push notifications to Android, iOS, and desktop devices. Deliver messages with configurable priority levels (silent, low, normal, high, emergency), HTML formatting, image attachments, custom sounds, and URLs. Track emergency-priority message acknowledgements via receipts and callbacks. Manage delivery groups by adding, removing, enabling, or disabling users. Push silent data updates (title, text, count, percent) to smartwatch widgets via Glances. Validate user and group keys. Create inbound webhooks to convert external JSON payloads into Pushover notifications. Manage user subscriptions and licenses for Teams accounts.",
+  "description": "Send push notifications with configurable priorities, HTML or monospace formatting, images, custom sounds, and links. Track emergency acknowledgements and cancel retries. Discover and manage delivery groups and members, validate recipient keys, update smartwatch widgets, inspect account message limits, and migrate existing user keys to subscriptions.",
   "categories": ["apis-and-http-requests", "email-and-messaging"],
   "skills": [
     "send push notifications",
@@ -9,10 +9,11 @@
     "manage delivery groups",
     "push smartwatch widget data",
     "validate user keys",
-    "configure inbound webhooks",
-    "manage user subscriptions",
     "attach images to messages",
-    "cancel emergency notifications"
+    "cancel emergency notifications",
+    "discover delivery groups",
+    "migrate user subscription keys",
+    "check account message limits"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/pushover.png"
 }

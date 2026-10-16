@@ -54,11 +54,25 @@ export let generateQrCode = SlateTool.create(spec, {
       light: ctx.input.light
     });
 
+    let query: Record<string, string> = {};
+    for (let [key, value] of Object.entries(ctx.input)) {
+      if (value === undefined) continue;
+      if ((key === 'dark' || key === 'light') && !value) continue;
+      query[key] = String(value);
+    }
+    await ctx.addAttachment({
+      type: 'url',
+      url: 'https://api.u301.com/v2/qrcode',
+      mimeType: 'image/svg+xml',
+      headers: { Authorization: `Bearer ${ctx.auth.token}`, Accept: 'application/xml' },
+      query
+    });
+
     return {
       output: {
         svgContent: svg
       },
-      message: `QR code generated for **${ctx.input.url}** in SVG format.`
+      message: `QR code generated for **${ctx.input.url}** in SVG format and prepared for download.`
     };
   })
   .build();

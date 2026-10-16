@@ -6,12 +6,16 @@ import { spec } from '../spec';
 export let deleteImages = SlateTool.create(spec, {
   name: 'Delete Images',
   key: 'delete_images',
-  description: `Permanently delete one or more generated images. Removes the images from servers and clears CDN caching. This action **cannot be undone**.`,
+  description: `DEPRECATED — use \`request_image_deletion\` instead. Permanently delete one or more generated images. Removes the images from servers and clears CDN caching. This action **cannot be undone**.`,
+  instructions: [
+    'Use request_image_deletion for truthful request acceptance; this legacy result cannot confirm completed deletions.'
+  ],
   constraints: [
     'Deletion is permanent and cannot be undone.',
     'Deleted image URLs will no longer be accessible.'
   ],
   tags: {
+    deprecated: true,
     destructive: true,
     readOnly: false
   }

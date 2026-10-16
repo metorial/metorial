@@ -1,6 +1,21 @@
 # <img src="logo.png" height="20"> API Ninjas
 
-Retrieve data from 100+ REST APIs spanning finance, technology, AI, geography, health, and entertainment. Look up stock prices, cryptocurrency rates, exchange rates, and financial instruments. Perform AI-powered text sentiment analysis, image OCR, face detection, and object detection. Access geographic data including geocoding, weather, air quality, and country statistics. Process text with dictionary lookups, spell checking, language detection, and profanity filtering. Retrieve nutrition data, exercise info, quotes, jokes, trivia, and historical facts. Look up vehicle specs, airport data, domain availability, WHOIS records, IP geolocation, and validate emails, phone numbers, and IBANs. Generate barcodes, QR codes, and passwords. Calculate taxes, mortgage payments, and currency conversions.
+Use API Ninjas to look up market prices, currencies, weather, places, text analysis, nutrition, reference data, and contact information.
+
+Connect an API key from your [account dashboard](https://api-ninjas.com/profile). The key is sent in the `X-Api-Key` header; no additional connection settings are required.
+
+The integration provides 25 read-only tools across six selectable areas:
+
+| Area | Capabilities |
+| --- | --- |
+| Finance | Stock, crypto, and commodity prices; exchange rates; currency conversion |
+| Places and Weather | Current weather, five-day forecasts, air quality, geocoding, city and country search, world time |
+| Text and Language | Sentiment, text similarity, dictionary and thesaurus |
+| Health and Wellness | Nutrition analysis and exercise search |
+| Entertainment and Reference | Quotes, trivia, historical events, holidays, animal information |
+| Internet and Contact Validation | IP geolocation, WHOIS and DNS records, email and phone validation |
+
+Provider plan limits apply. Free stock prices reflect the latest completed trading session, free crypto prices update hourly, and some filters and pagination require a paid plan. Commodity quotes identify their currency and unit; `USX` means US cents. Country populations are reported in thousands. See the [API directory](https://api-ninjas.com/api) and [supported tools](docs/SPEC.md).
 
 ## License
 

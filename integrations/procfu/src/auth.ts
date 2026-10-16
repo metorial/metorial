@@ -1,5 +1,6 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ProcFuClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -13,32 +14,28 @@ export let auth = SlateAuth.create()
     key: 'api_token',
 
     inputSchema: z.object({
-      token: z.string().describe('ProcFu API Auth Token found on your Account Settings page')
+      token: z
+        .string()
+        .describe(
+          'ProcFu API Auth Token from Security & Keys. Allow the calling server IP there before connecting.'
+        )
     }),
 
     getOutput: async ctx => {
+      let token = ctx.input.token.trim();
+      if (!token) {
+        throw createApiServiceError('A ProcFu API Auth Token is required.');
+      }
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let { createAxios } = await import('slates');
-      let client = createAxios({
-        baseURL: 'https://procfu.com'
-      });
-
-      let response = await client.post('/exe/whoami.pf', '', {
-        headers: {
-          Authorization: `Basic ${ctx.output.token}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      let email =
-        typeof response.data === 'string' ? response.data.trim() : String(response.data);
+      let client = new ProcFuClient({ token: ctx.output.token });
+      let email = await client.whoami();
 
       return {
         profile: {

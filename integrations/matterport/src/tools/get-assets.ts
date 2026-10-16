@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fileDelivery, filePath } from '../lib/files';
 import { spec } from '../spec';
 
 export let getAssets = SlateTool.create(spec, {
@@ -65,9 +66,9 @@ export let getAssets = SlateTool.create(spec, {
       client.getAssetBundles(ctx.input.modelId)
     ]);
 
-    let mappedFloorplans = (floorplans || []).map((fp: any) => ({
-      floorLabel: fp.floor?.label || null,
-      floorSequence: fp.floor?.sequence || null,
+    let mappedFloorplans = floorplans.map((fp: any) => ({
+      floorLabel: fp.floor?.label ?? null,
+      floorSequence: fp.floor?.sequence ?? null,
       format: fp.format,
       flags: fp.flags,
       url: fp.url,
@@ -76,13 +77,37 @@ export let getAssets = SlateTool.create(spec, {
       resolution: fp.resolution
     }));
 
-    let mappedBundles = (bundlesResult || []).map((b: any) => ({
+    let mappedBundles = bundlesResult.map((b: any) => ({
       bundleId: b.id,
       name: b.name,
       description: b.description,
       availability: b.availability,
-      assets: b.assets || null
+      assets: b.assets ?? null
     }));
+
+    for (let floorplan of floorplans) {
+      if (floorplan.url != null)
+        await ctx.addAttachment(
+          fileDelivery(floorplan.url, floorplan.validUntil, {
+            kind: 'floorplan',
+            modelId: ctx.input.modelId,
+            path: filePath(floorplan.url)
+          })
+        );
+    }
+    for (let bundle of bundlesResult) {
+      for (let asset of bundle.assets ?? []) {
+        if (asset.url != null)
+          await ctx.addAttachment(
+            fileDelivery(asset.url, asset.validUntil, {
+              kind: 'bundle',
+              modelId: ctx.input.modelId,
+              bundleId: bundle.id,
+              path: filePath(asset.url)
+            })
+          );
+      }
+    }
 
     return {
       output: {
@@ -141,6 +166,18 @@ export let purchaseAssetBundle = SlateTool.create(spec, {
       ctx.input.bundleId,
       ctx.input.deliverySpeed
     );
+
+    for (let asset of result.assets ?? []) {
+      if (asset.url != null)
+        await ctx.addAttachment(
+          fileDelivery(asset.url, asset.validUntil, {
+            kind: 'bundle',
+            modelId: ctx.input.modelId,
+            bundleId: result.id,
+            path: filePath(asset.url)
+          })
+        );
+    }
 
     return {
       output: {

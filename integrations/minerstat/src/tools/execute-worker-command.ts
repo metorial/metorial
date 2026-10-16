@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
 import { spec } from '../spec';
@@ -44,17 +44,17 @@ export let executeWorkerCommandTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.token) {
-      throw new Error(
+      throw createApiServiceError(
         'Bearer token is required for executing commands. Use the "API Credentials" authentication method.'
       );
     }
 
     if (ctx.input.command === 'exec' && !ctx.input.execCommand) {
-      throw new Error('execCommand is required when command is "exec".');
+      throw createApiServiceError('execCommand is required when command is "exec".');
     }
 
     if (!ctx.input.workerName && !ctx.input.groupName) {
-      throw new Error('Either workerName or groupName must be provided.');
+      throw createApiServiceError('Either workerName or groupName must be provided.');
     }
 
     let client = new ManagementClient({ token: ctx.auth.token });

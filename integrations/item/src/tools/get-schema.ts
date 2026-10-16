@@ -53,6 +53,18 @@ let fieldSchema = z.object({
     .nullable()
     .optional()
     .describe('Allowed decimal places for currency fields'),
+  percentageDecimalPlaces: z
+    .number()
+    .min(0)
+    .max(6)
+    .nullable()
+    .optional()
+    .describe('Editable and display precision for percentage fields'),
+  valueScale: z
+    .enum(['percentage_units'])
+    .nullable()
+    .optional()
+    .describe('Percentage values use percentage units; 43.5 means 43.5%'),
   defaultValue: z.string().nullable().optional().describe('Default value when defined'),
   visibilityType: z.string().optional().describe('Visibility mode for the field')
 });
@@ -61,7 +73,7 @@ export let getSchema = SlateTool.create(spec, {
   name: 'Get Schema',
   key: 'get_schema',
   description:
-    'Retrieve the item schema for all available object types, including field definitions and select options. Useful for discovering custom objects and valid field names before creating or updating records.',
+    'Retrieve the item schema for all available object types, including field definitions, select options, and percentage precision/value scale. Useful for discovering custom objects and valid field names before creating or updating records.',
   docs: [
     {
       type: 'docs.action.general',
@@ -88,7 +100,10 @@ export let getSchema = SlateTool.create(spec, {
             .describe('Plural display name when available'),
           description: z.string().nullable().optional().describe('Object type description'),
           icon: z.string().nullable().optional().describe('Object type icon when available'),
-          fields: z.array(fieldSchema).describe('Field definitions for this object type')
+          fields: z
+            .array(fieldSchema)
+            .optional()
+            .describe('Field definitions when returned for this object type')
         })
       )
     })
@@ -103,31 +118,32 @@ export let getSchema = SlateTool.create(spec, {
           objectTypeId: objectType.id,
           objectTypeSlug: objectType.slug,
           displayName: objectType.display_name,
-          pluralDisplayName: objectType.plural_display_name ?? null,
-          description: objectType.description ?? null,
-          icon: objectType.icon ?? null,
-          fields: (objectType.fields ?? []).map(field => ({
+          pluralDisplayName: objectType.plural_display_name,
+          description: objectType.description,
+          icon: objectType.icon,
+          fields: objectType.fields?.map(field => ({
             fieldName: field.field_name,
             displayName: field.display_name,
             fieldType: field.field_type,
             fieldOrder: field.field_order,
             isRequired: field.is_required,
-            description: field.description ?? null,
-            selectOptions: field.select_options
-              ? field.select_options.map(option => ({
-                  label: option.label,
-                  value: option.value,
-                  color: option.color ?? null
-                }))
-              : null,
-            allowMultiple: field.allow_multiple ?? null,
-            relatedObjectTypeId: field.related_object_type_id ?? null,
-            relationshipType: field.relationship_type ?? null,
-            numberMin: field.number_min ?? null,
-            numberMax: field.number_max ?? null,
-            numberDecimalPlaces: field.number_decimal_places ?? null,
-            currencyDecimalPlaces: field.currency_decimal_places ?? null,
-            defaultValue: field.default_value ?? null,
+            description: field.description,
+            selectOptions:
+              field.select_options?.map(option => ({
+                label: option.label,
+                value: option.value,
+                color: option.color
+              })) ?? field.select_options,
+            allowMultiple: field.allow_multiple,
+            relatedObjectTypeId: field.related_object_type_id,
+            relationshipType: field.relationship_type,
+            numberMin: field.number_min,
+            numberMax: field.number_max,
+            numberDecimalPlaces: field.number_decimal_places,
+            currencyDecimalPlaces: field.currency_decimal_places,
+            percentageDecimalPlaces: field.percentage_decimal_places,
+            valueScale: field.value_scale,
+            defaultValue: field.default_value,
             visibilityType: field.visibility_type
           }))
         }))

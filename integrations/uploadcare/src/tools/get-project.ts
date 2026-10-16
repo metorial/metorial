@@ -14,9 +14,12 @@ export let getProject = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      projectName: z.string().describe('Name of the project'),
-      publicKey: z.string().describe('Public API key for the project'),
-      autostoreEnabled: z.boolean().describe('Whether files are automatically stored'),
+      projectName: z.string().optional().describe('Name of the project'),
+      publicKey: z.string().optional().describe('Public API key for the project'),
+      autostoreEnabled: z
+        .boolean()
+        .optional()
+        .describe('Whether files are automatically stored'),
       collaborators: z
         .array(
           z.object({
@@ -24,6 +27,7 @@ export let getProject = SlateTool.create(spec, {
             name: z.string().describe('Collaborator name')
           })
         )
+        .optional()
         .describe('List of project collaborators')
     })
   )
@@ -36,9 +40,9 @@ export let getProject = SlateTool.create(spec, {
         projectName: project.name,
         publicKey: project.pub_key,
         autostoreEnabled: project.autostore_enabled,
-        collaborators: project.collaborators
+        collaborators: project.collaborators ?? undefined
       },
-      message: `Project **${project.name}** (${project.pub_key}), autostore: ${project.autostore_enabled ? 'enabled' : 'disabled'}, ${project.collaborators.length} collaborator(s).`
+      message: 'Retrieved the current Uploadcare project.'
     };
   })
   .build();

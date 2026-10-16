@@ -1,5 +1,7 @@
 export * from './find-similar-properties';
 export * from './get-property';
+export * from './get-saved-search';
+export * from './list-cities';
 export * from './list-saved-searches';
 export * from './location-autocomplete';
 export * from './manage-saved-search';

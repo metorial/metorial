@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PlacidTemplate {
   uuid: string;
@@ -67,15 +67,22 @@ export interface PlacidPaginatedResponse<T> {
 }
 
 export class PlacidClient {
-  private api: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Placid API token is required.');
+    }
+    this.api = createAuthenticatedAxios({
       baseURL: 'https://api.placid.app/api/rest',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 60_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Placid',
+          reason: 'placid_api_error',
+          extractResponse: (value, helpers) => helpers.getResponseWithBody(value)
+        })
     });
   }
 
@@ -86,24 +93,47 @@ export class PlacidClient {
     titleFilter?: string;
     orderBy?: string;
     page?: number;
+    nextPageUrl?: string;
+    tag?: string;
   }): Promise<PlacidPaginatedResponse<PlacidTemplate>> {
     let queryParams: Record<string, string | number> = {};
     if (params?.collectionId) queryParams.collection_id = params.collectionId;
     if (params?.titleFilter) queryParams.title_filter = params.titleFilter;
     if (params?.orderBy) queryParams.order_by = params.orderBy;
-    if (params?.page) queryParams.page = params.page;
+    if (params?.page !== undefined) queryParams.page = params.page;
+    if (params?.tag !== undefined) queryParams.tag = params.tag;
 
+    if (params?.nextPageUrl !== undefined) {
+      let nextPage: URL;
+      try {
+        nextPage = new URL(params.nextPageUrl);
+      } catch {
+        throw createApiServiceError('nextPageUrl must be a URL returned by list templates.');
+      }
+      if (
+        nextPage.origin !== 'https://api.placid.app' ||
+        nextPage.pathname !== '/api/rest/templates' ||
+        nextPage.username ||
+        nextPage.password
+      ) {
+        throw createApiServiceError(
+          'nextPageUrl must point to the Placid templates endpoint.'
+        );
+      }
+      let response = await this.api.get(`/templates${nextPage.search}`);
+      return response.data;
+    }
     let response = await this.api.get('/templates', { params: queryParams });
     return response.data;
   }
 
   async getTemplate(templateUuid: string): Promise<PlacidTemplate> {
-    let response = await this.api.get(`/templates/${templateUuid}`);
+    let response = await this.api.get(`/templates/${encodeURIComponent(templateUuid)}`);
     return response.data;
   }
 
   async createTemplate(params: {
-    title: string;
+    title?: string;
     width?: number;
     height?: number;
     tags?: string[];
@@ -111,9 +141,8 @@ export class PlacidClient {
     fromTemplate?: string;
     addToCollections?: string[];
   }): Promise<PlacidTemplate> {
-    let body: Record<string, unknown> = {
-      title: params.title
-    };
+    let body: Record<string, unknown> = {};
+    if (params.title !== undefined) body.title = params.title;
     if (params.width !== undefined) body.width = params.width;
     if (params.height !== undefined) body.height = params.height;
     if (params.tags !== undefined) body.tags = params.tags;
@@ -138,21 +167,26 @@ export class PlacidClient {
     if (params.tags !== undefined) body.tags = params.tags;
     if (params.customData !== undefined) body.custom_data = params.customData;
 
-    let response = await this.api.patch(`/templates/${templateUuid}`, body);
+    let response = await this.api.patch(
+      `/templates/${encodeURIComponent(templateUuid)}`,
+      body
+    );
     return response.data;
   }
 
   async deleteTemplate(templateUuid: string): Promise<void> {
-    await this.api.delete(`/templates/${templateUuid}`);
+    await this.api.delete(`/templates/${encodeURIComponent(templateUuid)}`);
   }
 
   // ========== Collections ==========
 
   async listCollections(params?: {
     perPage?: number;
+    cursor?: string;
   }): Promise<PlacidPaginatedResponse<PlacidCollection>> {
-    let queryParams: Record<string, number> = {};
-    if (params?.perPage) queryParams.per_page = params.perPage;
+    let queryParams: Record<string, number | string> = {};
+    if (params?.perPage !== undefined) queryParams.per_page = params.perPage;
+    if (params?.cursor !== undefined) queryParams.cursor = params.cursor;
 
     let response = await this.api.get('/collections', { params: queryParams });
     return response.data;
@@ -185,11 +219,13 @@ export class PlacidClient {
       customData?: string | null;
       addTemplateUuids?: string[];
       removeTemplateUuids?: string[];
+      templateUuids?: string[];
     }
   ): Promise<PlacidCollection> {
     let body: Record<string, unknown> = {};
     if (params.title !== undefined) body.title = params.title;
     if (params.customData !== undefined) body.custom_data = params.customData;
+    if (params.templateUuids !== undefined) body.template_uuids = params.templateUuids;
     if (params.addTemplateUuids) body.add_template_uuids = params.addTemplateUuids;
     if (params.removeTemplateUuids) body.remove_template_uuids = params.removeTemplateUuids;
 
@@ -340,18 +376,15 @@ export class PlacidClient {
   async uploadMedia(files: Array<{ key: string; url: string }>): Promise<{
     media: Array<{ file_key: string; file_id: string }>;
   }> {
-    // Placid expects multipart/form-data for file uploads
-    // Since we receive URLs, we need to fetch files and upload them
-    // For simplicity, using the URL-based approach that Placid supports
     let formData = new FormData();
     for (let file of files) {
+      // Preserve legacy provider-side URL submission without fetching arbitrary sources.
+      // Current documentation only specifies binary uploads; URL acceptance is unverified.
       formData.append(file.key, file.url);
     }
 
     let response = await this.api.post('/media', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
   }

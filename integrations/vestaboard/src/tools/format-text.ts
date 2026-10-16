@@ -16,7 +16,19 @@ Does **not** require authentication — this is a public VBML formatting service
 })
   .input(
     z.object({
-      text: z.string().describe('The plain text message to convert into character codes.')
+      text: z.string().describe('The plain text message to convert into character codes.'),
+      rows: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Output rows. Default: 6. Use 3 for Vestaboard Note.'),
+      columns: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Output columns. Default: 22. Use 15 for Vestaboard Note.')
     })
   )
   .output(
@@ -28,7 +40,7 @@ Does **not** require authentication — this is a public VBML formatting service
   )
   .handleInvocation(async ctx => {
     let vbml = new VbmlClient();
-    let characters = await vbml.format(ctx.input.text);
+    let characters = await vbml.format(ctx.input.text, ctx.input.rows, ctx.input.columns);
 
     let rows = characters.length;
     let cols = characters[0]?.length ?? 0;

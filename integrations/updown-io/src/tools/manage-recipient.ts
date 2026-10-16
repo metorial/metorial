@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { recipientSchema } from '../lib/types';
+import { rawSchema, recipientSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let createRecipient = SlateTool.create(spec, {
@@ -26,7 +26,9 @@ export let createRecipient = SlateTool.create(spec, {
       selected: z
         .boolean()
         .optional()
-        .describe('Whether this recipient is selected by default for new checks')
+        .describe(
+          'Select this recipient on all existing checks when true; omit to use the provider default of true'
+        )
     })
   )
   .output(recipientSchema)
@@ -56,7 +58,8 @@ export let deleteRecipient = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deleted: z.boolean().describe('Whether the recipient was successfully deleted')
+      deleted: z.boolean().describe('Whether the recipient was successfully deleted'),
+      raw: rawSchema.optional().describe('Complete original deletion response')
     })
   )
   .handleInvocation(async ctx => {
@@ -65,7 +68,9 @@ export let deleteRecipient = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Deleted recipient \`${ctx.input.recipientId}\`.`
+      message: result.deleted
+        ? `Deleted recipient \`${ctx.input.recipientId}\`.`
+        : 'Updown.io did not confirm recipient deletion.'
     };
   })
   .build();

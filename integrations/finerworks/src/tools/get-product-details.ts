@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requiredArray, requiredNumber, requiredString } from '../lib/client';
 import { spec } from '../spec';
 
 export let getProductDetails = SlateTool.create(spec, {
@@ -34,6 +34,7 @@ export let getProductDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       products: z
         .array(
           z.object({
@@ -81,25 +82,21 @@ export let getProductDetails = SlateTool.create(spec, {
 
     let data = await client.getProductDetails(apiItems);
 
-    if (!data.status?.success) {
-      throw new Error(data.status?.message || 'Failed to fetch product details');
-    }
-
-    let products = (data.product_list ?? []).map((p: any) => ({
-      sku: p.sku ?? '',
-      productCode: p.product_code || undefined,
-      name: p.name || undefined,
-      descriptionShort: p.description_short || undefined,
-      descriptionLong: p.description_long || undefined,
-      monetaryFormat: p.monetary_format || undefined,
-      quantity: p.quantity ?? 0,
-      perItemPrice: p.per_item_price ?? 0,
-      totalPrice: p.total_price ?? 0,
-      askingPrice: p.asking_price || undefined,
-      imageUrl1: p.image_url_1 || undefined,
-      imageUrl2: p.image_url_2 || undefined,
-      imageUrl3: p.image_url_3 || undefined,
-      imageGuid: p.image_guid || undefined,
+    let products = requiredArray(data.product_list, 'product_list').map((p: any) => ({
+      sku: requiredString(p.sku, 'sku'),
+      productCode: p.product_code ?? undefined,
+      name: p.name ?? undefined,
+      descriptionShort: p.description_short ?? undefined,
+      descriptionLong: p.description_long ?? undefined,
+      monetaryFormat: p.monetary_format ?? undefined,
+      quantity: requiredNumber(p.quantity, 'quantity'),
+      perItemPrice: requiredNumber(p.per_item_price, 'per_item_price'),
+      totalPrice: requiredNumber(p.total_price, 'total_price'),
+      askingPrice: p.asking_price ?? undefined,
+      imageUrl1: p.image_url_1 ?? undefined,
+      imageUrl2: p.image_url_2 ?? undefined,
+      imageUrl3: p.image_url_3 ?? undefined,
+      imageGuid: p.image_guid ?? undefined,
       productSize: p.product_size
         ? {
             width: p.product_size.width,
@@ -113,7 +110,7 @@ export let getProductDetails = SlateTool.create(spec, {
     }));
 
     return {
-      output: { products },
+      output: { products, raw: data },
       message: `Retrieved details for **${products.length}** product(s). ${products.map((p: any) => `\`${p.sku}\`: ${p.name ?? 'Unknown'} ($${p.perItemPrice.toFixed(2)}/ea)`).join(', ')}`
     };
   })

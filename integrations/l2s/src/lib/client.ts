@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface ShortenUrlParams {
   url: string;
@@ -22,7 +27,7 @@ export interface UpdateUrlParams {
   tags?: string[];
 }
 
-export interface L2sApiResponse<T = any> {
+export interface L2sApiResponse<T = unknown> {
   ok: boolean;
   response: {
     message: string;
@@ -31,36 +36,78 @@ export interface L2sApiResponse<T = any> {
 }
 
 export class L2sClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.l2s.is',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'L2S',
+          reason: 'l2s_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          nestedKeys: ['response', 'errors']
+        })
     });
+    this.axios.interceptors.response.use(response => {
+      if (isApiErrorRecord(response.data) && response.data.ok === false) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'L2S',
+            reason: 'l2s_api_error',
+            nestedKeys: ['response', 'errors']
+          }
+        );
+      }
+      return response;
+    });
+  }
+
+  private readUrlResponse(data: unknown): L2sApiResponse {
+    if (
+      !isApiErrorRecord(data) ||
+      typeof data.ok !== 'boolean' ||
+      !isApiErrorRecord(data.response) ||
+      typeof data.response.message !== 'string' ||
+      !Object.hasOwn(data.response, 'data') ||
+      data.response.data === undefined
+    ) {
+      throw createApiServiceError('L2S returned an invalid URL response.', {
+        reason: 'l2s_invalid_response'
+      });
+    }
+    return {
+      ...data,
+      ok: data.ok,
+      response: {
+        ...data.response,
+        message: data.response.message,
+        data: data.response.data
+      }
+    };
   }
 
   async shortenUrl(params: ShortenUrlParams): Promise<L2sApiResponse> {
     let response = await this.axios.post('/url', params);
-    return response.data;
+    return this.readUrlResponse(response.data);
   }
 
   async getUrl(urlId: string): Promise<L2sApiResponse> {
     let response = await this.axios.get(`/url/${urlId}`);
-    return response.data;
+    return this.readUrlResponse(response.data);
   }
 
   async updateUrl(urlId: string, params: UpdateUrlParams): Promise<L2sApiResponse> {
     let response = await this.axios.put(`/url/${urlId}`, params);
-    return response.data;
+    return this.readUrlResponse(response.data);
   }
 
-  async getUserSettings(): Promise<Record<string, any>> {
+  async getUserSettings(): Promise<Record<string, unknown>> {
     let response = await this.axios.get('/user/setting');
-    let data = response.data as L2sApiResponse;
+    let data = response.data as L2sApiResponse<Record<string, unknown>> &
+      Record<string, unknown>;
     return data.response?.data ?? data;
   }
 }

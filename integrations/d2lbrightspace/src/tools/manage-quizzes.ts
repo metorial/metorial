@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { richText } from '../lib/response';
 import { spec } from '../spec';
 
 export let listQuizzes = SlateTool.create(spec, {
@@ -11,7 +12,11 @@ export let listQuizzes = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID')
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        )
     })
   )
   .output(
@@ -40,13 +45,13 @@ export let listQuizzes = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : result?.Objects || [];
     let quizzes = items.map((q: any) => ({
       quizId: String(q.QuizId),
-      name: q.Name,
-      isActive: q.IsActive,
-      startDate: q.StartDate,
-      endDate: q.EndDate,
-      dueDate: q.DueDate,
-      attemptsAllowed: q.AttemptsAllowed?.NumberOfAttemptsAllowed,
-      timeLimitMinutes: q.TimeLimit?.TimeLimit,
+      name: q.Name ?? undefined,
+      isActive: q.IsActive ?? undefined,
+      startDate: q.StartDate ?? undefined,
+      endDate: q.EndDate ?? undefined,
+      dueDate: q.DueDate ?? undefined,
+      attemptsAllowed: q.AttemptsAllowed?.NumberOfAttemptsAllowed ?? undefined,
+      timeLimitMinutes: q.SubmissionTimeLimit?.TimeLimitValue ?? undefined,
       gradeItemId: q.GradeItemId ? String(q.GradeItemId) : undefined
     }));
 
@@ -65,7 +70,11 @@ export let getQuiz = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       quizId: z.string().describe('Quiz ID'),
       includeAttempts: z.boolean().optional().describe('Also include quiz attempts'),
       includeQuestions: z.boolean().optional().describe('Also include quiz questions')
@@ -119,10 +128,10 @@ export let getQuiz = SlateTool.create(spec, {
       attempts = attItems.map((a: any) => ({
         attemptId: String(a.AttemptId),
         userId: a.UserId ? String(a.UserId) : undefined,
-        score: a.Score,
-        isCompleted: a.IsCompleted,
-        startedDate: a.AttemptedDateTime,
-        completedDate: a.CompletedDateTime
+        score: a.Score ?? undefined,
+        isCompleted: a.Completed != null,
+        startedDate: a.Started ?? undefined,
+        completedDate: a.Completed ?? undefined
       }));
     }
 
@@ -132,23 +141,23 @@ export let getQuiz = SlateTool.create(spec, {
       let qItems = Array.isArray(qResult) ? qResult : qResult?.Objects || [];
       questions = qItems.map((q: any) => ({
         questionId: String(q.QuestionId),
-        questionText: q.QuestionText?.Text || q.QuestionText?.Content,
-        questionType: q.QuestionTypeId,
-        points: q.Points
+        questionText: richText(q.QuestionInfo?.QuestionText ?? q.QuestionText),
+        questionType: q.QuestionTypeId ?? undefined,
+        points: q.Points ?? undefined
       }));
     }
 
     return {
       output: {
         quizId: String(quiz.QuizId),
-        name: quiz.Name,
-        isActive: quiz.IsActive,
-        description: quiz.Description?.Text || quiz.Description?.Content,
-        startDate: quiz.StartDate,
-        endDate: quiz.EndDate,
-        dueDate: quiz.DueDate,
-        attemptsAllowed: quiz.AttemptsAllowed?.NumberOfAttemptsAllowed,
-        timeLimitMinutes: quiz.TimeLimit?.TimeLimit,
+        name: quiz.Name ?? undefined,
+        isActive: quiz.IsActive ?? undefined,
+        description: richText(quiz.Description?.Text),
+        startDate: quiz.StartDate ?? undefined,
+        endDate: quiz.EndDate ?? undefined,
+        dueDate: quiz.DueDate ?? undefined,
+        attemptsAllowed: quiz.AttemptsAllowed?.NumberOfAttemptsAllowed ?? undefined,
+        timeLimitMinutes: quiz.SubmissionTimeLimit?.TimeLimitValue ?? undefined,
         attempts,
         questions
       },

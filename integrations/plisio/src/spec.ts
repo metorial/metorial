@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'plisio',
   name: 'Plisio',
   description:
-    'Cryptocurrency payment gateway for creating invoices, processing withdrawals, managing balances, and accepting payments in 30+ cryptocurrencies.',
+    'Create and retrieve cryptocurrency invoices, send withdrawals, inspect balances and fees, identify your shop, and manage permanent deposit addresses.',
   metadata: {},
   config,
   auth

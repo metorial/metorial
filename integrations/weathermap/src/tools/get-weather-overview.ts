@@ -18,14 +18,16 @@ export let getWeatherOverview = SlateTool.create(spec, {
       date: z
         .string()
         .optional()
-        .describe('Date for the overview in YYYY-MM-DD format (optional, defaults to today)')
+        .describe(
+          'Today or tomorrow in YYYY-MM-DD format, using the location timezone (defaults to today)'
+        )
     })
   )
   .output(
     z.object({
       latitude: z.number().describe('Latitude'),
       longitude: z.number().describe('Longitude'),
-      timezone: z.string().optional().describe('Timezone name'),
+      timezone: z.string().optional().describe('Timezone offset in the ±HH:MM format'),
       date: z.string().optional().describe('Date of the overview'),
       weatherOverview: z.string().describe('Human-readable weather summary')
     })
@@ -46,8 +48,8 @@ export let getWeatherOverview = SlateTool.create(spec, {
     let output = {
       latitude: data.lat,
       longitude: data.lon,
-      timezone: data.tz,
-      date: data.date,
+      timezone: data.tz ?? undefined,
+      date: data.date ?? undefined,
       weatherOverview: data.weather_overview
     };
 

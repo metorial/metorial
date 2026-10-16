@@ -1,121 +1,87 @@
-Let me check the API reference page for a full list of features, and also look for webhook support specifically.Now I have a comprehensive understanding. Let me confirm whether Blackboard has webhook support or not.
+# Blackboard Learn integration
 
-Based on my research, Blackboard Learn REST API does not appear to have native webhook or event subscription support. The API is purely request-response based. Let me compile the specification.
+## Connection
 
-# Slates Specification for Blackboard
+Connect to the institution's Learn instance URL using either user-authorized
+OAuth (`oauth_3lo`) or an application's client credentials
+(`client_credentials`). An administrator must register the application on the
+Learn instance and grant the required Learn entitlements.
 
-## Overview
+The user authorization flow requests `read write offline`, exchanges an
+authorization code for an access token, and uses the refresh token for renewal.
+Client-credentials connections renew by requesting another client-credentials
+token. The instance URL and token expiry are retained with authentication.
+Existing saved connections may use their previously stored instance URL until
+the next authentication renewal.
 
-Blackboard Learn (now part of Anthology) is a learning management system (LMS) used by educational institutions to deliver courses, manage enrollments, track grades, and facilitate communication between instructors and students. It provides a REST API that allows external applications to programmatically access and manage LMS data such as courses, users, content, grades, and more.
+## Available operations
 
-## Authentication
+| Area | Tools |
+| --- | --- |
+| Connection identity | `who_am_i` |
+| Courses | `create_course`, `get_course`, `update_course`, `delete_course`, `list_courses` |
+| Users | `create_user`, `get_user`, `update_user`, `delete_user`, `list_users` |
+| Enrollments | `enroll_user`, `unenroll_user`, `list_enrollments`, `get_enrollment`, `update_enrollment` |
+| Course content | `create_content`, `get_content`, `list_content`, `update_content`, `delete_content` |
+| Grade columns | `create_grade_column`, `get_grade_column`, `list_grade_columns`, `update_grade_column`, `delete_grade_column` |
+| Grades | `record_grade`, `get_grade`, `list_grades` |
+| Course announcements | `create_announcement`, `list_announcements`, `update_announcement`, `delete_announcement` |
+| Groups | `create_group`, `list_groups`, `update_group`, `delete_group`, `manage_group_members` |
+| Attendance | `create_attendance_meeting`, `list_attendance_meetings`, `record_attendance`, `list_attendance_records` |
+| Assignment attempts | `list_attempts`, `get_attempt`, `grade_attempt` |
+| Calendars | `list_calendars`, `list_calendar_items`, `create_calendar_item` |
+| Discovery | `list_terms`, `list_data_sources` |
 
-Blackboard Learn supports OAuth 2.0 for API authentication with two grant types:
+## Behavior and limits
 
-### 1. Client Credentials (Two-Legged OAuth)
+- List tools return one page and `hasMore`; advance `offset` to retrieve the next
+  page. Offsets, limits, positions, attempt counts, and member limits must be
+  whole numbers. Scores retain fractional precision and accept zero.
+- Discover course IDs with `list_courses`, term IDs with `list_terms`, data
+  source IDs with `list_data_sources`, calendar IDs with `list_calendars`, and
+  grade column IDs with `list_grade_columns`.
+- Creating a user requires password, first name, and last name at invocation
+  time. These inputs retain their existing optional schema shape.
+- User profile fields depend on Learn entitlements and visibility settings. A
+  username may be absent from a visible user profile.
+- `FixedNumDays` course availability uses `availability.duration.daysOfUse`.
+- External content links use `contentHandlerUrl`. Content positions are zero
+  based. Submission text is returned as `studentSubmission`; an attempt's
+  `text` field is its text grade.
+- Grade columns default to manual grading, or attempts grading when due date
+  or attempt settings are supplied. Creation includes the provider-required
+  anonymous-grading settings, defaulting to `None`. Zero possible points and zero allowed
+  attempts are sent unchanged; Learn uses zero attempts for unlimited attempts.
+- Course announcements support permanent or date-restricted availability.
+  `DateRange` maps to the provider's `Restricted` value. `Term` resolves the
+  course's associated term dates and reports an error when no date range is
+  available. Login and course-display flags are system-announcement settings;
+  requesting them as true for a course announcement reports an error.
+- Group `SignupSheet` enrollment maps to self-enrollment with a signup sheet.
+  In Ultra courses, standalone groups should be associated with a content item
+  using Learn's content-group APIs; those associations are outside this tool set.
+- Creating an attendance meeting requires title, start, and end at invocation
+  time. Attendance inputs retain uppercase statuses and send the provider's
+  title-case equivalents. An existing record is updated; a confirmed missing
+  record is created. API-created meetings' attendance is managed through the API.
+- Calendar date ranges can span at most 16 weeks. `OfficeHours` items need
+  recurrence settings. LTI launch deep-link details are optional for Course items.
+  Gradebook calendar items are created through grade column operations.
 
-Authentication for REST integrations follows the OAuth 2.0 RFC Standard. Each developer has a unique key and secret associated with each application they create, and makes an HTTP POST directly to the REST-enabled Learn server requesting an OAuth access token.
+## Provider references
 
-**Setup:**
+Contracts were checked against the official [Learn API
+reference](https://developer.anthology.com/portal/displayApi/Learn) and its
+[OpenAPI document](https://devportal-docstore.s3.amazonaws.com/learn-swagger.json)
+(version `4001.0.0`, retrieved 2026-10-15). The official [attendance
+walkthrough](https://github.com/blackboard/anthologydevdocs/blob/main/docs/blackboard/rest-apis/hands-on/attendance.md)
+also documents record creation/update and API-managed attendance.
 
-- Register as a developer at `developer.blackboard.com` and create an application to receive an Application ID, Key, and Secret.
-- Before you can use an integration with Blackboard Learn, an administrator must register it with Blackboard Learn. Before you begin, you must obtain an application ID. The admin registers the Application ID on the Learn instance and assigns a Learn User whose permissions the integration will inherit.
+API availability and permissions depend on the institution's Learn release and
+entitlements. Local static verification does not establish provider acceptance.
 
-**Token Request:**
-
-- POST to `/learn/api/public/v1/oauth2/token` with `grant_type=client_credentials`
-- Authorization set to Basic followed by a space and base64-encoded credentials. Credentials must be formatted as `application-key:secret` before encoding.
-- The Portal returns an authorization token that grants the application access to the Learn REST API for one hour.
-- Use the returned `access_token` as a Bearer token in subsequent requests.
-
-**Considerations:**
-
-- One of the drawbacks associated with Basic Authentication is that the application requires broad access, as the tool is acting as a system-level user.
-- The Learn instance base URL (e.g., `https://yourschool.blackboard.com`) is required as each institution has its own server.
-
-### 2. Authorization Code (Three-Legged OAuth / 3LO)
-
-Three-legged OAuth (3LO) allows an application to act as a user, enabling much more granular access control. Rather than a system user acting as someone that can modify all courses, the application acts as a specific user with only their permissions.
-
-**Flow:**
-
-1. Redirect the user to: `GET /learn/api/public/v1/oauth2/authorizationcode` with `redirect_uri`, `response_type=code`, `client_id`, `scope`, and optionally `state`.
-2. The user logs in and authorizes the application.
-3. Exchange the authorization code for a token: POST to `/learn/api/public/v1/oauth2/token` with `grant_type=authorization_code`, the `code`, and `redirect_uri`.
-
-**Scopes:**
-
-- `read`, `write`, or `offline` are available scopes.
-- The `offline` scope allows an application to access Blackboard Learn as a user without requiring the user to login each time. When granted, a `refresh_token` is returned.
-
-**PKCE Support:**
-
-- Starting in version 3700.4, Blackboard Learn's 3-Legged OAuth 2.0 implementation supports the Proof Key for Code Exchange (PKCE) extension.
-
-## Features
-
-### Course Management
-
-Create, read, update, and delete courses. Manage course properties including availability, enrollment settings, terms, and descriptions. Supports organizing courses into categories.
-
-### User Management
-
-Create, read, update, and delete user accounts. Manage user profiles including names, contact information, system roles, and availability. Users can be identified by internal ID, UUID, username, or external ID.
-
-### Enrollment / Course Memberships
-
-Manage course memberships including enrolling and unenrolling users in courses, assigning course roles (student, instructor, etc.), and controlling availability. Also supports organization memberships.
-
-### Course Content
-
-Create documents in Learn, pull lists of different types of content in a course, and manage content items. Supports folders, files, links, and other content types. Content can be organized hierarchically with parent-child relationships and configured with adaptive release dates and availability settings.
-
-- File attachments can be uploaded and associated with content items.
-
-### Assignments and Assessments
-
-Blackboard Ultra offers a REST API for managing assignments. Create assignments with instructions, file attachments, due dates, and grading settings. Manage student assignment attempts and submissions.
-
-### Gradebook
-
-Manage grade columns (creating, updating, configuring scoring), record and retrieve student grades, and sync grades between external tools and the Blackboard gradebook. The Gradebook Columns API provides flexibility in grading, including changing formulas used in grade calculations for the "Overall Grade" column.
-
-- Supports grade schemas and calculated columns.
-
-### Announcements
-
-Manage announcements at the system and course level, including creating, reading, and deleting them.
-
-### Calendar
-
-Non-3LO users can manage calendars, and integrate external calendar systems with Learn Calendars, including Personal, Course/Organization, and System calendars.
-
-### Attendance
-
-Track whether a student arrived at a class, was late, or absent. Integrate with attendance systems and tie attendance data to grades in the grade center. Create and manage attendance meetings and record student attendance statuses.
-
-- If you create an attendance meeting using the REST API, the attendance status can only be modified using the REST API, not the GUI.
-
-### Course Groups
-
-Manage groups within courses, including creating group sets, assigning members, and configuring group properties.
-
-### Course Messages
-
-Send and manage messages within courses for instructor-student communication.
-
-### Data Sources
-
-Manage data source keys used to associate records with external systems, useful for SIS integrations and tracking the origin of data.
-
-### Institutional Hierarchy
-
-Manage institutional hierarchy nodes for organizing the institution's structure.
-
-### System Administration
-
-Manage system-level settings including terms, system roles, institution roles, course roles, LTI placements, and user sessions.
-
-## Events
-
-The provider does not support webhooks or event subscriptions through its REST API. There is no built-in mechanism for receiving real-time notifications about changes in the system. Integrations must poll the API to detect changes.
+The OpenAPI property description says Course calendar items require an LTI
+launch deep link, but the structural required-field list excludes it and the
+official [calendar creation guide](https://github.com/blackboard/anthologydevdocs/blob/main/docs/blackboard/rest-apis/hands-on/calendar-api.md#create-a-calendaritem)
+shows Course creation and results without a deep link. The integration therefore
+accepts ordinary Course events without a deep link and forwards one when supplied.

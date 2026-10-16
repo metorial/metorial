@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getRecord = SlateTool.create(spec, {
@@ -26,9 +27,12 @@ export let getRecord = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
 
-    let record = await client.getRecord(ctx.input.tableId, ctx.input.recordId, {
-      fields: ctx.input.fields
-    });
+    let record = requireRecord(
+      await client.getRecord(ctx.input.tableId, ctx.input.recordId, {
+        fields: ctx.input.fields
+      }),
+      'record'
+    );
 
     return {
       output: { record },

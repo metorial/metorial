@@ -1,85 +1,34 @@
-Let me get more details on the API endpoints available.Now I have enough information to write the specification.
+# Givebutter Integration
 
-# Slates Specification for Givebutter
+Givebutter's public REST API is used for nonprofit fundraising and donor management. Requests use HTTPS and an API-key Bearer header. Generate a key in **Settings → Integrations → API Keys**; its permissions determine available resources. There is no OAuth or token refresh in this integration. Connection configuration contains no account or resource IDs.
 
-## Overview
+## Supported workflows
 
-Givebutter is a fundraising platform for nonprofits and community organizations that provides donation forms, fundraising campaigns, events with ticketing, auctions, and donor/contact management (CRM). Its REST API allows programmatic access to manage campaigns, contacts, transactions, funds, plans, tickets, and payouts.
+- **Account:** `get_account` calls `GET /sso/v1/account` to identify the connected account and return its organization profile.
+- **Campaigns:** list, retrieve, create, update, and delete. Updates use `PUT /v1/campaigns/{id}` and support publication and public visibility. Campaign goals must be non-negative integers at runtime.
+- **Contacts:** list/filter, retrieve, create, update, archive, and restore. Updates use PUT; restore uses PATCH. `manage_contact_tags` adds, removes, or synchronizes a non-empty tag list. Archive and restore must be performed separately from profile edits. Archive reads the resulting provider record to report actual timestamps.
+- **Transactions:** list/filter, retrieve, and record manual payments without charging the donor. The existing numeric amount is serialized as the provider's numeric-string field without rescaling. Existing campaign IDs and fund IDs are resolved to the campaign and fund codes required by the current create endpoint. Address fields are flattened, `in_kind` maps to the provider's `in-kind` value, and an omitted transaction timestamp is filled with the current time before submission.
+- **Funds:** list, retrieve, create, update, and delete. Code-only updates retrieve the current name required by the provider's PUT endpoint.
+- **Recurring plans and payouts:** list and retrieve. Payout completion uses the provider's `paid_at` field.
+- **Tickets:** list and retrieve attendee tickets. Check-in uses `checked_in_at`. `get_ticket` prepares a downloadable PDF when Givebutter supplies a valid HTTPS PDF URL; the original `pdf` metadata field remains available with credential values redacted. URL expiry is not documented, so no expiry or automatic renewal is invented.
+- **Campaign participation:** list peer-to-peer members and teams.
 
-## Authentication
+Every list tool accepts `page` and optional `perPage` (1–100) and returns actual total count/current page/last page. Contact searches support email, first/last name, tags, and update timestamp. Transactions support transaction timestamps, contact, payment method, and scope filters; current scope values are `all`, `benefiting`, and `chapters`.
 
-Givebutter uses **API Key** authentication, passed as a Bearer token in the `Authorization` header.
+## Compatibility and limits
 
-To authenticate requests, provide your API Key as the Bearer header: `Authorization: Bearer {{ your_api_key }}`. All API requests must be made over HTTPS.
+The original 24 tool keys and all original input/output field types, null branches, enums, defaults, and input requiredness remain intact. Four documented optional outputs (campaign event/logo and payout address in detail/list tools) may be omitted; their present types and null branches are unchanged and original provider records are retained under `raw`. `get_account`, `get_fund`, and `manage_contact_tags` are additive. Missing or malformed required provider data produces a service error instead of fabricated IDs, zero totals, empty arrays, or timestamps. Actual null values remain null. Numeric provider IDs are checked before conversion to the original numeric output fields; unrepresentable IDs fail rather than losing precision. Decimal contribution strings and recognizable boolean values are normalized to the existing numeric/boolean contracts.
 
-**Generating an API Key:**
+Create-contact email and phone objects retain their existing public input shapes. The provider's current creation schema accepts arrays of values, so optional legacy type labels are not sent. The update endpoint supports richer email/phone objects, but that functionality is not exposed here. Some generated API response schemas describe historically structured fields (for example tags, addresses, campaign covers, and transaction UTM parameters) as strings. The integration preserves its established structured output contracts and rejects incompatible values rather than inventing a conversion.
 
-1. In your Givebutter dashboard, click on **Settings**, then the **Developers** tab, and click **API** in the sub-menu. Click **New API key**, give it a name, and click **Create**.
-2. Once generated, API keys are only shown once – they are hashed for improved security. Copy and store the key securely.
-3. You need to be an admin to access the Integrations/Developers tab.
+No webhook triggers are registered. Household management, contact activities, campaign ticket types/discounts, pledges, messages, webhook administration, and transaction editing are documented provider surfaces outside this integration's practical scope. No undocumented mutations are inferred for recurring plans, tickets, or payouts.
 
-**Base URL:** `https://api.givebutter.com/v1/`
+## Official sources
 
-There are no OAuth flows or scopes. The API key grants full access to the account's data.
-
-## Features
-
-### Campaign Management
-
-Create, retrieve, update, and delete fundraising campaigns (donation forms, fundraising pages, events). You can display donation data, create campaigns programmatically, or connect donation events to marketing automation tools. Campaigns have properties like title, type, goal, status, currency, and URL.
-
-### Contact Management
-
-Create, retrieve, update, archive, and restore donor/supporter contacts. Contacts support customized profiles, comprehensive donor histories, and tailored fields, notes, and tags. Contacts include personal information, email/phone/address details, contribution statistics, custom fields, external IDs, and subscription preferences.
-
-### Transaction Management
-
-Retrieve transactions and create manual transactions. The transactions endpoint returns only transactions made under your account by default. If your account has campaigns of which you are the beneficiary, or campaigns owned by chapter accounts, you'll need to change the scope parameter. Transaction data includes donor details, amounts, fees, payment method, line items, custom fields, and UTM parameters.
-
-### Recurring Plans
-
-Retrieve information about recurring giving plans (monthly, quarterly, annual subscriptions). Plans are tied to donors and campaigns, and the API provides read access to plan details.
-
-### Funds
-
-Create, retrieve, update, and delete funds. Funds allow organizations to categorize and designate donations for specific purposes or programs.
-
-### Tickets
-
-Retrieve ticket information for event-based campaigns. Tickets contain attendee details, pricing, and check-in status.
-
-### Payouts
-
-Retrieve payout records that represent transfers of raised funds to the organization's bank account.
-
-### Campaign Members and Teams
-
-Retrieve and manage peer-to-peer fundraising members and teams within campaigns. Members can receive credit for donations by sharing their custom link, and any donations made will automatically be credited to them. Teams support leaderboard-style fundraising competitions.
-
-## Events
-
-Givebutter supports webhooks that can be configured from the dashboard under **Settings > Developers > Webhooks**. Givebutter supports 9 primary webhook events. Each webhook includes a signing secret for HMAC signature verification. When creating a webhook, you specify a name, destination URL, and which events to subscribe to.
-
-### Campaign Events
-
-- **campaign.created** – Triggered when a campaign is created.
-- **campaign.updated** – Triggered when campaign details are updated.
-
-### Transaction Events
-
-- **transaction.succeeded** – Triggered when a transaction is successful. The `transaction.succeeded` and `contact.created` events are not fired during CSV imports and only trigger for real-time transactions. Givebutter does not provide webhooks for transaction refunds or updates.
-
-### Contact Events
-
-- **contact.created** – Triggered when a new contact is created as a result of a new transaction or manual contact creation. Does not fire during CSV imports.
-
-### Ticket Events
-
-- **ticket.created** – Triggered when a supporter purchases a ticket (not when a ticket type is created in the dashboard).
-
-### Plan (Recurring) Events
-
-- **plan.created** – Triggered when a recurring plan is created.
-- **plan.updated** – Triggered when a plan is updated.
-- **plan.canceled** – Triggered when a plan is canceled.
-- **plan.resumed** – Triggered when a plan is resumed.
+- [Documentation index](https://docs.givebutter.com/llms.txt)
+- [Current OpenAPI document](https://givebutter.com/docs/api.json)
+- [Authentication](https://docs.givebutter.com/api-reference/authentication), [pagination](https://docs.givebutter.com/api-reference/pagination), and [errors](https://docs.givebutter.com/api-reference/errors)
+- [Account identity](https://docs.givebutter.com/api-reference/sso-accounts/get-ssov1account)
+- [Campaign update](https://docs.givebutter.com/api-reference/campaigns/update-a-campaign)
+- [Contact creation](https://docs.givebutter.com/api-reference/contacts/create-a-contact), [update](https://docs.givebutter.com/api-reference/contacts/update-a-contact), [restore](https://docs.givebutter.com/api-reference/contacts/restore-a-contact), and [tags](https://docs.givebutter.com/api-reference/contact-tags/add-tags-to-a-contact)
+- [Create transaction](https://docs.givebutter.com/api-reference/transactions/create-a-transaction), [get fund](https://docs.givebutter.com/api-reference/funds/get-a-fund), [get ticket](https://docs.givebutter.com/api-reference/tickets/get-a-ticket), and [get payout](https://docs.givebutter.com/api-reference/payouts/get-a-payout)

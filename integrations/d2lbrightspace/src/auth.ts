@@ -1,259 +1,255 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { BrightspaceClient } from './lib/client';
+import { brightspaceError } from './lib/errors';
+import { normalizeInstanceUrl } from './lib/instance';
+
+let tokenClient = createAxios({
+  baseURL: 'https://auth.brightspace.com',
+  timeout: 30_000,
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+});
+tokenClient.interceptors.response.use(undefined, error => {
+  throw brightspaceError(error, 'OAuth token exchange');
+});
+
+let getProfile = async (ctx: {
+  output: { token: string; instanceUrl?: string };
+  input: { instanceUrl?: string };
+}) => {
+  let instanceUrl = ctx.output.instanceUrl ?? ctx.input.instanceUrl;
+  if (!instanceUrl) return { profile: {} };
+  let whoami = await new BrightspaceClient({
+    instanceUrl,
+    token: ctx.output.token,
+    lpVersion: '1.49',
+    leVersion: '1.82',
+    basVersion: '1.4'
+  }).getWhoAmI();
+  return {
+    profile: {
+      id: String(whoami.Identifier),
+      name: [whoami.FirstName, whoami.LastName].filter(Boolean).join(' ') || undefined
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      instanceUrl: z.string().optional()
     })
   )
   .addOauth({
     type: 'auth.oauth',
     name: 'Brightspace OAuth',
     key: 'oauth',
-
     scopes: [
+      { title: 'Core API fallback', description: 'Core API fallback.', scope: 'core:*:*' },
+      { title: 'Read users', description: 'Read users.', scope: 'users:userdata:read' },
+      { title: 'Create users', description: 'Create users.', scope: 'users:userdata:create' },
+      { title: 'Update users', description: 'Update users.', scope: 'users:userdata:update' },
       {
-        title: 'Core Full Access',
-        description: 'Full access to core APIs (fallback for unmapped actions)',
-        scope: 'core:*:*'
-      },
-      { title: 'Users Read', description: 'Read user data', scope: 'users:userdata:read' },
-      {
-        title: 'Users Create',
-        description: 'Create user accounts',
-        scope: 'users:userdata:create'
-      },
-      {
-        title: 'Users Update',
-        description: 'Update user accounts',
-        scope: 'users:userdata:update'
-      },
-      {
-        title: 'Users Delete',
-        description: 'Delete user accounts',
-        scope: 'users:userdata:delete'
-      },
-      {
-        title: 'Profile Read',
-        description: 'Read user profiles',
-        scope: 'users:profile:read'
-      },
-      {
-        title: 'Own Profile',
-        description: 'Read own profile',
+        title: 'Read own identity',
+        description: 'Read own identity.',
         scope: 'users:own_profile:read'
       },
       {
-        title: 'Enrollment Read',
-        description: 'Read enrollment data',
+        title: 'Read enrollments',
+        description: 'Read enrollments.',
         scope: 'enrollment:orgunit:read'
       },
       {
-        title: 'Enrollment Create',
-        description: 'Create enrollments',
+        title: 'Create enrollments',
+        description: 'Create enrollments.',
         scope: 'enrollment:orgunit:create'
       },
       {
-        title: 'Enrollment Delete',
-        description: 'Delete enrollments',
+        title: 'Remove enrollments',
+        description: 'Remove enrollments.',
         scope: 'enrollment:orgunit:delete'
       },
       {
-        title: 'Own Enrollment',
-        description: 'Read own enrollment data',
+        title: 'Read own enrollments',
+        description: 'Read own enrollments.',
         scope: 'enrollment:own_enrollment:read'
       },
+      { title: 'Read courses', description: 'Read courses.', scope: 'orgunits:course:read' },
       {
-        title: 'Course Read',
-        description: 'Read course offerings',
-        scope: 'orgunits:course:read'
-      },
-      {
-        title: 'Course Create',
-        description: 'Create course offerings',
+        title: 'Create courses',
+        description: 'Create courses.',
         scope: 'orgunits:course:create'
       },
       {
-        title: 'Course Update',
-        description: 'Update course offerings',
+        title: 'Update courses',
+        description: 'Update courses.',
         scope: 'orgunits:course:update'
       },
       {
-        title: 'Course Delete',
-        description: 'Delete course offerings',
+        title: 'Delete courses',
+        description: 'Delete courses.',
         scope: 'orgunits:course:delete'
       },
       {
-        title: 'Template Read',
-        description: 'Read course templates',
-        scope: 'orgunits:coursetemplate:read'
+        title: 'Read organization structure',
+        description: 'Read organization structure.',
+        scope: 'organizations:organization:read'
       },
       {
-        title: 'Template Create',
-        description: 'Create course templates',
-        scope: 'orgunits:coursetemplate:create'
+        title: 'Read organization types',
+        description: 'Discover organizational unit types.',
+        scope: 'organizations:organizationtypes:read'
       },
       {
-        title: 'Content Read',
-        description: 'Read course content modules',
+        title: 'Read roles',
+        description: 'Discover enrollment roles.',
+        scope: 'role:detail:read'
+      },
+      {
+        title: 'Read grade categories',
+        description: 'Read grade categories.',
+        scope: 'grades:gradecategories:read'
+      },
+      {
+        title: 'Read discussion topics',
+        description: 'Read topics in a forum.',
+        scope: 'discussions:topics:readonly'
+      },
+      {
+        title: 'Manage discussion topics',
+        description: 'Create discussion topics.',
+        scope: 'discussions:topics:manage'
+      },
+      {
+        title: 'Delete assignments',
+        description: 'Delete assignment folders.',
+        scope: 'dropbox:folders:delete'
+      },
+      {
+        title: 'Read content modules',
+        description: 'Read content modules.',
         scope: 'content:modules:read'
       },
       {
-        title: 'Content Manage',
-        description: 'Manage course content modules',
+        title: 'Manage content modules',
+        description: 'Manage content modules.',
         scope: 'content:modules:manage'
       },
       {
-        title: 'Topics Read',
-        description: 'Read course content topics',
+        title: 'Read content topics',
+        description: 'Read content topics.',
         scope: 'content:topics:read'
       },
       {
-        title: 'Topics Manage',
-        description: 'Manage course content topics',
-        scope: 'content:topics:manage'
-      },
-      {
-        title: 'Grades Read',
-        description: 'Read grade data',
+        title: 'Read grade values',
+        description: 'Read grade values.',
         scope: 'grades:gradevalues:read'
       },
       {
-        title: 'Grades Write',
-        description: 'Write grade data',
+        title: 'Write grade values',
+        description: 'Write grade values.',
         scope: 'grades:gradevalues:write'
       },
       {
-        title: 'Grade Items Read',
-        description: 'Read grade objects',
+        title: 'Read grade items',
+        description: 'Read grade items.',
         scope: 'grades:gradeobjects:read'
       },
       {
-        title: 'Grade Items Write',
-        description: 'Write grade objects',
-        scope: 'grades:gradeobjects:write'
-      },
-      {
-        title: 'Dropbox Read',
-        description: 'Read assignment dropbox folders',
+        title: 'Read assignments',
+        description: 'Read assignments.',
         scope: 'dropbox:folders:read'
       },
       {
-        title: 'Dropbox Write',
-        description: 'Write assignment dropbox folders',
+        title: 'Create assignments',
+        description: 'Create assignments.',
         scope: 'dropbox:folders:write'
       },
       {
-        title: 'Dropbox Delete',
-        description: 'Delete assignment dropbox folders',
-        scope: 'dropbox:folders:delete'
-      },
-      { title: 'Quizzes Read', description: 'Read quizzes', scope: 'quizzes:quizzes:read' },
-      {
-        title: 'Quizzes Write',
-        description: 'Manage quizzes',
-        scope: 'quizzes:quizzes:write'
+        title: 'Read groups',
+        description: 'Read course groups and group categories.',
+        scope: 'groups:group:read'
       },
       {
-        title: 'Discussions Read',
-        description: 'Read discussion forums',
-        scope: 'discussions:forums:read'
+        title: 'Enroll group members',
+        description: 'Add users to groups.',
+        scope: 'groups:enrollment:create'
       },
       {
-        title: 'Discussions Manage',
-        description: 'Manage discussion forums',
+        title: 'Remove group members',
+        description: 'Remove users from groups.',
+        scope: 'groups:enrollment:delete'
+      },
+      { title: 'Read quizzes', description: 'Read quizzes.', scope: 'quizzing:quizzes:read' },
+      {
+        title: 'Read quiz attempts',
+        description: 'Read quiz attempts.',
+        scope: 'quizzing:attempts:read'
+      },
+      {
+        title: 'Read discussion forums',
+        description: 'Read discussion forums.',
+        scope: 'discussions:forums:readonly'
+      },
+      {
+        title: 'Manage discussion forums',
+        description: 'Manage discussion forums.',
         scope: 'discussions:forums:manage'
       },
       {
-        title: 'Posts Read',
-        description: 'Read discussion posts',
-        scope: 'discussions:posts:read'
+        title: 'Read discussion posts',
+        description: 'Read discussion posts.',
+        scope: 'discussions:posts:readonly'
       },
       {
-        title: 'Posts Manage',
-        description: 'Manage discussion posts',
+        title: 'Manage discussion posts',
+        description: 'Manage discussion posts.',
         scope: 'discussions:posts:manage'
       },
       {
-        title: 'News Read',
-        description: 'Read news/announcements',
+        title: 'Read announcements',
+        description: 'Read announcements.',
         scope: 'news:newsitems:read'
       },
       {
-        title: 'News Manage',
-        description: 'Manage news/announcements',
+        title: 'Manage announcements',
+        description: 'Manage announcements.',
         scope: 'news:newsitems:manage'
       },
       {
-        title: 'Calendar Read',
-        description: 'Read calendar events',
+        title: 'Read calendar events',
+        description: 'Read calendar events.',
         scope: 'calendar:events:read'
       },
       {
-        title: 'Calendar Write',
-        description: 'Manage calendar events',
+        title: 'Write calendar events',
+        description: 'Write calendar events.',
         scope: 'calendar:events:write'
       },
       {
-        title: 'Awards Read',
-        description: 'Read awards and badges',
-        scope: 'awards:awards:read'
-      },
-      {
-        title: 'Awards Manage',
-        description: 'Manage awards and badges',
-        scope: 'awards:awards:manage'
-      },
-      {
-        title: 'Groups Read',
-        description: 'Read groups and sections',
-        scope: 'groups:groups:read'
-      },
-      {
-        title: 'Groups Manage',
-        description: 'Manage groups and sections',
-        scope: 'groups:groups:manage'
-      },
-      {
-        title: 'OrgUnit Read',
-        description: 'Read org unit structure',
-        scope: 'orgunits:orgunit:read'
-      },
-      {
-        title: 'OrgUnit Manage',
-        description: 'Manage org unit structure',
-        scope: 'orgunits:orgunit:manage'
-      },
-      {
-        title: 'Completion Read',
-        description: 'Read enrollment completion data',
-        scope: 'enrollment:completion:read'
-      },
-      {
-        title: 'Completion Update',
-        description: 'Update enrollment completion',
-        scope: 'enrollment:completion:update'
-      },
-      {
-        title: 'Password Write',
-        description: 'Manage user passwords',
-        scope: 'users:password:write'
+        title: 'Delete calendar events',
+        description: 'Delete calendar events.',
+        scope: 'calendar:events:delete'
       }
     ],
-
     inputSchema: z.object({
       instanceUrl: z
         .string()
         .optional()
         .describe(
-          'Your Brightspace instance URL (e.g. https://myschool.brightspace.com). Used only for token refresh and profile retrieval.'
+          'Your Brightspace HTTPS instance origin, such as https://school.brightspace.com.'
         )
     }),
-
     getAuthorizationUrl: async ctx => {
+      let instanceUrl = normalizeInstanceUrl(ctx.input.instanceUrl);
       let params = new URLSearchParams({
         response_type: 'code',
         client_id: ctx.clientId,
@@ -261,22 +257,13 @@ export let auth = SlateAuth.create()
         state: ctx.state,
         scope: ctx.scopes.join(' ')
       });
-
       return {
-        url: `https://auth.brightspace.com/oauth2/auth?${params.toString()}`,
-        input: ctx.input
+        url: `https://auth.brightspace.com/oauth2/auth?${params}`,
+        input: { ...ctx.input, instanceUrl }
       };
     },
-
     handleCallback: async ctx => {
-      let client = createAxios({
-        baseURL: 'https://auth.brightspace.com',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      let response = await client.post(
+      let response = await tokenClient.post(
         '/core/connect/token',
         new URLSearchParams({
           grant_type: 'authorization_code',
@@ -286,50 +273,34 @@ export let auth = SlateAuth.create()
           client_secret: ctx.clientSecret
         }).toString()
       );
-
-      let data = response.data as {
-        access_token?: string;
-        refresh_token?: string;
-        expires_in?: number;
-        token_type?: string;
-        error?: string;
-        error_description?: string;
-      };
-
-      if (!data.access_token) {
-        throw new Error(
-          `Brightspace OAuth error: ${data.error_description || data.error || 'No access token received'}`
-        );
-      }
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Brightspace',
+            operation: 'token exchange'
+          }),
+          instanceUrl: normalizeInstanceUrl(ctx.input.instanceUrl)
         },
         input: ctx.input
       };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      let client = createAxios({
-        baseURL: 'https://auth.brightspace.com',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      let response = await client.post(
+    handleTokenRefresh: async (ctx: {
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        instanceUrl?: string;
+      };
+      input: { instanceUrl?: string };
+      clientId: string;
+      clientSecret: string;
+      scopes: string[];
+    }) => {
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError('Reconnect Brightspace to obtain a refresh token.', {
+          reason: 'brightspace_missing_refresh_token'
+        });
+      let response = await tokenClient.post(
         '/core/connect/token',
         new URLSearchParams({
           grant_type: 'refresh_token',
@@ -339,90 +310,43 @@ export let auth = SlateAuth.create()
           scope: ctx.scopes.join(' ')
         }).toString()
       );
-
-      let data = response.data as {
-        access_token?: string;
-        refresh_token?: string;
-        expires_in?: number;
-        error?: string;
-        error_description?: string;
-      };
-
-      if (!data.access_token) {
-        throw new Error(
-          `Brightspace token refresh error: ${data.error_description || data.error || 'No access token received'}`
-        );
-      }
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Brightspace',
+            operation: 'token refresh',
+            previousRefreshToken: ctx.output.refreshToken,
+            refreshTokenFallbackMode: 'falsy'
+          }),
+          instanceUrl: ctx.output.instanceUrl ?? ctx.input.instanceUrl
         },
         input: ctx.input
       };
     },
-
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: { instanceUrl?: string };
-      scopes: string[];
-    }) => {
-      let instanceUrl = ctx.input.instanceUrl;
-      if (!instanceUrl) {
-        return { profile: {} };
-      }
-
-      let baseUrl = instanceUrl.replace(/\/+$/, '');
-      let client = createAxios({
-        baseURL: baseUrl,
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      try {
-        let response = await client.get('/d2l/api/lp/1.49/users/whoami');
-        let data = response.data as {
-          Identifier?: string;
-          FirstName?: string;
-          LastName?: string;
-          UniqueName?: string;
-          ProfileIdentifier?: string;
-        };
-
-        return {
-          profile: {
-            id: data.Identifier,
-            name: [data.FirstName, data.LastName].filter(Boolean).join(' ') || undefined,
-            email: data.UniqueName
-          }
-        };
-      } catch {
-        return { profile: {} };
-      }
-    }
+    getProfile
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'Bearer Token',
     key: 'bearer_token',
-
     inputSchema: z.object({
-      token: z.string().describe('Brightspace OAuth bearer token or API access token')
+      token: z.string().describe('Brightspace OAuth bearer token'),
+      instanceUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Your Brightspace HTTPS instance origin, such as https://school.brightspace.com.'
+        )
     }),
-
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('Provide a Brightspace bearer token.', {
+          reason: 'brightspace_missing_token'
+        });
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          instanceUrl: normalizeInstanceUrl(ctx.input.instanceUrl)
         }
       };
     }

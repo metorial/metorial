@@ -1,6 +1,8 @@
 # Ticketmaster
 
-Search and discover live events, attractions, venues, and classifications across global markets. Retrieve ticket offers, pricing, and availability for events. Reserve, purchase, and manage tickets including seat selection, payment processing, and order fulfillment. Get seat recommendations based on real-time availability and price points. Check inventory status for primary and resale ticket availability. Validate tickets by submitting entry and exit scans for venue access. Manage season ticketing including new sales, seat upgrades, exchanges, and returns. Integrate third-party inventory into Ticketmaster sales channels with event ingestion, availability sync, and booking management.
+Search live events, artists, teams, venues, and classification hierarchies. Retrieve event details, purchase links, offers, and primary or resale inventory status where authorized.
+
+Connect with a Ticketmaster developer API key. Discovery search supports paging, classification, location, sale-date, and event-date filters. Inventory Status requires separate authorization, and batches must contain events from one source and country. Legacy Commerce access must be confirmed with Ticketmaster.
 
 ## License
 

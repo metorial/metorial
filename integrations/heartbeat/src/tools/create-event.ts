@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let createEvent = SlateTool.create(spec, {
   name: 'Create Event',
   key: 'create_event',
-  description: `Creates a new event in your Heartbeat community. Events can have a location (Zoom requires an integrated Zoom account, Heartbeat creates a custom voice channel). You can invite attendees by email — existing users are invited directly, others receive an email invite.`,
+  description: `DEPRECATED — use \`schedule_event\` instead. Creates a new event in your Heartbeat community. Events can have a location (Zoom requires an integrated Zoom account, Heartbeat creates a custom voice channel). You can invite attendees by email — existing users are invited directly, others receive an email invite.`,
+  instructions: [
+    'Use schedule_event instead. The documented operation requires startTime, duration, and location and does not guarantee an event object response.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

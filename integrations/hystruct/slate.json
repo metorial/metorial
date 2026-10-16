@@ -6,8 +6,7 @@
     "retrieve scraped workflow data",
     "trigger scraping jobs",
     "extract structured web data",
-    "define data extraction schemas",
-    "scrape multiple pages",
+    "retrieve schema-based extraction results",
     "manage webhook subscriptions"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/hystruct.png"

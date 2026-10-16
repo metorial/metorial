@@ -24,7 +24,7 @@ export let listLogicblocks = SlateTool.create(spec, {
               .boolean()
               .nullable()
               .describe('Last evaluation result, or null if never evaluated'),
-            createdAt: z.string().describe('When the logicblock was created'),
+            createdAt: z.string().optional().describe('When the logicblock was created'),
             updatedAt: z.string().describe('When the logicblock was last updated')
           })
         )

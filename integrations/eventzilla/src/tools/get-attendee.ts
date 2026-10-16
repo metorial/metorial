@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { asText, readItem, requireText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getAttendeeTool = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let getAttendeeTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       attendeeId: z.string().describe('Attendee ID'),
       firstName: z.string().describe('First name'),
       lastName: z.string().describe('Last name'),
@@ -50,14 +52,11 @@ export let getAttendeeTool = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let data = await client.getAttendee(ctx.input.attendeeId);
-    let a = Array.isArray(data?.attendees)
-      ? data.attendees[0]
-      : Array.isArray(data)
-        ? data[0]
-        : data;
+    let a = readItem(data, 'attendees');
 
     let output = {
-      attendeeId: String(a.id),
+      raw: data,
+      attendeeId: requireText(asText(a.id), 'attendee ID'),
       firstName: a.first_name,
       lastName: a.last_name,
       email: a.email,
@@ -66,7 +65,7 @@ export let getAttendeeTool = SlateTool.create(spec, {
       isAttended: a.is_attended,
       transactionRef: a.refno ?? a.transaction_ref,
       transactionDate: a.transaction_date,
-      transactionAmount: a.transaction_amount,
+      transactionAmount: asText(a.transaction_amount),
       transactionStatus: a.transaction_status,
       eventDate: a.event_date,
       eventId: a.event_id,

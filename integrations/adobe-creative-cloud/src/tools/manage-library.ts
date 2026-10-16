@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LibrariesClient } from '../lib/libraries';
 import { spec } from '../spec';
@@ -34,20 +34,20 @@ export let manageLibrary = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('Library name is required for create action');
+        throw createApiServiceError('Library name is required for create action');
       }
       let result = await client.createLibrary(ctx.input.name);
       return {
         output: {
           libraryId: result.id || result.library_urn,
-          name: result.name || ctx.input.name,
+          name: result.name,
           success: true
         },
         message: `Created library **"${ctx.input.name}"** with ID \`${result.id || result.library_urn}\`.`
       };
     } else {
       if (!ctx.input.libraryId) {
-        throw new Error('Library ID is required for delete action');
+        throw createApiServiceError('Library ID is required for delete action');
       }
       await client.deleteLibrary(ctx.input.libraryId);
       return {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { richText } from '../lib/response';
 import { spec } from '../spec';
 
 export let listAnnouncements = SlateTool.create(spec, {
@@ -27,7 +28,8 @@ export let listAnnouncements = SlateTool.create(spec, {
             endDate: z.string().optional().describe('End date (when hidden)'),
             isPublished: z.boolean().optional().describe('Whether published'),
             isPinned: z.boolean().optional().describe('Whether pinned'),
-            createdByName: z.string().optional().describe('Author name')
+            createdByName: z.string().optional().describe('Author name when available'),
+            createdByUserId: z.string().optional().describe('Author user ID')
           })
         )
         .describe('List of announcements')
@@ -40,14 +42,15 @@ export let listAnnouncements = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : [];
     let announcements = items.map((n: any) => ({
       newsItemId: String(n.Id),
-      title: n.Title,
-      body: n.Body?.Text || n.Body?.Content || n.Body?.Html,
-      createdDate: n.CreatedDate,
-      startDate: n.StartDate,
-      endDate: n.EndDate,
-      isPublished: n.IsPublished,
-      isPinned: n.IsPinned,
-      createdByName: n.CreatedBy
+      title: n.Title ?? undefined,
+      body: richText(n.Body),
+      createdDate: n.CreatedDate ?? undefined,
+      startDate: n.StartDate ?? undefined,
+      endDate: n.EndDate ?? undefined,
+      isPublished: n.IsPublished ?? undefined,
+      isPinned: n.IsPinned ?? undefined,
+      createdByName: undefined,
+      createdByUserId: n.CreatedBy == null ? undefined : String(n.CreatedBy)
     }));
 
     return {
@@ -94,8 +97,16 @@ export let createAnnouncement = SlateTool.create(spec, {
 
     let newsData: any = {
       Title: ctx.input.title,
-      Body: { Content: ctx.input.body, Type: 'Html' },
-      IsPublished: ctx.input.isPublished ?? true
+      Body: { Text: '', Html: ctx.input.body },
+      IsPublished: ctx.input.isPublished ?? true,
+      StartDate: ctx.input.startDate ?? new Date().toISOString(),
+      EndDate: ctx.input.endDate ?? null,
+      IsGlobal: ctx.input.isGlobal ?? false,
+      IsAuthorInfoShown: ctx.input.showAuthorInfo ?? true,
+      IsPinned: ctx.input.isPinned ?? false,
+      ShowOnlyInCourseOfferings: false,
+      IsStartDateShown: true,
+      SortOrder: null
     };
 
     if (ctx.input.isPinned !== undefined) newsData.IsPinned = ctx.input.isPinned;
@@ -110,7 +121,7 @@ export let createAnnouncement = SlateTool.create(spec, {
     return {
       output: {
         newsItemId: String(result.Id),
-        title: result.Title
+        title: result.Title ?? undefined
       },
       message: `Created announcement **${result.Title}** (ID: ${result.Id}).`
     };
@@ -146,8 +157,7 @@ export let updateAnnouncement = SlateTool.create(spec, {
 
     let updateData: any = {};
     if (ctx.input.title !== undefined) updateData.Title = ctx.input.title;
-    if (ctx.input.body !== undefined)
-      updateData.Body = { Content: ctx.input.body, Type: 'Html' };
+    if (ctx.input.body !== undefined) updateData.Body = { Text: '', Html: ctx.input.body };
     if (ctx.input.isPublished !== undefined) updateData.IsPublished = ctx.input.isPublished;
     if (ctx.input.isPinned !== undefined) updateData.IsPinned = ctx.input.isPinned;
     if (ctx.input.startDate !== undefined) updateData.StartDate = ctx.input.startDate;
@@ -162,7 +172,7 @@ export let updateAnnouncement = SlateTool.create(spec, {
     return {
       output: {
         newsItemId: String(result.Id),
-        title: result.Title
+        title: result.Title ?? undefined
       },
       message: `Updated announcement **${result.Title}** (ID: ${result.Id}).`
     };

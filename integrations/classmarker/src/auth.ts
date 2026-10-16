@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -7,7 +7,7 @@ export let auth = SlateAuth.create()
       token: z.string().describe('ClassMarker API key'),
       apiSecret: z
         .string()
-        .describe('ClassMarker API secret used for HMAC signature generation')
+        .describe('ClassMarker API secret used for SHA256 signature generation')
     })
   )
   .addCustomAuth({
@@ -25,6 +25,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim() || !ctx.input.apiSecret.trim()) {
+        throw createApiServiceError('A ClassMarker API key and API secret are required.');
+      }
       return {
         output: {
           token: ctx.input.apiKey,

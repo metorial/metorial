@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getModuleFileUrl } from '../lib/files';
 import { spec } from '../spec';
 
 export let generateBusinessReport = SlateTool.create(spec, {
@@ -39,6 +40,9 @@ Useful for creating summaries, trend analyses, KPI reports, and other data-drive
       instructions: ctx.input.instructions,
       rawData: ctx.input.rawData
     });
+
+    let fileUrl = getModuleFileUrl(result);
+    if (fileUrl) await ctx.addAttachment({ type: 'url', url: fileUrl });
 
     return {
       output: {

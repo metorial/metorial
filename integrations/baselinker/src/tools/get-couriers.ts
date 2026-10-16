@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BaseLinkerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,6 +13,10 @@ export let getCouriers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      courierCodeForAccounts: z
+        .string()
+        .optional()
+        .describe('Courier code to discover available API accounts'),
       courierCodeForFields: z
         .string()
         .optional()
@@ -30,6 +34,10 @@ export let getCouriers = SlateTool.create(spec, {
   .output(
     z.object({
       couriers: z.any().describe('List of available couriers with codes and names'),
+      courierAccounts: z
+        .any()
+        .optional()
+        .describe('Available accounts for the selected courier'),
       courierFields: z.any().optional().describe('Required fields for the specified courier'),
       orderPackages: z.any().optional().describe('Existing packages for the specified order'),
       packageStatusHistory: z
@@ -39,19 +47,29 @@ export let getCouriers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.packageIdsForStatus && ctx.input.packageIdsForStatus.length > 100) {
+      throw createApiServiceError(
+        'Status history supports at most 100 package IDs per request.'
+      );
+    }
     let client = new BaseLinkerClient({ token: ctx.auth.token });
 
     let couriersResult = await client.getCouriersList();
     let courierFields: any;
+    let courierAccounts: any;
     let orderPackages: any;
     let packageStatusHistory: any;
 
+    if (ctx.input.courierCodeForAccounts) {
+      courierAccounts = (await client.getCourierAccounts(ctx.input.courierCodeForAccounts))
+        .accounts;
+    }
     if (ctx.input.courierCodeForFields) {
       let fieldsResult = await client.getCourierFields(ctx.input.courierCodeForFields);
       courierFields = fieldsResult;
     }
 
-    if (ctx.input.orderIdForPackages) {
+    if (ctx.input.orderIdForPackages !== undefined) {
       let packagesResult = await client.getOrderPackages(ctx.input.orderIdForPackages);
       orderPackages = packagesResult;
     }
@@ -63,10 +81,16 @@ export let getCouriers = SlateTool.create(spec, {
       packageStatusHistory = statusResult;
     }
 
-    let couriers = couriersResult.couriers || [];
+    let couriers = couriersResult.couriers;
 
     return {
-      output: { couriers, courierFields, orderPackages, packageStatusHistory },
+      output: {
+        couriers,
+        courierFields,
+        courierAccounts,
+        orderPackages,
+        packageStatusHistory
+      },
       message: `Found **${Array.isArray(couriers) ? couriers.length : Object.keys(couriers).length}** courier(s) available.`
     };
   })

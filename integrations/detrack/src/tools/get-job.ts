@@ -14,6 +14,10 @@ export let getJobTool = SlateTool.create(spec, {
   .input(
     z.object({
       doNumber: z.string().describe('Delivery order number of the job to retrieve'),
+      type: z
+        .enum(['Delivery', 'Collection'])
+        .optional()
+        .describe('Job type to disambiguate matching D.O. numbers'),
       date: z
         .string()
         .optional()
@@ -59,7 +63,7 @@ export let getJobTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DetrackClient(ctx.auth.token);
 
-    let result = await client.getJob(ctx.input.doNumber, ctx.input.date);
+    let result = await client.getJob(ctx.input.doNumber, ctx.input.date, ctx.input.type);
 
     let items = Array.isArray(result.items)
       ? (result.items as Record<string, unknown>[])
@@ -71,8 +75,8 @@ export let getJobTool = SlateTool.create(spec, {
     return {
       output: {
         jobId: result.id ? String(result.id) : undefined,
-        doNumber: String(result.do_number ?? ctx.input.doNumber),
-        date: String(result.date ?? ''),
+        doNumber: result.do_number,
+        date: result.date,
         type: result.type ? String(result.type) : undefined,
         status: result.status ? String(result.status) : undefined,
         trackingStatus: result.tracking_status ? String(result.tracking_status) : undefined,
@@ -82,14 +86,16 @@ export let getJobTool = SlateTool.create(spec, {
           ? String(result.deliver_to_collect_from)
           : undefined,
         companyName: result.company_name ? String(result.company_name) : undefined,
-        phone: result.phone ? String(result.phone) : undefined,
+        phone: result.phone_number ? String(result.phone_number) : undefined,
         trackingNumber: result.tracking_number ? String(result.tracking_number) : undefined,
         orderNumber: result.order_number ? String(result.order_number) : undefined,
         instructions: result.instructions ? String(result.instructions) : undefined,
         items,
         milestones,
         podAt: result.pod_at ? String(result.pod_at) : undefined,
-        receivedBy: result.received_by ? String(result.received_by) : undefined,
+        receivedBy: result.received_by_sent_by
+          ? String(result.received_by_sent_by)
+          : undefined,
         note: result.note ? String(result.note) : undefined,
         reason: result.reason ? String(result.reason) : undefined,
         raw: result

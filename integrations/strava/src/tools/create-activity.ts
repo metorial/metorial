@@ -33,6 +33,7 @@ export let createActivity = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       activityId: z.number().describe('Created activity identifier'),
       name: z.string().describe('Activity name'),
       sportType: z.string().describe('Sport type'),
@@ -58,6 +59,7 @@ export let createActivity = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: activity,
         activityId: activity.id,
         name: activity.name,
         sportType: activity.sport_type || activity.type,

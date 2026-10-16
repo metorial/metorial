@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageDastTarget = SlateTool.create(spec, {
@@ -53,6 +53,15 @@ export let manageDastTarget = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Pagination cursor for the next page of targets.'),
+      total: z.number().optional().describe('Total number of targets, when returned.'),
       targets: z
         .array(
           z.object({
@@ -92,21 +101,28 @@ export let manageDastTarget = SlateTool.create(spec, {
       });
 
       let targets = (response.data ?? []).map((t: any) => ({
-        targetId: t.id ?? 0,
+        targetId: requireCodacyNumber(t.id, 'dastTarget.id'),
         url: t.url ?? undefined,
         targetType: t.targetType ?? undefined,
         status: t.status ?? undefined
       }));
 
       return {
-        output: { targets },
+        output: {
+          targets,
+          raw: response,
+          cursor: response.pagination?.cursor,
+          total: response.pagination?.total
+        },
         message: `Found **${targets.length}** DAST target(s).`
       };
     }
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.url || !ctx.input.targetType) {
-        throw new Error('URL and targetType are required for creating a DAST target.');
+        throw createApiServiceError(
+          'URL and targetType are required for creating a DAST target.'
+        );
       }
 
       let body: any = {
@@ -121,8 +137,9 @@ export let manageDastTarget = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: response,
           createdTarget: {
-            targetId: data.id ?? 0,
+            targetId: requireCodacyNumber(data.id, 'dastTarget.id'),
             url: data.url ?? ctx.input.url,
             targetType: data.targetType ?? ctx.input.targetType
           }
@@ -133,7 +150,7 @@ export let manageDastTarget = SlateTool.create(spec, {
 
     if (ctx.input.action === 'scan') {
       if (ctx.input.targetId == null) {
-        throw new Error('targetId is required for triggering a DAST scan.');
+        throw createApiServiceError('targetId is required for triggering a DAST scan.');
       }
 
       await client.analyzeDastTarget(ctx.input.targetId);
@@ -146,7 +163,7 @@ export let manageDastTarget = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (ctx.input.targetId == null) {
-        throw new Error('targetId is required for deleting a DAST target.');
+        throw createApiServiceError('targetId is required for deleting a DAST target.');
       }
 
       await client.deleteDastTarget(ctx.input.targetId);
@@ -157,6 +174,6 @@ export let manageDastTarget = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

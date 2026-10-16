@@ -4,6 +4,7 @@ export * from './create-contact';
 export * from './create-job';
 export * from './delete-candidate';
 export * from './delete-job';
+export * from './discovery';
 export * from './get-candidate';
 export * from './get-company';
 export * from './get-contact';

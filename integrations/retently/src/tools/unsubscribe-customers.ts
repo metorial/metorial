@@ -23,15 +23,19 @@ export let unsubscribeCustomers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the unsubscription succeeded')
+      success: z.boolean().describe('Whether the unsubscription request succeeded'),
+      result: z
+        .any()
+        .optional()
+        .describe('Provider response, including any per-customer outcomes')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
-    await client.unsubscribeCustomers(ctx.input.emails, ctx.input.message);
+    let result = await client.unsubscribeCustomers(ctx.input.emails, ctx.input.message);
 
     return {
-      output: { success: true },
+      output: { success: true, result },
       message: `Unsubscribed **${ctx.input.emails.length}** customer(s) from future surveys.`
     };
   })

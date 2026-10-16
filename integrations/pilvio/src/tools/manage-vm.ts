@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,6 +51,7 @@ export let manageVm = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider operation response'),
       vmUuid: z.string().describe('UUID of the affected VM'),
       name: z.string().optional().describe('VM name'),
       status: z.string().optional().describe('VM status after the action'),
@@ -105,7 +106,9 @@ export let manageVm = SlateTool.create(spec, {
 
       case 'change_password':
         if (!ctx.input.username || !ctx.input.password) {
-          throw new Error('username and password are required for change_password action');
+          throw createApiServiceError(
+            'username and password are required for change_password action'
+          );
         }
         result = await client.changeVmPassword(vmUuid, ctx.input.username, ctx.input.password);
         message = `Changed password for user **${ctx.input.username}** on VM **${vmUuid}**.`;
@@ -121,11 +124,15 @@ export let manageVm = SlateTool.create(spec, {
         break;
     }
 
+    if (action === 'clone' && !result?.uuid) {
+      throw createApiServiceError('Pilvio did not return the cloned VM identifier.');
+    }
     return {
       output: {
+        raw: result,
         vmUuid: result?.uuid || vmUuid,
-        name: result?.name,
-        status: result?.status,
+        name: result?.name ?? undefined,
+        status: result?.status ?? undefined,
         success: true
       },
       message

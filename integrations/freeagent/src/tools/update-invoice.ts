@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateInvoice = SlateTool.create(spec, {
@@ -9,7 +9,7 @@ export let updateInvoice = SlateTool.create(spec, {
   description: `Update an existing invoice in FreeAgent. Use status transitions to change invoice status (mark as sent, cancelled, draft, or scheduled). Only the provided fields will be modified.`,
   instructions: [
     'To change invoice status, use the "transition" field with one of: mark_as_sent, mark_as_scheduled, mark_as_draft, mark_as_cancelled.',
-    'Status transitions and field updates cannot be combined in a single call. If a transition is provided, only the transition will be applied.'
+    'Status transitions and field updates cannot be combined in a single call. Calls combining a transition with field updates are rejected.'
   ],
   tags: {
     destructive: false
@@ -35,15 +35,27 @@ export let updateInvoice = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    if (
+      ctx.input.transition &&
+      [
+        ctx.input.datedOn,
+        ctx.input.paymentTermsInDays,
+        ctx.input.reference,
+        ctx.input.currency,
+        ctx.input.comments
+      ].some(value => value !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Apply an invoice transition separately from field updates.'
+      );
+    }
+
+    let client = createClient(ctx);
 
     if (ctx.input.transition) {
       let invoice = await client.transitionInvoice(ctx.input.invoiceId, ctx.input.transition);
       return {
-        output: { invoice: invoice || {} },
+        output: { invoice },
         message: `Applied transition **${ctx.input.transition}** to invoice **${ctx.input.invoiceId}**`
       };
     }
@@ -59,7 +71,7 @@ export let updateInvoice = SlateTool.create(spec, {
     let invoice = await client.updateInvoice(ctx.input.invoiceId, invoiceData);
 
     return {
-      output: { invoice: invoice || {} },
+      output: { invoice },
       message: `Updated invoice **${ctx.input.invoiceId}**`
     };
   })

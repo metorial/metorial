@@ -1,6 +1,6 @@
 # Item
 
-Manage people, companies, and custom objects in item. List and retrieve flat object records across contacts, companies, and custom object types with pagination, search, sorting, and field-based filters. Create, update, soft-delete, and batch upsert records for sync and CRM workflows. Inspect the full workspace schema to discover object types, fields, select options, and relationship metadata. List organization users for ownership mapping, list shared views, and execute saved views to pull pre-filtered structured data. Trigger live item skills through webhook endpoints with arbitrary JSON payloads and optional HMAC signatures.
+Manage people, companies, and custom objects in item. List and retrieve flat object records across contacts, companies, and custom object types with pagination, search, sorting, and field-based filters. Create, update, soft-delete, and batch upsert records for sync and CRM workflows. Inspect the full workspace schema to discover object types, fields, select options, relationship metadata, and percentage precision/value scale. List organization users for ownership mapping, list shared views, and execute saved views to pull pre-filtered structured data. Trigger live item skills through webhook endpoints with arbitrary JSON payloads and optional HMAC signatures.
 
 ## Tools
 

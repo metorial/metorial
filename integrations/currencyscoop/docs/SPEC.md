@@ -1,56 +1,32 @@
-I notice references to CurrencyBeacon in the documentation links. Let me check if CurrencyScoop has been rebranded to CurrencyBeacon.Now I have enough information. CurrencyScoop appears to have been rebranded to CurrencyBeacon, with the API now hosted at `api.currencybeacon.com`. Let me compile the specification.
+# Currency Scoop API specification
 
-# Slates Specification for CurrencyScoop
+The integration retains the `currencyscoop` identifier and connects to the existing CurrencyBeacon v1 host. The public CurrencyScoop homepage redirects to CurrencyBeacon. This refresh does not migrate saved credentials or connection settings.
 
-## Overview
+## Connection
 
-CurrencyScoop (now operating as CurrencyBeacon) is a REST API providing real-time and historical exchange rates for 168 fiat currencies and over 2,000 cryptocurrencies. Exchange rate data is retrieved from several major Forex data providers, central banks, and various commercial vendors in real-time. The API delivers data in JSON format and is designed for use in currency converters, financial software, and back-office systems.
+- API base: `https://api.currencybeacon.com/v1`.
+- Authentication: the saved API key is sent as a Bearer token.
+- Configuration: `baseCurrency` remains a string with a USD default.
 
-## Authentication
+## Tools
 
-CurrencyBeacon uses API keys to allow access to the API. You can register a new API key at their developer portal. Authentication is required for all API requests.
+| Tool | Request | Behavior |
+| --- | --- | --- |
+| `get_exchange_rates` | `GET /latest`; optional base and target currencies | Returns provider date, base, and rate map. |
+| `get_historical_rates` | `GET /historical`; date plus optional base and targets | Retrieves one historical date. |
+| `convert_currency` | `GET /convert`; source, target, amount, optional date | Returns the provider's amount, converted value, date, and Unix timestamp in seconds. |
+| `get_time_series` | `GET /timeseries`; start/end dates plus optional base and targets | Returns daily rate maps and provider-returned range metadata. |
+| `list_currencies` | `GET /currencies` | Returns currency identifiers and formatting metadata. |
 
-The API key can be provided in one of two ways:
+Every tool includes an optional complete `raw` response envelope. The normalized output fields remain unchanged. Required fields are checked before use; absent or incompatible provider data raises an error without a fabricated value. Rates are quoted-currency units per one base-currency unit. Returned dates are provider data, not timestamps synthesized from the request or current clock.
 
-1. **Query parameter**: Pass the key as the `api_key` query parameter.
-   - Example: `https://api.currencybeacon.com/v1/latest?api_key=YOUR_ACCESS_KEY`
+## Limits
 
-2. **Bearer token**: Pass the key as a Bearer token in the request header: `Authorization: Bearer YOUR_ACCESS_KEY`.
+Subscription access and date-range restrictions remain provider controlled. There are no paginated lists, file operations, or webhook registrations in this surface. The provider documents an account-usage tool on its remote MCP service, but does not publish a corresponding REST contract; account usage is not exposed here.
 
-Sign in and copy your API key directly from your dashboard. The base URL for all API requests is `https://api.currencybeacon.com/v1/`. HTTPS is required for all requests.
+## Official references
 
-## Features
-
-### Real-Time Exchange Rates
-
-Returns real-time exchange rate data for all available currencies. The data is updated based on your subscription plan frequency (e.g., every 60 seconds).
-
-- **Parameters**: Base currency (e.g., USD), optional list of target currency symbols to filter results.
-
-### Historical Exchange Rates
-
-Retrieve historical exchange rates for any specific date in the past. The database goes back to January 1, 1996. This is useful for auditing, accounting, and trend analysis.
-
-- **Parameters**: Base currency, specific date.
-
-### Currency Conversion
-
-The convert endpoint allows you to convert any amount from one currency to another using real-time mid-market exchange rates. This endpoint performs the calculation on the server side.
-
-- **Parameters**: Source currency, target currency, amount.
-
-### Time-Series Data
-
-The time-series endpoint returns daily historical exchange rates between two specified dates. This is designed for plotting charts or analyzing volatility over time. Available on Startup and Pro plans only.
-
-- **Parameters**: Base currency, start date, end date, optional target currency symbols.
-
-### Supported Currencies List
-
-Returns a list of all supported currencies, including their full names, symbols, and ISO codes.
-
-- Useful for populating dropdowns or validating currency inputs in applications.
-
-## Events
-
-The provider does not support events. CurrencyScoop/CurrencyBeacon is a data retrieval API and does not offer webhooks or event subscription mechanisms.
+- [REST API, authentication, endpoint parameters, response examples, and errors](https://www.currencybeacon.com/api-documentation)
+- [Time-series filtering example](https://www.currencybeacon.com/code-samples)
+- [Provider MCP tools](https://www.currencybeacon.com/mcp)
+- [CurrencyScoop homepage redirect](https://currencyscoop.com/)

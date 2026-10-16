@@ -39,6 +39,7 @@ Supports CSV files, JSON, Excel files, and other formats accessible via URL.`,
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the created source'),
       name: z.string().optional().describe('Name of the source'),
       statusCode: z.number().describe('Status code of the source creation'),
@@ -49,15 +50,15 @@ Supports CSV files, JSON, Excel files, and other formats accessible via URL.`,
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       remote: ctx.input.remoteUrl
     };
 
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.projectId) body.project = ctx.input.projectId;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
     if (ctx.input.sourceParser) {
-      let parser: Record<string, any> = {};
+      let parser: Record<string, unknown> = {};
       if (ctx.input.sourceParser.separator !== undefined)
         parser.separator = ctx.input.sourceParser.separator;
       if (ctx.input.sourceParser.header !== undefined)
@@ -72,13 +73,14 @@ Supports CSV files, JSON, Excel files, and other formats accessible via URL.`,
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
-        statusCode: result.status?.code ?? result.code,
-        statusMessage: result.status?.message ?? 'Created',
+        statusCode: result.status.code,
+        statusMessage: result.status.message,
         created: result.created
       },
-      message: `Source **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status?.message ?? 'pending'}.`
+      message: `Source **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status.message}.`
     };
   })
   .build();

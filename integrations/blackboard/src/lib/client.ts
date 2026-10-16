@@ -1,4 +1,6 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios, isApiErrorRecord } from 'slates';
+import { normalizeBaseUrl } from './base-url';
+import { blackboardApiError } from './errors';
 
 export interface PaginatedResponse<T> {
   results: T[];
@@ -173,6 +175,7 @@ export interface BlackboardGrade {
 }
 
 export interface BlackboardAnnouncement {
+  creatorUserId?: string;
   id: string;
   title: string;
   body: string;
@@ -188,39 +191,6 @@ export interface BlackboardAnnouncement {
   created?: string;
   modified?: string;
   creator?: string;
-}
-
-export interface BlackboardAssignment {
-  id: string;
-  courseId?: string;
-  name: string;
-  instructions?: string;
-  description?: string;
-  position?: number;
-  fileUploadEnabled?: boolean;
-  textSubmissionEnabled?: boolean;
-  created?: string;
-  modified?: string;
-  gradeColumnId?: string;
-  groupContent?: boolean;
-  score?: {
-    possible: number;
-  };
-  availability?: {
-    available?: string;
-    allowGuests?: boolean;
-    adaptiveRelease?: {
-      start?: string;
-      end?: string;
-    };
-  };
-  grading?: {
-    due?: string;
-    attemptsAllowed?: number;
-    anonymousGrading?: {
-      type?: string;
-    };
-  };
 }
 
 export interface BlackboardAttempt {
@@ -277,7 +247,8 @@ export interface BlackboardTerm {
 }
 
 export interface BlackboardAttendanceMeeting {
-  id: string;
+  id: string | number;
+  description?: string;
   courseId?: string;
   start?: string;
   end?: string;
@@ -287,6 +258,7 @@ export interface BlackboardAttendanceMeeting {
 }
 
 export interface BlackboardAttendanceRecord {
+  modifiedTime?: string;
   userId: string;
   meetingId?: string;
   status: string;
@@ -294,15 +266,13 @@ export interface BlackboardAttendanceRecord {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(params: { baseUrl: string; token: string }) {
-    this.http = createAxios({
-      baseURL: params.baseUrl.replace(/\/+$/, ''),
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json'
-      }
+    this.http = createAuthenticatedAxios({
+      baseURL: normalizeBaseUrl(params.baseUrl),
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: blackboardApiError
     });
   }
 
@@ -318,6 +288,7 @@ export class Client {
     modified?: string;
     modifiedCompare?: string;
   }): Promise<PaginatedResponse<BlackboardCourse>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -346,7 +317,7 @@ export class Client {
     termId?: string;
     availability?: {
       available?: string;
-      duration?: { type?: string; start?: string; end?: string };
+      duration?: { type?: string; start?: string; end?: string; daysOfUse?: number };
     };
     enrollment?: {
       type?: string;
@@ -354,6 +325,12 @@ export class Client {
     };
     allowGuests?: boolean;
   }): Promise<BlackboardCourse> {
+    validateWholeNumber(data.availability?.duration?.daysOfUse, 'daysOfUse', 1);
+    if (
+      data.availability?.duration?.type === 'FixedNumDays' &&
+      data.availability.duration.daysOfUse === undefined
+    )
+      throw createApiServiceError('FixedNumDays requires availability.duration.daysOfUse.');
     let response = await this.http.post('/learn/api/public/v3/courses', data);
     return response.data;
   }
@@ -366,7 +343,7 @@ export class Client {
       termId?: string;
       availability?: {
         available?: string;
-        duration?: { type?: string; start?: string; end?: string };
+        duration?: { type?: string; start?: string; end?: string; daysOfUse?: number };
       };
       enrollment?: {
         type?: string;
@@ -375,6 +352,7 @@ export class Client {
       allowGuests?: boolean;
     }
   ): Promise<BlackboardCourse> {
+    validateWholeNumber(data.availability?.duration?.daysOfUse, 'daysOfUse', 1);
     let response = await this.http.patch(
       `/learn/api/public/v3/courses/${encodeURIComponent(courseId)}`,
       data
@@ -397,6 +375,7 @@ export class Client {
     modified?: string;
     modifiedCompare?: string;
   }): Promise<PaginatedResponse<BlackboardUser>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -434,6 +413,16 @@ export class Client {
     institutionRoleIds?: string[];
     systemRoleIds?: string[];
   }): Promise<BlackboardUser> {
+    let missingFields = [
+      ...(data.password === undefined ? ['password'] : []),
+      ...(data.name?.given === undefined ? ['name.given'] : []),
+      ...(data.name?.family === undefined ? ['name.family'] : [])
+    ];
+    if (missingFields.length) {
+      throw createApiServiceError(
+        `Creating a Blackboard Learn user requires ${missingFields.join(', ')}.`
+      );
+    }
     let response = await this.http.post('/learn/api/public/v1/users', data);
     return response.data;
   }
@@ -483,6 +472,7 @@ export class Client {
       modifiedCompare?: string;
     }
   ): Promise<PaginatedResponse<BlackboardMembership>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -549,6 +539,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardMembership>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -568,6 +559,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardContent>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -586,6 +578,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardContent>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -619,6 +612,7 @@ export class Client {
       };
     }
   ): Promise<BlackboardContent> {
+    validateWholeNumber(data.position, 'position');
     let parentPath = data.parentId
       ? `/contents/${encodeURIComponent(data.parentId)}/children`
       : '/contents';
@@ -644,6 +638,7 @@ export class Client {
       };
     }
   ): Promise<BlackboardContent> {
+    validateWholeNumber(data.position, 'position');
     let response = await this.http.patch(
       `/learn/api/public/v1/courses/${encodeURIComponent(courseId)}/contents/${encodeURIComponent(contentId)}`,
       data
@@ -666,6 +661,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardGradeColumn>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -699,9 +695,11 @@ export class Client {
         attemptsAllowed?: number;
         scoringModel?: string;
         schemaId?: string;
+        anonymousGrading?: { type: string; releaseAfter?: string };
       };
     }
   ): Promise<BlackboardGradeColumn> {
+    validateWholeNumber(data.grading?.attemptsAllowed, 'attemptsAllowed');
     let response = await this.http.post(
       `/learn/api/public/v2/courses/${encodeURIComponent(courseId)}/gradebook/columns`,
       data
@@ -729,6 +727,7 @@ export class Client {
       };
     }
   ): Promise<BlackboardGradeColumn> {
+    validateWholeNumber(data.grading?.attemptsAllowed, 'attemptsAllowed');
     let response = await this.http.patch(
       `/learn/api/public/v2/courses/${encodeURIComponent(courseId)}/gradebook/columns/${encodeURIComponent(columnId)}`,
       data
@@ -752,6 +751,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardGrade>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -800,6 +800,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardGrade>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -819,6 +820,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardAnnouncement>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -839,6 +841,41 @@ export class Client {
     return response.data;
   }
 
+  private async prepareCourseAnnouncement<
+    T extends {
+      showAtLogin?: boolean;
+      showInCourses?: boolean;
+      availability?: { duration?: { type?: string; start?: string; end?: string } };
+    }
+  >(courseId: string, data: T) {
+    if (data.showAtLogin || data.showInCourses)
+      throw createApiServiceError(
+        'showAtLogin and showInCourses are only supported for system announcements, not course announcements.'
+      );
+    let { showAtLogin: _login, showInCourses: _courses, ...body } = data;
+    let duration = body.availability?.duration;
+    if (duration?.type === 'DateRange') duration.type = 'Restricted';
+    if (duration?.type === 'Term') {
+      let course = await this.getCourse(courseId);
+      if (!course.termId)
+        throw createApiServiceError(
+          'The course has no term. Use DateRange with startDate and endDate.'
+        );
+      let term = await this.getTerm(course.termId);
+      let dates = term.availability?.duration;
+      if (!dates?.start || !dates.end)
+        throw createApiServiceError(
+          'The course term has no date range. Use DateRange with startDate and endDate.'
+        );
+      body.availability = {
+        duration: { type: 'Restricted', start: dates.start, end: dates.end }
+      };
+    }
+    if (duration?.type === undefined && (duration?.start || duration?.end))
+      duration.type = 'Restricted';
+    return body;
+  }
+
   async createCourseAnnouncement(
     courseId: string,
     data: {
@@ -851,9 +888,10 @@ export class Client {
       showInCourses?: boolean;
     }
   ): Promise<BlackboardAnnouncement> {
+    let body = await this.prepareCourseAnnouncement(courseId, data);
     let response = await this.http.post(
       `/learn/api/public/v1/courses/${encodeURIComponent(courseId)}/announcements`,
-      data
+      body
     );
     return response.data;
   }
@@ -871,9 +909,10 @@ export class Client {
       showInCourses?: boolean;
     }
   ): Promise<BlackboardAnnouncement> {
+    let body = await this.prepareCourseAnnouncement(courseId, data);
     let response = await this.http.patch(
       `/learn/api/public/v1/courses/${encodeURIComponent(courseId)}/announcements/${encodeURIComponent(announcementId)}`,
-      data
+      body
     );
     return response.data;
   }
@@ -888,36 +927,11 @@ export class Client {
     offset?: number;
     limit?: number;
   }): Promise<PaginatedResponse<BlackboardAnnouncement>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
     let response = await this.http.get('/learn/api/public/v1/announcements', { params });
-    return response.data;
-  }
-
-  // ── Assignments ──────────────────────────────────────
-
-  async listAssignments(
-    courseId: string,
-    options?: {
-      offset?: number;
-      limit?: number;
-    }
-  ): Promise<PaginatedResponse<BlackboardAssignment>> {
-    let params: Record<string, string> = {};
-    if (options?.offset !== undefined) params.offset = String(options.offset);
-    if (options?.limit !== undefined) params.limit = String(options.limit);
-    let response = await this.http.get(
-      `/learn/api/public/v1/courses/${encodeURIComponent(courseId)}/contents`,
-      { params }
-    );
-    return response.data;
-  }
-
-  async getAssignment(courseId: string, columnId: string): Promise<BlackboardAssignment> {
-    let response = await this.http.get(
-      `/learn/api/public/v2/courses/${encodeURIComponent(courseId)}/gradebook/columns/${encodeURIComponent(columnId)}`
-    );
     return response.data;
   }
 
@@ -932,6 +946,7 @@ export class Client {
       userId?: string;
     }
   ): Promise<PaginatedResponse<BlackboardAttempt>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -985,6 +1000,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardGroup>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -1016,6 +1032,7 @@ export class Client {
       };
     }
   ): Promise<BlackboardGroup> {
+    validateWholeNumber(data.enrollment?.limit, 'memberLimit');
     let response = await this.http.post(
       `/learn/api/public/v2/courses/${encodeURIComponent(courseId)}/groups`,
       data
@@ -1038,6 +1055,7 @@ export class Client {
       };
     }
   ): Promise<BlackboardGroup> {
+    validateWholeNumber(data.enrollment?.limit, 'memberLimit');
     let response = await this.http.patch(
       `/learn/api/public/v2/courses/${encodeURIComponent(courseId)}/groups/${encodeURIComponent(groupId)}`,
       data
@@ -1058,7 +1076,8 @@ export class Client {
       offset?: number;
       limit?: number;
     }
-  ): Promise<PaginatedResponse<BlackboardMembership>> {
+  ): Promise<PaginatedResponse<{ userId: string }>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -1073,7 +1092,7 @@ export class Client {
     courseId: string,
     groupId: string,
     userId: string
-  ): Promise<BlackboardMembership> {
+  ): Promise<{ userId: string }> {
     let response = await this.http.put(
       `/learn/api/public/v2/courses/${encodeURIComponent(courseId)}/groups/${encodeURIComponent(groupId)}/users/${encodeURIComponent(userId)}`,
       {}
@@ -1093,6 +1112,7 @@ export class Client {
     offset?: number;
     limit?: number;
   }): Promise<PaginatedResponse<BlackboardTerm>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -1116,6 +1136,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardAttendanceMeeting>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -1132,11 +1153,17 @@ export class Client {
       start?: string;
       end?: string;
       title?: string;
+      description?: string;
     }
   ): Promise<BlackboardAttendanceMeeting> {
+    if (!data.title || !data.start || !data.end)
+      throw createApiServiceError(
+        'title, start, and end are required to create an attendance meeting.'
+      );
+    validateDateRange(data.start, data.end);
     let response = await this.http.post(
       `/learn/api/public/v1/courses/${encodeURIComponent(courseId)}/meetings`,
-      data
+      { ...data, courseId, description: data.description ?? '' }
     );
     return response.data;
   }
@@ -1149,6 +1176,7 @@ export class Client {
       limit?: number;
     }
   ): Promise<PaginatedResponse<BlackboardAttendanceRecord>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -1167,11 +1195,25 @@ export class Client {
       status: string;
     }
   ): Promise<BlackboardAttendanceRecord> {
-    let response = await this.http.patch(
-      `/learn/api/public/v1/courses/${encodeURIComponent(courseId)}/meetings/${encodeURIComponent(meetingId)}/users/${encodeURIComponent(userId)}`,
-      data
-    );
-    return response.data;
+    let status = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent', EXCUSED: 'Excused' }[
+      data.status
+    ];
+    if (!status) throw createApiServiceError('Unsupported attendance status.');
+    let path = `/learn/api/public/v1/courses/${encodeURIComponent(courseId)}/meetings/${encodeURIComponent(meetingId)}/users`;
+    let body = { meetingId, userId, status };
+    try {
+      let response = await this.http.patch(`${path}/${encodeURIComponent(userId)}`, body);
+      return response.data;
+    } catch (error) {
+      if (
+        !isApiErrorRecord(error) ||
+        !isApiErrorRecord(error.data) ||
+        String(error.data.upstreamStatus) !== '404'
+      )
+        throw error;
+      let response = await this.http.post(path, body);
+      return response.data;
+    }
   }
 
   // ── Calendar ─────────────────────────────────────────
@@ -1184,7 +1226,20 @@ export class Client {
     offset?: number;
     limit?: number;
   }): Promise<PaginatedResponse<Record<string, any>>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
+    if (
+      options?.type &&
+      !['Course', 'GradebookColumn', 'Institution', 'OfficeHours', 'Personal'].includes(
+        options.type
+      )
+    )
+      throw createApiServiceError('Unsupported calendar item type.');
+    if (options?.since && options.until) {
+      validateDateRange(options.since, options.until);
+      if (Date.parse(options.until) - Date.parse(options.since) > 16 * 7 * 86400000)
+        throw createApiServiceError('Calendar date ranges cannot exceed 16 weeks.');
+    }
     if (options?.courseId) params.courseId = options.courseId;
     if (options?.type) params.type = options.type;
     if (options?.since) params.since = options.since;
@@ -1203,8 +1258,67 @@ export class Client {
     location?: string;
     start: string;
     end: string;
+    recurrence?: Record<string, unknown>;
+    ltiLaunchDeepLink?: {
+      placementHandle?: string;
+      uuid?: string;
+      url?: string;
+      title?: string;
+      customParameters?: Record<string, string>;
+    };
   }): Promise<Record<string, any>> {
+    if (!['Course', 'Institution', 'OfficeHours', 'Personal'].includes(data.type))
+      throw createApiServiceError(
+        'Calendar type must be Course, Institution, OfficeHours, or Personal. GradebookColumn items are created through grade columns.'
+      );
+    if (data.type === 'OfficeHours' && !data.recurrence)
+      throw createApiServiceError('OfficeHours items require recurrence settings.');
+    validateDateRange(data.start, data.end);
+    if (data.recurrence) {
+      let recurrence = data.recurrence;
+      if (recurrence.count === undefined && !recurrence.until)
+        throw createApiServiceError('Recurrence requires count or until.');
+      for (let [key, minimum, maximum] of [
+        ['count', 1, 2147483647],
+        ['interval', 1, 100],
+        ['monthRepeatDay', 1, 31],
+        ['monthPosition', -1, 4]
+      ] as const) {
+        let value = recurrence[key];
+        if (
+          value !== undefined &&
+          (typeof value !== 'number' ||
+            !Number.isSafeInteger(value) ||
+            value < minimum ||
+            value > maximum ||
+            (key === 'monthPosition' && value === 0))
+        )
+          throw createApiServiceError(`Invalid recurrence ${key}.`);
+      }
+      if (
+        recurrence.frequency === 'Monthly' &&
+        recurrence.monthRepeatDay === undefined &&
+        (recurrence.monthPosition === undefined || !recurrence.repeatDay)
+      )
+        throw createApiServiceError(
+          'Monthly recurrence requires monthRepeatDay or both monthPosition and repeatDay.'
+        );
+      if (
+        recurrence.frequency === 'Weekly' &&
+        (!Array.isArray(recurrence.weekDays) || recurrence.weekDays.length === 0)
+      )
+        throw createApiServiceError('Weekly recurrence requires weekDays.');
+    }
     let response = await this.http.post('/learn/api/public/v1/calendars/items', data);
+    return response.data;
+  }
+
+  async listCalendars(options?: {
+    offset?: number;
+    limit?: number;
+  }): Promise<PaginatedResponse<{ id: string; name: string }>> {
+    validatePagination(options);
+    let response = await this.http.get('/learn/api/public/v1/calendars', { params: options });
     return response.data;
   }
 
@@ -1214,6 +1328,7 @@ export class Client {
     offset?: number;
     limit?: number;
   }): Promise<PaginatedResponse<Record<string, any>>> {
+    validatePagination(options);
     let params: Record<string, string> = {};
     if (options?.offset !== undefined) params.offset = String(options.offset);
     if (options?.limit !== undefined) params.limit = String(options.limit);
@@ -1221,3 +1336,43 @@ export class Client {
     return response.data;
   }
 }
+
+export let createClient = (ctx: {
+  auth: { token: string; baseUrl?: string };
+  config: unknown;
+}) => {
+  let legacyBaseUrl =
+    isApiErrorRecord(ctx.config) && typeof ctx.config.baseUrl === 'string'
+      ? ctx.config.baseUrl
+      : undefined;
+  let baseUrl = ctx.auth.baseUrl ?? legacyBaseUrl;
+  if (!baseUrl)
+    throw createApiServiceError('Reconnect Blackboard Learn to save the instance URL.');
+  return new Client({ baseUrl, token: ctx.auth.token });
+};
+
+let validatePagination = (options?: { offset?: number; limit?: number }) => {
+  validateWholeNumber(options?.offset, 'offset', 0);
+  validateWholeNumber(options?.limit, 'limit', 1);
+};
+
+export let validateWholeNumber = (value: number | undefined, name: string, minimum = 0) => {
+  if (
+    value !== undefined &&
+    (!Number.isSafeInteger(value) || value < minimum || value > 2147483647)
+  ) {
+    throw createApiServiceError(
+      `${name} must be a whole number between ${minimum} and 2147483647.`
+    );
+  }
+};
+
+export let validateDateRange = (start: string, end: string) => {
+  if (
+    !Number.isFinite(Date.parse(start)) ||
+    !Number.isFinite(Date.parse(end)) ||
+    Date.parse(start) >= Date.parse(end)
+  ) {
+    throw createApiServiceError('start and end must be valid dates with start before end.');
+  }
+};

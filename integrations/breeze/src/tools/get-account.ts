@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -20,25 +20,36 @@ export let getAccount = SlateTool.create(spec, {
       status: z.string().optional().describe('Account status'),
       createdOn: z.string().optional().describe('Account creation date'),
       timezone: z.string().optional().describe('Account timezone'),
-      country: z.any().optional().describe('Country details')
+      country: z.any().optional().describe('Country details'),
+      account: z.any().optional().describe('Complete account summary returned by Breeze')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
     let account = await client.getAccountSummary();
+    if (
+      !isApiErrorRecord(account) ||
+      typeof account.id !== 'string' ||
+      typeof account.name !== 'string' ||
+      typeof account.subdomain !== 'string'
+    ) {
+      throw createApiServiceError('Breeze returned an account summary without its identity.');
+    }
+    let details = isApiErrorRecord(account.details) ? account.details : undefined;
 
     return {
       output: {
-        accountId: account?.id || '',
-        name: account?.name || '',
-        subdomain: account?.subdomain || '',
-        status: account?.status,
-        createdOn: account?.created_on,
-        timezone: account?.details?.timezone,
-        country: account?.details?.country
+        accountId: account.id,
+        name: account.name,
+        subdomain: account.subdomain,
+        status: typeof account.status === 'string' ? account.status : undefined,
+        createdOn: typeof account.created_on === 'string' ? account.created_on : undefined,
+        timezone: typeof details?.timezone === 'string' ? details.timezone : undefined,
+        country: details?.country,
+        account
       },
-      message: `Account: **${account?.name || 'Unknown'}** (${account?.subdomain || ctx.config.subdomain}.breezechms.com).`
+      message: `Account: **${account.name}** (${account.subdomain}.breezechms.com).`
     };
   })
   .build();

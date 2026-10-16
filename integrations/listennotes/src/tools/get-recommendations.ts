@@ -24,6 +24,10 @@ export let getRecommendations = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       recommendations: z
         .array(z.any())
         .describe('Array of recommended podcast or episode objects (up to 8).')
@@ -35,7 +39,7 @@ export let getRecommendations = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let safeMode = ctx.input.safeMode ? 1 : undefined;
+    let safeMode = ctx.input.safeMode === undefined ? undefined : Number(ctx.input.safeMode);
 
     if (ctx.input.resourceType === 'podcast') {
       let data = await client.getPodcastRecommendations({
@@ -45,6 +49,7 @@ export let getRecommendations = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: data,
           recommendations: data.recommendations
         },
         message: `Found **${data.recommendations.length}** podcast recommendations.`
@@ -57,6 +62,7 @@ export let getRecommendations = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: data,
           recommendations: data.recommendations
         },
         message: `Found **${data.recommendations.length}** episode recommendations.`

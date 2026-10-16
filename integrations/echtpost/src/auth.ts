@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,13 +15,16 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'EchtPost API key, found in Account Settings under "API-Schlüssel zum Datenaustausch"'
+          'EchtPost API key from Account → API keys. Use a sandbox key to avoid billing and printing.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim() || /[\r\n]/.test(ctx.input.apiKey)) {
+        throw createApiServiceError('Provide a valid EchtPost API key.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey.trim()
         }
       };
     }

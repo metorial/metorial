@@ -1,7 +1,34 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DeveloperClient } from '../lib/client';
+import { parseMinerstatResponse } from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  devices: z.array(
+    z.object({
+      hardwareId: z.string().describe('Unique hardware identifier'),
+      name: z.string().describe('Hardware device name'),
+      slug: z.string().describe('URL slug for the hardware'),
+      hardwareType: z.string().describe('Category: "gpu" or "asic"'),
+      brand: z.string().describe('Manufacturer brand'),
+      algorithms: z
+        .record(
+          z.string(),
+          z.object({
+            hashrate: z.number().describe('Hashrate in H/s for this algorithm'),
+            power: z.number().describe('Power consumption in watts for this algorithm')
+          })
+        )
+        .describe('Supported algorithms with hashrate and power benchmarks'),
+      specs: z
+        .record(z.string(), z.any())
+        .describe('Technical specifications (clock speeds, memory, etc.)')
+    })
+  ),
+  response: z.any().optional().describe('Original API response'),
+  totalCount: z.number().describe('Number of devices returned')
+});
 
 export let getHardwareTool = SlateTool.create(spec, {
   name: 'Get Hardware',
@@ -24,35 +51,10 @@ export let getHardwareTool = SlateTool.create(spec, {
         .describe('Filter by manufacturer brand (e.g. "nvidia", "amd", "antminer")')
     })
   )
-  .output(
-    z.object({
-      devices: z.array(
-        z.object({
-          hardwareId: z.string().describe('Unique hardware identifier'),
-          name: z.string().describe('Hardware device name'),
-          slug: z.string().describe('URL slug for the hardware'),
-          hardwareType: z.string().describe('Category: "gpu" or "asic"'),
-          brand: z.string().describe('Manufacturer brand'),
-          algorithms: z
-            .record(
-              z.string(),
-              z.object({
-                hashrate: z.number().describe('Hashrate in H/s for this algorithm'),
-                power: z.number().describe('Power consumption in watts for this algorithm')
-              })
-            )
-            .describe('Supported algorithms with hashrate and power benchmarks'),
-          specs: z
-            .record(z.string(), z.any())
-            .describe('Technical specifications (clock speeds, memory, etc.)')
-        })
-      ),
-      totalCount: z.number().describe('Number of devices returned')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     if (!ctx.auth.developerApiKey) {
-      throw new Error(
+      throw createApiServiceError(
         'Developer API key is required to query hardware data. Please provide it in your authentication credentials.'
       );
     }
@@ -78,16 +80,17 @@ export let getHardwareTool = SlateTool.create(spec, {
       specs: h.specs
     }));
 
-    let filterDesc: any[] = [];
+    let filterDesc: string[] = [];
     if (ctx.input.hardwareType) filterDesc.push(`type: ${ctx.input.hardwareType}`);
     if (ctx.input.brand) filterDesc.push(`brand: ${ctx.input.brand}`);
     let filterText = filterDesc.length > 0 ? ` (filtered by ${filterDesc.join(', ')})` : '';
 
     return {
-      output: {
+      output: parseMinerstatResponse(outputSchema, {
         devices: mapped,
-        totalCount: mapped.length
-      },
+        totalCount: mapped.length,
+        response: hardware
+      }),
       message: `Retrieved **${mapped.length}** hardware devices${filterText}.`
     };
   })

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 let contactSchema = z
@@ -64,21 +65,22 @@ export let listContacts = SlateTool.create(spec, {
       createdAtLt: ctx.input.createdBefore
     });
 
-    let contacts = (result.data || []).map((c: any) => ({
-      contactUuid: c.uuid,
-      email: c.email,
-      firstName: c.first_name,
-      lastName: c.last_name,
-      creditBalance: c.credit_balance?.balance,
-      createdAt: c.created_at,
-      ...c
-    }));
+    let contacts = result.data.map((c: any) =>
+      mapEntity(c, {
+        contactUuid: requiredString(c.uuid, 'contactUuid'),
+        email: c.email,
+        firstName: c.current_values?.firstname ?? c.first_name,
+        lastName: c.current_values?.lastname ?? c.last_name,
+        creditBalance: c.credit_balance?.balance,
+        createdAt: c.created_at ?? c.current_values?.created_at
+      })
+    );
 
     return {
       output: {
         contacts,
         totalCount: result.meta?.total,
-        currentPage: result.meta?.page,
+        currentPage: result.meta?.current_page ?? result.meta?.page,
         lastPage: result.meta?.last_page
       },
       message: `Retrieved **${contacts.length}** contacts${result.meta?.total ? ` out of ${result.meta.total} total` : ''}.`

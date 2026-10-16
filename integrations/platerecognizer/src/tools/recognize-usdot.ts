@@ -7,7 +7,9 @@ export let recognizeUsdot = SlateTool.create(spec, {
   name: 'Recognize USDOT Number',
   key: 'recognize_usdot',
   description: `Read USDOT (US Department of Transportation) numbers from images of trucks and commercial vehicles. Handles blurry, low-resolution, and angled captures.`,
-  instructions: ['Provide either an imageUrl or imageBase64, not both.'],
+  instructions: [
+    'Use imageBase64 for the documented binary image upload. The legacy imageUrl field is forwarded to the provider as before, but URL uploads are not documented for this product. If both fields are supplied, imageUrl takes priority.'
+  ],
   constraints: ['Maximum image size is 3 MB.', 'Rate limit: 8 requests/sec.'],
   tags: {
     destructive: false,
@@ -17,9 +19,34 @@ export let recognizeUsdot = SlateTool.create(spec, {
   .input(
     z.object({
       imageUrl: z.string().optional().describe('URL of the image containing a USDOT number'),
-      imageBase64: z.string().optional().describe('Base64-encoded image data'),
+      imageBase64: z
+        .string()
+        .optional()
+        .describe('Base64-encoded image data; a base64 data URI also preserves its MIME type'),
+      imageMimeType: z
+        .string()
+        .optional()
+        .describe(
+          'MIME type of the uploaded image, when known; overrides a data URI MIME type'
+        ),
+      imageFilename: z
+        .string()
+        .optional()
+        .describe('Original filename of the uploaded image, when known'),
       cameraId: z.string().optional().describe('Unique camera identifier'),
-      timestamp: z.string().optional().describe('ISO 8601 UTC timestamp')
+      timestamp: z.string().optional().describe('ISO 8601 UTC timestamp'),
+      minDetectionScore: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Minimum text-region detection confidence'),
+      minOcrScore: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Minimum recognized-text confidence')
     })
   )
   .output(
@@ -46,7 +73,14 @@ export let recognizeUsdot = SlateTool.create(spec, {
             score: z.number().describe('OCR confidence')
           })
         )
-        .describe('Extracted USDOT number(s)')
+        .describe('Extracted USDOT number(s)'),
+      results: z
+        .array(z.unknown())
+        .optional()
+        .describe('All provider detections and their individual bounding boxes'),
+      processingTime: z.number().optional().describe('Processing time in milliseconds'),
+      timestamp: z.string().optional(),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -56,33 +90,45 @@ export let recognizeUsdot = SlateTool.create(spec, {
       imageUrl: ctx.input.imageUrl,
       imageBase64: ctx.input.imageBase64,
       cameraId: ctx.input.cameraId,
-      timestamp: ctx.input.timestamp
+      timestamp: ctx.input.timestamp,
+      minDetectionScore: ctx.input.minDetectionScore,
+      minOcrScore: ctx.input.minOcrScore,
+      imageMimeType: ctx.input.imageMimeType,
+      imageFilename: ctx.input.imageFilename
     });
 
-    let detectedObject = result.object
+    let detections = Array.isArray(result.results) ? result.results : [result];
+    let firstObject = detections.find((item: any) => item.object)?.object;
+    let detectedObject = firstObject
       ? {
-          label: result.object.label,
-          score: result.object.score,
+          label: firstObject.label,
+          score: firstObject.score,
           boundingBox: {
-            xmin: result.object.value?.xmin ?? 0,
-            ymin: result.object.value?.ymin ?? 0,
-            xmax: result.object.value?.xmax ?? 0,
-            ymax: result.object.value?.ymax ?? 0
+            xmin: firstObject.value?.xmin,
+            ymin: firstObject.value?.ymin,
+            xmax: firstObject.value?.xmax,
+            ymax: firstObject.value?.ymax
           }
         }
       : undefined;
 
-    let texts = (result.texts || []).map((t: any) => ({
-      value: t.value,
-      score: t.score
-    }));
+    let texts = detections
+      .flatMap((item: any) => item.texts ?? [])
+      .map((t: any) => ({
+        value: t.value,
+        score: t.score
+      }));
 
     let dotNumbers = texts.map((t: any) => t.value).join(', ');
 
     return {
       output: {
         detectedObject,
-        texts
+        texts,
+        results: detections,
+        processingTime: result.processing_time,
+        timestamp: result.timestamp,
+        raw: result
       },
       message: dotNumbers
         ? `Recognized USDOT number(s): **${dotNumbers}**`

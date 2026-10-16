@@ -1,14 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords, type ProviderResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let getPricePrediction = SlateTool.create(spec, {
   name: 'Get Price Predictions',
   key: 'get_price_prediction',
-  description: `Retrieve AI-powered price predictions and scenario analysis for crypto tokens. Supports two modes:
-- **Price Prediction**: Direct price forecasts based on AI models.
-- **Scenario Analysis**: Detailed scenario-based analysis with base, bear, and moon case predictions including predicted prices, market caps, FDV, and ROI.`,
+  description: `Retrieve provider-returned price forecasts and market-cap scenarios for crypto tokens. The price_prediction mode uses the documented price-prediction endpoint; scenario_analysis retains the legacy scenario-analysis route for existing workflows.`,
   tags: {
     readOnly: true
   }
@@ -26,6 +24,10 @@ export let getPricePrediction = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       predictions: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of prediction records')
@@ -33,7 +35,7 @@ export let getPricePrediction = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: ProviderResponse;
 
     if (ctx.input.predictionType === 'price_prediction') {
       result = await client.getPricePrediction({
@@ -51,10 +53,10 @@ export let getPricePrediction = SlateTool.create(spec, {
       });
     }
 
-    let predictions = result?.data ?? [];
+    let predictions = getRecords(result);
 
     return {
-      output: { predictions },
+      output: { predictions, raw: result },
       message: `Retrieved **${predictions.length}** ${ctx.input.predictionType.replace('_', ' ')} record(s).`
     };
   })

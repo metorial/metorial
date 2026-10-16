@@ -39,14 +39,16 @@ let eventSchema = z.object({
 export let searchEvents = SlateTool.create(spec, {
   name: 'Search Events',
   key: 'search_events',
-  description: `Search and filter cryptocurrency events from the CoinMarketCal calendar. Supports filtering by date range, specific coins, event categories, and sorting preferences. Results include event details, associated coins, community confidence scores, and source links.`,
+  description: `DEPRECATED — use \`list_events\` instead. Search and filter cryptocurrency events from the CoinMarketCal calendar. Supports filtering by date range, specific coins, event categories, and sorting preferences. Results include event details, associated coins, community confidence scores, and source links.`,
   instructions: [
+    'API V1 was retired on July 14, 2026. Use list_events with a V2 API key; its cursor pagination and response fields differ from this legacy tool.',
     'Use coin names (e.g., "bitcoin,ethereum") for the coins filter, not ticker symbols.',
     'Use category IDs (numeric) for the categories filter. Use the List Categories tool to discover available category IDs.',
     'Dates must be in YYYY-MM-DD format (e.g., "2024-01-15").'
   ],
   constraints: ['Maximum of 300 results per page.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

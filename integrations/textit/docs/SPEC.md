@@ -1,69 +1,31 @@
-# Slates Specification for Textit
+# TextIt integration specification
 
-## Overview
+## Authentication and identity
 
-TextIt is a cloud-based platform for building and managing interactive messaging workflows (flows) across SMS, voice, WhatsApp, Facebook Messenger, Telegram, and other channels. It provides a way of automating conversational interactions over SMS, messaging bots and phone calls. The core of the platform is a feature called "Flows," which allows you to map out entire conversations—from sending initial messages to asking questions, processing replies, and triggering different actions.
+Use an API token in the `Authorization: Token ...` header over HTTPS. The API is fixed to `https://textit.com/api/v2`; connection config has no duplicate credentials or workspace IDs. Authentication verifies the token through `workspace.json`, and `get_workspace` exposes the current workspace's UUID, name, country, languages, timezone, date style, and anonymous mode.
 
-## Authentication
+## Tools
 
-TextIt uses API token authentication. You must authenticate all calls by including an `Authorization` header with your API token. The Authorization header should look like `Authorization: Token YOUR_API_TOKEN`. For security reasons, all calls must be made using HTTPS.
+The 29 registered tools cover contact CRUD and bulk actions; contact/group/message/flow/run/campaign/channel/ticket lists; group and label CRUD; field/global creation and updates; single messages and translated broadcasts; flow starts; campaign/event management; ticket assignment, notes, closure, and reopening. Additional discovery/status tools are `list_labels`, `list_fields`, `list_globals`, `list_topics`, `list_users`, `list_broadcasts`, `list_flow_starts`, and `list_campaign_events`.
 
-To obtain your API token:
+All list tools return one page, `hasMore`, and nullable `nextCursor`. Continue by passing `cursor` and the same filters. Provider links are validated against the HTTPS TextIt origin and the same resource path; a cursor is sent as a query value rather than followed as a URL. Responses include sanitized provider data in `raw` for details beyond the normalized fields.
 
-- Log in to your TextIt account
-- Your API Token can be found at the top right of the API documentation page (`https://textit.com/api/v2/`)
+Single-message `quickReplies` remain an array of strings and are encoded as provider objects. Broadcasts additionally accept translated media UUIDs and typed quick reply objects. Message listings accept current media objects and legacy media strings while retaining string media references and normalized incoming/outgoing directions. Lists expose metadata; they do not download media files.
 
-The base URL for all API calls is `https://textit.com/api/v2/`.
+Conditional mutation inputs are validated before requests. Partial campaign and campaign-event updates first retrieve the current resource when required to preserve omitted values. Event offsets and delivery hours are validated as integers without narrowing the existing numeric schemas. Ticket action `note` is encoded as `add_note` upstream.
 
-## Features
+For channels without country or a first synchronization, normalized `country` and `lastSeen` are omitted when the provider returns null; the actual null remains in `raw`. All pre-existing nullable output branches remain nullable.
 
-### Contact Management
+## Limits
 
-Create, update, delete, and list contacts in your workspace. Contacts are identified by URNs (Uniform Resource Names) such as phone numbers (`tel:+250788123123`), Twitter handles (`twitter:jack`), or email addresses (`mailto:jack@example.com`). Contacts can be organized into groups, and custom contact fields can be defined to store additional data. Bulk contact actions (e.g., adding/removing from groups, blocking, archiving) are supported.
+No trigger handlers, webhook registration, archive downloads, media uploads, classifier discovery, or message bulk-action tool are registered. Token rotation is manual; this is not OAuth. Messaging can incur provider or channel charges. Asynchronous acceptance does not establish delivery to recipients.
 
-### Messaging
+## Provider references
 
-Send and list messages across configured channels. Broadcasts allow sending a message to multiple contacts, groups, or URNs at once. Messages can include media attachments uploaded through the media endpoint. Message labels can be created and applied to organize incoming messages, and bulk message actions are available (e.g., labeling, archiving).
-
-### Flow Management
-
-List available flows and their metadata. Start contacts in specific flows via flow starts, optionally passing extra variables for use during flow execution. A run is a single pass through a flow by a contact; you can list and filter all the runs on your account and retrieve the steps and values collected by each contact who passed through the flow. Flow text fields support translations using ISO-639-3 language codes.
-
-### Campaigns
-
-Create and manage campaigns that automate scheduled actions for contact groups. Campaign events define when and what action occurs (e.g., starting a flow at a specific offset from a date field on a contact). Campaign events can be created, updated, and deleted.
-
-### Channels
-
-List the messaging channels configured on your workspace (e.g., Twilio numbers, WhatsApp, Telegram bots). Channels represent the connection to external messaging services through which messages are sent and received.
-
-### Tickets and Topics
-
-List and manage support tickets for contacts. Tickets can be organized by topics, which can be created and listed. Bulk ticket actions (e.g., assigning, closing) are supported.
-
-### Classifiers
-
-List natural language processing classifiers connected to the workspace (e.g., Wit.ai). These classifiers can be used within flows to interpret message intent.
-
-### Workspace and Users
-
-View workspace information including organization details. List user logins associated with the workspace.
-
-### Archives
-
-Access historical archives of messages and flow runs for data export and analysis purposes.
-
-### Globals
-
-List global variables defined in the workspace, which can be referenced across multiple flows.
-
-## Events
-
-TextIt supports real-time event notifications through **Resthooks**, a subscription-based webhook pattern. By making a POST request with the event you want to subscribe to and the target URL, you can subscribe to be notified whenever your resthook event is triggered.
-
-### Flow-triggered Events
-
-Resthooks are defined within flows using a "Call Resthook" action. When a contact reaches that point in a flow, all subscribers to that resthook slug are notified via POST to their target URL. The event data includes information about the flow, the contact (UUID, name, URN), the channel, the run, the input (URN, text, attachments), and the path taken through the flow.
-
-- **Configuration**: Resthooks are identified by a slug (e.g., `new-report`, `new-birth`). Subscribers register a target URL for a specific resthook slug.
-- **Consideration**: Resthook slugs must first be created within a flow in the TextIt UI before subscribers can be added via the API. The events are entirely user-defined based on where the resthook action is placed in a flow.
+- [API overview and authentication](https://textit.com/api/v2/)
+- [Contacts](https://textit.com/api/v2/contacts), [groups](https://textit.com/api/v2/groups), [fields](https://textit.com/api/v2/fields), [labels](https://textit.com/api/v2/labels)
+- [Messages](https://textit.com/api/v2/messages), [broadcasts](https://textit.com/api/v2/broadcasts)
+- [Flows](https://textit.com/api/v2/flows), [flow starts](https://textit.com/api/v2/flow_starts), [runs](https://textit.com/api/v2/runs)
+- [Campaigns](https://textit.com/api/v2/campaigns), [campaign events](https://textit.com/api/v2/campaign_events)
+- [Channels](https://textit.com/api/v2/channels), [tickets](https://textit.com/api/v2/tickets), [topics](https://textit.com/api/v2/topics), [users](https://textit.com/api/v2/users), [workspace](https://textit.com/api/v2/workspace)
+- [Provider-owned serializer source](https://github.com/rapidpro/rapidpro/blob/main/temba/api/v2/serializers.py) for validation and nullable channel fields. Its older numeric-message examples differ from current TextIt UUID examples; current TextIt contracts take precedence.

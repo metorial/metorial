@@ -1,6 +1,6 @@
 # Datascope
 
-Collect, manage, and integrate mobile form data for field operations. Retrieve and update form submissions with GPS location data, filtering by form, user, date, and location. Create and manage locations with addresses and coordinates. Manage custom metadata lists (products, equipment) referenced in forms, including bulk updates. Assign forms as tasks to specific users with scheduled dates, locations, and time windows. Retrieve generated PDF and Excel reports and notifications.
+Collect, manage, and integrate mobile form data for field operations. Retrieve and update form submissions with GPS location data, filtering by form, user, date, and location. Create and manage locations with addresses and coordinates. Manage custom metadata lists (products, equipment) referenced in forms, including bulk updates. Assign forms as tasks to specific users with scheduled dates, locations, and time windows. Retrieve task assignments and their completion details, discover answer statuses, change submission statuses, and update list metadata. Retrieve generated PDF and Excel reports and notifications.
 
 ## License
 

@@ -28,7 +28,9 @@ export let listConfigFiles = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project')
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.')
     })
   )
   .output(
@@ -45,11 +47,11 @@ export let listConfigFiles = SlateTool.create(spec, {
 
     let files = await client.listConfigFiles(ctx.input.projectPermalink);
 
-    let mapped = (Array.isArray(files) ? files : []).map((f: any) => ({
+    let mapped = files.map((f: any) => ({
       configFileIdentifier: f.identifier,
       path: f.path,
       body: f.body,
-      servers: (f.servers || []).map((s: any) => ({
+      servers: f.servers?.map((s: any) => ({
         serverIdentifier: s.identifier,
         name: s.name
       }))
@@ -69,7 +71,9 @@ export let createConfigFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       path: z
         .string()
         .describe('File path relative to deployment root (e.g., config/database.yml)'),
@@ -104,7 +108,7 @@ export let createConfigFile = SlateTool.create(spec, {
         configFileIdentifier: f.identifier,
         path: f.path,
         body: f.body,
-        servers: (f.servers || []).map((s: any) => ({
+        servers: f.servers?.map((s: any) => ({
           serverIdentifier: s.identifier,
           name: s.name
         }))
@@ -121,7 +125,9 @@ export let updateConfigFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       configFileIdentifier: z.string().describe('The config file identifier'),
       path: z.string().optional().describe('Updated file path'),
       body: z.string().optional().describe('Updated file contents'),
@@ -158,7 +164,7 @@ export let updateConfigFile = SlateTool.create(spec, {
         configFileIdentifier: f.identifier,
         path: f.path,
         body: f.body,
-        servers: (f.servers || []).map((s: any) => ({
+        servers: f.servers?.map((s: any) => ({
           serverIdentifier: s.identifier,
           name: s.name
         }))
@@ -178,7 +184,9 @@ export let deleteConfigFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       configFileIdentifier: z.string().describe('The config file identifier to delete')
     })
   )
@@ -194,10 +202,13 @@ export let deleteConfigFile = SlateTool.create(spec, {
       accountName: ctx.config.accountName
     });
 
-    await client.deleteConfigFile(ctx.input.projectPermalink, ctx.input.configFileIdentifier);
+    let result = await client.deleteConfigFile(
+      ctx.input.projectPermalink,
+      ctx.input.configFileIdentifier
+    );
 
     return {
-      output: { status: 'deleted' },
+      output: { status: result.status },
       message: `Deleted config file \`${ctx.input.configFileIdentifier}\`.`
     };
   })

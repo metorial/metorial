@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { MxClient } from '../lib/client';
 import { spec } from '../spec';
 
-let memberSchema = z.object({
+export let memberSchema = z.object({
   guid: z.string().optional().describe('MX-assigned unique identifier for the member'),
   id: z.string().optional().nullable().describe('Partner-defined identifier'),
   userGuid: z.string().optional().describe('GUID of the owning user'),
@@ -24,15 +24,19 @@ let memberSchema = z.object({
     .optional()
     .nullable()
     .describe('Timestamp of last successful aggregation'),
-  metadata: z.string().optional().nullable().describe('Partner-defined metadata')
+  metadata: z.string().optional().nullable().describe('Partner-defined metadata'),
+  hasProcessedAccounts: z.boolean().optional().nullable(),
+  hasProcessedTransactions: z.boolean().optional().nullable(),
+  hasProcessedAccountNumbers: z.boolean().optional().nullable(),
+  isAuthenticated: z.boolean().optional().nullable()
 });
 
 export let createMember = SlateTool.create(spec, {
   name: 'Create Member',
   key: 'create_member',
-  description: `Connect a user to a financial institution by creating a member. Requires the institution code and user credentials. Aggregation starts automatically unless skipped. Use **Search Institutions** to find the institution code and **List Institution Credentials** to determine required credential fields.`,
+  description: `Connect a user to a financial institution by creating a member. Requires the institution code and user credentials. Aggregation starts automatically unless skipped. Use **Search Institutions** to find the institution code and **Read Institution** to determine required credential fields.`,
   instructions: [
-    'First search for the institution to get its code, then list its credentials to know which credential GUIDs to include.',
+    'First search for the institution to get its code, then read its credential requirements to know which credential GUIDs to include.',
     'Do not create duplicate members for the same institution with the same credentials on a single user.'
   ],
   constraints: ['Maximum 25 members per user in both environments.'],
@@ -57,6 +61,10 @@ export let createMember = SlateTool.create(spec, {
         .describe('Array of credentials required by the institution'),
       id: z.string().optional().describe('Custom identifier for this member'),
       metadata: z.string().optional().describe('Custom metadata string'),
+      useCases: z
+        .array(z.enum(['PFM', 'MONEY_MOVEMENT']))
+        .optional()
+        .describe('Use cases for clients that have opted in with MX; omit otherwise'),
       skipAggregation: z
         .boolean()
         .optional()
@@ -71,22 +79,12 @@ export let createMember = SlateTool.create(spec, {
       credentials: ctx.input.credentials,
       id: ctx.input.id,
       metadata: ctx.input.metadata,
+      useCases: ctx.input.useCases,
       skipAggregation: ctx.input.skipAggregation
     });
 
     return {
-      output: {
-        guid: member.guid,
-        id: member.id,
-        userGuid: member.user_guid,
-        institutionCode: member.institution_code,
-        name: member.name,
-        connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated,
-        aggregatedAt: member.aggregated_at,
-        successfullyAggregatedAt: member.successfully_aggregated_at,
-        metadata: member.metadata
-      },
+      output: mapMember(member),
       message: `Created member **${member.guid}** for institution \`${member.institution_code}\`. Connection status: **${member.connection_status}**.`
     };
   })
@@ -104,7 +102,7 @@ export let listMembers = SlateTool.create(spec, {
     z.object({
       userGuid: z.string().describe('MX GUID of the user'),
       page: z.number().optional().describe('Page number for pagination'),
-      recordsPerPage: z.number().optional().describe('Records per page (max: 100)')
+      recordsPerPage: z.number().optional().describe('Records per page (max: 1000)')
     })
   )
   .output(
@@ -128,13 +126,13 @@ export let listMembers = SlateTool.create(spec, {
     });
 
     let members = (result.members || []).map((m: any) => ({
-      guid: m.guid,
+      guid: m.guid ?? undefined,
       id: m.id,
-      userGuid: m.user_guid,
-      institutionCode: m.institution_code,
+      userGuid: m.user_guid ?? undefined,
+      institutionCode: m.institution_code ?? undefined,
       name: m.name,
       connectionStatus: m.connection_status,
-      isBeingAggregated: m.is_being_aggregated,
+      isBeingAggregated: m.is_being_aggregated ?? undefined,
       aggregatedAt: m.aggregated_at,
       successfullyAggregatedAt: m.successfully_aggregated_at,
       metadata: m.metadata
@@ -177,18 +175,7 @@ export let readMemberStatus = SlateTool.create(spec, {
     let member = await client.readMemberStatus(ctx.input.userGuid, ctx.input.memberGuid);
 
     return {
-      output: {
-        guid: member.guid,
-        id: member.id,
-        userGuid: member.user_guid,
-        institutionCode: member.institution_code,
-        name: member.name,
-        connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated,
-        aggregatedAt: member.aggregated_at,
-        successfullyAggregatedAt: member.successfully_aggregated_at,
-        metadata: member.metadata
-      },
+      output: mapMember(member),
       message: `Member **${member.guid}** status: **${member.connection_status}**. Aggregating: ${member.is_being_aggregated}.`
     };
   })
@@ -230,18 +217,7 @@ export let updateMember = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        guid: member.guid,
-        id: member.id,
-        userGuid: member.user_guid,
-        institutionCode: member.institution_code,
-        name: member.name,
-        connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated,
-        aggregatedAt: member.aggregated_at,
-        successfullyAggregatedAt: member.successfully_aggregated_at,
-        metadata: member.metadata
-      },
+      output: mapMember(member),
       message: `Updated member **${member.guid}**.`
     };
   })
@@ -299,18 +275,7 @@ export let aggregateMember = SlateTool.create(spec, {
     let member = await client.aggregateMember(ctx.input.userGuid, ctx.input.memberGuid);
 
     return {
-      output: {
-        guid: member.guid,
-        id: member.id,
-        userGuid: member.user_guid,
-        institutionCode: member.institution_code,
-        name: member.name,
-        connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated,
-        aggregatedAt: member.aggregated_at,
-        successfullyAggregatedAt: member.successfully_aggregated_at,
-        metadata: member.metadata
-      },
+      output: mapMember(member),
       message: `Triggered aggregation for member **${member.guid}**. Status: **${member.connection_status}**.`
     };
   })
@@ -319,7 +284,7 @@ export let aggregateMember = SlateTool.create(spec, {
 export let resumeMfaChallenge = SlateTool.create(spec, {
   name: 'Resume MFA Challenge',
   key: 'resume_mfa_challenge',
-  description: `Answer multi-factor authentication (MFA) challenges for a member whose connection status is CHALLENGED. First use **Read Member Status** to check if MFA is needed, then provide the challenge responses.`,
+  description: `Answer multi-factor authentication (MFA) challenges for a member whose connection status is CHALLENGED. First use **Read Member Status** to check if MFA is needed, then **List Member Challenges** to discover the required challenge GUIDs and prompts.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -349,19 +314,25 @@ export let resumeMfaChallenge = SlateTool.create(spec, {
     );
 
     return {
-      output: {
-        guid: member.guid,
-        id: member.id,
-        userGuid: member.user_guid,
-        institutionCode: member.institution_code,
-        name: member.name,
-        connectionStatus: member.connection_status,
-        isBeingAggregated: member.is_being_aggregated,
-        aggregatedAt: member.aggregated_at,
-        successfullyAggregatedAt: member.successfully_aggregated_at,
-        metadata: member.metadata
-      },
+      output: mapMember(member),
       message: `Submitted MFA answers for member **${member.guid}**. Status: **${member.connection_status}**.`
     };
   })
   .build();
+
+export let mapMember = (member: Record<string, any>) => ({
+  guid: member.guid ?? undefined,
+  id: member.id,
+  userGuid: member.user_guid ?? undefined,
+  institutionCode: member.institution_code ?? undefined,
+  name: member.name,
+  connectionStatus: member.connection_status,
+  isBeingAggregated: member.is_being_aggregated ?? undefined,
+  aggregatedAt: member.aggregated_at,
+  successfullyAggregatedAt: member.successfully_aggregated_at,
+  metadata: member.metadata,
+  hasProcessedAccounts: member.has_processed_accounts,
+  hasProcessedTransactions: member.has_processed_transactions,
+  hasProcessedAccountNumbers: member.has_processed_account_numbers,
+  isAuthenticated: member.is_authenticated
+});

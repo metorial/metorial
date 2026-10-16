@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CardlyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -164,6 +164,16 @@ export let editArtwork = SlateTool.create(spec, {
   .output(artworkOutputSchema)
   .handleInvocation(async ctx => {
     let client = new CardlyClient({ token: ctx.auth.token });
+
+    if (
+      ctx.input.name === undefined &&
+      ctx.input.description === undefined &&
+      ctx.input.pages === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide a name, description, or page images to update artwork.'
+      );
+    }
 
     let result = await client.editArtwork(ctx.input.artworkId, {
       name: ctx.input.name,

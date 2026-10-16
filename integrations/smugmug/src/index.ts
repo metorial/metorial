@@ -7,6 +7,7 @@ import {
   deleteAlbumTool,
   deleteImageTool,
   deleteNodeTool,
+  exportImageMetadataTool,
   getAlbumTool,
   getCommentsTool,
   getImageTool,
@@ -20,12 +21,15 @@ import {
   updateAlbumTool,
   updateImageTool,
   updateNodeTool,
+  updateProfileTool,
   uploadImageTool
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     getUserTool,
+    exportImageMetadataTool,
+    updateProfileTool,
     createAlbumTool,
     updateAlbumTool,
     deleteAlbumTool,

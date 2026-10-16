@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassMarkerClient } from '../lib/client';
+import { optionalNumber, validateText, validateWholeNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 // ── List / Get Questions ──
@@ -22,7 +23,9 @@ let questionOutputSchema = z.object({
   options: z.any().optional().describe('Answer options for the question'),
   correctOptions: z.array(z.string()).optional().describe('The correct answer option keys'),
   lastUpdatedTimestamp: z.number().optional().describe('Unix timestamp of last update'),
-  status: z.string().optional().describe('Question status')
+  status: z.string().optional().describe('Question status'),
+  gradeStyle: z.string().optional().describe('Multiple-response grading style'),
+  raw: z.any().describe('Complete question record, including question-type-specific fields')
 });
 
 export let getQuestions = SlateTool.create(spec, {
@@ -53,7 +56,12 @@ export let getQuestions = SlateTool.create(spec, {
   .output(
     z.object({
       questions: z.array(questionOutputSchema).describe('List of questions'),
-      totalQuestions: z.number().optional().describe('Total number of questions available')
+      totalQuestions: z
+        .number()
+        .optional()
+        .describe('Total number of questions when returned by ClassMarker'),
+      page: z.number().optional().describe('Requested page for question listings'),
+      response: z.any().describe('Complete ClassMarker response')
     })
   )
   .handleInvocation(async ctx => {
@@ -63,6 +71,13 @@ export let getQuestions = SlateTool.create(spec, {
     });
 
     let { questionId, page } = ctx.input;
+    validateWholeNumber(questionId, 'questionId');
+    validateWholeNumber(page, 'page');
+    if (questionId !== undefined && page !== undefined) {
+      throw createApiServiceError(
+        'page is only used when listing questions; omit it when retrieving a questionId.'
+      );
+    }
 
     if (questionId !== undefined) {
       let data = await client.getQuestion(questionId);
@@ -70,7 +85,7 @@ export let getQuestions = SlateTool.create(spec, {
       let mapped = mapQuestion(q);
 
       return {
-        output: { questions: [mapped], totalQuestions: 1 },
+        output: { questions: [mapped], response: data },
         message: `Retrieved question **#${questionId}**: "${mapped.question}"`
       };
     }
@@ -84,7 +99,12 @@ export let getQuestions = SlateTool.create(spec, {
     return {
       output: {
         questions,
-        totalQuestions: data?.data?.total_questions || data?.total_questions
+        totalQuestions: optionalNumber(
+          data?.data?.total_questions ?? data?.total_questions,
+          'total question count'
+        ),
+        page: page ?? 1,
+        response: data
       },
       message: `Retrieved **${questions.length}** question(s)${page ? ` (page ${page})` : ''}.`
     };
@@ -96,14 +116,19 @@ let mapQuestion = (q: any) => ({
   questionType: q.question_type,
   question: q.question,
   categoryId: q.category_id,
-  points: q.points,
+  points: optionalNumber(q.points, 'question points'),
   randomAnswers: q.random_answers,
   correctFeedback: q.correct_feedback,
   incorrectFeedback: q.incorrect_feedback,
   options: q.options,
-  correctOptions: q.correct_options,
-  lastUpdatedTimestamp: q.last_updated_timestamp,
-  status: q.status
+  correctOptions: q.correct_options ?? q.options?.correct_options,
+  lastUpdatedTimestamp: optionalNumber(
+    q.last_updated_timestamp ?? q.last_updated_datetime,
+    'question update timestamp'
+  ),
+  status: q.status,
+  gradeStyle: q.grade_style,
+  raw: q
 });
 
 // ── Create / Update Question ──
@@ -118,7 +143,7 @@ export let createOrUpdateQuestion = SlateTool.create(spec, {
   description: `Create a new question or update an existing one in ClassMarker. Supports multiple choice, multiple response, true/false, and essay question types. Provide answer options and correct answers as needed for the question type.`,
   instructions: [
     'To create a new question, omit `questionId`. To update, provide the `questionId` of the question to modify.',
-    'For **multiplechoice** and **multipleresponse** questions, provide `options` (keyed A-D+) and `correctOptions` (array of correct keys).',
+    'For **multiplechoice** and **multipleresponse** questions, provide `options` (keyed A-J) and `correctOptions` (array of correct keys).',
     'For **truefalse** questions, provide two options (A: True, B: False) and set `correctOptions` to the correct key.',
     'For **essay** questions, no options or correct answers are needed (requires manual grading).',
     'Free text, grammar, and matching question types are read-only and cannot be created or updated via the API.'
@@ -137,12 +162,15 @@ export let createOrUpdateQuestion = SlateTool.create(spec, {
       questionId: z
         .number()
         .optional()
-        .describe('ID of an existing question to update. Omit to create a new question.'),
+        .describe('Question ID from get_questions to update. Omit to create a new question.'),
       questionType: z
         .enum(['multiplechoice', 'multipleresponse', 'truefalse', 'essay'])
         .describe('Type of question'),
       question: z.string().describe('The question text'),
-      categoryId: z.number().optional().describe('Category ID to assign the question to'),
+      categoryId: z
+        .number()
+        .optional()
+        .describe('Category ID from list_categories to assign the question to'),
       points: z.number().optional().describe('Point value for the question'),
       randomAnswers: z.boolean().optional().describe('Whether to randomize answer order'),
       correctFeedback: z
@@ -166,7 +194,11 @@ export let createOrUpdateQuestion = SlateTool.create(spec, {
       gradeStyle: z
         .enum(['partial_with_deduction', 'partial_without_deduction', 'off'])
         .optional()
-        .describe('Grading style for multiple response questions')
+        .describe('Grading style for multiple response questions'),
+      verifyOnly: z
+        .boolean()
+        .optional()
+        .describe('Validate the request without creating or updating the question')
     })
   )
   .output(
@@ -193,34 +225,96 @@ export let createOrUpdateQuestion = SlateTool.create(spec, {
       incorrectFeedback,
       options,
       correctOptions,
-      gradeStyle
+      gradeStyle,
+      verifyOnly
     } = ctx.input;
 
-    let body: Record<string, any> = {
-      question_type: questionType,
-      question
-    };
+    validateWholeNumber(questionId, 'questionId');
+    validateWholeNumber(categoryId, 'categoryId');
+    validateText(question, 'question');
+    if (points !== undefined && (!Number.isFinite(points) || points < 0)) {
+      throw createApiServiceError('points must be a non-negative number.');
+    }
+    if (gradeStyle !== undefined && questionType !== 'multipleresponse') {
+      throw createApiServiceError(
+        'gradeStyle is only supported for multipleresponse questions.'
+      );
+    }
+    if (questionType === 'essay') {
+      if (
+        options !== undefined ||
+        correctOptions !== undefined ||
+        randomAnswers !== undefined
+      ) {
+        throw createApiServiceError(
+          'Essay questions do not use options, correctOptions, or randomAnswers.'
+        );
+      }
+    } else {
+      if (questionId === undefined && (!options || !correctOptions)) {
+        throw createApiServiceError(
+          'Provide options and correctOptions when creating a scored choice question.'
+        );
+      }
+      if (options !== undefined) {
+        let keys = Object.keys(options);
+        if (keys.length < 2 || keys.length > 10 || keys.some(key => !/^[A-J]$/.test(key))) {
+          throw createApiServiceError(
+            'Provide between 2 and 10 answer options, keyed A through J.'
+          );
+        }
+        for (let option of Object.values(options))
+          validateText(option.content, 'Answer option content');
+        if (questionType === 'truefalse' && (keys.length !== 2 || !options.A || !options.B)) {
+          throw createApiServiceError(
+            'True/false questions require exactly the options A and B.'
+          );
+        }
+      }
+      if (correctOptions !== undefined) {
+        if (
+          !correctOptions.length ||
+          new Set(correctOptions).size !== correctOptions.length ||
+          correctOptions.some(
+            key => !/^[A-J]$/.test(key) || (options !== undefined && !options[key])
+          )
+        ) {
+          throw createApiServiceError(
+            'correctOptions must contain distinct answer option keys that exist in options.'
+          );
+        }
+        if (questionType !== 'multipleresponse' && correctOptions.length !== 1) {
+          throw createApiServiceError(
+            'Multiple choice and true/false questions require exactly one correct option.'
+          );
+        }
+      }
+    }
 
-    if (categoryId !== undefined) body.category_id = categoryId;
-    if (points !== undefined) body.points = points;
-    if (randomAnswers !== undefined) body.random_answers = randomAnswers;
-    if (correctFeedback !== undefined) body.correct_feedback = correctFeedback;
-    if (incorrectFeedback !== undefined) body.incorrect_feedback = incorrectFeedback;
-    if (options !== undefined) body.options = options;
-    if (correctOptions !== undefined) body.correct_options = correctOptions;
-    if (gradeStyle !== undefined) body.grade_style = gradeStyle;
+    let body = pickDefined({
+      question_type: questionType,
+      question,
+      category_id: categoryId,
+      points,
+      random_answers: randomAnswers,
+      correct_feedback: correctFeedback,
+      incorrect_feedback: incorrectFeedback,
+      options,
+      correct_options: correctOptions,
+      grade_style: gradeStyle
+    });
 
     let data: any;
     let isUpdate = questionId !== undefined;
 
     if (isUpdate) {
-      data = await client.updateQuestion(questionId!, body);
+      data = await client.updateQuestion(questionId!, body, verifyOnly);
     } else {
-      data = await client.createQuestion(body);
+      data = await client.createQuestion(body, verifyOnly);
     }
 
     let resultQuestionId =
-      data?.data?.question?.question_id || data?.question_id || questionId;
+      data?.data?.question?.question_id ?? data?.question_id ?? questionId;
 
     return {
       output: {
@@ -228,7 +322,9 @@ export let createOrUpdateQuestion = SlateTool.create(spec, {
         status: data?.status || 'ok',
         response: data
       },
-      message: `Successfully ${isUpdate ? 'updated' : 'created'} ${questionType} question${resultQuestionId ? ` **#${resultQuestionId}**` : ''}.`
+      message: verifyOnly
+        ? 'Validated the question without saving changes.'
+        : `Successfully ${isUpdate ? 'updated' : 'created'} ${questionType} question${resultQuestionId ? ` **#${resultQuestionId}**` : ''}.`
     };
   })
   .build();

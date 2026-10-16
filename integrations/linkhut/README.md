@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Linkhut
 
-Save, tag, manage, and share web bookmarks through an open-source social bookmarking service. Create, retrieve, update, and delete bookmarks with URLs, titles, notes, tags, and visibility settings. Filter bookmarks by tag, date, URL, or URL hash. Manage tags by listing, renaming, or deleting them across all bookmarks. Get popular and recommended tag suggestions for URLs. Detect changes via last-modification timestamps and MD5 hashes for efficient syncing. Export bookmarks in Netscape format. API-compatible with Pinboard.
+Save, tag, manage, and share web bookmarks with Linkhut. Create or replace bookmarks, retrieve recent or filtered bookmarks, manage tags, and get tag suggestions. Compare bookmark modification timestamps, URL hashes, and change signatures for efficient synchronization. Connect with OAuth or a personal access token.
 
 ## License
 

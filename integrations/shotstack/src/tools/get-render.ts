@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EditClient } from '../lib/client';
+import { attachTemporaryOutput } from '../lib/files';
 import { spec } from '../spec';
 
 export let getRenderTool = SlateTool.create(spec, {
@@ -39,7 +40,12 @@ export let getRenderTool = SlateTool.create(spec, {
       owner: z.string().optional().describe('Account owner ID'),
       created: z.string().optional().describe('Creation timestamp'),
       updated: z.string().optional().describe('Last update timestamp'),
-      editData: z.any().optional().describe('Original edit data if requested')
+      editData: z.any().optional().describe('Original edit data if requested'),
+      error: z.string().optional().describe('Provider render error details'),
+      deliveryWarning: z
+        .string()
+        .optional()
+        .describe('File delivery warning when media could not be prepared')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,20 +57,42 @@ export let getRenderTool = SlateTool.create(spec, {
     });
 
     let response = result.response;
+    if (
+      !['queued', 'fetching', 'rendering', 'saving', 'done', 'failed'].includes(
+        response.status
+      )
+    )
+      throw createApiServiceError(
+        `Shotstack returned render status "${response.status}", which this tool does not support yet. Check the render again later.`
+      );
+    let warnings: string[] = [];
+    if (response.status === 'done') {
+      if (!response.url)
+        warnings.push(
+          'Shotstack reports the render complete but did not return its output URL. Retrieve the render again to check file availability.'
+        );
+      for (let url of [response.url, response.poster, response.thumbnail]) {
+        if (typeof url !== 'string' || !url) continue;
+        let warning = await attachTemporaryOutput(ctx, url);
+        if (warning) warnings.push(warning);
+      }
+    }
 
     return {
       output: {
         renderId: response.id,
         status: response.status,
-        url: response.url || undefined,
-        posterUrl: response.poster || undefined,
-        thumbnailUrl: response.thumbnail || undefined,
+        url: response.url ?? undefined,
+        posterUrl: response.poster ?? undefined,
+        thumbnailUrl: response.thumbnail ?? undefined,
         owner: response.owner,
         created: response.created,
         updated: response.updated,
-        editData: response.data || undefined
+        editData: response.data,
+        error: response.error,
+        deliveryWarning: warnings.length ? warnings.join(' ') : undefined
       },
-      message: `Render **${response.id}** is **${response.status}**${response.url ? `. Output: ${response.url}` : '.'}`
+      message: `Render **${response.id}** is **${response.status}**${response.url ? `. Output: ${response.url}` : '.'}${warnings.length ? ` ${warnings.join(' ')}` : ''}`
     };
   })
   .build();

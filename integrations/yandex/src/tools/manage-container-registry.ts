@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as containerRegistry from '../lib/container-registry';
 import { spec } from '../spec';
@@ -35,7 +35,8 @@ export let listRegistries = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await containerRegistry.listRegistries(
       ctx.auth,
@@ -87,8 +88,9 @@ export let manageRegistry = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'create') {
       let folderId = ctx.input.folderId || ctx.config.folderId;
-      if (!folderId) throw new Error('folderId is required for registry creation');
-      if (!ctx.input.name) throw new Error('name is required for registry creation');
+      if (!folderId) throw createApiServiceError('folderId is required for registry creation');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for registry creation');
 
       let result = await containerRegistry.createRegistry(ctx.auth, {
         folderId,
@@ -100,19 +102,20 @@ export let manageRegistry = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           registryId: result.metadata?.registryId,
-          done: result.done || false
+          done: result.done
         },
         message: `Registry **${ctx.input.name}** creation initiated.`
       };
     } else {
-      if (!ctx.input.registryId) throw new Error('registryId is required for deletion');
+      if (!ctx.input.registryId)
+        throw createApiServiceError('registryId is required for deletion');
 
       let result = await containerRegistry.deleteRegistry(ctx.auth, ctx.input.registryId);
 
       return {
         output: {
           operationId: result.id,
-          done: result.done || false
+          done: result.done
         },
         message: `Registry **${ctx.input.registryId}** deletion initiated.`
       };
@@ -161,7 +164,7 @@ export let listContainerImages = SlateTool.create(spec, {
       imageId: i.id,
       name: i.name,
       digest: i.digest,
-      compressedSize: i.compressedSize ? Number(i.compressedSize) : undefined,
+      compressedSize: i.compressedSize !== undefined ? Number(i.compressedSize) : undefined,
       createdAt: i.createdAt,
       tags: i.tags
     }));

@@ -1,5 +1,6 @@
 export * from './cancel-notification';
 export * from './export-data';
+export * from './manage-alias';
 export * from './manage-app';
 export * from './manage-segment';
 export * from './manage-subscription';

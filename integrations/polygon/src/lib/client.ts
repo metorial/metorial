@@ -1,22 +1,67 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
-let BASE_URL = 'https://api.polygon.io';
+let BASE_URL = 'https://api.massive.com';
 
 export class PolygonClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    if (!token.trim()) {
+      throw createApiServiceError(
+        'A Massive API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${token}`
+      authHeader: { value: `Bearer ${token}` },
+      timeout: 30000,
+      maxRedirects: 0,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Massive',
+          reason: 'upstream_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      let body: unknown = response.data;
+      if (
+        (!isApiErrorRecord(body) && !Array.isArray(body)) ||
+        (Array.isArray(body) && response.config.url !== '/v1/marketstatus/upcoming') ||
+        (isApiErrorRecord(body) && Object.keys(body).length === 0)
+      ) {
+        throw createApiServiceError(
+          'Massive returned a malformed response. Retry the request.'
+        );
       }
+      if (
+        isApiErrorRecord(body) &&
+        (body.error ||
+          body.errors ||
+          (typeof body.status === 'string' &&
+            !['OK', 'DELAYED', 'SUCCESS'].includes(body.status.toUpperCase())))
+      ) {
+        throw buildApiServiceError(
+          { response: { status: response.status, data: body } },
+          {
+            providerLabel: 'Massive',
+            reason: 'upstream_error'
+          }
+        );
+      }
+      return response;
     });
   }
 
   // ─── Stocks ───────────────────────────────────────────────
 
   async getAggregateBars(params: {
+    cursor?: string;
     ticker: string;
     multiplier: number;
     timespan: string;
@@ -28,7 +73,7 @@ export class PolygonClient {
   }) {
     let { ticker, multiplier, timespan, from, to, ...query } = params;
     let response = await this.axios.get(
-      `/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/${multiplier}/${timespan}/${from}/${to}`,
+      `/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/${multiplier}/${timespan}/${encodeURIComponent(from)}/${encodeURIComponent(to)}`,
       { params: query }
     );
     return response.data;
@@ -40,9 +85,12 @@ export class PolygonClient {
     includeOtc?: boolean;
   }) {
     let { date, ...query } = params;
-    let response = await this.axios.get(`/v2/aggs/grouped/locale/us/market/stocks/${date}`, {
-      params: { adjusted: query.adjusted, include_otc: query.includeOtc }
-    });
+    let response = await this.axios.get(
+      `/v2/aggs/grouped/locale/us/market/stocks/${encodeURIComponent(date)}`,
+      {
+        params: { adjusted: query.adjusted, include_otc: query.includeOtc }
+      }
+    );
     return response.data;
   }
 
@@ -55,6 +103,7 @@ export class PolygonClient {
   }
 
   async getTrades(params: {
+    cursor?: string;
     ticker: string;
     timestamp?: string;
     timestampGte?: string;
@@ -75,6 +124,7 @@ export class PolygonClient {
   }
 
   async getQuotes(params: {
+    cursor?: string;
     ticker: string;
     timestamp?: string;
     timestampGte?: string;
@@ -130,9 +180,21 @@ export class PolygonClient {
 
   // ─── Unified Snapshots ────────────────────────────────────
 
-  async getUnifiedSnapshot(params: { tickers: string }) {
+  async getUnifiedSnapshot(params: {
+    tickers: string;
+    cursor?: string;
+    limit?: number;
+    order?: string;
+    sort?: string;
+  }) {
     let response = await this.axios.get(`/v3/snapshot`, {
-      params: { 'ticker.any_of': params.tickers }
+      params: {
+        cursor: params.cursor,
+        limit: params.limit,
+        order: params.order,
+        sort: params.sort,
+        'ticker.any_of': params.tickers
+      }
     });
     return response.data;
   }
@@ -140,6 +202,7 @@ export class PolygonClient {
   // ─── Options ──────────────────────────────────────────────
 
   async getOptionsContracts(params: {
+    cursor?: string;
     underlyingTicker?: string;
     contractType?: string;
     expirationDate?: string;
@@ -155,6 +218,7 @@ export class PolygonClient {
   }) {
     let response = await this.axios.get(`/v3/reference/options/contracts`, {
       params: {
+        cursor: params.cursor,
         underlying_ticker: params.underlyingTicker,
         contract_type: params.contractType,
         expiration_date: params.expirationDate,
@@ -173,6 +237,7 @@ export class PolygonClient {
   }
 
   async getOptionsChainSnapshot(params: {
+    cursor?: string;
     underlyingAsset: string;
     strikePrice?: number;
     strikePriceGte?: number;
@@ -190,6 +255,7 @@ export class PolygonClient {
       `/v3/snapshot/options/${encodeURIComponent(underlyingAsset)}`,
       {
         params: {
+          cursor: params.cursor,
           strike_price: rest.strikePrice,
           'strike_price.gte': rest.strikePriceGte,
           'strike_price.lte': rest.strikePriceLte,
@@ -275,9 +341,21 @@ export class PolygonClient {
 
   // ─── Indices ──────────────────────────────────────────────
 
-  async getIndicesSnapshot(params?: { tickers?: string }) {
+  async getIndicesSnapshot(params?: {
+    tickers?: string;
+    cursor?: string;
+    limit?: number;
+    order?: string;
+    sort?: string;
+  }) {
     let response = await this.axios.get(`/v3/snapshot/indices`, {
-      params: { 'ticker.any_of': params?.tickers }
+      params: {
+        cursor: params?.cursor,
+        limit: params?.limit,
+        order: params?.order,
+        sort: params?.sort,
+        'ticker.any_of': params?.tickers
+      }
     });
     return response.data;
   }
@@ -285,6 +363,7 @@ export class PolygonClient {
   // ─── Technical Indicators ─────────────────────────────────
 
   async getSMA(params: {
+    cursor?: string;
     ticker: string;
     timespan?: string;
     adjusted?: boolean;
@@ -298,6 +377,7 @@ export class PolygonClient {
     let { ticker, timestampGte, timestampLte, seriesType, ...query } = params;
     let response = await this.axios.get(`/v1/indicators/sma/${encodeURIComponent(ticker)}`, {
       params: {
+        cursor: params.cursor,
         ...query,
         series_type: seriesType,
         'timestamp.gte': timestampGte,
@@ -308,6 +388,7 @@ export class PolygonClient {
   }
 
   async getEMA(params: {
+    cursor?: string;
     ticker: string;
     timespan?: string;
     adjusted?: boolean;
@@ -321,6 +402,7 @@ export class PolygonClient {
     let { ticker, timestampGte, timestampLte, seriesType, ...query } = params;
     let response = await this.axios.get(`/v1/indicators/ema/${encodeURIComponent(ticker)}`, {
       params: {
+        cursor: params.cursor,
         ...query,
         series_type: seriesType,
         'timestamp.gte': timestampGte,
@@ -331,6 +413,7 @@ export class PolygonClient {
   }
 
   async getRSI(params: {
+    cursor?: string;
     ticker: string;
     timespan?: string;
     adjusted?: boolean;
@@ -344,6 +427,7 @@ export class PolygonClient {
     let { ticker, timestampGte, timestampLte, seriesType, ...query } = params;
     let response = await this.axios.get(`/v1/indicators/rsi/${encodeURIComponent(ticker)}`, {
       params: {
+        cursor: params.cursor,
         ...query,
         series_type: seriesType,
         'timestamp.gte': timestampGte,
@@ -354,6 +438,7 @@ export class PolygonClient {
   }
 
   async getMACD(params: {
+    cursor?: string;
     ticker: string;
     timespan?: string;
     adjusted?: boolean;
@@ -378,6 +463,7 @@ export class PolygonClient {
     } = params;
     let response = await this.axios.get(`/v1/indicators/macd/${encodeURIComponent(ticker)}`, {
       params: {
+        cursor: params.cursor,
         ...query,
         series_type: seriesType,
         short_window: shortWindow,
@@ -393,6 +479,7 @@ export class PolygonClient {
   // ─── Reference Data ───────────────────────────────────────
 
   async getTickers(params?: {
+    cursor?: string;
     ticker?: string;
     type?: string;
     market?: string;
@@ -523,6 +610,7 @@ export class PolygonClient {
   }
 
   async getConditions(params?: {
+    cursor?: string;
     assetClass?: string;
     dataType?: string;
     order?: string;
@@ -531,6 +619,7 @@ export class PolygonClient {
   }) {
     let response = await this.axios.get(`/v3/reference/conditions`, {
       params: {
+        cursor: params?.cursor,
         asset_class: params?.assetClass,
         data_type: params?.dataType,
         order: params?.order,
@@ -544,6 +633,7 @@ export class PolygonClient {
   // ─── News ─────────────────────────────────────────────────
 
   async getNews(params?: {
+    cursor?: string;
     ticker?: string;
     publishedUtcGte?: string;
     publishedUtcLte?: string;
@@ -553,6 +643,7 @@ export class PolygonClient {
   }) {
     let response = await this.axios.get(`/v2/reference/news`, {
       params: {
+        cursor: params?.cursor,
         ticker: params?.ticker,
         'published_utc.gte': params?.publishedUtcGte,
         'published_utc.lte': params?.publishedUtcLte,
@@ -561,6 +652,94 @@ export class PolygonClient {
         sort: params?.sort
       }
     });
+    return response.data;
+  }
+
+  async getFinancialStatements(
+    kind: 'income-statements' | 'balance-sheets' | 'cash-flow-statements',
+    params: {
+      ticker?: string;
+      cik?: string;
+      timeframe?: string;
+      periodEndFrom?: string;
+      periodEndTo?: string;
+      filingDateFrom?: string;
+      filingDateTo?: string;
+      fiscalYear?: number;
+      fiscalQuarter?: number;
+      limit?: number;
+      sort?: string;
+      cursor?: string;
+    }
+  ) {
+    let response = await this.axios.get(`/stocks/financials/v1/${kind}`, {
+      params: {
+        tickers: params.ticker,
+        cik: params.cik,
+        timeframe: params.timeframe,
+        'period_end.gte': params.periodEndFrom,
+        'period_end.lte': params.periodEndTo,
+        'filing_date.gte': params.filingDateFrom,
+        'filing_date.lte': params.filingDateTo,
+        fiscal_year: params.fiscalYear,
+        fiscal_quarter: params.fiscalQuarter,
+        limit: params.limit,
+        sort: params.sort,
+        cursor: params.cursor
+      }
+    });
+    return response.data;
+  }
+
+  async getCorporateActions(
+    kind: 'splits' | 'dividends',
+    params: {
+      ticker?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      adjustmentType?: string;
+      distributionType?: string;
+      frequency?: number;
+      limit?: number;
+      sort?: string;
+      cursor?: string;
+    }
+  ) {
+    let date = kind === 'splits' ? 'execution_date' : 'ex_dividend_date';
+    let response = await this.axios.get(`/stocks/v1/${kind}`, {
+      params: {
+        ticker: params.ticker,
+        [`${date}.gte`]: params.dateFrom,
+        [`${date}.lte`]: params.dateTo,
+        adjustment_type: params.adjustmentType,
+        distribution_type: params.distributionType,
+        frequency: params.frequency,
+        limit: params.limit,
+        sort: params.sort,
+        cursor: params.cursor
+      }
+    });
+    return response.data;
+  }
+
+  async getTickerTypes(params: { assetClass?: string; locale?: string }) {
+    let response = await this.axios.get('/v3/reference/tickers/types', {
+      params: {
+        asset_class: params.assetClass,
+        locale: params.locale
+      }
+    });
+    return response.data;
+  }
+
+  async getFinancialRatios(params: {
+    ticker?: string;
+    cik?: string;
+    limit?: number;
+    sort?: string;
+    cursor?: string;
+  }) {
+    let response = await this.axios.get('/stocks/financials/v1/ratios', { params });
     return response.data;
   }
 }

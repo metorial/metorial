@@ -1,14 +1,68 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Planly',
+    reason: 'planly_api_error',
+    nestedKeys: ['error', 'errors'],
+    extractResponse: (value, helpers) => helpers.getResponseWithBody(value),
+    extractStatus: (_value, response) => {
+      let body = response?.data;
+      let detail =
+        isApiErrorRecord(body) && isApiErrorRecord(body.error) ? body.error : undefined;
+      let code = detail?.code;
+      let status =
+        typeof code === 'number' || typeof code === 'string' ? Number(code) : Number.NaN;
+      return Number.isInteger(status) && status >= 400 && status <= 599
+        ? status
+        : response?.status;
+    },
+    extractUpstreamCode: (_value, response) => {
+      let body = response?.data;
+      let detail =
+        isApiErrorRecord(body) && isApiErrorRecord(body.error) ? body.error : undefined;
+      return typeof detail?.code === 'string' || typeof detail?.code === 'number'
+        ? String(detail.code)
+        : undefined;
+    }
+  });
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://app.planly.com/api'
+    if (typeof config.token !== 'string' || !config.token.trim()) {
+      throw createApiServiceError('A Planly API key is required.');
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://app.planly.com/api',
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30_000,
+      errorAdapter: apiError
     });
-    this.axios.defaults.headers.common.Authorization = `Bearer ${config.token}`;
-    this.axios.defaults.headers.common['Content-Type'] = 'application/json';
+    this.axios.interceptors.response.use(response => {
+      let body: unknown = response.data;
+      if (
+        isApiErrorRecord(body) &&
+        body.error !== undefined &&
+        body.error !== null &&
+        body.error !== false &&
+        body.error !== ''
+      ) {
+        throw apiError({ response: { status: response.status, data: body } });
+      }
+      if (body === false || (isApiErrorRecord(body) && body.data === false)) {
+        throw createApiServiceError('Planly did not confirm the requested operation.', {
+          reason: 'planly_operation_rejected'
+        });
+      }
+      return response;
+    });
   }
 
   // ── Teams ──────────────────────────────────────────────────────────
@@ -177,7 +231,9 @@ export class Client {
   // ── Pinterest ──────────────────────────────────────────────────────
 
   async getPinterestBoards(channelId: string) {
-    let res = await this.axios.post(`/v2/pinterest/get-board-list/${channelId}`);
+    let res = await this.axios.post(
+      `/v2/pinterest/get-board-list/${encodeURIComponent(channelId)}`
+    );
     return res.data;
   }
 }

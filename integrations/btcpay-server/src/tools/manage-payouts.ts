@@ -16,8 +16,12 @@ let payoutSchema = z.object({
 export let managePayouts = SlateTool.create(spec, {
   name: 'Manage Payouts',
   key: 'manage_payouts',
-  description: `List, approve, cancel, or mark payouts as paid. Payouts represent claims against pull payments that need to be processed. Supports both on-chain and Lightning payouts.`,
+  description: `DEPRECATED — use \`manage_payout_claims\` instead. List, approve, cancel, or mark payouts as paid. Payouts represent claims against pull payments that need to be processed. Supports both on-chain and Lightning payouts.`,
+  instructions: [
+    'Use manage_payout_claims for current payout operations, including approval with the actual payout revision.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

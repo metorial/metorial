@@ -44,10 +44,10 @@ export let createUser = SlateTool.create(spec, {
 
     return {
       output: {
-        guid: user.guid,
-        id: user.id,
+        guid: user.guid ?? undefined,
+        id: user.id ?? undefined,
         email: user.email,
-        isDisabled: user.is_disabled,
+        isDisabled: user.is_disabled ?? undefined,
         metadata: user.metadata
       },
       message: `Created user **${user.guid}**${user.id ? ` (id: ${user.id})` : ''}.`
@@ -69,7 +69,7 @@ export let listUsers = SlateTool.create(spec, {
       recordsPerPage: z
         .number()
         .optional()
-        .describe('Number of records per page (default: 25, max: 100)')
+        .describe('Number of records per page (default: 25, max: 1000)')
     })
   )
   .output(
@@ -93,10 +93,10 @@ export let listUsers = SlateTool.create(spec, {
     });
 
     let users = (result.users || []).map((u: any) => ({
-      guid: u.guid,
-      id: u.id,
+      guid: u.guid ?? undefined,
+      id: u.id ?? undefined,
       email: u.email,
-      isDisabled: u.is_disabled,
+      isDisabled: u.is_disabled ?? undefined,
       metadata: u.metadata
     }));
 
@@ -139,10 +139,10 @@ export let readUser = SlateTool.create(spec, {
 
     return {
       output: {
-        guid: user.guid,
-        id: user.id,
+        guid: user.guid ?? undefined,
+        id: user.id ?? undefined,
         email: user.email,
-        isDisabled: user.is_disabled,
+        isDisabled: user.is_disabled ?? undefined,
         metadata: user.metadata
       },
       message: `User **${user.guid}**${user.id ? ` (id: ${user.id})` : ''}.`
@@ -178,10 +178,10 @@ export let updateUser = SlateTool.create(spec, {
 
     return {
       output: {
-        guid: user.guid,
-        id: user.id,
+        guid: user.guid ?? undefined,
+        id: user.id ?? undefined,
         email: user.email,
-        isDisabled: user.is_disabled,
+        isDisabled: user.is_disabled ?? undefined,
         metadata: user.metadata
       },
       message: `Updated user **${user.guid}**.`

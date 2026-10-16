@@ -1,5 +1,5 @@
-import { createAxios } from 'slates';
-import type { CharacterGrid } from './client';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
+import { type CharacterGrid, parseCharacterGrid } from './client';
 
 export interface VbmlComponent {
   template?: string;
@@ -26,8 +26,14 @@ export class VbmlClient {
   private http;
 
   constructor() {
-    this.http = createAxios({
-      baseURL: 'https://vbml.vestaboard.com',
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://cloud.vestaboard.com/vbml',
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Vestaboard VBML',
+          reason: 'vestaboard_api_error'
+        }),
       headers: {
         'Content-Type': 'application/json'
       }
@@ -36,11 +42,15 @@ export class VbmlClient {
 
   async compose(request: VbmlComposeRequest): Promise<CharacterGrid> {
     let response = await this.http.post('/compose', request);
-    return response.data;
+    return parseCharacterGrid(response.data, 'Vestaboard VBML result');
   }
 
-  async format(message: string): Promise<CharacterGrid> {
-    let response = await this.http.post('/format', { message });
-    return response.data;
+  async format(message: string, rows?: number, columns?: number): Promise<CharacterGrid> {
+    let response = await this.http.post('/format', {
+      message,
+      ...(rows !== undefined ? { rows } : {}),
+      ...(columns !== undefined ? { columns } : {})
+    });
+    return parseCharacterGrid(response.data, 'Vestaboard VBML result');
   }
 }

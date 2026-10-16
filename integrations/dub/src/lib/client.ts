@@ -1,8 +1,53 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+import { z } from 'zod';
 
-let api = createAxios({
-  baseURL: 'https://api.dub.co'
+export let dubApi = createAxios({
+  baseURL: 'https://api.dub.co',
+  timeout: 30000
 });
+dubApi.interceptors.response.use(
+  response => response,
+  error =>
+    Promise.reject(
+      buildApiServiceError(error, {
+        providerLabel: 'Dub',
+        reason: 'dub_api_error'
+      })
+    )
+);
+let api = dubApi;
+
+export let userInfoSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  image: z.string().nullable(),
+  workspace: z.object({
+    id: z.string(),
+    name: z.string(),
+    slug: z.string(),
+    logo: z.string().nullable()
+  })
+});
+
+export interface DubFolder {
+  id: string;
+  name: string;
+  description: string | null;
+  type: 'default' | 'mega';
+  accessLevel: 'read' | 'write' | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateCustomerParams {
+  name?: string | null;
+  email?: string | null;
+  avatar?: string | null;
+  externalId?: string;
+  stripeCustomerId?: string | null;
+  country?: string;
+  subscriptionCanceledAt?: string | null;
+}
 
 export interface DubLink {
   id: string;
@@ -46,7 +91,7 @@ export interface DubLink {
   updatedAt: string;
   userId: string;
   workspaceId: string;
-  tags: Array<{ id: string; name: string; color: string }>;
+  tags: Array<{ id: string; name: string; color: string }> | null;
   webhookIds: string[];
   testVariants: Array<{ url: string; percentage: number }> | null;
   testStartedAt: string | null;
@@ -73,16 +118,19 @@ export interface DubDomain {
   updatedAt: string;
 }
 
-export interface DubCustomer {
+export interface DubCustomer extends Record<string, unknown> {
   id: string;
-  name: string | null;
+  name?: string | null;
   externalId: string;
-  email: string | null;
-  avatar: string | null;
-  country: string | null;
+  email?: string | null;
+  avatar?: string | null;
+  country?: string | null;
   createdAt: string;
-  sales: number;
-  saleAmount: number;
+  sales?: number | null;
+  saleAmount?: number | null;
+  stripeCustomerId?: string | null;
+  firstSaleAt?: string | null;
+  subscriptionCanceledAt?: string | null;
 }
 
 export interface CreateLinkParams {
@@ -159,6 +207,8 @@ export interface UpdateLinkParams {
 }
 
 export interface ListLinksParams {
+  startingAfter?: string;
+  endingBefore?: string;
   domain?: string;
   tagIds?: string[];
   tagNames?: string[];
@@ -226,6 +276,8 @@ export interface TrackSaleParams {
 }
 
 export interface ListCustomersParams {
+  startingAfter?: string;
+  endingBefore?: string;
   email?: string;
   externalId?: string;
   search?: string;
@@ -257,10 +309,61 @@ export class Client {
   private headers: Record<string, string>;
 
   constructor(config: { token: string }) {
+    if (!config.token?.trim())
+      throw createApiServiceError('Connect a Dub account before making requests.');
     this.headers = {
       Authorization: `Bearer ${config.token}`,
       'Content-Type': 'application/json'
     };
+  }
+
+  async getCurrentUser() {
+    let response = await api.get('/oauth/userinfo', { headers: this.headers });
+    let result = userInfoSchema.safeParse(response.data);
+    if (!result.success)
+      throw createApiServiceError(
+        'Dub returned an invalid user profile. Reconnect your account.'
+      );
+    return result.data;
+  }
+
+  async listFolders(
+    params: { search?: string; page?: number; pageSize?: number } = {}
+  ): Promise<DubFolder[]> {
+    let response = await api.get('/folders', { headers: this.headers, params });
+    return response.data;
+  }
+
+  async createFolder(params: {
+    name: string;
+    description?: string | null;
+  }): Promise<DubFolder> {
+    let response = await api.post('/folders', params, { headers: this.headers });
+    return response.data;
+  }
+
+  async updateFolder(
+    id: string,
+    params: { name?: string; description?: string | null }
+  ): Promise<DubFolder> {
+    let response = await api.patch(`/folders/${encodeURIComponent(id)}`, params, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async deleteFolder(id: string): Promise<{ id: string }> {
+    let response = await api.delete(`/folders/${encodeURIComponent(id)}`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async updateCustomer(id: string, params: UpdateCustomerParams): Promise<DubCustomer> {
+    let response = await api.patch(`/customers/${encodeURIComponent(id)}`, params, {
+      headers: this.headers
+    });
+    return response.data;
   }
 
   // Links
@@ -276,9 +379,22 @@ export class Client {
     domain?: string;
     key?: string;
   }): Promise<DubLink> {
+    let identifiers =
+      Number(Boolean(params.linkId)) +
+      Number(Boolean(params.externalId)) +
+      Number(Boolean(params.domain || params.key));
+    if (identifiers !== 1 || Boolean(params.domain) !== Boolean(params.key)) {
+      throw createApiServiceError(
+        'Provide exactly one link identifier: linkId, externalId, or both domain and slug.'
+      );
+    }
     let query = new URLSearchParams();
     if (params.linkId) query.set('linkId', params.linkId);
-    if (params.externalId) query.set('externalId', params.externalId);
+    if (params.externalId)
+      query.set(
+        'externalId',
+        params.externalId.startsWith('ext_') ? params.externalId : `ext_${params.externalId}`
+      );
     if (params.domain) query.set('domain', params.domain);
     if (params.key) query.set('key', params.key);
 
@@ -287,7 +403,11 @@ export class Client {
   }
 
   async listLinks(params: ListLinksParams = {}): Promise<DubLink[]> {
+    if (params.startingAfter && params.endingBefore)
+      throw createApiServiceError('Use startingAfter or endingBefore, not both.');
     let query = new URLSearchParams();
+    if (params.startingAfter) query.set('startingAfter', params.startingAfter);
+    if (params.endingBefore) query.set('endingBefore', params.endingBefore);
     if (params.domain) query.set('domain', params.domain);
     if (params.tagIds) params.tagIds.forEach(id => query.append('tagIds', id));
     if (params.tagNames) params.tagNames.forEach(name => query.append('tagNames', name));
@@ -307,7 +427,9 @@ export class Client {
   }
 
   async updateLink(linkId: string, params: UpdateLinkParams): Promise<DubLink> {
-    let response = await api.patch(`/links/${linkId}`, params, { headers: this.headers });
+    let response = await api.patch(`/links/${encodeURIComponent(linkId)}`, params, {
+      headers: this.headers
+    });
     return response.data as DubLink;
   }
 
@@ -317,7 +439,9 @@ export class Client {
   }
 
   async deleteLink(linkId: string): Promise<{ id: string }> {
-    let response = await api.delete(`/links/${linkId}`, { headers: this.headers });
+    let response = await api.delete(`/links/${encodeURIComponent(linkId)}`, {
+      headers: this.headers
+    });
     return response.data as { id: string };
   }
 
@@ -375,8 +499,20 @@ export class Client {
       externalId: string | null;
     };
   }> {
-    let response = await api.post('/track/lead', params, { headers: this.headers });
-    return response.data as any;
+    let response = await api.post(
+      '/track/lead',
+      { ...params, mode: 'wait' },
+      { headers: this.headers }
+    );
+    if (!response.data)
+      throw createApiServiceError(
+        'Dub deduplicated this lead: the customer and event name were already tracked. No new lead was recorded.'
+      );
+    if (!response.data.link)
+      throw createApiServiceError(
+        'Dub recorded the lead without a link attribution. Retrieve the customer or events to inspect the result.'
+      );
+    return response.data;
   }
 
   async trackSale(params: TrackSaleParams): Promise<{
@@ -396,13 +532,23 @@ export class Client {
       metadata: Record<string, unknown> | null;
     };
   }> {
+    if (!Number.isSafeInteger(params.amount) || params.amount < 0)
+      throw createApiServiceError(
+        'Sale amount must be a non-negative integer in the currency minor unit.'
+      );
     let response = await api.post('/track/sale', params, { headers: this.headers });
-    return response.data as any;
+    if (!response.data?.customer || !response.data?.sale)
+      throw createApiServiceError(
+        'Dub returned no sale or customer details. The invoice may already be tracked; inspect events before retrying.'
+      );
+    return response.data;
   }
 
   // Customers
 
   async listCustomers(params: ListCustomersParams = {}): Promise<DubCustomer[]> {
+    if (params.startingAfter && params.endingBefore)
+      throw createApiServiceError('Use startingAfter or endingBefore, not both.');
     let query = new URLSearchParams();
     for (let [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null) {
@@ -415,12 +561,16 @@ export class Client {
   }
 
   async getCustomer(customerId: string): Promise<DubCustomer> {
-    let response = await api.get(`/customers/${customerId}`, { headers: this.headers });
+    let response = await api.get(`/customers/${encodeURIComponent(customerId)}`, {
+      headers: this.headers
+    });
     return response.data as DubCustomer;
   }
 
   async deleteCustomer(customerId: string): Promise<{ id: string }> {
-    let response = await api.delete(`/customers/${customerId}`, { headers: this.headers });
+    let response = await api.delete(`/customers/${encodeURIComponent(customerId)}`, {
+      headers: this.headers
+    });
     return response.data as { id: string };
   }
 
@@ -445,12 +595,16 @@ export class Client {
   }
 
   async updateTag(tagId: string, params: { name?: string; color?: string }): Promise<DubTag> {
-    let response = await api.patch(`/tags/${tagId}`, params, { headers: this.headers });
+    let response = await api.patch(`/tags/${encodeURIComponent(tagId)}`, params, {
+      headers: this.headers
+    });
     return response.data as DubTag;
   }
 
   async deleteTag(tagId: string): Promise<{ id: string }> {
-    let response = await api.delete(`/tags/${tagId}`, { headers: this.headers });
+    let response = await api.delete(`/tags/${encodeURIComponent(tagId)}`, {
+      headers: this.headers
+    });
     return response.data as { id: string };
   }
 
@@ -489,14 +643,16 @@ export class Client {
       placeholder?: string;
     }
   ): Promise<DubDomain> {
-    let response = await api.patch(`/domains/${domainSlug}`, params, {
+    let response = await api.patch(`/domains/${encodeURIComponent(domainSlug)}`, params, {
       headers: this.headers
     });
     return response.data as DubDomain;
   }
 
   async deleteDomain(domainSlug: string): Promise<{ slug: string }> {
-    let response = await api.delete(`/domains/${domainSlug}`, { headers: this.headers });
+    let response = await api.delete(`/domains/${encodeURIComponent(domainSlug)}`, {
+      headers: this.headers
+    });
     return response.data as { slug: string };
   }
 
@@ -530,11 +686,13 @@ export class Client {
     linkIds: string[];
   }> {
     let response = await api.post('/webhooks', params, { headers: this.headers });
-    return response.data as any;
+    return response.data;
   }
 
   async deleteWebhook(webhookId: string): Promise<{ id: string }> {
-    let response = await api.delete(`/webhooks/${webhookId}`, { headers: this.headers });
+    let response = await api.delete(`/webhooks/${encodeURIComponent(webhookId)}`, {
+      headers: this.headers
+    });
     return response.data as { id: string };
   }
 
@@ -549,6 +707,6 @@ export class Client {
     }>
   > {
     let response = await api.get('/webhooks', { headers: this.headers });
-    return response.data as any;
+    return response.data;
   }
 }

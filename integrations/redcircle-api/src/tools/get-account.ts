@@ -56,8 +56,8 @@ export let getAccount = SlateTool.create(spec, {
     let data = await client.getAccount();
 
     let account = data.account_info ?? {};
-    let credits = data.credits ?? {};
-    let quotas = data.quotas ?? {};
+    let credits = { ...data.credits, ...account };
+    let quotas = { ...data.quotas, ...account };
 
     return {
       output: {
@@ -72,10 +72,10 @@ export let getAccount = SlateTool.create(spec, {
         destinationsLimit: quotas.destinations_limit,
         collectionsUsed: quotas.collections_used,
         collectionsLimit: quotas.collections_limit,
-        usageHistory: data.usage_history,
-        systemStatus: data.status
+        usageHistory: account.usage_history ?? data.usage_history,
+        systemStatus: account.status ?? data.status
       },
-      message: `Account: **${account.name ?? 'N/A'}** (${account.plan ?? 'unknown plan'}). Credits: **${credits.credits_remaining ?? 0}** remaining of ${credits.credits_limit ?? 0}.`
+      message: `Account: **${account.name ?? 'N/A'}** (${account.plan ?? 'unknown plan'}). Credits: **${credits.credits_remaining ?? 'unknown'}** remaining of ${credits.credits_limit ?? 'unknown'}.`
     };
   })
   .build();

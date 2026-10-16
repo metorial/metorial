@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate } from '../lib/response';
 import { spec } from '../spec';
 
 let revisionSchema = z.object({
@@ -68,9 +69,7 @@ export let getPostRevisions = SlateTool.create(spec, {
       body: r.body,
       title: r.title,
       tags: r.tags,
-      creationDate: r.creation_date
-        ? new Date(r.creation_date * 1000).toISOString()
-        : undefined,
+      creationDate: optionalProviderDate(r.creation_date),
       userDisplayName: r.user?.display_name,
       userId: r.user?.user_id,
       setCommunityWiki: r.set_community_wiki

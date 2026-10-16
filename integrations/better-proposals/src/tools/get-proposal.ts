@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getProposal = SlateTool.create(spec, {
   name: 'Get Proposal',
   key: 'get_proposal',
-  description: `Retrieves detailed information about a specific proposal by its ID. Also supports fetching the total proposal count across the account.`,
+  description: `Retrieves detailed information about a specific proposal by its ID.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -30,7 +30,7 @@ export let getProposal = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         proposal: result.data
       },
       message: `Retrieved proposal **${ctx.input.proposalId}**.`

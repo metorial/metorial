@@ -20,7 +20,7 @@ export let createEvent = SlateTool.create(spec, {
       eventCategoryId: z
         .string()
         .optional()
-        .describe('Category ID to organize the event under'),
+        .describe('Category ID from manage_event_categories to organize the event under'),
       eventLocation: z.string().optional().describe('Location of the event'),
       maxParticipants: z
         .number()
@@ -71,7 +71,7 @@ export let createEvent = SlateTool.create(spec, {
 
     return {
       output: { event },
-      message: `Created event **${ctx.input.eventName}** (${ctx.input.dateStart} to ${ctx.input.dateEnd}).`
+      message: 'Received the event creation response.'
     };
   })
   .build();

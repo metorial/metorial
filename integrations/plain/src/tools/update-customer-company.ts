@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let updateCustomerCompany = SlateTool.create(spec, {
   .input(
     z.object({
       customerId: z.string().describe('Plain customer ID'),
-      companyId: z.string().optional().describe('Plain company ID to associate'),
+      companyId: z.string().optional().describe('Company ID from list_companies to associate'),
       companyDomainName: z
         .string()
         .optional()
@@ -35,6 +35,17 @@ export let updateCustomerCompany = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (
+      [
+        ctx.input.companyId !== undefined,
+        ctx.input.companyDomainName !== undefined,
+        ctx.input.removeCompany === true
+      ].filter(Boolean).length !== 1
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one of companyId, companyDomainName, or removeCompany: true'
+      );
+    }
 
     let input: any = {
       customerId: ctx.input.customerId
@@ -47,7 +58,9 @@ export let updateCustomerCompany = SlateTool.create(spec, {
     } else if (ctx.input.companyDomainName) {
       input.companyIdentifier = { companyDomainName: ctx.input.companyDomainName };
     } else {
-      throw new Error('Provide companyId, companyDomainName, or set removeCompany to true');
+      throw createApiServiceError(
+        'Provide companyId, companyDomainName, or set removeCompany to true'
+      );
     }
 
     let res = await client.updateCustomerCompany(input);

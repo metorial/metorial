@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,6 +18,7 @@ export let getDispatch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       center: z
         .object({
           city: z.string().optional(),
@@ -77,7 +78,7 @@ export let getDispatch = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let zip = ctx.input.zip || ctx.config.zip;
     if (!zip) {
-      throw new Error('A German postal code (zip) is required.');
+      throw createApiServiceError('A German postal code (zip) is required.');
     }
 
     let client = new Client({ token: ctx.auth.token });
@@ -85,30 +86,31 @@ export let getDispatch = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         center: result.center
           ? {
               city: result.center.city,
               zip: result.center.zip,
-              lat: result.center.lat,
-              lng: result.center.lng
+              lat: result.center.lat ?? result.center.coordinates?.[1],
+              lng: result.center.lng ?? result.center.coordinates?.[0]
             }
           : undefined,
         averageDistanceKm: result.avg_distance_km,
         preMix: result.premix,
         postMix: result.postmix,
         dispatchFrom: result.dispatch_from?.map(loc => ({
-          city: loc.city,
-          zip: loc.zip,
+          city: loc.city ?? loc.location?.label ?? loc.location?.prettyLabel,
+          zip: loc.zip ?? loc.location?.zip,
           energy: loc.energy,
-          lat: loc.lat,
-          lng: loc.lng
+          lat: loc.lat ?? loc.location?.coordinates?.[1],
+          lng: loc.lng ?? loc.location?.coordinates?.[0]
         })),
         dispatchTo: result.dispatch_to?.map(loc => ({
-          city: loc.city,
-          zip: loc.zip,
+          city: loc.city ?? loc.location?.label ?? loc.location?.prettyLabel,
+          zip: loc.zip ?? loc.location?.zip,
           energy: loc.energy,
-          lat: loc.lat,
-          lng: loc.lng
+          lat: loc.lat ?? loc.location?.coordinates?.[1],
+          lng: loc.lng ?? loc.location?.coordinates?.[0]
         })),
         timeframe: result.timeframe
           ? {

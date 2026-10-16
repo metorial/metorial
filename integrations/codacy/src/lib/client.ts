@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
 export interface CodacyClientConfig {
   token: string;
@@ -36,14 +36,28 @@ export class CodacyClient {
         'Content-Type': 'application/json'
       }
     });
+    this.axios.interceptors.response.use(undefined, error => {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Codacy',
+        reason: 'codacy_api_error',
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+        detailKeys: ['message', 'innerMessage', 'error', 'detail', 'code'],
+        nestedKeys: ['errors']
+      });
+    });
   }
 
   private orgPath(): string {
-    return `/organizations/${this.provider}/${this.organization}`;
+    return `/organizations/${encodeURIComponent(this.provider)}/${encodeURIComponent(this.organization)}`;
   }
 
   private analysisOrgPath(): string {
-    return `/analysis/organizations/${this.provider}/${this.organization}`;
+    return `/analysis/organizations/${encodeURIComponent(this.provider)}/${encodeURIComponent(this.organization)}`;
+  }
+
+  async getCurrentUser(): Promise<any> {
+    let response = await this.axios.get('/user');
+    return response.data;
   }
 
   // ─── Organizations ──────────────────────────────────────────────
@@ -79,16 +93,17 @@ export class CodacyClient {
     params?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.post(
-      `/search/analysis/organizations/${this.provider}/${this.organization}/repositories`,
+      `/search/analysis/organizations/${encodeURIComponent(this.provider)}/${encodeURIComponent(this.organization)}/repositories`,
       body,
       { params }
     );
     return response.data;
   }
 
-  async getRepositoryWithAnalysis(repositoryName: string): Promise<any> {
+  async getRepositoryWithAnalysis(repositoryName: string, branch?: string): Promise<any> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}`
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}`,
+      { params: { branch } }
     );
     return response.data;
   }
@@ -98,9 +113,10 @@ export class CodacyClient {
     return response.data;
   }
 
-  async getAnalysisProgress(repositoryName: string): Promise<any> {
+  async getAnalysisProgress(repositoryName: string, branch?: string): Promise<any> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/analysis-progress`
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/analysis-progress`,
+      { params: { branch } }
     );
     return response.data;
   }
@@ -113,7 +129,7 @@ export class CodacyClient {
     params?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.post(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/issues/search`,
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/issues/search`,
       body,
       { params }
     );
@@ -122,14 +138,14 @@ export class CodacyClient {
 
   async getIssue(repositoryName: string, issueId: string): Promise<any> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/issues/${issueId}`
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/issues/${encodeURIComponent(issueId)}`
     );
     return response.data;
   }
 
   async issuesOverview(repositoryName: string, body: any): Promise<any> {
     let response = await this.axios.post(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/issues/overview`,
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/issues/overview`,
       body
     );
     return response.data;
@@ -139,10 +155,15 @@ export class CodacyClient {
 
   async listRepositoryPullRequests(
     repositoryName: string,
-    params?: PaginationParams & { search?: string }
+    params?: PaginationParams & {
+      search?: string;
+      textQuery?: string;
+      targetBranch?: string;
+      includeNotAnalyzed?: boolean;
+    }
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/pull-requests`,
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/pull-requests`,
       { params }
     );
     return response.data;
@@ -153,7 +174,7 @@ export class CodacyClient {
     pullRequestNumber: number
   ): Promise<any> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/pull-requests/${pullRequestNumber}`
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/pull-requests/${pullRequestNumber}`
     );
     return response.data;
   }
@@ -164,7 +185,7 @@ export class CodacyClient {
     params?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/pull-requests/${pullRequestNumber}/issues`,
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/pull-requests/${pullRequestNumber}/issues`,
       { params }
     );
     return response.data;
@@ -176,7 +197,7 @@ export class CodacyClient {
     params?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/pull-requests/${pullRequestNumber}/files`,
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/pull-requests/${pullRequestNumber}/files`,
       { params }
     );
     return response.data;
@@ -189,15 +210,15 @@ export class CodacyClient {
     params?: PaginationParams & { branchName?: string }
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/commits`,
-      { params }
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/commits`,
+      { params: { cursor: params?.cursor, limit: params?.limit, branch: params?.branchName } }
     );
     return response.data;
   }
 
   async getCommitWithAnalysis(repositoryName: string, commitUuid: string): Promise<any> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/commits/${commitUuid}`
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/commits/${encodeURIComponent(commitUuid)}`
     );
     return response.data;
   }
@@ -209,7 +230,7 @@ export class CodacyClient {
     pullRequestNumber: number
   ): Promise<any> {
     let response = await this.axios.get(
-      `/coverage/organizations/${this.provider}/${this.organization}/repositories/${repositoryName}/pull-requests/${pullRequestNumber}`
+      `/coverage/organizations/${encodeURIComponent(this.provider)}/${encodeURIComponent(this.organization)}/repositories/${encodeURIComponent(repositoryName)}/pull-requests/${pullRequestNumber}`
     );
     return response.data;
   }
@@ -220,7 +241,7 @@ export class CodacyClient {
     params?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `/coverage/organizations/${this.provider}/${this.organization}/repositories/${repositoryName}/pull-requests/${pullRequestNumber}/files`,
+      `/coverage/organizations/${encodeURIComponent(this.provider)}/${encodeURIComponent(this.organization)}/repositories/${encodeURIComponent(repositoryName)}/pull-requests/${pullRequestNumber}/files`,
       { params }
     );
     return response.data;
@@ -233,8 +254,16 @@ export class CodacyClient {
     params?: PaginationParams & { branchName?: string; search?: string; sort?: string }
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/files`,
-      { params }
+      `${this.orgPath()}/repositories/${encodeURIComponent(repositoryName)}/files`,
+      {
+        params: {
+          cursor: params?.cursor,
+          limit: params?.limit,
+          branch: params?.branchName,
+          search: params?.search,
+          sort: params?.sort
+        }
+      }
     );
     return response.data;
   }
@@ -248,7 +277,7 @@ export class CodacyClient {
 
   async listRepositoryTools(repositoryName: string): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/tools`
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/tools`
     );
     return response.data;
   }
@@ -259,7 +288,7 @@ export class CodacyClient {
     body: any
   ): Promise<any> {
     let response = await this.axios.patch(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/tools/${toolUuid}`,
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/tools/${encodeURIComponent(toolUuid)}`,
       body
     );
     return response.data;
@@ -268,10 +297,10 @@ export class CodacyClient {
   async listRepositoryToolPatterns(
     repositoryName: string,
     toolUuid: string,
-    params?: PaginationParams
+    params?: PaginationParams & { enabled?: boolean; search?: string }
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/tools/${toolUuid}/patterns`,
+      `${this.analysisOrgPath()}/repositories/${encodeURIComponent(repositoryName)}/tools/${encodeURIComponent(toolUuid)}/patterns`,
       { params }
     );
     return response.data;
@@ -286,7 +315,7 @@ export class CodacyClient {
 
   async getCodingStandard(codingStandardId: string): Promise<any> {
     let response = await this.axios.get(
-      `${this.orgPath()}/coding-standards/${codingStandardId}`
+      `${this.orgPath()}/coding-standards/${encodeURIComponent(codingStandardId)}`
     );
     return response.data;
   }
@@ -297,19 +326,21 @@ export class CodacyClient {
   }
 
   async deleteCodingStandard(codingStandardId: string): Promise<void> {
-    await this.axios.delete(`${this.orgPath()}/coding-standards/${codingStandardId}`);
+    await this.axios.delete(
+      `${this.orgPath()}/coding-standards/${encodeURIComponent(codingStandardId)}`
+    );
   }
 
   async promoteCodingStandard(codingStandardId: string): Promise<any> {
     let response = await this.axios.post(
-      `${this.orgPath()}/coding-standards/${codingStandardId}/promote`
+      `${this.orgPath()}/coding-standards/${encodeURIComponent(codingStandardId)}/promote`
     );
     return response.data;
   }
 
   async setDefaultCodingStandard(codingStandardId: string): Promise<any> {
     let response = await this.axios.post(
-      `${this.orgPath()}/coding-standards/${codingStandardId}/setDefault`
+      `${this.orgPath()}/coding-standards/${encodeURIComponent(codingStandardId)}/setDefault`
     );
     return response.data;
   }
@@ -322,7 +353,9 @@ export class CodacyClient {
   }
 
   async getGatePolicy(gatePolicyId: string): Promise<any> {
-    let response = await this.axios.get(`${this.orgPath()}/gate-policies/${gatePolicyId}`);
+    let response = await this.axios.get(
+      `${this.orgPath()}/gate-policies/${encodeURIComponent(gatePolicyId)}`
+    );
     return response.data;
   }
 
@@ -333,14 +366,16 @@ export class CodacyClient {
 
   async updateGatePolicy(gatePolicyId: string, body: any): Promise<any> {
     let response = await this.axios.patch(
-      `${this.orgPath()}/gate-policies/${gatePolicyId}`,
+      `${this.orgPath()}/gate-policies/${encodeURIComponent(gatePolicyId)}`,
       body
     );
     return response.data;
   }
 
   async deleteGatePolicy(gatePolicyId: string): Promise<void> {
-    await this.axios.delete(`${this.orgPath()}/gate-policies/${gatePolicyId}`);
+    await this.axios.delete(
+      `${this.orgPath()}/gate-policies/${encodeURIComponent(gatePolicyId)}`
+    );
   }
 
   // ─── Security / SRM ────────────────────────────────────────────
@@ -356,13 +391,18 @@ export class CodacyClient {
   }
 
   async getSecurityItem(srmItemId: string): Promise<any> {
-    let response = await this.axios.get(`${this.orgPath()}/security/items/${srmItemId}`);
+    let response = await this.axios.get(
+      `${this.orgPath()}/security/items/${encodeURIComponent(srmItemId)}`
+    );
     return response.data;
   }
 
-  async ignoreSecurityItem(srmItemId: string, body?: { reason?: string }): Promise<any> {
+  async ignoreSecurityItem(
+    srmItemId: string,
+    body?: { reason?: string; comment?: string }
+  ): Promise<any> {
     let response = await this.axios.post(
-      `${this.orgPath()}/security/items/${srmItemId}/ignore`,
+      `${this.orgPath()}/security/items/${encodeURIComponent(srmItemId)}/ignore`,
       body ?? {}
     );
     return response.data;
@@ -370,7 +410,7 @@ export class CodacyClient {
 
   async unignoreSecurityItem(srmItemId: string): Promise<any> {
     let response = await this.axios.post(
-      `${this.orgPath()}/security/items/${srmItemId}/unignore`
+      `${this.orgPath()}/security/items/${encodeURIComponent(srmItemId)}/unignore`
     );
     return response.data;
   }
@@ -438,32 +478,43 @@ export class CodacyClient {
 
   async listRepositoryTokens(repositoryName: string): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.orgPath()}/repositories/${repositoryName}/tokens`
+      `${this.orgPath()}/repositories/${encodeURIComponent(repositoryName)}/tokens`
     );
     return response.data;
   }
 
-  async createRepositoryToken(repositoryName: string): Promise<any> {
+  async createRepositoryToken(
+    repositoryName: string,
+    body?: { name: string; expiresAt: string }
+  ): Promise<any> {
     let response = await this.axios.post(
-      `${this.orgPath()}/repositories/${repositoryName}/tokens`
+      `${this.orgPath()}/repositories/${encodeURIComponent(repositoryName)}/tokens`,
+      body
     );
     return response.data;
   }
 
   async deleteRepositoryToken(repositoryName: string, tokenId: string): Promise<void> {
     await this.axios.delete(
-      `${this.orgPath()}/repositories/${repositoryName}/tokens/${tokenId}`
+      `${this.orgPath()}/repositories/${encodeURIComponent(repositoryName)}/tokens/${encodeURIComponent(tokenId)}`
     );
+  }
+
+  async getRepositoryQualitySettings(repositoryName: string): Promise<any> {
+    let response = await this.axios.get(
+      `${this.orgPath()}/repositories/${encodeURIComponent(repositoryName)}/settings/quality/repository`
+    );
+    return response.data;
   }
 
   // ─── Branches ──────────────────────────────────────────────────
 
   async listBranches(
     repositoryName: string,
-    params?: PaginationParams
+    params?: PaginationParams & { enabled?: boolean; search?: string }
   ): Promise<PaginatedResponse<any>> {
     let response = await this.axios.get(
-      `${this.analysisOrgPath()}/repositories/${repositoryName}/branches`,
+      `${this.orgPath()}/repositories/${encodeURIComponent(repositoryName)}/branches`,
       { params }
     );
     return response.data;

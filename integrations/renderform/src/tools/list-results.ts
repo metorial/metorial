@@ -14,6 +14,7 @@ export let listResults = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      batch: z.string().optional().describe('Filter by render batch identifier'),
       templateId: z.string().optional().describe('Filter results by template identifier'),
       page: z.number().optional().describe('Page number for pagination (0-indexed)'),
       size: z.number().optional().describe('Number of results per page (max 50)')
@@ -29,7 +30,17 @@ export let listResults = SlateTool.create(spec, {
             width: z.number().optional().describe('Image width in pixels'),
             height: z.number().optional().describe('Image height in pixels'),
             templateName: z.string().optional().describe('Name of the template used'),
-            createdAt: z.string().optional().describe('ISO 8601 creation timestamp')
+            createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
+            status: z
+              .string()
+              .optional()
+              .describe('Provider status: pending, done, or failed'),
+            type: z.string().optional().describe('Provider result type'),
+            errorMessage: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Provider failure reason when present')
           })
         )
         .describe('List of render results'),
@@ -43,6 +54,7 @@ export let listResults = SlateTool.create(spec, {
 
     let response = await client.listResults({
       template: ctx.input.templateId,
+      batch: ctx.input.batch,
       page: ctx.input.page,
       size: ctx.input.size
     });
@@ -53,7 +65,10 @@ export let listResults = SlateTool.create(spec, {
       width: r.width,
       height: r.height,
       templateName: r.templateName,
-      createdAt: r.createdAt
+      createdAt: r.createdAt,
+      status: r.status,
+      type: r.type,
+      errorMessage: r.errorMessage
     }));
 
     return {
@@ -61,9 +76,9 @@ export let listResults = SlateTool.create(spec, {
         results,
         totalPages: response.totalPages,
         totalElements: response.totalElements,
-        pageNumber: response.pageNumber
+        pageNumber: response.number
       },
-      message: `Found **${response.totalElements}** render result(s) (page ${response.pageNumber + 1} of ${response.totalPages}).`
+      message: `Found **${response.totalElements}** render result(s) (page ${response.number + 1} of ${response.totalPages}).`
     };
   })
   .build();

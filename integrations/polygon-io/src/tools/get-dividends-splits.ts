@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorInput, cursorOutput, nextCursor, responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 let dividendSchema = z.object({
@@ -31,13 +32,15 @@ let splitSchema = z.object({
 export let getDividendsSplits = SlateTool.create(spec, {
   name: 'Get Dividends & Splits',
   key: 'get_dividends_splits',
-  description: `Retrieve historical dividend and stock split data for a ticker. Useful for tracking corporate actions, dividend history, and split-adjusted analysis. Can fetch dividends, splits, or both.`,
+  description: `Retrieve legacy dividend and stock split data for a ticker. Useful for tracking corporate actions, dividend history, and split-adjusted analysis. Can fetch dividends, splits, or both. Use get_adjusted_corporate_actions for current datasets with historical adjustment factors.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      dividendCursor: cursorInput,
+      splitCursor: cursorInput,
       ticker: z.string().describe('Ticker symbol (e.g., "AAPL")'),
       dataType: z
         .enum(['dividends', 'splits', 'both'])
@@ -52,6 +55,8 @@ export let getDividendsSplits = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextDividendCursor: cursorOutput,
+      nextSplitCursor: cursorOutput,
       dividends: z.array(dividendSchema).optional().describe('Array of dividend records'),
       splits: z.array(splitSchema).optional().describe('Array of stock split records'),
       dividendCount: z.number().optional().describe('Number of dividends returned'),
@@ -62,9 +67,12 @@ export let getDividendsSplits = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let dividends: any[] | undefined;
     let splits: any[] | undefined;
+    let nextDividendCursor: string | undefined;
+    let nextSplitCursor: string | undefined;
 
     if (ctx.input.dataType === 'dividends' || ctx.input.dataType === 'both') {
       let divData = await client.getDividends({
+        cursor: ctx.input.dividendCursor,
         ticker: ctx.input.ticker,
         exDividendDateGte: ctx.input.dateFrom,
         exDividendDateLte: ctx.input.dateTo,
@@ -72,21 +80,23 @@ export let getDividendsSplits = SlateTool.create(spec, {
         sort: 'ex_dividend_date',
         limit: ctx.input.limit
       });
-      dividends = (divData.results || []).map((d: any) => ({
-        ticker: d.ticker,
-        cashAmount: d.cash_amount,
-        declarationDate: d.declaration_date,
-        exDividendDate: d.ex_dividend_date,
-        recordDate: d.record_date,
-        payDate: d.pay_date,
-        frequency: d.frequency,
-        dividendType: d.dividend_type,
-        currency: d.currency
+      nextDividendCursor = nextCursor(divData);
+      dividends = responseRows(divData.results)?.map((d: any) => ({
+        ticker: d.ticker ?? undefined,
+        cashAmount: d.cash_amount ?? undefined,
+        declarationDate: d.declaration_date ?? undefined,
+        exDividendDate: d.ex_dividend_date ?? undefined,
+        recordDate: d.record_date ?? undefined,
+        payDate: d.pay_date ?? undefined,
+        frequency: d.frequency ?? undefined,
+        dividendType: d.dividend_type ?? undefined,
+        currency: d.currency ?? undefined
       }));
     }
 
     if (ctx.input.dataType === 'splits' || ctx.input.dataType === 'both') {
       let splitData = await client.getStockSplits({
+        cursor: ctx.input.splitCursor,
         ticker: ctx.input.ticker,
         executionDateGte: ctx.input.dateFrom,
         executionDateLte: ctx.input.dateTo,
@@ -94,11 +104,12 @@ export let getDividendsSplits = SlateTool.create(spec, {
         sort: 'execution_date',
         limit: ctx.input.limit
       });
-      splits = (splitData.results || []).map((s: any) => ({
-        ticker: s.ticker,
-        executionDate: s.execution_date,
-        splitFrom: s.split_from,
-        splitTo: s.split_to
+      nextSplitCursor = nextCursor(splitData);
+      splits = responseRows(splitData.results)?.map((s: any) => ({
+        ticker: s.ticker ?? undefined,
+        executionDate: s.execution_date ?? undefined,
+        splitFrom: s.split_from ?? undefined,
+        splitTo: s.split_to ?? undefined
       }));
     }
 
@@ -108,10 +119,12 @@ export let getDividendsSplits = SlateTool.create(spec, {
 
     return {
       output: {
+        nextDividendCursor,
+        nextSplitCursor,
         dividends,
         splits,
-        dividendCount: dividends?.length,
-        splitCount: splits?.length
+        dividendCount: dividends?.length ?? undefined,
+        splitCount: splits?.length ?? undefined
       },
       message: `Retrieved ${parts.join(' and ')} for **${ctx.input.ticker}**.`
     };

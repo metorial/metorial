@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import { readBidsketchNumber, readBidsketchString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getClient = SlateTool.create(spec, {
@@ -61,24 +62,24 @@ export let getClient = SlateTool.create(spec, {
 
     return {
       output: {
-        clientId: c.id,
-        firstName: c.first_name,
-        lastName: c.last_name,
-        email: c.email,
+        clientId: readBidsketchNumber(c.id, 'id'),
+        firstName: readBidsketchString(c.first_name, 'first_name'),
+        lastName: readBidsketchString(c.last_name, 'last_name'),
+        email: readBidsketchString(c.email, 'email'),
         phone: c.phone ?? null,
         website: c.website ?? null,
-        address: c.address ?? null,
-        address2: c.address2 ?? null,
+        address: c.address_field_one ?? c.address ?? null,
+        address2: c.address_field_two ?? c.address2 ?? null,
         city: c.city ?? null,
         state: c.state ?? null,
         postalZip: c.postal_zip ?? null,
-        locale: c.locale ?? null,
+        locale: c.country ?? c.locale ?? null,
         notes: c.notes ?? null,
         otherContact,
-        url: c.url,
-        appUrl: c.app_url,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at
+        url: readBidsketchString(c.url, 'url'),
+        appUrl: readBidsketchString(c.app_url, 'app_url'),
+        createdAt: readBidsketchString(c.created_at, 'created_at'),
+        updatedAt: readBidsketchString(c.updated_at, 'updated_at')
       },
       message: `Retrieved client **${c.first_name} ${c.last_name}** (${c.email}).`
     };

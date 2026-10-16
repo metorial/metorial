@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prepareGeneratedFile } from '../lib/files';
 import { spec } from '../spec';
 
 export let takeScreenshot = SlateTool.create(spec, {
@@ -34,7 +35,17 @@ export let takeScreenshot = SlateTool.create(spec, {
   .output(
     z.object({
       requestId: z.string().describe('Unique identifier for this screenshot request'),
-      href: z.string().describe('CDN URL of the screenshot image')
+      href: z.string().describe('CDN URL of the screenshot image'),
+      downloadPrepared: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether file content was retrieved and prepared for download; availability remains unverified'
+        ),
+      downloadWarning: z
+        .string()
+        .optional()
+        .describe('File preparation or availability information')
     })
   )
   .handleInvocation(async ctx => {
@@ -48,12 +59,15 @@ export let takeScreenshot = SlateTool.create(spec, {
       webhookUrl: ctx.input.webhookUrl
     });
 
+    let download = await prepareGeneratedFile(ctx, result, Boolean(ctx.input.webhookUrl));
+
     return {
       output: {
         requestId: result.requestId,
-        href: result.href
+        href: result.href,
+        ...download
       },
-      message: `Screenshot taken of ${ctx.input.url} (${ctx.input.width}x${ctx.input.height}). Available at: ${result.href}`
+      message: `Screenshot request accepted for ${ctx.input.url} (${ctx.input.width}x${ctx.input.height}). Result URL: ${result.href}. ${download.downloadWarning}`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,6 +56,13 @@ export let convertDocument = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
 
+    if (
+      ctx.input.page !== undefined &&
+      (!Number.isInteger(ctx.input.page) || ctx.input.page < 1)
+    ) {
+      throw createApiServiceError('page must be a positive whole number.');
+    }
+
     let path = `${ctx.input.fileId}/document/-/format/${ctx.input.targetFormat}/`;
     if (ctx.input.page !== undefined) path += `-/page/${ctx.input.page}/`;
     if (ctx.input.dpi !== undefined) path += `-/dpi/${ctx.input.dpi}/`;
@@ -65,7 +72,9 @@ export let convertDocument = SlateTool.create(spec, {
 
     let first = result.result[0];
     if (!first) {
-      throw new Error('No conversion result returned');
+      throw createApiServiceError(
+        `Document conversion did not start. ${Object.values(result.problems).join('; ')}`
+      );
     }
 
     return {

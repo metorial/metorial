@@ -6,15 +6,19 @@ import { spec } from '../spec';
 let commentSchema = z.object({
   commentId: z.number().describe('Unique ID of the comment'),
   body: z.string().nullable().describe('Comment text'),
-  state: z.string().describe('State of the comment'),
-  isAdminComment: z.boolean().describe('Whether this comment was posted by an admin'),
+  state: z.string().optional().describe('State of the comment'),
+  isAdminComment: z
+    .boolean()
+    .optional()
+    .describe('Whether this comment was posted by an admin'),
   channel: z.string().nullable().describe('Channel the comment came from'),
-  createdAt: z.string().describe('When the comment was created'),
-  updatedAt: z.string().describe('When the comment was last updated'),
+  createdAt: z.string().optional().describe('When the comment was created'),
+  updatedAt: z.string().optional().describe('When the comment was last updated'),
   links: z
     .record(z.string(), z.any())
     .optional()
-    .describe('Associated resource links (suggestion, created_by)')
+    .describe('Associated resource links (suggestion, created_by)'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listComments = SlateTool.create(spec, {
@@ -37,44 +41,46 @@ export let listComments = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      comments: z.array(commentSchema),
-      totalRecords: z.number().describe('Total number of matching comments'),
-      totalPages: z.number().describe('Total number of pages')
+      comments: z.array(commentSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of matching comments'),
+      totalPages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let params: Record<string, unknown> = {};
-    if (ctx.input.suggestionId) params.suggestion = ctx.input.suggestionId;
-    if (ctx.input.page) params.page = ctx.input.page;
-    if (ctx.input.perPage) params.perPage = ctx.input.perPage;
+    if (ctx.input.suggestionId !== undefined) params.suggestion = ctx.input.suggestionId;
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.perPage = ctx.input.perPage;
     if (ctx.input.sort) params.sort = ctx.input.sort;
     if (ctx.input.updatedAfter) params.updatedAfter = ctx.input.updatedAfter;
 
     let result = await client.listComments(params);
 
-    let comments = result.comments.map((c: any) => ({
+    let comments = result.comments?.map((c: any) => ({
       commentId: c.id,
-      body: c.body || null,
-      state: c.state || 'published',
-      isAdminComment: c.is_admin_comment ?? false,
-      channel: c.channel || null,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at,
-      links: c.links
+      body: c.body ?? null,
+      state: c.state ?? undefined,
+      isAdminComment: c.is_admin_comment,
+      channel: c.channel ?? null,
+      createdAt: c.created_at ?? undefined,
+      updatedAt: c.updated_at ?? undefined,
+      links: c.links,
+      raw: c
     }));
 
     return {
       output: {
         comments,
-        totalRecords: result.pagination?.totalRecords || 0,
-        totalPages: result.pagination?.totalPages || 0
+        totalRecords: result.pagination?.totalRecords,
+        totalPages: result.pagination?.totalPages
       },
-      message: `Found **${comments.length}** comments.`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

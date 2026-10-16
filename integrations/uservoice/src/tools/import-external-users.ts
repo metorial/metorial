@@ -28,24 +28,26 @@ export let importExternalUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      importedCount: z.number().describe('Number of users processed'),
-      success: z.boolean().describe('Whether the import was successful')
+      importedCount: z.number().optional().describe('Number of users processed'),
+      success: z.boolean().optional().describe('Whether the import was successful'),
+      response: z.unknown().optional().describe('Provider import response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let apiUsers = ctx.input.users.map(u => {
       let user: Record<string, any> = {
         external_id: u.externalId
       };
-      if (u.email) user.email = u.email;
-      if (u.name) user.name = u.name;
-      if (u.accountExternalId) {
-        user.external_account = {
+      if (u.email !== undefined) user.email = u.email;
+      if (u.name !== undefined) user.name = u.name;
+      if (u.accountExternalId !== undefined) {
+        user.account = {
           external_id: u.accountExternalId,
           name: u.accountName
         };
@@ -53,14 +55,16 @@ export let importExternalUsers = SlateTool.create(spec, {
       return user;
     });
 
-    await client.importExternalUsers(apiUsers);
+    let result = await client.importExternalUsers(apiUsers);
 
     return {
       output: {
-        importedCount: ctx.input.users.length,
-        success: true
+        importedCount:
+          typeof result?.imported_count === 'number' ? result.imported_count : undefined,
+        success: typeof result?.success === 'boolean' ? result.success : undefined,
+        response: result
       },
-      message: `Successfully imported **${ctx.input.users.length}** external users.`
+      message: `Completed the external user import request.`
     };
   })
   .build();

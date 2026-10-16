@@ -45,31 +45,37 @@ export let getOrder = SlateTool.create(spec, {
           .describe('Gift cards in this order'),
         customFields: z
           .array(
-            z.object({
-              label: z.string(),
-              value: z.any()
-            })
+            z
+              .object({
+                label: z.string(),
+                value: z.any()
+              })
+              .passthrough()
           )
           .optional()
           .describe('Custom fields'),
         salesTaxes: z
           .array(
-            z.object({
-              label: z.string(),
-              amount: z.number(),
-              type: z.string()
-            })
+            z
+              .object({
+                label: z.string(),
+                amount: z.number(),
+                type: z.string()
+              })
+              .passthrough()
           )
           .optional()
           .describe('Sales taxes'),
         notes: z
           .array(
-            z.object({
-              noteId: z.string(),
-              content: z.string(),
-              createdOn: z.string(),
-              username: z.string()
-            })
+            z
+              .object({
+                noteId: z.string(),
+                content: z.string(),
+                createdOn: z.string(),
+                username: z.string()
+              })
+              .passthrough()
           )
           .optional()
           .describe('Order notes'),
@@ -86,6 +92,7 @@ export let getOrder = SlateTool.create(spec, {
     let order = await client.getOrder(ctx.input.orderId);
 
     let notes = order.notes?.map((n: any) => ({
+      ...n,
       noteId: n.id,
       content: n.content,
       createdOn: n.createdOn,
@@ -96,7 +103,17 @@ export let getOrder = SlateTool.create(spec, {
       output: {
         ...order,
         orderId: order.id,
-        notes
+        notes,
+        metadata:
+          order.metadata == null
+            ? undefined
+            : Object.fromEntries(
+                Object.entries(order.metadata).map(([key, value]) => [
+                  key,
+                  typeof value === 'string' ? value : (JSON.stringify(value) ?? 'null')
+                ])
+              ),
+        rawMetadata: order.metadata
       },
       message: `Order **#${order.orderNumber}** by ${order.purchaserName} — ${order.giftCards?.length ?? 0} gift card(s), revenue: ${order.revenue} ${order.currency}`
     };

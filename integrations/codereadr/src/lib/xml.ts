@@ -1,7 +1,4 @@
-/**
- * Lightweight XML parser for CodeREADr API responses.
- * The API returns simple XML structures; this parser handles the expected formats.
- */
+import { createApiServiceError } from 'slates';
 
 export interface XmlNode {
   tag: string;
@@ -10,151 +7,164 @@ export interface XmlNode {
   text: string;
 }
 
-let parseAttributes = (attrString: string): Record<string, string> => {
-  let attrs: Record<string, string> = {};
-  let regex = /(\w+)\s*=\s*"([^"]*)"/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(attrString)) !== null) {
-    attrs[match[1]!] = match[2]!;
-  }
-  return attrs;
+let invalidXml = (): never => {
+  throw createApiServiceError('CodeREADr returned malformed XML.', {
+    reason: 'invalid_provider_response'
+  });
 };
 
-export let parseXml = (xml: string): XmlNode => {
-  // Remove XML declaration
-  xml = xml.replace(/<\?xml[^?]*\?>\s*/g, '').trim();
-
-  let parseNode = (input: string, pos: number): { node: XmlNode; endPos: number } => {
-    // Skip whitespace
-    while (pos < input.length && /\s/.test(input[pos]!)) pos++;
-
-    if (input[pos] !== '<') {
-      throw new Error(`Expected '<' at position ${pos}, got '${input[pos]}'`);
+let decodeXml = (text: string): string =>
+  text.replace(/&([^;\s<&]+);|&/g, (_entity, name: string | undefined) => {
+    let named: Record<string, string> = {
+      amp: '&',
+      lt: '<',
+      gt: '>',
+      quot: '"',
+      apos: "'"
+    };
+    if (name && Object.hasOwn(named, name)) return named[name]!;
+    if (name && /^#(?:[0-9]+|x[0-9a-f]+)$/i.test(name)) {
+      let code =
+        name[1]?.toLowerCase() === 'x'
+          ? Number.parseInt(name.slice(2), 16)
+          : Number.parseInt(name.slice(1), 10);
+      if (
+        code === 9 ||
+        code === 10 ||
+        code === 13 ||
+        (code >= 32 && code <= 0xd7ff) ||
+        (code >= 0xe000 && code <= 0xfffd) ||
+        (code >= 0x10000 && code <= 0x10ffff)
+      )
+        return String.fromCodePoint(code);
     }
+    return invalidXml();
+  });
 
-    // Read tag name and attributes
-    let tagEnd = input.indexOf('>', pos);
-    if (tagEnd === -1) throw new Error('Unclosed tag');
-
-    let tagContent = input.substring(pos + 1, tagEnd);
-    let isSelfClosing = tagContent.endsWith('/');
-    if (isSelfClosing) {
-      tagContent = tagContent.slice(0, -1).trim();
+// The provider returns XML, including CDATA responses and empty relationship nodes.
+// External entities and document types are never needed by this API.
+export let parseXml = (value: unknown): XmlNode => {
+  if (typeof value !== 'string') return invalidXml();
+  let xml = value.replace(/^\uFEFF/, '').trim();
+  let pos = 0;
+  let skipMisc = () => {
+    while (true) {
+      while (/\s/.test(xml[pos] ?? '') && pos < xml.length) pos++;
+      if (xml.startsWith('<?xml', pos)) {
+        let end = xml.indexOf('?>', pos);
+        if (end === -1) return invalidXml();
+        pos = end + 2;
+      } else if (xml.startsWith('<!--', pos)) {
+        let end = xml.indexOf('-->', pos);
+        if (end === -1) return invalidXml();
+        pos = end + 3;
+      } else return;
     }
-
-    let spaceIdx = tagContent.indexOf(' ');
-    let tag: string;
-    let attrString: string;
-    if (spaceIdx === -1) {
-      tag = tagContent.trim();
-      attrString = '';
-    } else {
-      tag = tagContent.substring(0, spaceIdx).trim();
-      attrString = tagContent.substring(spaceIdx + 1).trim();
-    }
-
-    let attributes = parseAttributes(attrString);
-    let node: XmlNode = { tag, attributes, children: [], text: '' };
-
-    if (isSelfClosing) {
-      return { node, endPos: tagEnd + 1 };
-    }
-
-    pos = tagEnd + 1;
-    let textParts: string[] = [];
-
-    // Parse children and text content
-    while (pos < input.length) {
-      // Skip to next interesting character
-      let nextTag = input.indexOf('<', pos);
-      if (nextTag === -1) break;
-
-      // Collect text before the tag
-      let textBefore = input.substring(pos, nextTag);
-      if (textBefore.trim()) {
-        textParts.push(textBefore.trim());
-      }
-
-      // Check if it's a CDATA section
-      if (input.substring(nextTag, nextTag + 9) === '<![CDATA[') {
-        let cdataEnd = input.indexOf(']]>', nextTag + 9);
-        if (cdataEnd === -1) throw new Error('Unclosed CDATA');
-        textParts.push(input.substring(nextTag + 9, cdataEnd));
-        pos = cdataEnd + 3;
-        continue;
-      }
-
-      // Check if closing tag
-      if (input[nextTag + 1] === '/') {
-        let closeEnd = input.indexOf('>', nextTag);
-        if (closeEnd === -1) throw new Error('Unclosed closing tag');
-        node.text = textParts.join('');
-        return { node, endPos: closeEnd + 1 };
-      }
-
-      // Must be a child element
-      let result = parseNode(input, nextTag);
-      node.children.push(result.node);
-      pos = result.endPos;
-    }
-
-    node.text = textParts.join('');
-    return { node, endPos: pos };
   };
-
-  let result = parseNode(xml, 0);
-  return result.node;
+  let parseNode = (depth: number): XmlNode => {
+    if (depth > 256 || xml[pos] !== '<') return invalidXml();
+    let start = ++pos;
+    let quote: string | undefined;
+    while (pos < xml.length) {
+      let char = xml[pos]!;
+      if (quote) {
+        if (char === quote) quote = undefined;
+      } else if (char === '"' || char === "'") quote = char;
+      else if (char === '>') break;
+      pos++;
+    }
+    if (pos === xml.length || quote) return invalidXml();
+    let opening = xml.slice(start, pos++);
+    let selfClosing = /\/\s*$/.test(opening);
+    if (selfClosing) opening = opening.replace(/\/\s*$/, '');
+    let match = /^([A-Za-z_][\w:.-]*)([\s\S]*)$/.exec(opening);
+    if (!match) return invalidXml();
+    let tag = match[1]!;
+    let attributes: Record<string, string> = Object.create(null);
+    let remaining = match[2]!;
+    while (remaining.trim()) {
+      let attr = /^\s+([A-Za-z_][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(remaining);
+      if (!attr || Object.hasOwn(attributes, attr[1]!)) return invalidXml();
+      attributes[attr[1]!] = decodeXml(attr[2] ?? attr[3]!);
+      remaining = remaining.slice(attr[0].length);
+    }
+    let node: XmlNode = { tag, attributes, children: [], text: '' };
+    if (selfClosing) return node;
+    let parts: string[] = [];
+    while (pos < xml.length) {
+      if (xml.startsWith(`</${tag}`, pos)) {
+        let closing = /^<\/([A-Za-z_][\w:.-]*)\s*>/.exec(xml.slice(pos));
+        if (!closing || closing[1] !== tag) return invalidXml();
+        pos += closing[0].length;
+        node.text = parts.join('');
+        return node;
+      }
+      if (xml.startsWith('<!--', pos)) {
+        let end = xml.indexOf('-->', pos);
+        if (end === -1) return invalidXml();
+        pos = end + 3;
+      } else if (xml.startsWith('<![CDATA[', pos)) {
+        let end = xml.indexOf(']]>', pos + 9);
+        if (end === -1) return invalidXml();
+        parts.push(xml.slice(pos + 9, end));
+        pos = end + 3;
+      } else if (xml[pos] === '<') {
+        node.children.push(parseNode(depth + 1));
+      } else {
+        let end = xml.indexOf('<', pos);
+        if (end === -1) return invalidXml();
+        parts.push(decodeXml(xml.slice(pos, end)));
+        pos = end;
+      }
+    }
+    return invalidXml();
+  };
+  skipMisc();
+  let node = parseNode(0);
+  skipMisc();
+  if (pos !== xml.length) return invalidXml();
+  return node;
 };
 
-export let findChild = (node: XmlNode, tag: string): XmlNode | undefined => {
-  return node.children.find(c => c.tag === tag);
-};
+export let findChild = (node: XmlNode, tag: string): XmlNode | undefined =>
+  node.children.find(c => c.tag === tag);
 
-export let findChildren = (node: XmlNode, tag: string): XmlNode[] => {
-  return node.children.filter(c => c.tag === tag);
-};
+export let findChildren = (node: XmlNode, tag: string): XmlNode[] =>
+  node.children.filter(c => c.tag === tag);
 
 export let getChildText = (node: XmlNode, tag: string): string => {
   let child = findChild(node, tag);
-  return child ? child.text : '';
+  if (!child?.text.trim()) {
+    throw createApiServiceError(`CodeREADr returned a response without a valid ${tag}.`, {
+      reason: 'invalid_provider_response'
+    });
+  }
+  return child.text;
 };
 
-export let nodeToObject = (node: XmlNode): Record<string, any> => {
-  let obj: Record<string, any> = {};
-
-  // Include attributes
-  for (let [key, value] of Object.entries(node.attributes)) {
-    obj[key] = value;
+export let getAttribute = (node: XmlNode, name: string): string => {
+  let value = node.attributes[name];
+  if (value === undefined || !value.trim()) {
+    throw createApiServiceError(`CodeREADr returned a ${node.tag} without a valid ${name}.`, {
+      reason: 'invalid_provider_response'
+    });
   }
+  return value;
+};
 
-  if (node.children.length === 0) {
-    if (node.text) {
-      return node.text as any;
-    }
-    return obj;
-  }
-
-  // Group children by tag
-  let groups: Record<string, XmlNode[]> = {};
-  for (let child of node.children) {
-    if (!groups[child.tag]) {
-      groups[child.tag] = [];
-    }
-    groups[child.tag]!.push(child);
-  }
-
+export let nodeToObject = (node: XmlNode): unknown => {
+  let obj: Record<string, unknown> = Object.assign(Object.create(null), node.attributes);
+  if (node.children.length === 0) return node.text || obj;
+  let groups: Record<string, XmlNode[]> = Object.create(null);
+  for (let child of node.children) (groups[child.tag] ??= []).push(child);
   for (let [tag, children] of Object.entries(groups)) {
-    if (children!.length === 1) {
-      let child = children![0]!;
-      if (child.children.length === 0 && Object.keys(child.attributes).length === 0) {
-        obj[tag] = child.text;
-      } else {
-        obj[tag] = nodeToObject(child);
-      }
-    } else {
-      obj[tag] = children.map(c => nodeToObject(c));
-    }
+    if (children.length === 1) {
+      let child = children[0]!;
+      obj[tag] =
+        child.children.length === 0 && Object.keys(child.attributes).length === 0
+          ? child.text
+          : nodeToObject(child);
+    } else obj[tag] = children.map(nodeToObject);
   }
-
   return obj;
 };

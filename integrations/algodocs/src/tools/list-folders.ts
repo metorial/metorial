@@ -22,7 +22,11 @@ export let listFolders = SlateTool.create(spec, {
               .string()
               .nullable()
               .describe('ID of the parent folder, or null if top-level'),
-            name: z.string().describe('Name of the folder')
+            name: z.string().describe('Name of the folder'),
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Complete folder metadata')
           })
         )
         .describe('List of folders in the account')
@@ -39,7 +43,8 @@ export let listFolders = SlateTool.create(spec, {
     let mapped = folders.map(f => ({
       folderId: f.id,
       parentFolderId: f.parentId,
-      name: f.name
+      name: f.name,
+      raw: f
     }));
 
     return {

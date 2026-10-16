@@ -6,8 +6,8 @@ import { spec } from '../spec';
 export let getNFTOwners = SlateTool.create(spec, {
   name: 'Get NFT Owners',
   key: 'get_nft_owners',
-  description: `Look up owners of a specific NFT token or all owners of an NFT contract/collection. Can also check spam classification and fetch NFT sales history.
-Use this to verify NFT ownership, analyze holder distribution, or check recent sales.`,
+  description: `Look up owners of a specific NFT token or all owners of an NFT contract/collection. Can also check spam classification.
+Use this to verify NFT ownership or analyze holder distribution.`,
   tags: {
     readOnly: true
   }
@@ -35,6 +35,7 @@ Use this to verify NFT ownership, analyze holder distribution, or check recent s
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Provider ownership response'),
       owners: z
         .array(
           z.object({
@@ -63,12 +64,7 @@ Use this to verify NFT ownership, analyze holder distribution, or check recent s
 
     let isSpam: boolean | undefined;
     if (ctx.input.checkSpam) {
-      try {
-        let spamResult = await client.isSpamContract(ctx.input.contractAddress);
-        isSpam = spamResult === true || spamResult?.isSpamContract === true;
-      } catch {
-        // Spam check may not be available for all networks
-      }
+      isSpam = await client.isSpamContract(ctx.input.contractAddress);
     }
 
     if (ctx.input.tokenId) {
@@ -77,15 +73,21 @@ Use this to verify NFT ownership, analyze holder distribution, or check recent s
         ctx.input.tokenId,
         ctx.input.pageKey
       );
-      let owners = (result.owners || []).map((addr: string) => ({
-        ownerAddress: addr
-      }));
+      let owners = result.owners.map(entry =>
+        typeof entry === 'string'
+          ? { ownerAddress: entry }
+          : {
+              ownerAddress: entry.ownerAddress,
+              tokenBalances: entry.tokenBalances
+            }
+      );
 
       return {
         output: {
+          raw: result,
           owners,
           isSpam,
-          pageKey: result.pageKey || undefined
+          pageKey: result.pageKey ?? undefined
         },
         message: `Found **${owners.length}** owner(s) for NFT \`${ctx.input.contractAddress.slice(0, 10)}...\` token #${ctx.input.tokenId}.${isSpam !== undefined ? ` Spam: ${isSpam}.` : ''}`
       };
@@ -96,7 +98,7 @@ Use this to verify NFT ownership, analyze holder distribution, or check recent s
       ctx.input.withTokenBalances,
       ctx.input.pageKey
     );
-    let owners = (result.ownerAddresses || result.owners || []).map((entry: any) => {
+    let owners = result.owners.map(entry => {
       if (typeof entry === 'string') {
         return { ownerAddress: entry };
       }
@@ -111,9 +113,10 @@ Use this to verify NFT ownership, analyze holder distribution, or check recent s
 
     return {
       output: {
+        raw: result,
         owners,
         isSpam,
-        pageKey: result.pageKey || undefined
+        pageKey: result.pageKey ?? undefined
       },
       message: `Found **${owners.length}** owner(s) for contract \`${ctx.input.contractAddress.slice(0, 10)}...\`.${isSpam !== undefined ? ` Spam: ${isSpam}.` : ''}${result.pageKey ? ' More results available.' : ''}`
     };

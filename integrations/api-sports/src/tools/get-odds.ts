@@ -39,9 +39,9 @@ let fixtureOddsSchema = z.object({
 export let getOddsTool = SlateTool.create(spec, {
   name: 'Get Odds',
   key: 'get_odds',
-  description: `Retrieve pre-match betting odds from multiple bookmakers. Filter by fixture, league, season, or date. Returns odds for various bet types (match winner, over/under, both teams to score, etc.) across all available bookmakers.`,
+  description: `Retrieve pre-match betting odds from multiple bookmakers for supported sports. NBA and Formula 1 do not expose this odds endpoint. For other sports, fixture maps to the provider game or fight ID; only football supports pagination and timezone filters. Filter by fixture, league, season, or date. Returns odds for various bet types (match winner, over/under, both teams to score, etc.) across all available bookmakers.`,
   instructions: [
-    'Provide either a fixtureId or a combination of league + season to query odds.'
+    'Use fixture for a specific match. NFL requires fixture; MMA accepts fixture or date. Football and other team sports also accept league with season.'
   ],
   tags: {
     readOnly: true
@@ -66,6 +66,10 @@ export let getOddsTool = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sport to query. Defaults to the configured sport.'),
+      seasonName: z
+        .string()
+        .optional()
+        .describe('Exact string basketball season from get_seasons; use instead of season'),
       fixture: z.number().optional().describe('Fixture ID to get odds for'),
       league: z.number().optional().describe('League ID'),
       season: z.number().optional().describe('Season year'),
@@ -78,6 +82,12 @@ export let getOddsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
+      currentPage: z.number().optional().describe('Current page, when the API paginates'),
+      totalPages: z.number().optional().describe('Total pages, when the API paginates'),
       odds: z.array(fixtureOddsSchema),
       count: z.number().describe('Number of fixtures with odds')
     })
@@ -89,7 +99,7 @@ export let getOddsTool = SlateTool.create(spec, {
     let data = await client.getOdds({
       fixture: ctx.input.fixture,
       league: ctx.input.league,
-      season: ctx.input.season,
+      season: ctx.input.seasonName ?? ctx.input.season,
       date: ctx.input.date,
       bookmaker: ctx.input.bookmaker,
       bet: ctx.input.bet,
@@ -98,10 +108,13 @@ export let getOddsTool = SlateTool.create(spec, {
     });
 
     let results = (data.response ?? []).map((item: any) => ({
-      fixtureId: item.fixture?.id ?? null,
+      fixtureId: item.fixture?.id ?? item.game?.id ?? item.fight?.id ?? null,
       leagueName: item.league?.name ?? null,
       leagueId: item.league?.id ?? null,
-      date: item.fixture?.date ?? null,
+      date:
+        typeof (item.fixture?.date ?? item.game?.date ?? item.fight?.date) === 'string'
+          ? (item.fixture?.date ?? item.game?.date ?? item.fight?.date)
+          : (item.game?.date?.date ?? null),
       bookmakers: (item.bookmakers ?? []).map((bk: any) => ({
         bookmakerName: bk.name ?? null,
         bookmakerId: bk.id ?? null,
@@ -118,6 +131,9 @@ export let getOddsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
+        currentPage: data.paging?.current,
+        totalPages: data.paging?.total,
         odds: results,
         count: results.length
       },

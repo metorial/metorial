@@ -22,7 +22,7 @@ export let listCurrencies = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiHost: ctx.auth.apiHost });
 
     let result = await client.getSymbols();
 

@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { gifSchema, paginationSchema } from '../lib/types';
+import {
+  gifSchema,
+  paginationSchema,
+  requestContextFields,
+  responseMetadataFields
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let getGifs = SlateTool.create(spec, {
@@ -15,6 +20,7 @@ export let getGifs = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...requestContextFields,
       gifIds: z
         .array(z.string())
         .min(1)
@@ -24,6 +30,7 @@ export let getGifs = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       results: z.array(gifSchema).describe('Array of retrieved GIFs'),
       pagination: paginationSchema
         .optional()
@@ -31,24 +38,19 @@ export let getGifs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
 
     if (ctx.input.gifIds.length === 1) {
       let result = await client.getGifById(ctx.input.gifIds[0]!);
       return {
-        output: {
-          results: [result.gif]
-        },
+        output: { raw: result.raw, results: [result.gif] },
         message: `Retrieved GIF: **${result.gif.title || result.gif.gifId}**`
       };
     }
 
     let result = await client.getGifsByIds(ctx.input.gifIds);
     return {
-      output: {
-        results: result.gifs,
-        pagination: result.pagination
-      },
+      output: { raw: result.raw, results: result.gifs, pagination: result.pagination },
       message: `Retrieved ${result.gifs.length} GIFs.`
     };
   })

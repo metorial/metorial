@@ -30,7 +30,7 @@ export let createDepositAddress = SlateTool.create(spec, {
     z.object({
       address: z.string().optional().describe('Generated deposit address'),
       cryptoAmount: z.string().optional().describe('Amount in cryptocurrency'),
-      charge: z.string().optional().describe('Charge identifier'),
+      charge: z.string().optional().describe('Provider charge value in cryptocurrency'),
       rate: z.string().optional().describe('Exchange rate used'),
       raw: z.any().optional().describe('Full response from the API')
     })
@@ -47,7 +47,7 @@ export let createDepositAddress = SlateTool.create(spec, {
     return {
       output: {
         address: result?.address,
-        cryptoAmount: result?.amount?.toString(),
+        cryptoAmount: result?.charge?.toString(),
         charge: result?.charge?.toString(),
         rate: result?.rate?.toString(),
         raw: result

@@ -1,147 +1,88 @@
-Now let me get more details on the Gist API, specifically around webhooks, OAuth, and available features.Now let me get the OAuth details.Now I have all the information needed to write the specification.
+# Gist integration specification
 
-# Slates Specification for Gist
-
-## Overview
-
-Gist (getgist.com) is a customer messaging and marketing platform that combines live chat, email marketing, drip campaigns, knowledge base, forms, meeting scheduling, and a lightweight CRM into a single workspace. It provides a RESTful API for managing contacts, conversations, campaigns, knowledge base articles, e-commerce data, and more.
+The integration provides 32 tools for a single Gist customer messaging workspace.
+It uses the [official REST reference](https://developers.getgist.com/api/),
+[OAuth guide](https://developers.getgist.com/docs/working-with-oauth/), and
+[scope list](https://developers.getgist.com/docs/oauth-scopes/).
 
 ## Authentication
 
-Gist supports two authentication methods:
+API keys and OAuth access tokens are sent as Bearer credentials over HTTPS.
+OAuth authorization uses `https://app.getgist.com/oauth/authorize`; the
+code is exchanged as URL-encoded form data at `/oauth/token`. Tokens do not
+expire until the app is uninstalled or deleted; no refresh grant is documented.
+The token's workspace is discovered at `/token/info`, also exposed by
+`get_workspace`. Configuration is empty; no workspace ID is entered at setup.
 
-### API Key (Bearer Token)
+The declared OAuth scopes match Gist's documented list: `read_contact`,
+`write_contact`, `read_bulk_contacts`, `write_bulk_contacts`,
+`read_conversations`, `write_conversations`, `read_events`, `read_tags`,
+`write_tags`, `read_teams`, and `read_teammates`. The provider does not publish
+separate scopes for every other API area; permissions remain provider controlled.
 
-- Obtain your secret API key from **Settings > API > API Key** in the Gist dashboard.
-- Include the key in the `Authorization` header of every request as a Bearer token:
-  `Authorization: Bearer sk_test_BQokikJOvBiI2HlWgH4olfQ2`
-- All requests must be made over HTTPS.
-- Use this method when accessing your own workspace data directly.
+## Tools and API behavior
 
-### OAuth 2.0 (Authorization Code Flow)
+- Contacts: `get_contact`, `list_contacts`, `create_or_update_contact`,
+  `delete_contact`, `batch_import_contacts`, `get_batch_import_status`.
+  Identity is a Gist contact ID, email, or external user ID as documented per
+  operation. Batch status exposes actual completion counts and errors. Lists
+  accept page/per-page, filters, and sort fields. `createdWithinDays` maps to
+  the provider's day-count filter. The older `createdSince` UNIX timestamp is
+  converted to whole days, rounded up to provider precision.
+- Conversations: `get_conversation`, `create_conversation`,
+  `reply_to_conversation`, `search_conversations`, `manage_conversation`,
+  `get_conversation_counts`, `list_conversation_messages`. Creation sends a
+  contact `from` object and a plain-text body. Replies/notes send `message_type`
+  and an explicit teammate or bot author. Assignment uses PATCH `/assign` and
+  requires the acting teammate. State transitions use PATCH on the conversation;
+  priorities use PATCH `/priority`. Search sends `filter_query` criteria in a
+  POST body. Count endpoints use singular `/conversations/count`. Untag uses a
+  tag ID; a legacy tag name is resolved by bounded, paginated lookup.
+- Tags and segmentation: `manage_tags`, `list_segments`, `track_event`,
+  `list_events`. Event tracking sends `event_name`; lists expose pagination.
+  Tag contact lists use the documented `{ id, untag }` objects.
+- Marketing: `list_campaigns`, `manage_campaign`, `manage_form`,
+  `manage_subscription_type`. Campaign subscription changes POST `/campaigns`
+  with the campaign ID and `unsubscribed`; a Gist contact ID is resolved to its
+  actual email or external user ID first. Form retrieval sends GET `/forms` with the `form_id` query parameter.
+  Form lists and submissions forward page/per-page and expose provider pagination.
+  Form subscriptions send `fields` and
+  the caller's optional consent choice. Submission rows retain original values.
+  Subscription types POST to the type resource with `subscribed_status`.
+- Knowledge base: `manage_article`, `get_article`, `list_articles`,
+  `manage_collection`. Translation input arrays become locale-keyed objects.
+  Article creation requires each translation's author, title, HTML, and status.
+  Summaries expose translation arrays while original locale maps remain in raw
+  responses. Search uses PATCH `/articles/search` with `search_text`; pagination
+  accepts either documented `pages` or example `page` envelopes. Article search and
+  collection lists forward page/per-page and expose the actual pagination metadata.
+- Workspace and teams: `get_workspace`, `list_teams`. Teams/teammates expose
+  IDs needed for conversation routing and article authorship. Token metadata
+  identifies the authorized workspace without inventing a workspace name.
+- Commerce: `manage_store`, `manage_customer`, `manage_product`, `manage_cart`,
+  `manage_order`. Store discovery uses `/ecommerce/stores`; all child operations
+  are scoped to a selected store. Variants are nested under products; carts are
+  identified by store and customer. External customer/product/variant/order IDs
+  must come from the caller's commerce platform. Currency uses `currency_code`,
+  titles use `title`, totals use `order_total`, and variant lines use
+  `product_variant_id`. Product category writes send an ID array, while raw
+  product responses retain the provider's category objects. The legacy store interval remains minutes at the tool
+  boundary and is converted to provider hours. Store tags use `contactTags`.
 
-Use OAuth 2.0 when building integrations that access other users' Gist workspaces.
+## Compatibility and failure behavior
 
-1. **Register your application** in the [Gist Developer Portal](https://app.getgist.com/developer) to obtain a `client_id` and `client_secret`.
-2. **Authorization URL:** Redirect users to:
-   `https://app.getgist.com/oauth/authorize?response_type=code&client_id={CLIENT_ID}&scope={SCOPES}&redirect_uri={REDIRECT_URI}&state={STATE}`
-3. **Token Exchange:** After the user authorizes, exchange the returned authorization code for an access token via a POST to:
-   `https://api.getgist.com/oauth/token`
-   with parameters: `grant_type=authorization_code`, `client_id`, `client_secret`, `redirect_uri`, and `code`.
-4. The response returns an `access_token` to use as a Bearer token in subsequent API requests. Tokens generated via OAuth do not expire unless the app is uninstalled or deleted.
+All 28 original tool keys, input/output fields, types, requiredness, and enum
+values remain. Additions are optional on original tools. Every original tool
+can return `rawResponse`, an ordered array of untouched provider response bodies
+for its requests, retaining actual nulls, objects, and partial-import errors.
+Required malformed IDs/list entries fail explicitly. Optional summary fields
+omit provider nulls; there are no fabricated IDs, zero counts, states, or dates.
 
-**Available OAuth Scopes:**
+Existing four-level priorities and `autoTagging` are retained in schemas but
+rejected with instructions to use Gist's documented values. The legacy product
+`category` name alone lacks the category ID needed by the documented API; use
+`categories` with IDs and names. Schema checks do not prove provider execution.
 
-| Scope                 | Description                           |
-| --------------------- | ------------------------------------- |
-| `read_contact`        | List and view a single contact        |
-| `write_contact`       | Create or update a single contact     |
-| `read_bulk_contacts`  | List and view all contacts            |
-| `write_bulk_contacts` | Create or update batch of contacts    |
-| `read_conversations`  | List and view conversation details    |
-| `write_conversations` | Create or update conversation details |
-| `read_events`         | List and view events                  |
-| `read_tags`           | List and view tags                    |
-| `write_tags`          | Create or update tags                 |
-| `read_teams`          | List and view teams                   |
-| `read_teammates`      | List and view teammates               |
-
-## Features
-
-### Contact Management
-
-Manage contacts (users and leads) in your Gist workspace. Create, update, retrieve, list, search, and delete contacts. Contacts support custom properties (up to 250), tags, segments, and subscription types. Contacts are de-duplicated by email address. Batch import of contacts is supported with status tracking. Contacts are classified as either "user" (has a user_id) or "lead" (email only).
-
-### Conversations
-
-Create, retrieve, list, search, reply to, and manage conversations across multiple channels (chat, email, Facebook, Twitter, API). Conversations can be assigned/unassigned to teammates or teams, snoozed, closed, prioritized, and tagged. Internal notes can be added. Conversation search supports filtering by assignee, team, channel, tags, and contact. Conversation counts can be retrieved globally, per team, or per teammate.
-
-### Campaigns
-
-Manage drip email campaigns. Retrieve and list campaigns with performance metrics (open rate, click rate, subscriber counts). Subscribe or unsubscribe contacts from campaigns, with options to set a starting email index and force-resubscribe contacts who previously unsubscribed.
-
-### Knowledge Base (Articles & Collections)
-
-Manage knowledge base articles and collections. Articles support multi-language translations, authoring, publishing/drafting, and search by text and locale. Collections organize articles into groups with support for nested parent/child hierarchies and multi-language translations. Knowledge base settings (domain, SEO, branding) can also be retrieved.
-
-### Tags
-
-Create, update, delete, and list tags. Tags can be applied to or removed from multiple contacts at once (bulk tagging). Tag names are case-insensitive and automatically de-duplicated.
-
-### Segments
-
-Retrieve and list dynamic contact segments defined in your workspace. Segment counts can be optionally included.
-
-### Forms
-
-Retrieve and list forms, view form submissions, and programmatically subscribe contacts to forms. Form submissions include field data, consent information, and page context.
-
-### Subscription Types
-
-Manage email subscription types. View subscription types and attach/detach contacts to control which communication categories they receive.
-
-### Event Tracking
-
-Track custom events associated with contacts to record product interactions (e.g., "Clicked Signup Button"). Events have a name, optional properties, and a timestamp. All workspace events can be listed.
-
-### E-Commerce
-
-Full e-commerce integration support including:
-
-- **Stores:** Create and manage store connections with currency, abandoned cart interval, and auto-tagging settings.
-- **Customers:** Create and manage e-commerce customers with billing/shipping addresses, linked to Gist contacts.
-- **Products & Variants:** Create and manage products and product variants with categories, pricing, inventory, and SKUs.
-- **Carts:** Track shopping carts with line items and checkout URLs to power abandoned cart automations.
-- **Orders:** Track orders with financial status (pending, paid, refunded, cancelled, etc.), fulfillment status, tracking info, and line items. Order status changes automatically update contact lifetime value (LTV) and trigger timeline events.
-
-### Teams & Teammates
-
-View teams and their members. Retrieve teammate details including online/away status, team membership, and inbox seat status. These are read-only.
-
-### Workspace Metadata
-
-Retrieve metadata about the current workspace and token, including workspace ID, token scopes, expiration, and associated app ID.
-
-## Events
-
-Gist supports webhooks for real-time event notifications. Webhooks are available on Premium plans and are configured in **Settings > API > Webhooks** in the Gist dashboard. Each webhook is configured with a name, endpoint URL, topic, and optional custom request headers.
-
-### Contact Events
-
-- **User Created / Lead Created:** Triggered when a new user or lead is created.
-- **User Deleted / Lead Deleted:** Triggered when a user or lead is deleted.
-- **Contact Tagged / Contact Untagged:** Triggered when a tag is added to or removed from a contact.
-- **Custom Attribute Updated:** Triggered when a contact's custom properties are updated.
-- **Contact Email Updated:** Triggered when a contact's email address changes.
-- **Contact Unsubscribed Emails:** Triggered when a contact unsubscribes from emails.
-- **Lead Submitted Email:** Triggered when a lead submits their email address.
-- **Contact Performed Event:** Triggered when a contact performs a tracked event.
-- **Contact Submitted Form:** Triggered when a contact submits a form.
-
-### Conversation Events
-
-- **Contact Initiated Conversation:** Triggered when a contact starts a new conversation.
-- **Conversation Assigned:** Triggered when a conversation is assigned to a teammate or team.
-- **Conversation Opened / Conversation Closed:** Triggered when a conversation is opened or closed.
-- **Conversation Rating:** Triggered when a contact rates a conversation (1–5 scale with optional remark).
-- **Message From Contact:** Triggered when a contact sends a message in a conversation.
-- **Teammate Replied:** Triggered when a teammate replies in a conversation.
-- **Note Added:** Triggered when a teammate adds an internal note to a conversation.
-
-### Campaign Events
-
-- **Contact Subscribed Campaign:** Triggered when a contact is subscribed to a campaign.
-- **Contact Unsubscribed Campaign:** Triggered when a contact unsubscribes from a campaign.
-
-### Meeting Events
-
-- **Meeting Scheduled:** Triggered when a meeting is booked.
-- **Meeting Cancelled:** Triggered when a meeting is cancelled.
-- **Meeting Rescheduled:** Triggered when a meeting is rescheduled.
-
-### Other Events
-
-- **New Page Visit:** Triggered when a new page visit is recorded.
-- **Event Created:** Triggered when a new event type is created.
-
-Failed webhook deliveries are retried up to 3 times with increasing intervals (1h, 3h, 6h, 24h). A `410 Gone` response automatically disables the webhook. Webhooks are disabled after 3 consecutive failed retries.
+No file download/export endpoints are wrapped, and no triggers are registered.
+Provider webhooks are configured in Gist's dashboard; this integration does not
+claim webhook registration or delivery verification.

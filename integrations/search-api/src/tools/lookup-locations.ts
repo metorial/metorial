@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let locationSchema = z.object({
@@ -21,29 +21,37 @@ export let lookupLocations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      query: z.string().describe('Location search term (e.g., "New York", "London", "Tokyo")')
+      query: z.string().describe('Location search term (e.g., "New York", "London", "Tokyo")'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum matching locations, from 1 to 100; defaults to 10')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       locations: z.array(locationSchema).describe('Matching locations')
     })
   )
   .handleInvocation(async ctx => {
     let client = new SearchApiClient({ token: ctx.auth.token });
 
-    let data = await client.getLocations(ctx.input.query);
+    let data = await client.getLocations(ctx.input.query, ctx.input.limit);
 
-    let locations = (Array.isArray(data) ? data : data.locations || []).map((loc: any) => ({
-      name: loc.name || loc.canonical_name,
-      countryCode: loc.country_code,
-      latitude: loc.latitude || loc.gps_coordinates?.latitude,
-      longitude: loc.longitude || loc.gps_coordinates?.longitude,
-      reachCount: loc.reach
-    }));
+    let locations = resultArray(Array.isArray(data) ? data : data.locations, 'locations').map(
+      (loc: any) => ({
+        name: loc.canonical_name ?? loc.name,
+        countryCode: loc.country_code,
+        latitude: loc.lat ?? loc.latitude ?? loc.gps_coordinates?.latitude,
+        longitude: loc.lon ?? loc.longitude ?? loc.gps_coordinates?.longitude,
+        reachCount: loc.reach
+      })
+    );
 
     return {
       output: {
+        raw: data,
         locations
       },
       message: `Found ${locations.length} location${locations.length !== 1 ? 's' : ''} matching "${ctx.input.query}".`

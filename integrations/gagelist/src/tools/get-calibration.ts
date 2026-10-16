@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attachmentSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getCalibration = SlateTool.create(spec, {
@@ -45,6 +46,12 @@ Returns full details about the calibration including dates, results, equipment c
       updatedBy: z.string().optional().describe('Last updated by user'),
       createdDate: z.string().optional().describe('Date the record was created'),
       updatedDate: z.string().optional().describe('Date the record was last updated'),
+      attachments: z
+        .array(attachmentSchema)
+        .optional()
+        .describe(
+          'Files linked to this record; use their Id with get_attachment or delete_attachment'
+        ),
       isDeleted: z.boolean().optional().describe('Whether the record is soft-deleted')
     })
   )
@@ -81,6 +88,7 @@ Returns full details about the calibration including dates, results, equipment c
         updatedBy: cal.UpdatedBy,
         createdDate: cal.CreatedDate,
         updatedDate: cal.UpdatedDate,
+        attachments: cal.Attachments,
         isDeleted: cal.IsDeleted
       },
       message: `Retrieved calibration **${cal.Id}** (Record: ${cal.RecordNumber ?? 'N/A'}) for gage ${cal.EquipmentRefId ?? 'N/A'}.`

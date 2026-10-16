@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -48,20 +48,30 @@ export let listLocations = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { country, state, city } = ctx.input;
 
+    if (
+      (state !== undefined && country === undefined) ||
+      (city !== undefined && (state === undefined || country === undefined))
+    ) {
+      throw createApiServiceError(
+        'Provide country before state, and both country and state before city.',
+        { reason: 'iqair_incomplete_location_hierarchy' }
+      );
+    }
+
     let level: 'countries' | 'states' | 'cities' | 'stations';
     let locations: string[];
 
-    if (city && state && country) {
+    if (city !== undefined && state !== undefined && country !== undefined) {
       ctx.progress(`Listing stations in ${city}, ${state}, ${country}...`);
       let result = await client.listStations(country, state, city);
       level = 'stations';
       locations = result.map(s => s.station);
-    } else if (state && country) {
+    } else if (state !== undefined && country !== undefined) {
       ctx.progress(`Listing cities in ${state}, ${country}...`);
       let result = await client.listCities(country, state);
       level = 'cities';
       locations = result.map(c => c.city);
-    } else if (country) {
+    } else if (country !== undefined) {
       ctx.progress(`Listing states in ${country}...`);
       let result = await client.listStates(country);
       level = 'states';

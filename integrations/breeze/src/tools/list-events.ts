@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listEvents = SlateTool.create(spec, {
@@ -20,6 +20,10 @@ export let listEvents = SlateTool.create(spec, {
       end: z.string().optional().describe('End date filter (YYYY-MM-DD format)'),
       categoryId: z.string().optional().describe('Calendar/category ID to filter by'),
       details: z.boolean().optional().describe('Set to true to include full event details'),
+      eligible: z
+        .boolean()
+        .optional()
+        .describe('Include check-in eligibility settings and associated tags'),
       limit: z.number().optional().describe('Maximum number of events to return'),
       includeCalendars: z
         .boolean()
@@ -52,20 +56,21 @@ export let listEvents = SlateTool.create(spec, {
       end: ctx.input.end,
       categoryId: ctx.input.categoryId,
       details: ctx.input.details,
+      eligible: ctx.input.eligible,
       limit: ctx.input.limit
     });
-    let eventsArray = Array.isArray(events) ? events : [];
+    let eventsArray = requireList(events, 'list-events');
 
     let calendars: unknown[] | undefined;
     if (ctx.input.includeCalendars) {
       let result = await client.listCalendars();
-      calendars = Array.isArray(result) ? result : [];
+      calendars = requireList(result, 'list-events');
     }
 
     let locations: unknown[] | undefined;
     if (ctx.input.includeLocations) {
       let result = await client.listLocations();
-      locations = Array.isArray(result) ? result : [];
+      locations = requireList(result, 'list-events');
     }
 
     return {

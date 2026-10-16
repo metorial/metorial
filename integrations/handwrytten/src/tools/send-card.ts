@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let sendCard = SlateTool.create(spec, {
   name: 'Send Card',
   key: 'send_card',
-  description: `Send a physical handwritten card or note to a recipient. Provide the message, card design, handwriting style, recipient address, and optional sender address. Cards can be scheduled for future delivery by specifying a send date. You can also include a gift card or physical insert with the order.`,
+  description: `Send a physical handwritten card or note to a recipient. Provide the message, card design, handwriting style, recipient address, and sender address. Cards can be scheduled for future delivery by specifying a send date. You can also include a gift card or physical insert with the order.`,
   instructions: [
     'Use the **List Handwriting Styles** tool to find available font labels.',
     'Use the **Browse Cards** tool to find available card IDs.',
@@ -23,7 +23,9 @@ export let sendCard = SlateTool.create(spec, {
       cardId: z.string().describe('ID of the card/stationery design to use'),
       message: z
         .string()
-        .describe('The handwritten message text (max ~320 characters depending on card)'),
+        .describe(
+          'The handwritten message text (check get_card_details for the selected card character limit)'
+        ),
       fontLabel: z.string().describe('Handwriting style font label to use for writing'),
 
       recipientName: z.string().describe('Full name of the recipient'),
@@ -39,7 +41,7 @@ export let sendCard = SlateTool.create(spec, {
       recipientCountryId: z
         .number()
         .optional()
-        .describe('Recipient country ID (defaults to US)'),
+        .describe('Recipient country ID from list_countries (defaults to US)'),
 
       senderName: z.string().optional().describe('Full name of the sender'),
       senderAddress1: z.string().optional().describe('Sender street address line 1'),
@@ -47,7 +49,7 @@ export let sendCard = SlateTool.create(spec, {
       senderCity: z.string().optional().describe('Sender city'),
       senderState: z.string().optional().describe('Sender state/province'),
       senderZip: z.string().optional().describe('Sender postal/ZIP code'),
-      senderCountryId: z.number().optional().describe('Sender country ID'),
+      senderCountryId: z.number().optional().describe('Sender country ID from list_countries'),
 
       giftCardDenominationId: z
         .string()
@@ -73,6 +75,20 @@ export let sendCard = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (!ctx.input.senderAddress1 || !ctx.input.senderCity || !ctx.input.senderZip) {
+      throw createApiServiceError(
+        'Provide senderAddress1, senderCity, and senderZip. Use list_return_addresses to find a saved sender address.'
+      );
+    }
+    if (
+      (ctx.input.senderCountryId === undefined ||
+        [1, 2].includes(ctx.input.senderCountryId)) &&
+      !ctx.input.senderState
+    ) {
+      throw createApiServiceError(
+        'senderState is required for a United States or Canada sender address.'
+      );
+    }
     let result = await client.sendCard({
       cardId: ctx.input.cardId,
       message: ctx.input.message,
@@ -99,7 +115,13 @@ export let sendCard = SlateTool.create(spec, {
       validateAddress: true
     });
 
-    let orderId = String(result.order_id ?? result.id ?? '');
+    let returnedId = result.order_id ?? result.id;
+    if (returnedId === undefined || returnedId === null || String(returnedId).trim() === '') {
+      throw createApiServiceError(
+        'Handwrytten did not return an order ID. Check order history before retrying to avoid a duplicate order.'
+      );
+    }
+    let orderId = String(returnedId);
 
     return {
       output: {

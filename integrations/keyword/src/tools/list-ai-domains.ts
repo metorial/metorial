@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getCollection } from '../lib/response';
 import { spec } from '../spec';
 
 export let listAiDomains = SlateTool.create(spec, {
@@ -11,21 +12,29 @@ export let listAiDomains = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      page: z
+        .number()
+        .optional()
+        .describe('Page number. Follow pagination metadata to retrieve additional domains.')
+    })
+  )
   .output(
     z.object({
-      domains: z.array(z.any()).describe('List of AI Visibility tracked domains')
+      domains: z.array(z.any()).describe('AI Visibility domains on the current page'),
+      rawResponse: z.any().describe('Original response including pagination metadata')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data = await client.listAiDomains();
-    let domains = Array.isArray(data) ? data : (data?.domains ?? data?.data ?? []);
+    let data = await client.listAiDomains(ctx.input.page);
+    let domains = getCollection(data, 'domains');
 
     return {
-      output: { domains },
-      message: `Found **${domains.length}** AI Visibility tracked domain(s).`
+      output: { domains, rawResponse: data },
+      message: `Found **${domains.length}** AI Visibility domain(s) on this page.`
     };
   })
   .build();

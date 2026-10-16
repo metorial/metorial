@@ -1,17 +1,16 @@
 {
   "name": "@metorial/coinranking",
-  "description": "Access real-time and historical cryptocurrency market data. Look up coin prices, market caps, trading volumes, supply data, and rankings. Search and filter coins by tags, tiers, and various sorting criteria. Retrieve exchange and decentralized exchange listings, trading pair/market data, and blockchain information. Fetch global crypto market statistics including total market cap and volume. Get trending coins, price history over configurable time periods, OHLC data, and reference currency conversions. Browse available tags and search across coins, exchanges, and markets.",
+  "description": "Access current and historical cryptocurrency prices, coin details, rankings, trending coins, and global market statistics. Search coins, exchanges, and markets. Filter coin lists by symbols, UUIDs, contract addresses, blockchains, tiers, and tags. Discover category and ecosystem tags and available reference currencies, with cursor pagination for coins, tags, and currencies.",
   "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
   "skills": [
     "look up coin prices",
     "retrieve price history",
     "search coins and exchanges",
     "fetch global market statistics",
-    "list exchange coin listings",
     "browse trending coins",
     "filter coins by tags",
     "get reference currencies",
-    "retrieve market cap history",
-    "access trading pair data"
+    "discover cryptocurrency categories",
+    "filter coin contract addresses"
   ]
 }

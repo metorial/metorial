@@ -1,53 +1,69 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  requestAxiosData
+} from 'slates';
 
 export class ProcFuClient {
-  private token: string;
-  private http;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-    this.http = createAxios({
-      baseURL: 'https://procfu.com'
-    });
-  }
-
-  private buildFormData(params: Record<string, string | undefined>): string {
-    let parts: string[] = [];
-    for (let [key, value] of Object.entries(params)) {
-      if (value !== undefined) {
-        parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
-      }
+    let token = config.token.trim();
+    if (!token) {
+      throw createApiServiceError('A ProcFu API Auth Token is required.');
     }
-    return parts.join('&');
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://procfu.com',
+      authHeader: { value: `Basic ${token}` },
+      contentType: 'application/x-www-form-urlencoded'
+    });
   }
 
   private async callFunction(
     scriptName: string,
     params: Record<string, string | undefined> = {}
   ): Promise<any> {
-    let body = this.buildFormData(params);
-    let response = await this.http.post(`/exe/${scriptName}`, body, {
-      headers: {
-        Authorization: `Basic ${this.token}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
+    let body = new URLSearchParams();
+    for (let [key, value] of Object.entries(params)) {
+      if (value !== undefined) {
+        body.set(key, value);
       }
-    });
-    return response.data;
+    }
+    return requestAxiosData(
+      scriptName,
+      () => this.http.post(`/exe/${scriptName}`, body.toString()),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'ProcFu',
+          reason: 'procfu_api_error',
+          operation,
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
+    );
   }
 
   // ──── Account ────
 
   async whoami(): Promise<string> {
     let result = await this.callFunction('whoami.pf');
-    return typeof result === 'string' ? result.trim() : String(result);
+    if (typeof result !== 'string' || !/^[^\s@]+@[^\s@]+$/.test(result.trim())) {
+      throw createApiServiceError(
+        'ProcFu did not return an account email. Verify the API Auth Token and allow access from the calling server IP in Security & Keys.'
+      );
+    }
+    return result.trim();
   }
 
   async getAccountUsage(): Promise<any> {
     return this.callFunction('account_get_usage.pf');
   }
 
-  async getLastError(): Promise<any> {
-    return this.callFunction('account_last_error.pf');
+  async getLastError(scriptId?: string, since?: number): Promise<any> {
+    return this.callFunction('account_last_error.pf', {
+      scriptId,
+      since: since !== undefined ? String(since) : undefined
+    });
   }
 
   // ──── Podio Items ────
@@ -131,7 +147,7 @@ export class ProcFuClient {
       search_val: searchVal,
       condition,
       max_results: maxResults !== undefined ? String(maxResults) : undefined,
-      simplified: simplified ? '1' : undefined
+      simplified: simplified !== undefined ? (simplified ? '1' : '0') : undefined
     });
   }
 
@@ -162,8 +178,12 @@ export class ProcFuClient {
     return this.callFunction('podio_comment_get_raw.pf', { comment_id: commentId });
   }
 
-  async deleteComment(commentId: string): Promise<any> {
-    return this.callFunction('podio_comment_delete.pf', { comment_id: commentId });
+  async deleteComment(commentId: string, hook?: boolean, silent?: boolean): Promise<any> {
+    return this.callFunction('podio_comment_delete.pf', {
+      podio_comment_id: commentId,
+      hook: hook !== undefined ? String(hook) : undefined,
+      silent: silent !== undefined ? String(silent) : undefined
+    });
   }
 
   async getMostRecentComment(podioItemId: string): Promise<any> {
@@ -189,8 +209,11 @@ export class ProcFuClient {
     });
   }
 
-  async getRecentActivity(appId: string): Promise<any> {
-    return this.callFunction('podio_app_activity_recent.pf', { app_id: appId });
+  async getRecentActivity(appId: string, sinceDate?: string): Promise<any> {
+    return this.callFunction('podio_app_activity_recent.pf', {
+      app_id: appId,
+      since_date: sinceDate
+    });
   }
 
   // ──── Podio Views ────
@@ -263,8 +286,8 @@ export class ProcFuClient {
     return this.callFunction('vars_list.pf');
   }
 
-  async incrementVariable(varname: string): Promise<any> {
-    return this.callFunction('var_inc.pf', { varname });
+  async incrementVariable(varname: string, incrementBy = 1): Promise<any> {
+    return this.callFunction('var_inc.pf', { varname, increment_by: String(incrementBy) });
   }
 
   // ──── ProcScript ────

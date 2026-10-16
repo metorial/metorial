@@ -23,7 +23,8 @@ export let getEvent = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Maximum number of schedule instances to return'),
-      details: z.boolean().optional().describe('Include full event details')
+      details: z.boolean().optional().describe('Include full event details'),
+      eligible: z.boolean().optional().describe('Include check-in eligibility settings')
     })
   )
   .output(
@@ -38,7 +39,8 @@ export let getEvent = SlateTool.create(spec, {
       schedule: ctx.input.schedule,
       scheduleDirection: ctx.input.scheduleDirection,
       scheduleLimit: ctx.input.scheduleLimit,
-      details: ctx.input.details
+      details: ctx.input.details,
+      eligible: ctx.input.eligible
     });
 
     return {

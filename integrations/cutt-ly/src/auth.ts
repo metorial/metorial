@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,13 +15,16 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Your Cutt.ly API key. Generate one from the Edit Account page at https://cutt.ly/edit'
+          'Your Cutt.ly API key. Use an Edit Account key for the Regular API, or a Team edit page key for the Team API. Match the connection API type to the key.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Enter a Cutt.ly API key.');
+      }
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     }

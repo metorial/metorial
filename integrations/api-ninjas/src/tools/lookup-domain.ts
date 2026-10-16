@@ -3,13 +3,20 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+// WHOIS returns oldest-first arrays of Unix seconds; retain the full source in raw.
+let whoisDate = (value: unknown): string | undefined => {
+  let first = Array.isArray(value) ? value[0] : value;
+  if (typeof first === 'string') return first;
+  if (typeof first !== 'number' || !Number.isFinite(first)) return undefined;
+  let date = new Date(first * 1000);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
 export let lookupDomain = SlateTool.create(spec, {
   name: 'Lookup Domain',
   key: 'lookup_domain',
-  description: `Get WHOIS registration data and DNS records for a domain. Combines WHOIS and DNS lookup into a single tool to provide comprehensive domain information including registrar, creation date, expiration, nameservers, and DNS records.`,
-  tags: {
-    readOnly: true
-  }
+  description: `Get WHOIS registration data and DNS records for a domain, including registrar, creation date, expiration, and nameservers. Non-.com domains and some record types require a premium plan.`,
+  tags: { readOnly: true }
 })
   .input(
     z.object({
@@ -19,6 +26,7 @@ export let lookupDomain = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider responses'),
       whois: z
         .object({
           domainName: z.string().optional().describe('Registered domain name'),
@@ -33,7 +41,14 @@ export let lookupDomain = SlateTool.create(spec, {
         .array(
           z.object({
             recordType: z.string().describe('DNS record type (A, AAAA, MX, CNAME, etc.)'),
-            value: z.string().describe('Record value')
+            value: z
+              .string()
+              .optional()
+              .describe('Record value; omitted for structured SOA records'),
+            raw: z
+              .unknown()
+              .optional()
+              .describe('Original DNS record, including structured SOA fields')
           })
         )
         .optional()
@@ -42,32 +57,32 @@ export let lookupDomain = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let includeDns = ctx.input.includeDns !== false;
-
     let [whoisResult, dnsResult] = await Promise.all([
       client.getWhois(ctx.input.domain),
-      includeDns ? client.getDnsLookup(ctx.input.domain) : Promise.resolve(null)
+      ctx.input.includeDns !== false
+        ? client.getDnsLookup(ctx.input.domain)
+        : Promise.resolve(undefined)
     ]);
-
-    let dnsRecords = dnsResult
-      ? (Array.isArray(dnsResult) ? dnsResult : [dnsResult]).map((r: any) => ({
-          recordType: r.record_type ?? r.type ?? 'Unknown',
-          value: r.value ?? r.address ?? String(r)
-        }))
-      : undefined;
-
+    let expirationDate = whoisDate(whoisResult.expiration_date);
     return {
       output: {
+        raw: { whois: whoisResult, ...(dnsResult !== undefined ? { dns: dnsResult } : {}) },
         whois: {
-          domainName: whoisResult.domain_name,
-          registrar: whoisResult.registrar,
-          creationDate: whoisResult.creation_date,
-          expirationDate: whoisResult.expiration_date,
-          nameservers: whoisResult.name_servers ?? whoisResult.nameservers
+          domainName: whoisResult.domain_name ?? undefined,
+          registrar: whoisResult.registrar ?? undefined,
+          creationDate: whoisDate(whoisResult.creation_date),
+          expirationDate,
+          nameservers: whoisResult.name_servers ?? whoisResult.nameservers ?? undefined
         },
-        dnsRecords
+        dnsRecords: dnsResult?.map(
+          (record: { record_type: string; value?: string | null }) => ({
+            recordType: record.record_type,
+            value: record.value ?? undefined,
+            raw: record
+          })
+        )
       },
-      message: `**${ctx.input.domain}** — Registrar: ${whoisResult.registrar ?? 'Unknown'}${whoisResult.expiration_date ? `, Expires: ${whoisResult.expiration_date}` : ''}`
+      message: `Domain information for **${ctx.input.domain}**.${whoisResult.registrar ? ` Registrar: ${whoisResult.registrar}.` : ''}${expirationDate ? ` Expires: ${expirationDate}.` : ''}`
     };
   })
   .build();

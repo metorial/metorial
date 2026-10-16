@@ -48,6 +48,14 @@ export let getStandingsTool = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sport to query. Defaults to the configured sport.'),
+      seasonName: z
+        .string()
+        .optional()
+        .describe('Exact string basketball season from get_seasons; use instead of season'),
+      stage: z.string().optional().describe('Standings stage, where supported'),
+      group: z.string().optional().describe('Standings group, where supported'),
+      conference: z.string().optional().describe('NFL conference filter'),
+      division: z.string().optional().describe('NFL division filter'),
       league: z.number().describe('League ID'),
       season: z.number().describe('Season year'),
       team: z.number().optional().describe('Filter by specific team ID')
@@ -55,6 +63,10 @@ export let getStandingsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       standings: z.array(standingEntrySchema),
       leagueName: z.string().nullable().describe('League name'),
       count: z.number().describe('Number of entries')
@@ -66,44 +78,71 @@ export let getStandingsTool = SlateTool.create(spec, {
 
     let data = await client.getStandings({
       league: ctx.input.league,
-      season: ctx.input.season,
+      season: ctx.input.seasonName ?? ctx.input.season,
+      stage: ctx.input.stage,
+      group: ctx.input.group,
+      conference: ctx.input.conference,
+      division: ctx.input.division,
       team: ctx.input.team
     });
 
     let leagueName: string | null = null;
     let entries: any[] = [];
 
-    let responseArr = data.response ?? [];
-    for (let item of responseArr) {
-      leagueName = item.league?.name ?? leagueName;
-      let standingsGroups = item.league?.standings ?? item.standings ?? [];
-      for (let group of standingsGroups) {
-        if (Array.isArray(group)) {
-          for (let entry of group) {
-            entries.push({
-              rank: entry.rank ?? null,
-              teamId: entry.team?.id ?? null,
-              teamName: entry.team?.name ?? null,
-              teamLogo: entry.team?.logo ?? null,
-              points: entry.points ?? null,
-              goalsDiff: entry.goalsDiff ?? null,
-              group: entry.group ?? null,
-              form: entry.form ?? null,
-              played: entry.all?.played ?? entry.games?.played ?? null,
-              win: entry.all?.win ?? entry.games?.win?.total ?? null,
-              draw: entry.all?.draw ?? entry.games?.draw?.total ?? null,
-              lose: entry.all?.lose ?? entry.games?.lose?.total ?? null,
-              goalsFor: entry.all?.goals?.for ?? null,
-              goalsAgainst: entry.all?.goals?.against ?? null,
-              description: entry.description ?? null
-            });
-          }
-        }
+    const collect = (item: any): void => {
+      if (Array.isArray(item)) {
+        item.forEach(collect);
+        return;
       }
-    }
+      leagueName = item.league?.name ?? leagueName;
+      const nested = item.league?.standings ?? item.standings;
+      if (nested) {
+        collect(nested);
+        return;
+      }
+      if (!item.team) return;
+      const numeric = (value: any) => (typeof value === 'number' ? value : null);
+      entries.push({
+        rank: item.rank ?? item.position ?? null,
+        teamId: item.team?.id ?? null,
+        teamName: item.team?.name ?? null,
+        teamLogo: item.team?.logo ?? null,
+        points: numeric(item.points),
+        goalsDiff: item.goalsDiff ?? null,
+        group:
+          typeof item.group === 'string'
+            ? item.group
+            : (item.group?.name ?? item.division ?? null),
+        form: item.form ?? null,
+        played: item.all?.played ?? item.games?.played ?? null,
+        win:
+          item.all?.win ??
+          numeric(item.games?.win) ??
+          item.games?.win?.total ??
+          item.won ??
+          null,
+        draw:
+          item.all?.draw ??
+          numeric(item.games?.draw) ??
+          item.games?.draw?.total ??
+          item.ties ??
+          null,
+        lose:
+          item.all?.lose ??
+          numeric(item.games?.lose) ??
+          item.games?.lose?.total ??
+          item.lost ??
+          null,
+        goalsFor: item.all?.goals?.for ?? null,
+        goalsAgainst: item.all?.goals?.against ?? null,
+        description: item.description ?? null
+      });
+    };
+    collect(data.response ?? []);
 
     return {
       output: {
+        raw: data,
         standings: entries,
         leagueName,
         count: entries.length

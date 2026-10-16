@@ -1,16 +1,16 @@
 {
   "name": "@metorial/plain",
-  "description": "Manage customer support threads, customers, and conversations across email, Slack, chat, and other channels. Create and update customers with external IDs, organize them into companies, tenants, and groups. Create, reply to, assign, prioritize, and change status of support threads. Apply labels, set SLA tiers, and manage thread fields. Send and receive messages via email (with Cc/Bcc), Slack, and chat. Create custom timeline events on customer profiles with rich UI components.",
+  "description": "Manage customer support customers, threads, conversations, internal notes, labels, companies, tenants, and customer groups. Discover workspace and resource IDs, read thread history across supported channels, send email, reply to threads, and manage assignment, priority, and status.",
   "categories": ["crm-and-sales-tools", "email-and-messaging", "task-and-project-management"],
   "skills": [
     "manage customer records",
     "create support threads",
-    "send multi-channel messages",
+    "read thread conversations",
+    "send email and thread replies",
     "assign and prioritize threads",
     "apply thread labels",
     "manage companies and tenants",
-    "create timeline events",
-    "configure SLA tiers",
+    "create timeline events and internal notes",
     "manage customer groups"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/plain.png"

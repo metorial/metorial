@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let gradeColumnOutputSchema = z.object({
@@ -33,6 +33,14 @@ let gradeOutputSchema = z.object({
   userId: z.string().describe('User ID'),
   columnId: z.string().describe('Grade column ID'),
   score: z.number().optional().describe('Numeric score'),
+  displayGrade: z
+    .object({
+      scaleType: z.string().optional(),
+      score: z.number().optional(),
+      text: z.string().optional()
+    })
+    .optional()
+    .describe('Provider-calculated display grade'),
   text: z.string().optional().describe('Text grade'),
   notes: z.string().optional().describe('Instructor notes'),
   feedback: z.string().optional().describe('Feedback for the student'),
@@ -46,6 +54,7 @@ let mapGrade = (g: any) => ({
   userId: g.userId,
   columnId: g.columnId,
   score: g.score,
+  displayGrade: g.displayGrade,
   text: g.text,
   notes: g.notes,
   feedback: g.feedback,
@@ -72,28 +81,36 @@ export let createGradeColumn = SlateTool.create(spec, {
       available: z.enum(['Yes', 'No']).optional().describe('Whether the column is visible'),
       gradingType: z.string().optional().describe('Grading type (e.g., "Attempts", "Manual")'),
       dueDate: z.string().optional().describe('Due date (ISO 8601)'),
-      attemptsAllowed: z.number().optional().describe('Number of attempts allowed')
+      attemptsAllowed: z
+        .number()
+        .optional()
+        .describe('Number of attempts allowed (whole number, zero means unlimited)')
     })
   )
   .output(gradeColumnOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let column = await client.createGradeColumn(ctx.input.courseId, {
       name: ctx.input.name,
       displayName: ctx.input.displayName,
       description: ctx.input.description,
       externalId: ctx.input.externalId,
-      score: ctx.input.scorePossible ? { possible: ctx.input.scorePossible } : undefined,
+      score:
+        ctx.input.scorePossible !== undefined
+          ? { possible: ctx.input.scorePossible }
+          : undefined,
       availability: ctx.input.available ? { available: ctx.input.available } : undefined,
-      grading:
-        ctx.input.gradingType || ctx.input.dueDate || ctx.input.attemptsAllowed
-          ? {
-              type: ctx.input.gradingType,
-              due: ctx.input.dueDate,
-              attemptsAllowed: ctx.input.attemptsAllowed
-            }
-          : undefined
+      grading: {
+        type:
+          ctx.input.gradingType ??
+          (ctx.input.dueDate || ctx.input.attemptsAllowed !== undefined
+            ? 'Attempts'
+            : 'Manual'),
+        due: ctx.input.dueDate,
+        attemptsAllowed: ctx.input.attemptsAllowed,
+        anonymousGrading: { type: 'None' }
+      }
     });
 
     return {
@@ -123,7 +140,7 @@ export let listGradeColumns = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let result = await client.listGradeColumns(ctx.input.courseId, {
       offset: ctx.input.offset,
       limit: ctx.input.limit
@@ -157,13 +174,16 @@ export let updateGradeColumn = SlateTool.create(spec, {
   )
   .output(gradeColumnOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let column = await client.updateGradeColumn(ctx.input.courseId, ctx.input.columnId, {
       name: ctx.input.name,
       displayName: ctx.input.displayName,
       description: ctx.input.description,
-      score: ctx.input.scorePossible ? { possible: ctx.input.scorePossible } : undefined,
+      score:
+        ctx.input.scorePossible !== undefined
+          ? { possible: ctx.input.scorePossible }
+          : undefined,
       availability: ctx.input.available ? { available: ctx.input.available } : undefined,
       grading: ctx.input.dueDate ? { due: ctx.input.dueDate } : undefined
     });
@@ -195,7 +215,7 @@ export let recordGrade = SlateTool.create(spec, {
   )
   .output(gradeOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let grade = await client.updateGrade(
       ctx.input.courseId,
@@ -232,7 +252,7 @@ export let getGrade = SlateTool.create(spec, {
   )
   .output(gradeOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let grade = await client.getGrade(
       ctx.input.courseId,
       ctx.input.columnId,
@@ -278,10 +298,10 @@ export let listGrades = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     if (!ctx.input.columnId && !ctx.input.userId) {
-      throw new Error('Either columnId or userId must be provided.');
+      throw createApiServiceError('Either columnId or userId must be provided.');
     }
 
     let result: any;

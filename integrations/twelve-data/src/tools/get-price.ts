@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { providerError, record, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getPrice = SlateTool.create(spec, {
-  name: 'Get Real-Time Price',
+  name: 'Get Latest Price',
   key: 'get_price',
-  description: `Retrieve the current real-time price for one or more financial instruments. This is the simplest and fastest way to get the latest price.
+  description: `Retrieve the latest available price for one or more financial instruments. Freshness depends on exchange coverage, subscription entitlements, and market sessions; this endpoint does not return a quote timestamp.
 Supports multiple symbols in a single request by providing a comma-separated list.`,
   tags: {
     readOnly: true
@@ -24,10 +25,18 @@ Supports multiple symbols in a single request by providing a comma-separated lis
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       prices: z
         .array(
           z.object({
-            symbol: z.string().describe('Ticker symbol'),
+            symbol: z
+              .string()
+              .describe(
+                'Requested ticker used to associate this price; the single-symbol provider response does not return a symbol'
+              ),
             price: z.string().describe('Current price')
           })
         )
@@ -48,21 +57,20 @@ Supports multiple symbols in a single request by providing a comma-separated lis
     let prices: Array<{ symbol: string; price: string }> = [];
 
     if (symbols.length === 1) {
-      prices.push({ symbol: symbols[0]!, price: result.price });
+      prices.push({ symbol: symbols[0]!, price: requiredString(result.price, 'price') });
     } else {
       for (let sym of symbols) {
-        let data = result[sym];
-        if (data?.price) {
-          prices.push({ symbol: sym, price: data.price });
-        }
+        let data = record(result[sym], `price for ${sym}`);
+        if (data.status === 'error') throw providerError(data);
+        prices.push({ symbol: sym, price: requiredString(data.price, `price for ${sym}`) });
       }
     }
 
     let priceList = prices.map(p => `**${p.symbol}**: ${p.price}`).join(', ');
 
     return {
-      output: { prices },
-      message: `Current prices: ${priceList}`
+      output: { prices, raw: result },
+      message: `Latest available prices: ${priceList}`
     };
   })
   .build();

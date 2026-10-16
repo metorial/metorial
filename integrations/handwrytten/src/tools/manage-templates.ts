@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseString } from '../lib/response';
 import { spec } from '../spec';
 
 let templateSchema = z.object({
@@ -54,12 +55,25 @@ export let manageTemplates = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { action } = ctx.input;
 
-    let mapTemplate = (t: any) => ({
-      templateId: String(t.id ?? t.template_id),
-      name: t.name ?? '',
-      message: t.message ?? undefined,
-      categoryId: t.category_id != null ? String(t.category_id) : undefined
-    });
+    let mapTemplate = (t: unknown) => {
+      if (!isApiErrorRecord(t)) {
+        throw createApiServiceError('Handwrytten did not return a valid template.');
+      }
+      let templateId = t.id ?? t.template_id;
+      if (
+        (typeof templateId !== 'string' && typeof templateId !== 'number') ||
+        String(templateId).trim() === ''
+      ) {
+        throw createApiServiceError('Handwrytten did not return a template ID.');
+      }
+      return {
+        templateId: String(templateId),
+        name: responseString(t.name, 'template name'),
+        message:
+          t.message === undefined ? undefined : responseString(t.message, 'template message'),
+        categoryId: t.category_id != null ? String(t.category_id) : undefined
+      };
+    };
 
     if (action === 'list') {
       let result = await client.listTemplates(ctx.input.categoryId);
@@ -71,7 +85,8 @@ export let manageTemplates = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.templateId) throw new Error('templateId is required for get action');
+      if (!ctx.input.templateId)
+        throw createApiServiceError('templateId is required for get action');
       let result = await client.getTemplate(ctx.input.templateId);
       let template = mapTemplate(result.template ?? result);
       return {
@@ -82,32 +97,40 @@ export let manageTemplates = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name || !ctx.input.message) {
-        throw new Error('name and message are required to create a template');
+        throw createApiServiceError('name and message are required to create a template');
       }
       let result = await client.createTemplate(ctx.input.name, ctx.input.message);
-      let templateId = String(result.template_id ?? result.id ?? '');
+      let returnedId =
+        result.template_id ?? result.id ?? result.template?.id ?? result.template?.template_id;
+      if (
+        returnedId === undefined ||
+        returnedId === null ||
+        String(returnedId).trim() === ''
+      ) {
+        throw createApiServiceError(
+          'Handwrytten did not return a template ID. Check templates before retrying.'
+        );
+      }
+      let templateId = String(returnedId);
+      let persisted = result.template ?? (await client.getTemplate(templateId));
+      let template = mapTemplate(persisted.template ?? persisted);
       return {
         output: {
-          template: { templateId, name: ctx.input.name, message: ctx.input.message },
+          template,
           success: true
         },
-        message: `Created template **${ctx.input.name}** with ID \`${templateId}\`.`
+        message: `Created template **${template.name}** with ID \`${templateId}\`.`
       };
     }
 
     if (action === 'update') {
-      if (!ctx.input.templateId) throw new Error('templateId is required for update action');
+      if (!ctx.input.templateId)
+        throw createApiServiceError('templateId is required for update action');
       let result = await client.updateTemplate(ctx.input.templateId, {
         name: ctx.input.name,
         message: ctx.input.message
       });
-      let template = result.template
-        ? mapTemplate(result.template)
-        : {
-            templateId: ctx.input.templateId,
-            name: ctx.input.name ?? '',
-            message: ctx.input.message ?? undefined
-          };
+      let template = result.template !== undefined ? mapTemplate(result.template) : undefined;
       return {
         output: { template, success: true },
         message: `Updated template \`${ctx.input.templateId}\`.`
@@ -115,7 +138,8 @@ export let manageTemplates = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.templateId) throw new Error('templateId is required for delete action');
+      if (!ctx.input.templateId)
+        throw createApiServiceError('templateId is required for delete action');
       await client.deleteTemplate(ctx.input.templateId);
       return {
         output: { success: true },
@@ -123,6 +147,6 @@ export let manageTemplates = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

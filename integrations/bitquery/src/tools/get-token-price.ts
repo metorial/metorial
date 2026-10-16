@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BitqueryClient } from '../lib/client';
+import { BitqueryClient, toBitqueryNumber } from '../lib/client';
 import { spec } from '../spec';
 
 let ohlcCandleSchema = z.object({
@@ -69,7 +69,7 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
   .handleInvocation(async ctx => {
     let client = new BitqueryClient({
       token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion as 'v1' | 'v2'
+      apiVersion: ctx.auth.apiVersion
     });
 
     let { blockchain, baseCurrency, quoteCurrency, since, till, intervalMinutes } = ctx.input;
@@ -78,6 +78,7 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
     let candles: z.infer<typeof ohlcCandleSchema>[] = [];
 
     if (blockchain === 'solana') {
+      client.requireV2('Solana convenience queries');
       let query = `query GetSolanaOHLC($baseCurrency: String!, $quoteCurrency: String!, $since: DateTime!, $till: DateTime!, $interval: Int!) {
   Solana(dataset: combined) {
     DEXTradeByTokens(
@@ -95,10 +96,12 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
       Block {
         Time(interval: {count: $interval, in: minutes})
       }
-      high: Trade_Price: Trade_Price(maximum: Trade_Price)
-      low: Trade_Price: Trade_Price(minimum: Trade_Price)
-      open: Trade_Price: Trade_Price(minimum: Block_Slot)
-      close: Trade_Price: Trade_Price(maximum: Block_Slot)
+      Trade {
+        high: Price(maximum: Trade_Price)
+        low: Price(minimum: Trade_Price)
+        open: Price(minimum: Block_Slot)
+        close: Price(maximum: Block_Slot)
+      }
       volume: sum(of: Trade_Side_AmountInUSD)
       tradeCount: count
     }
@@ -116,15 +119,15 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
       let raw = data?.Solana?.DEXTradeByTokens || [];
 
       candles = raw.map((c: any) => ({
-        time: c.Block?.Time || '',
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume,
-        tradeCount: c.tradeCount
+        time: c.Block?.Time,
+        open: toBitqueryNumber(c.Trade?.open),
+        high: toBitqueryNumber(c.Trade?.high),
+        low: toBitqueryNumber(c.Trade?.low),
+        close: toBitqueryNumber(c.Trade?.close),
+        volume: toBitqueryNumber(c.volume),
+        tradeCount: toBitqueryNumber(c.tradeCount)
       }));
-    } else if (ctx.config.apiVersion === 'v1') {
+    } else if (ctx.auth.apiVersion === 'v1') {
       let networkMap: Record<string, string> = {
         eth: 'ethereum',
         bsc: 'bsc',
@@ -132,7 +135,7 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
         arbitrum: 'arbitrum',
         base: 'base',
         optimism: 'optimism',
-        avalanche: 'avalanche_c',
+        avalanche: 'avalanche',
         fantom: 'fantom',
         cronos: 'cronos'
       };
@@ -170,13 +173,13 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
       let raw = data?.ethereum?.dexTrades || [];
 
       candles = raw.map((c: any) => ({
-        time: c.timeInterval?.minute || '',
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume,
-        tradeCount: c.tradeCount
+        time: c.timeInterval?.minute,
+        open: toBitqueryNumber(c.open),
+        high: toBitqueryNumber(c.high),
+        low: toBitqueryNumber(c.low),
+        close: toBitqueryNumber(c.close),
+        volume: toBitqueryNumber(c.volume),
+        tradeCount: toBitqueryNumber(c.tradeCount)
       }));
     } else {
       let query = `query GetOHLC($network: evm_network!, $baseCurrency: String!, $quoteCurrency: String!, $since: DateTime!, $till: DateTime!, $interval: Int!) {
@@ -195,10 +198,12 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
       Block {
         Time(interval: {count: $interval, in: minutes})
       }
-      high: Trade_Price: Trade_Price(maximum: Trade_Price)
-      low: Trade_Price: Trade_Price(minimum: Trade_Price)
-      open: Trade_Price: Trade_Price(minimum: Block_Number)
-      close: Trade_Price: Trade_Price(maximum: Block_Number)
+      Trade {
+        high: Price(maximum: Trade_Price)
+        low: Price(minimum: Trade_Price)
+        open: Price(minimum: Block_Number)
+        close: Price(maximum: Block_Number)
+      }
       volume: sum(of: Trade_Side_AmountInUSD)
       tradeCount: count
     }
@@ -217,13 +222,13 @@ Useful for charting, price analysis, and building trading dashboards. Supports E
       let raw = data?.EVM?.DEXTradeByTokens || [];
 
       candles = raw.map((c: any) => ({
-        time: c.Block?.Time || '',
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume,
-        tradeCount: c.tradeCount
+        time: c.Block?.Time,
+        open: toBitqueryNumber(c.Trade?.open),
+        high: toBitqueryNumber(c.Trade?.high),
+        low: toBitqueryNumber(c.Trade?.low),
+        close: toBitqueryNumber(c.Trade?.close),
+        volume: toBitqueryNumber(c.volume),
+        tradeCount: toBitqueryNumber(c.tradeCount)
       }));
     }
 

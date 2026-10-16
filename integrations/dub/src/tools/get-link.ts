@@ -77,7 +77,7 @@ export let getLink = SlateTool.create(spec, {
         leads: link.leads,
         sales: link.sales,
         saleAmount: link.saleAmount,
-        tags: link.tags.map(t => ({ tagId: t.id, name: t.name, color: t.color })),
+        tags: (link.tags ?? []).map(t => ({ tagId: t.id, name: t.name, color: t.color })),
         title: link.title,
         description: link.description,
         ios: link.ios,

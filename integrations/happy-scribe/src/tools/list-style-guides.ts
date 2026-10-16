@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationId, rawSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let listStyleGuides = SlateTool.create(spec, {
@@ -16,7 +17,9 @@ export let listStyleGuides = SlateTool.create(spec, {
       organizationId: z
         .string()
         .optional()
-        .describe('Organization ID. Falls back to the value in config if not provided.')
+        .describe(
+          'Organization ID. Call list_organizations to discover IDs. Falls back to the saved setting.'
+        )
     })
   )
   .output(
@@ -63,35 +66,32 @@ export let listStyleGuides = SlateTool.create(spec, {
               .nullable()
               .describe('Notation tags configuration.'),
             createdAt: z.string().optional().describe('Creation timestamp.'),
-            updatedAt: z.string().optional().describe('Last update timestamp.')
+            updatedAt: z.string().optional().describe('Last update timestamp.'),
+            raw: rawSchema.optional().describe('Complete style guide metadata.')
           })
         )
         .describe('List of style guides.')
     })
   )
   .handleInvocation(async ctx => {
-    let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) {
-      throw new Error(
-        'Organization ID is required. Provide it in the input or configure it globally.'
-      );
-    }
+    let orgId = organizationId(ctx.input.organizationId, ctx.config.organizationId);
 
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listStyleGuides(orgId);
 
-    let styleGuides = (result.results || result || []).map((sg: any) => ({
-      styleGuideId: sg.id,
+    let styleGuides = result.map(sg => ({
+      styleGuideId: String(sg.id),
       name: sg.name,
       operation: sg.operation,
-      organizationDefault: sg.organization_default,
+      organizationDefault: sg.organization_default ?? undefined,
       verbatim: sg.verbatim,
       fixGrammar: sg.fix_grammar,
       sdh: sg.sdh,
       speakerId: sg.speaker_id,
       notationTags: sg.notation_tags,
-      createdAt: sg.created_at,
-      updatedAt: sg.updated_at
+      createdAt: sg.created_at ?? undefined,
+      updatedAt: sg.updated_at ?? undefined,
+      raw: sg
     }));
 
     return {

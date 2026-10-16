@@ -1,9 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, recordsFrom } from '../lib/client';
 import { spec } from '../spec';
 
-let newsArticleSchema = z.object({
+export let newsArticleSchema = z.object({
   articleId: z.number().describe('Unique article identifier'),
   author: z.string().optional().describe('Article author'),
   created: z.string().optional().describe('Creation timestamp'),
@@ -41,6 +41,16 @@ export let searchNewsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Comma-separated ticker symbols to filter by (max 50), e.g. "AAPL,MSFT"'),
+      date: z.string().optional().describe('Specific date (YYYY-MM-DD)'),
+      updatedSince: z
+        .number()
+        .optional()
+        .describe('Return articles updated since this Unix timestamp in seconds'),
+      publishedSince: z
+        .number()
+        .optional()
+        .describe('Return articles published since this Unix timestamp in seconds'),
+      region: z.string().optional().describe('Region filter, such as ca for Canadian content'),
       dateFrom: z.string().optional().describe('Start date for article range (YYYY-MM-DD)'),
       dateTo: z.string().optional().describe('End date for article range (YYYY-MM-DD)'),
       channels: z.string().optional().describe('Comma-separated channel names to filter by'),
@@ -77,6 +87,7 @@ export let searchNewsTool = SlateTool.create(spec, {
   .output(
     z.object({
       articles: z.array(newsArticleSchema).describe('List of news articles'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of articles returned')
     })
   )
@@ -85,6 +96,10 @@ export let searchNewsTool = SlateTool.create(spec, {
 
     let data = await client.getNews({
       tickers: ctx.input.tickers,
+      date: ctx.input.date,
+      updatedSince: ctx.input.updatedSince,
+      publishedSince: ctx.input.publishedSince,
+      region: ctx.input.region,
       dateFrom: ctx.input.dateFrom,
       dateTo: ctx.input.dateTo,
       channels: ctx.input.channels,
@@ -97,23 +112,11 @@ export let searchNewsTool = SlateTool.create(spec, {
       pageSize: ctx.input.pageSize
     });
 
-    let articles = (Array.isArray(data) ? data : []).map((item: any) => ({
-      articleId: item.id,
-      author: item.author,
-      created: item.created,
-      updated: item.updated,
-      title: item.title,
-      teaser: item.teaser,
-      body: item.body,
-      url: item.url,
-      images: item.image || [],
-      channels: (item.channels || []).map((c: any) => c.name),
-      tickers: (item.stocks || []).map((s: any) => s.name),
-      tags: (item.tags || []).map((t: any) => t.name)
-    }));
+    let articles = recordsFrom(data).map(normalizeNewsArticle);
 
     return {
       output: {
+        raw: data,
         articles,
         count: articles.length
       },
@@ -121,3 +124,18 @@ export let searchNewsTool = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let normalizeNewsArticle = (item: any) => ({
+  articleId: item.id,
+  author: item.author,
+  created: item.created,
+  updated: item.updated,
+  title: item.title,
+  teaser: item.teaser,
+  body: item.body,
+  url: item.url,
+  images: item.image || [],
+  channels: (item.channels || []).map((c: any) => c.name),
+  tickers: (item.stocks || []).map((s: any) => s.name),
+  tags: (item.tags || []).map((t: any) => t.name)
+});

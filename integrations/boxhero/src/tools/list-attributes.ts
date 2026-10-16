@@ -20,10 +20,12 @@ export let listAttributes = SlateTool.create(spec, {
           z.object({
             attributeId: z.number().describe('Unique attribute ID'),
             name: z.string().describe('Attribute name'),
-            type: z.string().describe('Attribute data type (text, number, date, barcode)')
+            type: z.string().describe('Attribute data type (text, number, date, barcode)'),
+            rank: z.number().optional().describe('Display sort order')
           })
         )
-        .describe('List of attribute definitions')
+        .describe('List of attribute definitions'),
+      raw: z.unknown().optional().describe('Original response returned by BoxHero')
     })
   )
   .handleInvocation(async ctx => {
@@ -33,12 +35,13 @@ export let listAttributes = SlateTool.create(spec, {
 
     let attributes = response.items.map(attr => ({
       attributeId: attr.id,
-      name: attr.name,
-      type: attr.type
+      name: attr.attr_name,
+      type: attr.attr_type,
+      rank: attr.rank
     }));
 
     return {
-      output: { attributes },
+      output: { attributes, raw: response },
       message: `Retrieved ${attributes.length} attribute definition(s).`
     };
   })

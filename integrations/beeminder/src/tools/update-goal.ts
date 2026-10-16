@@ -28,7 +28,20 @@ export let updateGoal = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Tags to set on the goal (replaces existing)'),
-      callbackUrl: z.string().optional().describe('Webhook URL for derail notifications')
+      callbackUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy callback URL setting; changing it can overwrite another app callback'
+        ),
+      datasource: z
+        .string()
+        .optional()
+        .describe(
+          'Automatic data source; send an empty string to return to manual data entry'
+        ),
+      tmin: z.string().optional().describe('Graph start date in YYYY-MM-DD format'),
+      tmax: z.string().optional().describe('Graph end date in YYYY-MM-DD format')
     })
   )
   .output(goalSchema)
@@ -36,7 +49,8 @@ export let updateGoal = SlateTool.create(spec, {
     let { goalSlug, ...params } = ctx.input;
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
     let raw = await client.updateGoal(goalSlug, params);

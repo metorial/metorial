@@ -1,6 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import {
+  ActiveTrailClient,
+  readId,
+  readList,
+  readMailingList,
+  redactProviderData,
+  requireContactAddress,
+  toCustomerState
+} from '../lib/client';
 import { spec } from '../spec';
 
 let mailingListOutputSchema = z.object({
@@ -11,7 +19,7 @@ let mailingListOutputSchema = z.object({
 export let listMailingLists = SlateTool.create(spec, {
   name: 'List Mailing Lists',
   key: 'list_mailing_lists',
-  description: `List all mailing lists in your account with pagination.`,
+  description: `List all mailing lists in your account. ActiveTrail returns the full list.`,
   tags: { destructive: false, readOnly: true }
 })
   .input(
@@ -31,16 +39,16 @@ export let listMailingLists = SlateTool.create(spec, {
       page: ctx.input.page,
       limit: ctx.input.limit
     });
-    let lists = Array.isArray(result) ? result : [];
-    return {
-      output: {
-        mailingLists: lists.map((l: any) => ({
-          mailingListId: l.id,
-          name: l.name
-        }))
+    let lists = readList(result);
+    return redactProviderData(
+      {
+        output: {
+          mailingLists: lists.map(readMailingList)
+        },
+        message: `Found **${lists.length}** mailing list(s).`
       },
-      message: `Found **${lists.length}** mailing list(s).`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -59,10 +67,14 @@ export let createMailingList = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.createMailingList({ name: ctx.input.name });
-    return {
-      output: { mailingListId: result.id, name: result.name },
-      message: `Mailing list **${ctx.input.name}** created with ID **${result.id}**.`
-    };
+    let mailingList = readMailingList(result);
+    return redactProviderData(
+      {
+        output: mailingList,
+        message: `Mailing list **${ctx.input.name}** created with ID **${mailingList.mailingListId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -85,10 +97,13 @@ export let deleteMailingList = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.deleteMailingList(ctx.input.mailingListId);
-    return {
-      output: { success: true },
-      message: `Mailing list **${ctx.input.mailingListId}** deleted.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Mailing list **${ctx.input.mailingListId}** deleted.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -119,17 +134,20 @@ export let getMailingListMembers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.getMailingListMembers(ctx.input.mailingListId, {
-      customerStates: ctx.input.status,
+      customerStates: toCustomerState(ctx.input.status),
       fromDate: ctx.input.fromDate,
       toDate: ctx.input.toDate,
       page: ctx.input.page,
       limit: ctx.input.limit
     });
-    let members = Array.isArray(result) ? result : [];
-    return {
-      output: { members },
-      message: `Found **${members.length}** member(s) in mailing list **${ctx.input.mailingListId}**.`
-    };
+    let members = readList(result);
+    return redactProviderData(
+      {
+        output: { members },
+        message: `Found **${members.length}** member(s) in mailing list **${ctx.input.mailingListId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -145,7 +163,13 @@ export let addContactToMailingList = SlateTool.create(spec, {
       email: z.string().optional().describe('Contact email address'),
       sms: z.string().optional().describe('Contact SMS number'),
       firstName: z.string().optional().describe('First name'),
-      lastName: z.string().optional().describe('Last name')
+      lastName: z.string().optional().describe('Last name'),
+      groupIds: z
+        .array(z.number())
+        .optional()
+        .describe(
+          'Group IDs within the mailing list. Call list_groups to discover IDs. Required by ActiveTrail.'
+        )
     })
   )
   .output(
@@ -157,16 +181,24 @@ export let addContactToMailingList = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
-    let data: Record<string, any> = {};
-    if (ctx.input.email) data.email = ctx.input.email;
-    if (ctx.input.sms) data.sms = ctx.input.sms;
-    if (ctx.input.firstName) data.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) data.last_name = ctx.input.lastName;
+    requireContactAddress(ctx.input);
+    if (!ctx.input.groupIds?.length)
+      throw createApiServiceError(
+        'Provide at least one group ID for the mailing-list contact. Call list_groups to discover IDs.'
+      );
+    let data: Record<string, any> = { group_ids: ctx.input.groupIds };
+    if (ctx.input.email !== undefined) data.email = ctx.input.email;
+    if (ctx.input.sms !== undefined) data.sms = ctx.input.sms;
+    if (ctx.input.firstName !== undefined) data.first_name = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) data.last_name = ctx.input.lastName;
 
     let result = await client.addContactToMailingList(ctx.input.mailingListId, data);
-    return {
-      output: { contactId: result.id, email: result.email, sms: result.sms },
-      message: `Contact added to mailing list **${ctx.input.mailingListId}**.`
-    };
+    return redactProviderData(
+      {
+        output: { contactId: readId(result), email: result.email, sms: result.sms },
+        message: `Contact added to mailing list **${ctx.input.mailingListId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

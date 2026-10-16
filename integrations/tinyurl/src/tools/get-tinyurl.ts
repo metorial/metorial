@@ -54,7 +54,7 @@ export let getTinyUrl = SlateTool.create(spec, {
         createdAt: result.created_at,
         expiresAt: result.expires_at,
         tags: result.tags || [],
-        description: result.description,
+        description: result.description ?? null,
         analyticsEnabled: result.analytics?.enabled ?? false,
         analyticsPublic: result.analytics?.public ?? false
       },

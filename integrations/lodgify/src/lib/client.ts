@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
 import { lodgifyApiError } from './errors';
 
 export type GuestBreakdown = {
@@ -88,29 +88,26 @@ export let serializeBracketedParams = (params: Record<string, unknown>) => {
   return parts.join('&');
 };
 
-let applyLodgifyErrorInterceptor = (http: ReturnType<typeof createAxios>) => {
-  http.interceptors.response.use(
-    response => response,
-    error => Promise.reject(lodgifyApiError(error))
-  );
-};
-
 export class Client {
   private axiosV1;
   private axiosV2;
 
   constructor(config: { token: string }) {
-    let headers = {
-      'X-ApiKey': config.token,
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
+    let options = {
+      authHeader: { name: 'X-ApiKey', value: config.token },
+      headers: { Accept: 'application/json' },
+      timeout: 30000,
+      errorAdapter: lodgifyApiError
     };
 
-    this.axiosV1 = createAxios({ baseURL: 'https://api.lodgify.com/v1', headers });
-    this.axiosV2 = createAxios({ baseURL: 'https://api.lodgify.com/v2', headers });
-
-    applyLodgifyErrorInterceptor(this.axiosV1);
-    applyLodgifyErrorInterceptor(this.axiosV2);
+    this.axiosV1 = createAuthenticatedAxios({
+      ...options,
+      baseURL: 'https://api.lodgify.com/v1'
+    });
+    this.axiosV2 = createAuthenticatedAxios({
+      ...options,
+      baseURL: 'https://api.lodgify.com/v2'
+    });
   }
 
   // ---- Properties ----
@@ -493,7 +490,7 @@ export class Client {
 
   // GET /v2/messaging/{threadGuid}
   async getMessageThread(threadGuid: string) {
-    let response = await this.axiosV2.get(`/messaging/${threadGuid}`);
+    let response = await this.axiosV2.get(`/messaging/${encodeURIComponent(threadGuid)}`);
     return response.data;
   }
 }

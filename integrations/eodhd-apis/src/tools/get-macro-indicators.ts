@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let macroDataPointSchema = z.object({
@@ -50,7 +50,7 @@ export let getMacroIndicators = SlateTool.create(spec, {
       indicator: ctx.input.indicator
     });
 
-    let dataPoints = Array.isArray(data) ? data : [];
+    let dataPoints = eodhdArray(data, 'get-macro-indicators');
 
     return {
       output: {

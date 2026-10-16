@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import {
+  FinmeiClient,
+  optionalNumber,
+  optionalString,
+  pagination,
+  readList,
+  requireId
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let listInvoices = SlateTool.create(spec, {
@@ -14,11 +21,11 @@ export let listInvoices = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (default: 1)'),
+      page: z.number().optional().describe('Page number for pagination (1-based)'),
       perPage: z
         .number()
         .optional()
-        .describe('Number of invoices per page (default: 20, max: 100)')
+        .describe('Number of invoices per page (the provider may use a fixed page size)')
     })
   )
   .output(
@@ -32,10 +39,13 @@ export let listInvoices = SlateTool.create(spec, {
             currency: z.string().optional().describe('Currency code'),
             amountDue: z.number().optional().describe('Amount due'),
             issueDate: z.string().optional().describe('Issue date'),
-            dueDate: z.string().optional().describe('Due date')
+            dueDate: z.string().optional().describe('Due date'),
+            total: z.number().optional().describe('Invoice total including VAT'),
+            shareLink: z.string().optional().describe('Provider invoice sharing link')
           })
         )
         .describe('List of invoices'),
+      rawResponse: z.any().optional().describe('Complete provider response'),
       total: z.number().optional().describe('Total number of invoices'),
       page: z.number().optional().describe('Current page'),
       totalPages: z.number().optional().describe('Total number of pages')
@@ -49,31 +59,34 @@ export let listInvoices = SlateTool.create(spec, {
       per_page: ctx.input.perPage
     });
 
-    let rawInvoices = result?.data ?? result?.invoices ?? result ?? [];
-    let invoicesArray = Array.isArray(rawInvoices) ? rawInvoices : [];
-
-    let invoices = invoicesArray.map((inv: any) => ({
-      invoiceId: String(inv.id),
-      code: inv.code,
-      status: inv.status,
-      currency: inv.currency,
-      amountDue: inv.amount_due ?? inv.total,
-      issueDate: inv.issue_date ?? inv.date,
-      dueDate: inv.due_date
+    let invoices = readList(result, 'invoices').map(inv => ({
+      invoiceId: requireId(inv.id, 'invoice ID'),
+      ...pickDefined({
+        code:
+          inv.invoice_number === undefined || inv.invoice_number === null
+            ? optionalString(inv.code, 'invoice code')
+            : requireId(inv.invoice_number, 'invoice number'),
+        status: optionalString(inv.payment_status ?? inv.status, 'invoice status'),
+        currency: optionalString(inv.currency, 'invoice currency'),
+        amountDue: optionalNumber(inv.amount_due, 'amount due'),
+        issueDate: optionalString(
+          inv.invoice_date ?? inv.issue_date ?? inv.date,
+          'invoice date'
+        ),
+        dueDate: optionalString(inv.pay_until_date ?? inv.due_date, 'invoice due date'),
+        total: optionalNumber(inv.total_incl_vat ?? inv.total, 'invoice total'),
+        shareLink: optionalString(inv.share_link, 'invoice share link')
+      })
     }));
 
-    let total = result?.total ?? result?.meta?.total;
-    let page = result?.page ?? result?.meta?.current_page ?? ctx.input.page;
-    let totalPages = result?.total_pages ?? result?.meta?.last_page;
-
+    let metadata = pagination(result);
     return {
       output: {
         invoices,
-        total,
-        page,
-        totalPages
+        ...metadata,
+        rawResponse: result
       },
-      message: `Found **${invoices.length}** invoice(s)${total ? ` out of ${total} total` : ''}.`
+      message: `Found **${invoices.length}** invoice(s)${metadata.total !== undefined ? ` out of ${metadata.total} total` : ''}.`
     };
   })
   .build();

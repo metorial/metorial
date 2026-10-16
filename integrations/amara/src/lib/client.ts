@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginatedResponse<T> {
   meta: {
@@ -12,7 +12,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface AmaraUser {
-  username: string;
+  username?: string;
   id: string;
   uri: string;
 }
@@ -61,7 +61,8 @@ export interface SubtitleLanguageData {
   published: boolean;
   versions: Array<{
     author: AmaraUser;
-    version_no: number;
+    version_number: number;
+    created: string;
     published: boolean;
   }>;
 }
@@ -115,7 +116,7 @@ export interface ProjectData {
   name: string;
   slug: string;
   description: string;
-  guidelines: string;
+  guidelines: string | null;
   created: string;
   modified: string;
   workflow_enabled: boolean;
@@ -128,7 +129,7 @@ export interface ApplicationData {
   status: string;
   id: number;
   created: string;
-  modified: string;
+  modified: string | null;
   resource_uri: string;
 }
 
@@ -167,12 +168,13 @@ export interface SubtitleAction {
 
 export interface SubtitleNote {
   user: AmaraUser;
-  datetime: string;
+  created: string;
+  datetime?: string;
   body: string;
 }
 
 export interface UserData {
-  username: string;
+  username?: string;
   id: string;
   first_name: string;
   last_name: string;
@@ -201,15 +203,24 @@ export class Client {
   private axios;
 
   constructor(private config: { token: string; username: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://amara.org/api'
+    if (!config.token.trim()) {
+      throw createApiServiceError('An Amara API key is required.');
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://amara.org/api',
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Amara',
+          reason: 'amara_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+        })
     });
   }
 
   private get headers() {
     return {
       'X-api-key': this.config.token,
-      'X-api-username': this.config.username,
       'Content-Type': 'application/json'
     };
   }
@@ -229,8 +240,8 @@ export class Client {
     if (params?.project) query.project = params.project;
     if (params?.videoUrl) query.video_url = params.videoUrl;
     if (params?.orderBy) query.order_by = params.orderBy;
-    if (params?.limit) query.limit = params.limit;
-    if (params?.offset) query.offset = params.offset;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.offset !== undefined) query.offset = params.offset;
 
     let response = await this.axios.get('/videos/', {
       headers: this.headers,
@@ -240,7 +251,7 @@ export class Client {
   }
 
   async getVideo(videoId: string): Promise<VideoData> {
-    let response = await this.axios.get(`/videos/${videoId}/`, {
+    let response = await this.axios.get(`/videos/${encodeURIComponent(videoId)}/`, {
       headers: this.headers
     });
     return response.data;
@@ -259,14 +270,14 @@ export class Client {
     let body: Record<string, any> = {
       video_url: data.videoUrl
     };
-    if (data.title) body.title = data.title;
-    if (data.description) body.description = data.description;
-    if (data.primaryAudioLanguageCode)
+    if (data.title !== undefined) body.title = data.title;
+    if (data.description !== undefined) body.description = data.description;
+    if (data.primaryAudioLanguageCode !== undefined)
       body.primary_audio_language_code = data.primaryAudioLanguageCode;
-    if (data.thumbnail) body.thumbnail = data.thumbnail;
-    if (data.metadata) body.metadata = data.metadata;
-    if (data.team) body.team = data.team;
-    if (data.project) body.project = data.project;
+    if (data.thumbnail !== undefined) body.thumbnail = data.thumbnail;
+    if (data.metadata !== undefined) body.metadata = data.metadata;
+    if (data.team !== undefined) body.team = data.team;
+    if (data.project !== undefined) body.project = data.project;
 
     let response = await this.axios.post('/videos/', body, {
       headers: this.headers
@@ -296,14 +307,14 @@ export class Client {
     if (data.team !== undefined) body.team = data.team;
     if (data.project !== undefined) body.project = data.project;
 
-    let response = await this.axios.put(`/videos/${videoId}/`, body, {
+    let response = await this.axios.put(`/videos/${encodeURIComponent(videoId)}/`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async deleteVideo(videoId: string): Promise<void> {
-    await this.axios.delete(`/videos/${videoId}/`, {
+    await this.axios.delete(`/videos/${encodeURIComponent(videoId)}/`, {
       headers: this.headers
     });
   }
@@ -311,7 +322,7 @@ export class Client {
   // ==================== Video URLs ====================
 
   async listVideoUrls(videoId: string): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get(`/videos/${videoId}/urls/`, {
+    let response = await this.axios.get(`/videos/${encodeURIComponent(videoId)}/urls/`, {
       headers: this.headers
     });
     return response.data;
@@ -325,9 +336,13 @@ export class Client {
       original?: boolean;
     }
   ): Promise<any> {
-    let response = await this.axios.post(`/videos/${videoId}/urls/`, data, {
-      headers: this.headers
-    });
+    let response = await this.axios.post(
+      `/videos/${encodeURIComponent(videoId)}/urls/`,
+      data,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -340,7 +355,7 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<SubtitleLanguageData>> {
-    let response = await this.axios.get(`/videos/${videoId}/languages/`, {
+    let response = await this.axios.get(`/videos/${encodeURIComponent(videoId)}/languages/`, {
       headers: this.headers,
       params
     });
@@ -351,9 +366,12 @@ export class Client {
     videoId: string,
     languageCode: string
   ): Promise<SubtitleLanguageData> {
-    let response = await this.axios.get(`/videos/${videoId}/languages/${languageCode}/`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -384,9 +402,13 @@ export class Client {
     if (data.softLimitCpl !== undefined) body.soft_limit_cpl = data.softLimitCpl;
     if (data.softLimitCps !== undefined) body.soft_limit_cps = data.softLimitCps;
 
-    let response = await this.axios.post(`/videos/${videoId}/languages/`, body, {
-      headers: this.headers
-    });
+    let response = await this.axios.post(
+      `/videos/${encodeURIComponent(videoId)}/languages/`,
+      body,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -416,7 +438,7 @@ export class Client {
     if (data.softLimitCps !== undefined) body.soft_limit_cps = data.softLimitCps;
 
     let response = await this.axios.put(
-      `/videos/${videoId}/languages/${languageCode}/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/`,
       body,
       {
         headers: this.headers
@@ -437,10 +459,10 @@ export class Client {
   ): Promise<SubtitleData> {
     let query: Record<string, any> = {};
     if (params?.subFormat) query.sub_format = params.subFormat;
-    if (params?.versionNumber) query.version_number = params.versionNumber;
+    if (params?.versionNumber !== undefined) query.version_number = params.versionNumber;
 
     let response = await this.axios.get(
-      `/videos/${videoId}/languages/${languageCode}/subtitles/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/`,
       {
         headers: this.headers,
         params: query
@@ -465,7 +487,7 @@ export class Client {
     let accept = acceptMap[format] || 'text/srt';
 
     let response = await this.axios.get(
-      `/videos/${videoId}/languages/${languageCode}/subtitles/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/`,
       {
         headers: {
           ...this.headers,
@@ -499,7 +521,7 @@ export class Client {
     if (data.isComplete !== undefined) body.is_complete = data.isComplete;
 
     let response = await this.axios.post(
-      `/videos/${videoId}/languages/${languageCode}/subtitles/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/`,
       body,
       {
         headers: this.headers
@@ -509,16 +531,19 @@ export class Client {
   }
 
   async deleteSubtitles(videoId: string, languageCode: string): Promise<void> {
-    await this.axios.delete(`/videos/${videoId}/languages/${languageCode}/subtitles/`, {
-      headers: this.headers
-    });
+    await this.axios.delete(
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/`,
+      {
+        headers: this.headers
+      }
+    );
   }
 
   // ==================== Subtitle Actions ====================
 
   async listSubtitleActions(videoId: string, languageCode: string): Promise<SubtitleAction[]> {
     let response = await this.axios.get(
-      `/videos/${videoId}/languages/${languageCode}/subtitles/actions/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/actions/`,
       {
         headers: this.headers
       }
@@ -532,7 +557,7 @@ export class Client {
     action: string
   ): Promise<void> {
     await this.axios.post(
-      `/videos/${videoId}/languages/${languageCode}/subtitles/actions/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/actions/`,
       { action },
       {
         headers: this.headers
@@ -547,7 +572,7 @@ export class Client {
     languageCode: string
   ): Promise<PaginatedResponse<SubtitleNote>> {
     let response = await this.axios.get(
-      `/videos/${videoId}/languages/${languageCode}/subtitles/notes/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/notes/`,
       {
         headers: this.headers
       }
@@ -561,7 +586,7 @@ export class Client {
     body: string
   ): Promise<SubtitleNote> {
     let response = await this.axios.post(
-      `/videos/${videoId}/languages/${languageCode}/subtitles/notes/`,
+      `/videos/${encodeURIComponent(videoId)}/languages/${encodeURIComponent(languageCode)}/subtitles/notes/`,
       { body },
       {
         headers: this.headers
@@ -584,7 +609,7 @@ export class Client {
   }
 
   async getTeam(teamSlug: string): Promise<TeamData> {
-    let response = await this.axios.get(`/teams/${teamSlug}/`, {
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamSlug)}/`, {
       headers: this.headers
     });
     return response.data;
@@ -604,12 +629,12 @@ export class Client {
       name: data.name,
       slug: data.slug
     };
-    if (data.type) body.type = data.type;
-    if (data.description) body.description = data.description;
-    if (data.teamVisibility) body.team_visibility = data.teamVisibility;
-    if (data.videoVisibility) body.video_visibility = data.videoVisibility;
-    if (data.membershipPolicy) body.membership_policy = data.membershipPolicy;
-    if (data.videoPolicy) body.video_policy = data.videoPolicy;
+    if (data.type !== undefined) body.type = data.type;
+    if (data.description !== undefined) body.description = data.description;
+    if (data.teamVisibility !== undefined) body.team_visibility = data.teamVisibility;
+    if (data.videoVisibility !== undefined) body.video_visibility = data.videoVisibility;
+    if (data.membershipPolicy !== undefined) body.membership_policy = data.membershipPolicy;
+    if (data.videoPolicy !== undefined) body.video_policy = data.videoPolicy;
 
     let response = await this.axios.post('/teams/', body, {
       headers: this.headers
@@ -638,7 +663,7 @@ export class Client {
     if (data.membershipPolicy !== undefined) body.membership_policy = data.membershipPolicy;
     if (data.videoPolicy !== undefined) body.video_policy = data.videoPolicy;
 
-    let response = await this.axios.put(`/teams/${teamSlug}/`, body, {
+    let response = await this.axios.put(`/teams/${encodeURIComponent(teamSlug)}/`, body, {
       headers: this.headers
     });
     return response.data;
@@ -653,7 +678,7 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<TeamMemberData>> {
-    let response = await this.axios.get(`/teams/${teamSlug}/members/`, {
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamSlug)}/members/`, {
       headers: this.headers,
       params
     });
@@ -661,9 +686,12 @@ export class Client {
   }
 
   async getTeamMember(teamSlug: string, userIdentifier: string): Promise<TeamMemberData> {
-    let response = await this.axios.get(`/teams/${teamSlug}/members/${userIdentifier}/`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/members/${encodeURIComponent(userIdentifier)}/`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -674,9 +702,13 @@ export class Client {
       role?: string;
     }
   ): Promise<TeamMemberData> {
-    let response = await this.axios.post(`/teams/${teamSlug}/members/`, data, {
-      headers: this.headers
-    });
+    let response = await this.axios.post(
+      `/teams/${encodeURIComponent(teamSlug)}/members/`,
+      data,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -688,7 +720,7 @@ export class Client {
     }
   ): Promise<TeamMemberData> {
     let response = await this.axios.put(
-      `/teams/${teamSlug}/members/${userIdentifier}/`,
+      `/teams/${encodeURIComponent(teamSlug)}/members/${encodeURIComponent(userIdentifier)}/`,
       data,
       {
         headers: this.headers
@@ -698,9 +730,12 @@ export class Client {
   }
 
   async removeTeamMember(teamSlug: string, userIdentifier: string): Promise<void> {
-    await this.axios.delete(`/teams/${teamSlug}/members/${userIdentifier}/`, {
-      headers: this.headers
-    });
+    await this.axios.delete(
+      `/teams/${encodeURIComponent(teamSlug)}/members/${encodeURIComponent(userIdentifier)}/`,
+      {
+        headers: this.headers
+      }
+    );
   }
 
   // ==================== Projects ====================
@@ -712,7 +747,7 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<ProjectData>> {
-    let response = await this.axios.get(`/teams/${teamSlug}/projects/`, {
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamSlug)}/projects/`, {
       headers: this.headers,
       params
     });
@@ -720,9 +755,12 @@ export class Client {
   }
 
   async getProject(teamSlug: string, projectSlug: string): Promise<ProjectData> {
-    let response = await this.axios.get(`/teams/${teamSlug}/projects/${projectSlug}/`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/projects/${encodeURIComponent(projectSlug)}/`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -735,9 +773,13 @@ export class Client {
       guidelines?: string;
     }
   ): Promise<ProjectData> {
-    let response = await this.axios.post(`/teams/${teamSlug}/projects/`, data, {
-      headers: this.headers
-    });
+    let response = await this.axios.post(
+      `/teams/${encodeURIComponent(teamSlug)}/projects/`,
+      data,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -750,16 +792,23 @@ export class Client {
       guidelines?: string;
     }
   ): Promise<ProjectData> {
-    let response = await this.axios.put(`/teams/${teamSlug}/projects/${projectSlug}/`, data, {
-      headers: this.headers
-    });
+    let response = await this.axios.put(
+      `/teams/${encodeURIComponent(teamSlug)}/projects/${encodeURIComponent(projectSlug)}/`,
+      data,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   async deleteProject(teamSlug: string, projectSlug: string): Promise<void> {
-    await this.axios.delete(`/teams/${teamSlug}/projects/${projectSlug}/`, {
-      headers: this.headers
-    });
+    await this.axios.delete(
+      `/teams/${encodeURIComponent(teamSlug)}/projects/${encodeURIComponent(projectSlug)}/`,
+      {
+        headers: this.headers
+      }
+    );
   }
 
   // ==================== Team Applications ====================
@@ -775,17 +824,23 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<ApplicationData>> {
-    let response = await this.axios.get(`/teams/${teamSlug}/applications/`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/applications/`,
+      {
+        headers: this.headers,
+        params
+      }
+    );
     return response.data;
   }
 
   async getApplication(teamSlug: string, applicationId: number): Promise<ApplicationData> {
-    let response = await this.axios.get(`/teams/${teamSlug}/applications/${applicationId}/`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/applications/${applicationId}/`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -795,7 +850,7 @@ export class Client {
     status: string
   ): Promise<ApplicationData> {
     let response = await this.axios.put(
-      `/teams/${teamSlug}/applications/${applicationId}/`,
+      `/teams/${encodeURIComponent(teamSlug)}/applications/${applicationId}/`,
       { status },
       {
         headers: this.headers
@@ -807,15 +862,23 @@ export class Client {
   // ==================== Team Language Preferences ====================
 
   async setPreferredLanguages(teamSlug: string, languages: string[]): Promise<void> {
-    await this.axios.put(`/teams/${teamSlug}/languages/preferred/`, languages, {
-      headers: this.headers
-    });
+    await this.axios.put(
+      `/teams/${encodeURIComponent(teamSlug)}/languages/preferred/`,
+      languages,
+      {
+        headers: this.headers
+      }
+    );
   }
 
   async setBlacklistedLanguages(teamSlug: string, languages: string[]): Promise<void> {
-    await this.axios.put(`/teams/${teamSlug}/languages/blacklisted/`, languages, {
-      headers: this.headers
-    });
+    await this.axios.put(
+      `/teams/${encodeURIComponent(teamSlug)}/languages/blacklisted/`,
+      languages,
+      {
+        headers: this.headers
+      }
+    );
   }
 
   // ==================== Subtitle Requests ====================
@@ -842,20 +905,26 @@ export class Client {
     if (params?.project) query.project = params.project;
     if (params?.assignee) query.assignee = params.assignee;
     if (params?.sort) query.sort = params.sort;
-    if (params?.limit) query.limit = params.limit;
-    if (params?.offset) query.offset = params.offset;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.offset !== undefined) query.offset = params.offset;
 
-    let response = await this.axios.get(`/teams/${teamSlug}/subtitle-requests/`, {
-      headers: this.headers,
-      params: query
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/subtitle-requests/`,
+      {
+        headers: this.headers,
+        params: query
+      }
+    );
     return response.data;
   }
 
   async getSubtitleRequest(teamSlug: string, jobId: string): Promise<SubtitleRequestData> {
-    let response = await this.axios.get(`/teams/${teamSlug}/subtitle-requests/${jobId}/`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/subtitle-requests/${encodeURIComponent(jobId)}/`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -866,9 +935,13 @@ export class Client {
       language: string;
     }
   ): Promise<SubtitleRequestData> {
-    let response = await this.axios.post(`/teams/${teamSlug}/subtitle-requests/`, data, {
-      headers: this.headers
-    });
+    let response = await this.axios.post(
+      `/teams/${encodeURIComponent(teamSlug)}/subtitle-requests/`,
+      data,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -880,6 +953,11 @@ export class Client {
       reviewer?: string | null;
       approver?: string | null;
       workStatus?: string;
+      workStage?: string;
+      dueDate?: string;
+      subtitlesDueDate?: string;
+      reviewDueDate?: string;
+      approvalDueDate?: string;
     }
   ): Promise<SubtitleRequestData> {
     let body: Record<string, any> = {};
@@ -887,9 +965,14 @@ export class Client {
     if (data.reviewer !== undefined) body.reviewer = data.reviewer;
     if (data.approver !== undefined) body.approver = data.approver;
     if (data.workStatus !== undefined) body.work_status = data.workStatus;
+    if (data.workStage !== undefined) body.work_stage = data.workStage;
+    if (data.dueDate !== undefined) body.due_date = data.dueDate;
+    if (data.subtitlesDueDate !== undefined) body.subtitles_due_date = data.subtitlesDueDate;
+    if (data.reviewDueDate !== undefined) body.review_due_date = data.reviewDueDate;
+    if (data.approvalDueDate !== undefined) body.approval_due_date = data.approvalDueDate;
 
     let response = await this.axios.put(
-      `/teams/${teamSlug}/subtitle-requests/${jobId}/`,
+      `/teams/${encodeURIComponent(teamSlug)}/subtitle-requests/${encodeURIComponent(jobId)}/`,
       body,
       {
         headers: this.headers
@@ -899,9 +982,12 @@ export class Client {
   }
 
   async deleteSubtitleRequest(teamSlug: string, jobId: string): Promise<void> {
-    await this.axios.delete(`/teams/${teamSlug}/subtitle-requests/${jobId}/`, {
-      headers: this.headers
-    });
+    await this.axios.delete(
+      `/teams/${encodeURIComponent(teamSlug)}/subtitle-requests/${encodeURIComponent(jobId)}/`,
+      {
+        headers: this.headers
+      }
+    );
   }
 
   // ==================== Activity ====================
@@ -918,7 +1004,7 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<ActivityData>> {
-    let response = await this.axios.get(`/videos/${videoId}/activity/`, {
+    let response = await this.axios.get(`/videos/${encodeURIComponent(videoId)}/activity/`, {
       headers: this.headers,
       params
     });
@@ -938,7 +1024,7 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<ActivityData>> {
-    let response = await this.axios.get(`/teams/${teamSlug}/activity/`, {
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamSlug)}/activity/`, {
       headers: this.headers,
       params
     });
@@ -958,17 +1044,20 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<ActivityData>> {
-    let response = await this.axios.get(`/users/${userIdentifier}/activity/`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.axios.get(
+      `/users/${encodeURIComponent(userIdentifier)}/activity/`,
+      {
+        headers: this.headers,
+        params
+      }
+    );
     return response.data;
   }
 
   // ==================== Users ====================
 
   async getUser(identifier: string): Promise<UserData> {
-    let response = await this.axios.get(`/users/${identifier}/`, {
+    let response = await this.axios.get(`/users/${encodeURIComponent(identifier)}/`, {
       headers: this.headers
     });
     return response.data;
@@ -1016,7 +1105,7 @@ export class Client {
     if (data.lastName !== undefined) body.last_name = data.lastName;
     if (data.email !== undefined) body.email = data.email;
 
-    let response = await this.axios.put(`/users/${identifier}/`, body, {
+    let response = await this.axios.put(`/users/${encodeURIComponent(identifier)}/`, body, {
       headers: this.headers
     });
     return response.data;
@@ -1035,7 +1124,7 @@ export class Client {
       content: data.content
     };
     if (data.user) body.user = data.user;
-    if (data.team) body.team = data.team;
+    if (data.team !== undefined) body.team = data.team;
 
     await this.axios.post('/message/', body, {
       headers: this.headers
@@ -1044,7 +1133,7 @@ export class Client {
 
   // ==================== Languages ====================
 
-  async listLanguages(): Promise<any> {
+  async listLanguages(): Promise<{ languages: Record<string, string> }> {
     let response = await this.axios.get('/languages/', {
       headers: this.headers
     });
@@ -1060,17 +1149,23 @@ export class Client {
       offset?: number;
     }
   ): Promise<PaginatedResponse<NotificationData>> {
-    let response = await this.axios.get(`/teams/${teamSlug}/notifications/`, {
-      headers: this.headers,
-      params
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/notifications/`,
+      {
+        headers: this.headers,
+        params
+      }
+    );
     return response.data;
   }
 
   async getNotification(teamSlug: string, number: number): Promise<NotificationData> {
-    let response = await this.axios.get(`/teams/${teamSlug}/notifications/${number}/`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(
+      `/teams/${encodeURIComponent(teamSlug)}/notifications/${number}/`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 }

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleSummary, requireKaggleText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let createDataset = SlateTool.create(spec, {
@@ -18,6 +19,12 @@ export let createDataset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      newDatasetSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Slug for a new dataset; do not use datasetSlug, which selects version creation.'
+        ),
       title: z
         .string()
         .optional()
@@ -72,7 +79,18 @@ export let createDataset = SlateTool.create(spec, {
       description: f.fileDescription
     }));
 
-    let isNewVersion = ctx.input.ownerSlug && ctx.input.datasetSlug && ctx.input.versionNotes;
+    if (ctx.input.files.length === 0)
+      throw createApiServiceError('At least one uploaded file is required.');
+    for (let file of ctx.input.files) requireKaggleText(file.fileToken, 'File upload token');
+    let isNewVersion =
+      ctx.input.datasetSlug !== undefined || ctx.input.versionNotes !== undefined;
+    if (isNewVersion) {
+      requireKaggleText(ctx.input.ownerSlug, 'Owner slug for a new dataset version');
+      requireKaggleText(ctx.input.datasetSlug, 'Dataset slug for a new version');
+      requireKaggleText(ctx.input.versionNotes, 'Version notes');
+    } else {
+      requireKaggleText(ctx.input.title, 'Title for a new dataset');
+    }
 
     let result: any;
     if (isNewVersion) {
@@ -90,6 +108,8 @@ export let createDataset = SlateTool.create(spec, {
     } else {
       result = await client.createDataset({
         title: ctx.input.title!,
+        ownerSlug: ctx.input.ownerSlug,
+        slug: ctx.input.newDatasetSlug,
         licenseName: ctx.input.licenseName,
         subtitle: ctx.input.subtitle,
         description: ctx.input.description,
@@ -99,7 +119,7 @@ export let createDataset = SlateTool.create(spec, {
     }
 
     return {
-      output: result ?? {},
+      output: kaggleSummary(result, 'dataset creation'),
       message: isNewVersion
         ? `Created new version of dataset **${ctx.input.ownerSlug}/${ctx.input.datasetSlug}**.`
         : `Created new dataset **${ctx.input.title}**.`

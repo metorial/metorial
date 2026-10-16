@@ -1,80 +1,48 @@
-Now let me get the full webhook documentation and the Swagger API docs to understand all the endpoints:Now let me get the Swagger API to understand the available endpoints:Let me try to fetch the Swagger spec directly to get the actual endpoints:I now have enough information to write the specification. Based on my research, the API documentation at `rest.boxhero-app.com/docs/api` is a Swagger UI page that I cannot fetch programmatically, but from all the documentation, integration pages, and webhook docs, I can construct a comprehensive specification.
+# BoxHero API specification
 
-# Slates Specification for Boxhero
+BoxHero manages inventory for the team bound to an API token. Requests use `Authorization: Bearer <token>` and the base URL `https://rest.boxhero-app.com/v1`. Issue a token in Settings > Integrations; no OAuth or refresh token is used. `get_team` confirms the authorized team and operating mode. Items, locations, and transactions require Location mode (`2`); Basic (`0`) and Unit (`1`) teams receive a provider error for those resources.
 
-## Overview
+## Tools
 
-BoxHero is an inventory management platform for small businesses, trusted by over 300,000 users in 100+ countries. It provides real-time stock level updates across locations, barcode scanning and printing, and team collaboration features. The platform supports four core inventory transaction types: Stock In, Stock Out, Adjust Stock, and Move Stock.
+| Tool | Documented API behavior |
+| --- | --- |
+| `get_team` | `GET /teams/linked`; team ID, name, mode, and original currency metadata. |
+| `list_items` | `GET /items`; item/location filters, 1–100 records per page, stock totals and per-location breakdowns. |
+| `get_item` | `GET /items/{id}`; one item and optional location-scoped stock quantities. |
+| `manage_item` | `POST /items`, `PUT /items/{id}`, `DELETE /items/{id}`; create, patch, or delete item metadata. |
+| `list_attributes` | `GET /item-attrs`; maps `attr_name` and `attr_type`, includes attribute rank. |
+| `list_locations` | `GET /locations`; every active location, stock quantity, and memo. |
+| `list_partners` | `GET /partners`; paginated supplier/customer discovery, optional type 0/1, contact details. |
+| `list_transactions` | `GET /transactions` followed by `GET /transactions/{id}` per result to preserve full line-item output. |
+| `get_transaction` | `GET /transactions/{id}`; full line items and optional historical revision. |
+| `create_transaction` | `POST /transactions` returns an ID; a detail read supplies the full required output. |
+| `manage_transaction` | `PUT /transactions/{id}` and `DELETE /transactions/{id}`; partial updates/deletes with optional optimistic-concurrency revision. |
 
-## Authentication
+## Stock rules
 
-BoxHero uses **Bearer Token (API Key)** authentication.
+Stock In and Move Stock use positive quantities. Stock Out uses negative quantities. Adjust Stock applies a signed relative change, not an absolute stock target. Each item may appear only once per transaction. `to_location_id` identifies the stock location for in/out/adjust and the destination for move. The existing `fromLocationId` input is also accepted as a Stock Out location and translated to `to_location_id`. Move Stock requires two distinct locations. A single active location can be selected automatically by the provider for other transaction types.
 
-All API requests must include an Authorization header with a Bearer token. The format is:
+`partner_id` applies only to Stock In/Out. `transactionTime` maps to `tx_time`, cannot be in the future, and is unavailable for Adjust Stock. Memos accept up to 2,000 characters. Transaction updates can replace all line items; use the latest revision from `get_transaction` to reject concurrent edits. Delete returns an error for a missing or already deleted transaction.
 
-```
-Authorization: Bearer {API_TOKEN}
-```
+Item creation can seed nonzero initial stock using `quantity` plus `locationId`; this happens after metadata creation. A stock-seeding failure can leave the item present, so inspect the error and existing items before retrying. Metadata updates do not alter stock. Attribute values use the documented array of `{id, value}` entries; update accepts null to remove a value. Deleting an item removes it from bundles while transaction history retains snapshots.
 
-**Obtaining an API Token:**
+## Pagination and errors
 
-1. Log into your BoxHero account on the Desktop (Web), navigate to Settings > Integrations, and generate a new API token.
+Provider cursors are numeric or null. Existing public cursor fields remain strings: real numeric values are converted to strings, and null is omitted. Original responses preserve provider fields, numeric cursors, nulls, nested item references, and stock-level metadata. Required malformed response data raises a service error instead of reporting invented IDs, state, stock, or timestamps.
 
-**Base URL:** `https://rest.boxhero-app.com`
+The team limit is 5 requests/second and 300 requests/minute across all tokens. Detail reads are paced within an invocation. A transaction list with N results uses N+1 HTTP requests, so smaller page sizes finish sooner. Detail hydration reads the latest state and is not an atomic snapshot. Creation followed by detail lookup is also nontransactional: a failed lookup reports the created ID and instructs callers to retrieve it rather than repeat creation.
 
-**Additional details:**
+HTTP failures retain the provider status, machine-readable code/type, title, field-level messages, and correlation identifiers. There are no file download/export tools or triggers in this integration.
 
-- Access may be limited based on plan level; a plan upgrade may be required for full API usage.
-- Certain API features (such as the location lookup API) may not be available depending on the team's mode (e.g., Basic Mode vs. Business Mode).
-- Each API token is scoped to a specific team. There are no configurable OAuth scopes.
+## Official references
 
-## Features
-
-### Item Management
-
-Retrieve and manage inventory items within a team. Each item has a unique barcode number and SKU, along with custom attributes such as size, color, or manufacturer. Items include fields like name, SKU, barcode, cost, price, photo URL, and custom attributes. Items can be filtered by location.
-
-- BoxHero supports decimal values for inventory quantities (e.g., 1.9 or 0.28).
-
-### Inventory Transactions
-
-The API allows updating inventory using stock adjustments and stock transfers, and pulling inventory data. Transactions cover the four core types:
-
-- **Stock In**: Record items entering inventory (e.g., purchases, returns).
-- **Stock Out**: Record items leaving inventory (e.g., sales, shipments).
-- **Adjust Stock**: Modify quantities for corrections like damage or loss.
-- **Move Stock**: Transfer inventory between locations.
-
-Each transaction records the location, partner (supplier/customer), items with quantities, timestamp, and memo. Transactions can be listed and filtered.
-
-### Locations
-
-Locations represent physical places where inventory is stored, such as warehouses, stores, or stockrooms. The API allows retrieving location data. Multiple locations require the Business Plan.
-
-### Partners
-
-Partners include both Suppliers and Customers connected to inventory transactions, with contact information stored and managed in the Data Center. The API allows retrieving partner information.
-
-- Suppliers are linked to Stock In transactions, while Customers are linked to Stock Out transactions.
-
-### Attributes
-
-Custom attributes can be defined to add additional metadata to items (e.g., category, expiration date, safety stock level). These are returned as part of item data via the API.
-
-## Events
-
-BoxHero supports webhooks that allow you to receive real-time notifications when certain events occur. Webhooks are registered at Settings > Integrations & API in the BoxHero team.
-
-When an event occurs, BoxHero sends an HTTP POST request to the registered webhook endpoint with a JSON payload describing the event. If the server responds with any non-200 status code, BoxHero retries delivery up to 3 times. BoxHero does not guarantee the order of event delivery.
-
-### Transaction Events
-
-- **`txs/new`**: Triggered when a new inventory transaction occurs (Stock In, Stock Out, Adjust Stock, or Move Stock). The payload includes the transaction type, location(s), line items with quantities and updated stock levels, partner, timestamp, and the member who created it. Note: this event is not triggered for adjustments created through bulk edits or Excel imports.
-- **`txs/edit`**: Triggered when an existing inventory transaction is edited. Includes the same fields as `txs/new` plus a revision number.
-- **`txs/delete`**: Triggered when an inventory transaction is deleted. Includes the transaction ID and revision number.
-
-### Item Events
-
-- **`item/new`**: Triggered when a new item is added to the team's inventory. The payload includes item ID, name, SKU, barcode, photo URL, cost, price, and custom attributes. Note: not triggered when using the "Add Item Variants" feature or importing items via Excel.
-- **`item/edit`**: Triggered when an existing item is edited. Same payload fields as `item/new`. Note: not triggered for bulk edits through Data Center or Excel import.
-- **`item/delete`**: Triggered when an item is deleted. Includes only the item ID. Note: not triggered for bulk deletions through Data Center.
+- [Authentication](https://www.boxhero.io/docs/developers/api/authentication)
+- [Pagination](https://www.boxhero.io/docs/developers/api/pagination)
+- [Errors](https://www.boxhero.io/docs/developers/api/errors)
+- [List items](https://www.boxhero.io/docs/developers/api/reference/items/list-items)
+- [Create item](https://www.boxhero.io/docs/developers/api/reference/items/create-item), [get item](https://www.boxhero.io/docs/developers/api/reference/items/get-item), [update item](https://www.boxhero.io/docs/developers/api/reference/items/update-item), [delete item](https://www.boxhero.io/docs/developers/api/reference/items/delete-item)
+- [Attribute specifications](https://www.boxhero.io/docs/developers/api/reference/item-attrs/list-item-attrs)
+- [Locations](https://www.boxhero.io/docs/developers/api/reference/locations/list-locations)
+- [Partners](https://www.boxhero.io/docs/developers/api/reference/partners/list-partners)
+- [Linked team](https://www.boxhero.io/docs/developers/api/reference/teams/get-linked-team)
+- [List transactions](https://www.boxhero.io/docs/developers/api/reference/transactions/list-transactions), [create transaction](https://www.boxhero.io/docs/developers/api/reference/transactions/create-transaction), [get transaction](https://www.boxhero.io/docs/developers/api/reference/transactions/get-transaction), [update transaction](https://www.boxhero.io/docs/developers/api/reference/transactions/update-transaction), [delete transaction](https://www.boxhero.io/docs/developers/api/reference/transactions/delete-transaction)

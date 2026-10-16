@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CardlyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,9 +35,13 @@ export let listUsers = SlateTool.create(spec, {
       users: z
         .array(
           z.object({
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Complete user record returned by Cardly'),
             userId: z.string().describe('Unique user ID'),
-            firstName: z.string().describe('First name'),
-            lastName: z.string().describe('Last name'),
+            firstName: z.string().optional().describe('First name, when known to Cardly'),
+            lastName: z.string().optional().describe('Last name, when known to Cardly'),
             email: z.string().describe('Email address'),
             permissions: z.array(z.string()).optional().describe('User permissions')
           })
@@ -55,6 +59,7 @@ export let listUsers = SlateTool.create(spec, {
     });
 
     let users = result.users.map(u => ({
+      raw: u.raw,
       userId: u.id,
       firstName: u.firstName,
       lastName: u.lastName,
@@ -177,6 +182,10 @@ export let manageInvitation = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new CardlyClient({ token: ctx.auth.token });
 
+    if (!ctx.input.invitationId && !ctx.input.email) {
+      throw createApiServiceError('Provide an invitation ID or email address.');
+    }
+
     if (ctx.input.action === 'resend') {
       if (ctx.input.invitationId) {
         await client.resendInvitation(ctx.input.invitationId);
@@ -194,6 +203,55 @@ export let manageInvitation = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Invitation for **${target}** ${ctx.input.action === 'resend' ? 'resent' : 'revoked'} successfully.`
+    };
+  })
+  .build();
+
+export let listInvitations = SlateTool.create(spec, {
+  name: 'List Invitations',
+  key: 'list_invitations',
+  description:
+    'List organisation invitations and their IDs, email addresses, permissions, and status before resending or revoking an invitation.',
+  tags: { destructive: false, readOnly: true }
+})
+  .input(
+    z.object({
+      limit: z.number().optional().describe('Maximum number of results, default 25'),
+      offset: z.number().optional().describe('Number of records to skip'),
+      acceptedOnly: z.boolean().optional().describe('Only return accepted invitations'),
+      expiredOnly: z.boolean().optional().describe('Only return expired invitations'),
+      includeAccepted: z.boolean().optional().describe('Include accepted invitations')
+    })
+  )
+  .output(
+    z.object({
+      invitations: z.array(
+        z.object({
+          invitationId: z.string(),
+          email: z.string(),
+          permissions: z.array(z.string()),
+          status: z.string().optional(),
+          createdAt: z.string()
+        })
+      ),
+      totalRecords: z.number()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new CardlyClient({ token: ctx.auth.token });
+    let result = await client.listInvitations(ctx.input);
+    return {
+      output: {
+        invitations: result.invitations.map(invitation => ({
+          invitationId: invitation.id,
+          email: invitation.email,
+          permissions: invitation.permissions,
+          status: invitation.status,
+          createdAt: invitation.createdAt
+        })),
+        totalRecords: result.meta.totalRecords
+      },
+      message: `Found **${result.invitations.length}** invitation(s) (${result.meta.totalRecords} total).`
     };
   })
   .build();

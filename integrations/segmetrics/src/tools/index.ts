@@ -7,6 +7,7 @@ export * from './get-report';
 export * from './identify-visitor';
 export * from './manage-tags';
 export * from './record-ad-performance';
+export * from './run-report-query';
 export * from './upsert-contact';
 export * from './upsert-order';
 export * from './upsert-product';

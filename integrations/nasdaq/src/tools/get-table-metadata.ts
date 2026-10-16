@@ -45,7 +45,7 @@ Use this to understand a table's structure before querying it.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TablesClient({ apiKey: ctx.auth.token });
+    let client = new TablesClient({ apiKey: ctx.auth.token, authMethod: ctx.auth.authMethod });
 
     let response = await client.getTableMetadata(ctx.input.tablePath);
 
@@ -56,14 +56,14 @@ Use this to understand a table's structure before querying it.`,
         vendorCode: table.vendor_code,
         tableCode: table.datatable_code,
         name: table.name,
-        description: table.description || '',
+        description: table.description,
         columns: table.columns,
-        filters: table.filters || [],
-        primaryKey: table.primary_key || [],
+        filters: table.filters,
+        primaryKey: table.primary_key,
         premium: table.premium,
-        refreshedAt: table.status?.refreshed_at || '',
-        status: table.status?.status || '',
-        updateFrequency: table.status?.update_frequency || ''
+        refreshedAt: table.status.refreshed_at,
+        status: table.status.status,
+        updateFrequency: table.status.update_frequency
       },
       message: `Table **${ctx.input.tablePath}**: "${table.name}" with **${table.columns.length}** columns. ${table.premium ? '⚠️ Premium subscription required.' : 'Free access.'}`
     };

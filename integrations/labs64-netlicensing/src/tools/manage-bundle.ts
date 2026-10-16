@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -46,7 +46,10 @@ export let manageBundle = SlateTool.create(spec, {
     let { action, bundleNumber, ...params } = ctx.input;
 
     if (action === 'delete') {
-      if (!bundleNumber) throw new Error('bundleNumber is required for delete');
+      if (!bundleNumber)
+        throw createApiServiceError('bundleNumber is required for delete', {
+          reason: 'invalid_input'
+        });
       await client.deleteBundle(bundleNumber);
       return {
         output: { bundleNumber, deleted: true },
@@ -55,9 +58,13 @@ export let manageBundle = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!bundleNumber) throw new Error('bundleNumber is required for update');
+      if (!bundleNumber)
+        throw createApiServiceError('bundleNumber is required for update', {
+          reason: 'invalid_input'
+        });
       let result = await client.updateBundle(bundleNumber, params);
-      if (!result) throw new Error('Failed to update bundle');
+      if (!result)
+        throw createApiServiceError('Failed to update bundle', { reason: 'invalid_response' });
       return {
         output: {
           bundleNumber: result.number,
@@ -75,7 +82,8 @@ export let manageBundle = SlateTool.create(spec, {
     let createParams: Record<string, any> = { ...params };
     if (bundleNumber) createParams.number = bundleNumber;
     let result = await client.createBundle(createParams);
-    if (!result) throw new Error('Failed to create bundle');
+    if (!result)
+      throw createApiServiceError('Failed to create bundle', { reason: 'invalid_response' });
     return {
       output: {
         bundleNumber: result.number,

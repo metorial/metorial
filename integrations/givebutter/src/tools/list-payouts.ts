@@ -27,9 +27,20 @@ let payoutSchema = z.object({
       country: z.string().nullable()
     })
     .nullable()
+    .optional()
     .describe('Payout destination address'),
   completedAt: z.string().nullable().describe('When the payout completed'),
-  createdAt: z.string().nullable().describe('When the payout was created')
+  createdAt: z.string().nullable().describe('When the payout was created'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .describe('Original payout data returned by Givebutter')
+});
+
+let listPayoutsOutputSchema = z.object({
+  payouts: z.array(payoutSchema).describe('List of payouts'),
+  totalCount: z.number().describe('Total number of payouts'),
+  currentPage: z.number().describe('Current page'),
+  lastPage: z.number().describe('Last page')
 });
 
 export let listPayouts = SlateTool.create(spec, {
@@ -42,58 +53,60 @@ export let listPayouts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination')
+      page: z.number().optional().describe('Page number for pagination'),
+      perPage: z.number().optional().describe('Items per page, from 1 to 100')
     })
   )
-  .output(
-    z.object({
-      payouts: z.array(payoutSchema).describe('List of payouts'),
-      totalCount: z.number().describe('Total number of payouts'),
-      currentPage: z.number().describe('Current page'),
-      lastPage: z.number().describe('Last page')
-    })
-  )
+  .output(listPayoutsOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.listPayouts({ page: ctx.input.page });
+    let result = await client.listPayouts({
+      page: ctx.input.page,
+      per_page: ctx.input.perPage
+    });
 
     let payouts = result.data.map((p: any) => ({
       payoutId: String(p.id),
-      campaignId: p.campaign_id ?? null,
-      method: p.method ?? null,
-      status: p.status ?? null,
-      amount: p.amount ?? null,
-      fee: p.fee ?? null,
-      tip: p.tip ?? null,
-      payout: p.payout ?? null,
-      currency: p.currency ?? null,
-      memo: p.memo ?? null,
+      campaignId: p.campaign_id,
+      method: p.method,
+      status: p.status,
+      amount: p.amount,
+      fee: p.fee,
+      tip: p.tip,
+      payout: p.payout,
+      currency: p.currency,
+      memo: p.memo,
       address: p.address
         ? {
-            address1: p.address.address_1 ?? null,
-            address2: p.address.address_2 ?? null,
-            city: p.address.city ?? null,
-            state: p.address.state ?? null,
-            zipcode: p.address.zipcode ?? null,
-            country: p.address.country ?? null
+            address1: p.address.address_1,
+            address2: p.address.address_2,
+            city: p.address.city,
+            state: p.address.state,
+            zipcode: p.address.zipcode,
+            country: p.address.country
           }
-        : null,
-      completedAt: p.completed_at ?? null,
-      createdAt: p.created_at ?? null
+        : p.address,
+      completedAt: p.paid_at,
+      createdAt: p.created_at,
+      raw: client.rawData(p)
     }));
 
     return {
-      output: {
+      output: client.output(listPayoutsOutputSchema, {
         payouts,
         totalCount: result.meta.total,
         currentPage: result.meta.current_page,
         lastPage: result.meta.last_page
-      },
-      message: `Found **${result.meta.total}** payouts (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      }),
+      message: client.publicData(
+        `Found **${result.meta.total}** payouts (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      )
     };
   })
   .build();
+
+let getPayoutOutputSchema = payoutSchema;
 
 export let getPayout = SlateTool.create(spec, {
   name: 'Get Payout',
@@ -108,38 +121,39 @@ export let getPayout = SlateTool.create(spec, {
       payoutId: z.string().describe('ID of the payout to retrieve')
     })
   )
-  .output(payoutSchema)
+  .output(getPayoutOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let p = await client.getPayout(ctx.input.payoutId);
 
     return {
-      output: {
+      output: client.output(getPayoutOutputSchema, {
         payoutId: String(p.id),
-        campaignId: p.campaign_id ?? null,
-        method: p.method ?? null,
-        status: p.status ?? null,
-        amount: p.amount ?? null,
-        fee: p.fee ?? null,
-        tip: p.tip ?? null,
-        payout: p.payout ?? null,
-        currency: p.currency ?? null,
-        memo: p.memo ?? null,
+        campaignId: p.campaign_id,
+        method: p.method,
+        status: p.status,
+        amount: p.amount,
+        fee: p.fee,
+        tip: p.tip,
+        payout: p.payout,
+        currency: p.currency,
+        memo: p.memo,
         address: p.address
           ? {
-              address1: p.address.address_1 ?? null,
-              address2: p.address.address_2 ?? null,
-              city: p.address.city ?? null,
-              state: p.address.state ?? null,
-              zipcode: p.address.zipcode ?? null,
-              country: p.address.country ?? null
+              address1: p.address.address_1,
+              address2: p.address.address_2,
+              city: p.address.city,
+              state: p.address.state,
+              zipcode: p.address.zipcode,
+              country: p.address.country
             }
-          : null,
-        completedAt: p.completed_at ?? null,
-        createdAt: p.created_at ?? null
-      },
-      message: `Retrieved payout **${p.id}** — ${p.payout ?? 0} ${p.currency ?? 'USD'} (${p.status ?? 'unknown status'}).`
+          : p.address,
+        completedAt: p.paid_at,
+        createdAt: p.created_at,
+        raw: client.rawData(p)
+      }),
+      message: client.publicData(`Retrieved payout **${p.id}**.`)
     };
   })
   .build();

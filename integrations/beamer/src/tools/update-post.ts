@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type UpdatePostParams } from '../lib/client';
+import { translationParams } from '../lib/translations';
 import { spec } from '../spec';
 import { postOutputSchema } from './create-post';
 
@@ -33,9 +34,15 @@ export let updatePostTool = SlateTool.create(spec, {
       translations: z
         .array(translationUpdateSchema)
         .optional()
-        .describe('Updated translations'),
+        .describe(
+          'Updated translations; if any language code is provided, supply one for every translation'
+        ),
+      userEmail: z
+        .string()
+        .optional()
+        .describe('Email of the team member creating or updating the post'),
       category: z
-        .enum(['new', 'improvement', 'fix'])
+        .enum(['new', 'improvement', 'fix', 'comingsoon', 'announcement', 'other'])
         .optional()
         .describe('Built-in post category'),
       publish: z.boolean().optional().describe('Publish or unpublish the post'),
@@ -54,28 +61,26 @@ export let updatePostTool = SlateTool.create(spec, {
       enableReactions: z.boolean().optional().describe('Allow emoji reactions'),
       enableSocialShare: z.boolean().optional().describe('Enable social sharing'),
       autoOpen: z.boolean().optional().describe('Auto-open the post'),
-      sendPushNotification: z.boolean().optional().describe('Send push notification')
+      sendPushNotification: z.boolean().optional().describe('Send push notification'),
+      fixedBoostedAnnouncement: z
+        .boolean()
+        .optional()
+        .describe('Keep the boosted top-bar fixed')
     })
   )
   .output(postOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updateData: Record<string, unknown> = {};
+    let updateData: UpdatePostParams = {};
 
-    if (ctx.input.translations) {
-      updateData.title = ctx.input.translations.map(t => t.title);
-      updateData.content = ctx.input.translations.map(t => t.content);
-      let languages = ctx.input.translations.map(t => t.language).filter(Boolean);
-      let linkUrls = ctx.input.translations.map(t => t.linkUrl).filter(Boolean);
-      let linkTexts = ctx.input.translations.map(t => t.linkText).filter(Boolean);
-      let customCategories = ctx.input.translations.map(t => t.customCategory).filter(Boolean);
-      if (languages.length > 0) updateData.language = languages;
-      if (linkUrls.length > 0) updateData.linkUrl = linkUrls;
-      if (linkTexts.length > 0) updateData.linkText = linkTexts;
-      if (customCategories.length > 0) updateData.customCategory = customCategories;
+    if (ctx.input.translations !== undefined) {
+      Object.assign(updateData, translationParams(ctx.input.translations));
     }
 
+    if (ctx.input.userEmail !== undefined) updateData.userEmail = ctx.input.userEmail;
+    if (ctx.input.fixedBoostedAnnouncement !== undefined)
+      updateData.fixedBoostedAnnouncement = ctx.input.fixedBoostedAnnouncement;
     if (ctx.input.category !== undefined) updateData.category = ctx.input.category;
     if (ctx.input.publish !== undefined) updateData.publish = ctx.input.publish;
     if (ctx.input.archive !== undefined) updateData.archive = ctx.input.archive;

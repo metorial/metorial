@@ -31,15 +31,23 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage metadata'),
       stores: z
         .array(
           z.object({
+            raw: z
+              .unknown()
+              .optional()
+              .describe('Complete store data, including availability flags'),
             locationCode: z
               .string()
               .describe('Unique store location identifier used for creating orders'),
             name: z.string().describe('Store name'),
-            address: z.string().describe('Store address'),
-            phone: z.string().describe('Store phone number'),
+            address: z.string().optional().describe('Store address'),
+            phone: z.string().optional().describe('Store phone number'),
             alcohol: z.boolean().describe('Whether the store offers alcohol'),
             pickupOnly: z.boolean().describe('Whether the store only supports pickup')
           })
@@ -50,13 +58,14 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   .handleInvocation(async ctx => {
     let client = new ConnectClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.config.environment,
+      baseUrl: ctx.auth.baseUrl
     });
 
-    let stores = await client.findStores(ctx.input);
+    let { stores, raw } = await client.findStores(ctx.input);
 
     return {
-      output: { stores },
+      output: { stores, raw },
       message: `Found **${stores.length}** store(s) offering **${ctx.input.fulfillmentType}**.${stores.length > 0 ? `\n\n${stores.map(s => `- **${s.name}** (${s.locationCode})`).join('\n')}` : ''}`
     };
   })

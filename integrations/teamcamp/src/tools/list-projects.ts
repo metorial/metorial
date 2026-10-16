@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredString, requireRecords } from '../lib/response';
 import { spec } from '../spec';
 
 export let listProjects = SlateTool.create(spec, {
@@ -14,6 +15,12 @@ export let listProjects = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       projects: z.array(
         z.object({
           projectId: z.string().describe('Unique project identifier'),
@@ -26,13 +33,13 @@ export let listProjects = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let projects = await client.listProjects();
 
-    let mapped = (Array.isArray(projects) ? projects : []).map((p: any) => ({
-      projectId: p.projectId ?? '',
-      projectName: p.projectName ?? p.name ?? ''
+    let mapped = requireRecords(projects).map(item => ({
+      projectId: requiredString(item.projectId, 'projectId'),
+      projectName: requiredString(item.projectName, 'projectName')
     }));
 
     return {
-      output: { projects: mapped },
+      output: { projects: mapped, raw: projects },
       message: `Found **${mapped.length}** project(s) in the workspace.`
     };
   })

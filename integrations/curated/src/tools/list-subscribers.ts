@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { publicationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listSubscribers = SlateTool.create(spec, {
   name: 'List Subscribers',
   key: 'list_subscribers',
-  description: `List current email subscribers for a publication. Supports pagination to retrieve large subscriber lists.`,
+  description: `List current email subscribers for a publication. Supports pagination to retrieve large subscriber lists. Call list_publications to discover the publication ID.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      publicationId: z.string().describe('ID of the publication'),
+      publicationId: publicationIdSchema,
       page: z.number().optional().describe('Page number for pagination'),
       perPage: z
         .number()
@@ -23,6 +24,10 @@ export let listSubscribers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional metadata'),
       subscribers: z.array(
         z.object({
           subscriberId: z.number().describe('Unique identifier of the subscriber'),
@@ -45,21 +50,22 @@ export let listSubscribers = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let subscriberList = response.subscribers || response.data || [];
+    let subscriberList = response.subscribers ?? response.data!;
     let subscribers = subscriberList.map(sub => ({
       subscriberId: sub.id,
       email: sub.email,
-      createdAt: sub.created_at
+      createdAt: sub.created_at ?? undefined
     }));
 
     return {
       output: {
+        raw: response,
         subscribers,
-        page: response.page,
-        totalPages: response.total_pages,
-        totalResults: response.total_results
+        page: response.page ?? undefined,
+        totalPages: response.total_pages ?? undefined,
+        totalResults: response.total_results ?? undefined
       },
-      message: `Found **${response.total_results ?? subscribers.length}** subscriber(s)${response.page ? ` (page ${response.page}/${response.total_pages})` : ''}.`
+      message: `Retrieved **${subscribers.length}** subscriber(s)${response.total_results != null ? ` of ${response.total_results} total` : ''}${response.page != null ? ` (page ${response.page}${response.total_pages != null ? `/${response.total_pages}` : ''})` : ''}.`
     };
   })
   .build();

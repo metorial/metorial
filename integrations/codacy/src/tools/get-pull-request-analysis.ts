@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyString } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getPullRequestAnalysis = SlateTool.create(spec, {
@@ -16,6 +16,17 @@ export let getPullRequestAnalysis = SlateTool.create(spec, {
     z.object({
       repositoryName: z.string().describe('Name of the repository.'),
       pullRequestNumber: z.number().describe('Pull request number.'),
+      issuesCursor: z
+        .string()
+        .optional()
+        .describe('Pagination cursor for the optional issue list.'),
+      issuesLimit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Page size for optional issues. Defaults to 100.'),
       includeIssues: z
         .boolean()
         .optional()
@@ -25,6 +36,10 @@ export let getPullRequestAnalysis = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       pullRequestNumber: z.number().describe('Pull request number.'),
       title: z.string().optional().describe('Pull request title.'),
       status: z.string().optional().describe('PR status.'),
@@ -38,6 +53,8 @@ export let getPullRequestAnalysis = SlateTool.create(spec, {
       targetBranch: z.string().optional().describe('Target branch.'),
       headCommitSha: z.string().optional().describe('Head commit SHA.'),
       gitHref: z.string().optional().describe('Link to the PR on the Git provider.'),
+      issuesCursor: z.string().optional().describe('Cursor for the next page of issues.'),
+      issuesRaw: z.unknown().optional().describe('Original pull request issue response.'),
       issues: z
         .array(
           z.object({
@@ -63,6 +80,7 @@ export let getPullRequestAnalysis = SlateTool.create(spec, {
     let data = response.data ?? response;
 
     let result: any = {
+      raw: response,
       pullRequestNumber: data.pullRequest?.number ?? ctx.input.pullRequestNumber,
       title: data.pullRequest?.title ?? undefined,
       status: data.pullRequest?.status ?? undefined,
@@ -71,7 +89,8 @@ export let getPullRequestAnalysis = SlateTool.create(spec, {
       newIssues: data.newIssues ?? undefined,
       fixedIssues: data.fixedIssues ?? undefined,
       diffCoverage: data.coverage?.diffCoverage?.value ?? undefined,
-      coverageVariation: data.coverage?.coverageVariation?.value ?? undefined,
+      coverageVariation:
+        data.coverage?.deltaCoverage ?? data.coverage?.coverageVariation?.value ?? undefined,
       originBranch: data.pullRequest?.originBranch ?? undefined,
       targetBranch: data.pullRequest?.targetBranch ?? undefined,
       headCommitSha: data.pullRequest?.headCommitSha ?? undefined,
@@ -82,16 +101,21 @@ export let getPullRequestAnalysis = SlateTool.create(spec, {
       let issuesResponse = await client.listPullRequestIssues(
         ctx.input.repositoryName,
         ctx.input.pullRequestNumber,
-        { limit: 100 }
+        { limit: ctx.input.issuesLimit ?? 100, cursor: ctx.input.issuesCursor }
       );
-      result.issues = (issuesResponse.data ?? []).map((issue: any) => ({
-        issueId: issue.issueId ?? '',
-        filePath: issue.filePath ?? undefined,
-        lineNumber: issue.lineNumber ?? undefined,
-        message: issue.message ?? undefined,
-        level: issue.patternInfo?.level ?? undefined,
-        toolName: issue.toolInfo?.name ?? undefined
-      }));
+      result.issuesCursor = issuesResponse.pagination?.cursor;
+      result.issuesRaw = issuesResponse;
+      result.issues = (issuesResponse.data ?? []).map((item: any) => {
+        let issue = item.commitIssue ?? item;
+        return {
+          issueId: requireCodacyString(issue.issueId, 'issue.issueId'),
+          filePath: issue.filePath ?? undefined,
+          lineNumber: issue.lineNumber ?? undefined,
+          message: issue.message ?? undefined,
+          level: issue.patternInfo?.severityLevel ?? issue.patternInfo?.level ?? undefined,
+          toolName: issue.toolInfo?.name ?? undefined
+        };
+      });
     }
 
     let statusText =
@@ -103,7 +127,7 @@ export let getPullRequestAnalysis = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `PR #${result.pullRequestNumber} "${result.title ?? ''}": **${statusText}**. ${result.newIssues ?? 0} new issues, ${result.fixedIssues ?? 0} fixed.${result.diffCoverage != null ? ` Diff coverage: ${result.diffCoverage}%.` : ''}`
+      message: `PR #${result.pullRequestNumber} "${result.title ?? ''}": **${statusText}**. ${result.newIssues ?? 'unknown'} new issues, ${result.fixedIssues ?? 'unknown'} fixed.${result.diffCoverage != null ? ` Diff coverage: ${result.diffCoverage}%.` : ''}`
     };
   })
   .build();

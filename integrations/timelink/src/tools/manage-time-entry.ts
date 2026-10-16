@@ -20,8 +20,12 @@ let timeEntryOutputSchema = z.object({
 export let searchTimeEntriesTool = SlateTool.create(spec, {
   name: 'Search Time Entries',
   key: 'search_time_entries',
-  description: `Search and filter time entries in Timelink. Filter by date range, client, project, service, or external ID. Returns all matching time entries with their full details.`,
+  description: `DEPRECATED — use \`list_records\` instead. Search and filter time entries in Timelink. Filter by date range, client, project, service, or external ID. Returns all matching time entries with their full details.`,
+  instructions: [
+    'Use list_records for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -74,8 +78,12 @@ export let searchTimeEntriesTool = SlateTool.create(spec, {
 export let getTimeEntryTool = SlateTool.create(spec, {
   name: 'Get Time Entry',
   key: 'get_time_entry',
-  description: `Retrieve a specific time entry by ID. Returns full details including start/end times, associated client, project, service, and billing information.`,
+  description: `DEPRECATED — use \`get_record\` instead. Retrieve a specific time entry by ID. Returns full details including start/end times, associated client, project, service, and billing information.`,
+  instructions: [
+    'Use get_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -111,12 +119,14 @@ export let getTimeEntryTool = SlateTool.create(spec, {
 export let createTimeEntryTool = SlateTool.create(spec, {
   name: 'Create Time Entry',
   key: 'create_time_entry',
-  description: `Create a new time entry in Timelink. Requires start and end times. Optionally assign to a client, project, service, and user, and set billing and payment status.`,
+  description: `DEPRECATED — use \`manage_time_entry_record\` instead. Create a new time entry in Timelink. Requires start and end times. Optionally assign to a client, project, service, and user, and set billing and payment status.`,
   instructions: [
+    'Use manage_time_entry_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.',
     'Start and end times should be in ISO 8601 format (e.g., "2024-01-15T09:00:00Z").',
     'Use the List Clients, List Projects, and List Services tools to find valid IDs before creating a time entry.'
   ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -164,8 +174,12 @@ export let createTimeEntryTool = SlateTool.create(spec, {
 export let updateTimeEntryTool = SlateTool.create(spec, {
   name: 'Update Time Entry',
   key: 'update_time_entry',
-  description: `Update an existing time entry in Timelink. Only the provided fields will be updated; omitted fields remain unchanged. Can modify times, description, assignments, and billing status.`,
+  description: `DEPRECATED — use \`manage_time_entry_record\` instead. Update an existing time entry in Timelink. Only the provided fields will be updated; omitted fields remain unchanged. Can modify times, description, assignments, and billing status.`,
+  instructions: [
+    'Use manage_time_entry_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -212,8 +226,12 @@ export let updateTimeEntryTool = SlateTool.create(spec, {
 export let deleteTimeEntryTool = SlateTool.create(spec, {
   name: 'Delete Time Entry',
   key: 'delete_time_entry',
-  description: `Permanently delete a time entry from Timelink. This action cannot be undone.`,
+  description: `DEPRECATED — use \`manage_time_entry_record\` instead. Permanently delete a time entry from Timelink. This action cannot be undone.`,
+  instructions: [
+    'Use manage_time_entry_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     destructive: true
   }
 })

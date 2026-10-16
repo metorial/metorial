@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, readId, readList, redactProviderData } from '../lib/client';
 import { spec } from '../spec';
 
 let webhookOutputSchema = z.object({
@@ -26,19 +26,22 @@ export let listWebhooks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.listWebhooks();
-    let webhooks = Array.isArray(result) ? result : [];
-    return {
-      output: {
-        webhooks: webhooks.map((w: any) => ({
-          webhookId: w.id,
-          name: w.name,
-          url: w.url,
-          eventType: w.event_type,
-          isActive: w.is_active
-        }))
+    let webhooks = readList(result);
+    return redactProviderData(
+      {
+        output: {
+          webhooks: webhooks.map((w: any) => ({
+            webhookId: readId(w),
+            name: w.name,
+            url: w.url,
+            eventType: w.event_type,
+            isActive: w.is_active
+          }))
+        },
+        message: `Found **${webhooks.length}** webhook(s).`
       },
-      message: `Found **${webhooks.length}** webhook(s).`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -92,16 +95,19 @@ export let createWebhook = SlateTool.create(spec, {
     }
 
     let result = await client.createWebhook(data);
-    return {
-      output: {
-        webhookId: result.id,
-        name: result.name,
-        url: result.url,
-        eventType: result.event_type,
-        isActive: result.is_active
+    return redactProviderData(
+      {
+        output: {
+          webhookId: readId(result),
+          name: result.name,
+          url: result.url,
+          eventType: result.event_type,
+          isActive: result.is_active
+        },
+        message: `Webhook **${ctx.input.name}** created with ID **${result.id}**.`
       },
-      message: `Webhook **${ctx.input.name}** created with ID **${result.id}**.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -130,16 +136,19 @@ export let updateWebhook = SlateTool.create(spec, {
     if (ctx.input.isActive !== undefined) data.is_active = ctx.input.isActive;
 
     let result = await client.updateWebhook(ctx.input.webhookId, data);
-    return {
-      output: {
-        webhookId: result.id,
-        name: result.name,
-        url: result.url,
-        eventType: result.event_type,
-        isActive: result.is_active
+    return redactProviderData(
+      {
+        output: {
+          webhookId: readId(result),
+          name: result.name,
+          url: result.url,
+          eventType: result.event_type,
+          isActive: result.is_active
+        },
+        message: `Webhook **${ctx.input.webhookId}** updated.`
       },
-      message: `Webhook **${ctx.input.webhookId}** updated.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -162,9 +171,12 @@ export let deleteWebhook = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.deleteWebhook(ctx.input.webhookId);
-    return {
-      output: { success: true },
-      message: `Webhook **${ctx.input.webhookId}** deleted.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Webhook **${ctx.input.webhookId}** deleted.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

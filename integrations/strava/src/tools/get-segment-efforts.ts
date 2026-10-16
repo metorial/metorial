@@ -21,6 +21,7 @@ export let getSegmentEfforts = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       efforts: z
         .array(
           z.object({
@@ -70,6 +71,7 @@ export let getSegmentEfforts = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: efforts,
         efforts: mapped,
         count: mapped.length
       },

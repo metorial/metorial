@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireArray, requireLookup } from '../lib/client';
 import { spec } from '../spec';
 
 export let getReviews = SlateTool.create(spec, {
@@ -63,7 +63,10 @@ export let getReviews = SlateTool.create(spec, {
         .describe('Sort order for reviews.'),
       searchTerm: z.string().optional().describe('Search term to filter reviews.'),
       page: z.number().optional().describe('Page number to retrieve.'),
-      maxPage: z.number().optional().describe('Maximum page for auto-pagination.')
+      maxPage: z
+        .number()
+        .optional()
+        .describe('Maximum page for auto-pagination, up to 5 for real-time requests.')
     })
   )
   .output(
@@ -86,6 +89,7 @@ export let getReviews = SlateTool.create(spec, {
     let client = new CountdownClient({ token: ctx.auth.token });
     let ebayDomain = ctx.input.ebayDomain || ctx.config.ebayDomain;
 
+    requireLookup(ctx.input);
     let result = await client.getReviews({
       ebayDomain,
       epid: ctx.input.epid,
@@ -99,19 +103,20 @@ export let getReviews = SlateTool.create(spec, {
       maxPage: ctx.input.maxPage
     });
 
-    let reviews = result.reviews || [];
-    let summary = result.rating_summary || result.reviews_summary || {};
+    let reviews = requireArray(result.reviews, 'reviews');
+    let summary = result.summary ?? result.rating_summary ?? result.reviews_summary;
     let pagination = result.pagination || {};
 
     return {
       output: {
         reviews,
         ratingSummary: summary,
-        totalReviews: pagination.total_results || summary.reviews_total,
+        totalReviews:
+          pagination.total_reviews ?? pagination.total_results ?? summary?.reviews_total,
         currentPage: pagination.current_page,
         totalPages: pagination.total_pages
       },
-      message: `Retrieved **${reviews.length}** reviews.${summary.rating ? ` Average rating: **${summary.rating}/5**` : ''}${pagination.total_results ? ` (${pagination.total_results} total)` : ''}.`
+      message: `Retrieved **${reviews.length}** reviews.${summary?.rating ? ` Average rating: **${summary?.rating}/5**` : ''}${pagination.total_results ? ` (${pagination.total_results} total)` : ''}.`
     };
   })
   .build();

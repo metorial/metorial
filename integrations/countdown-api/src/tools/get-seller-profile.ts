@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireLookup, requireRecord } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSellerProfile = SlateTool.create(spec, {
@@ -65,6 +65,7 @@ export let getSellerProfile = SlateTool.create(spec, {
     let client = new CountdownClient({ token: ctx.auth.token });
     let ebayDomain = ctx.input.ebayDomain || ctx.config.ebayDomain;
 
+    requireLookup(ctx.input);
     let result = await client.getSellerProfile({
       ebayDomain,
       sellerName: ctx.input.sellerName,
@@ -72,13 +73,13 @@ export let getSellerProfile = SlateTool.create(spec, {
       isStore: ctx.input.isStore
     });
 
-    let profile = result.seller_profile || {};
+    let profile = requireRecord(result.seller ?? result.seller_profile, 'seller profile');
 
     return {
       output: {
         sellerProfile: profile
       },
-      message: `Retrieved seller profile for **${profile.name || ctx.input.sellerName || 'unknown'}**.${profile.positive_feedback_percentage ? ` Positive feedback: **${profile.positive_feedback_percentage}%**` : ''}${profile.top_rated ? ' (Top Rated Seller)' : ''}.`
+      message: `Retrieved seller profile for **${profile.name || ctx.input.sellerName || 'unknown'}**.${profile.positive_ratings_percent ? ` Positive feedback: **${profile.positive_ratings_percent}%**` : ''}${profile.top_rated_seller ? ' (Top Rated Seller)' : ''}.`
     };
   })
   .build();

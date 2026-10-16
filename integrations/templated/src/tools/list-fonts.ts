@@ -14,6 +14,7 @@ export let listFonts = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       fonts: z.array(
         z.object({
           fontName: z.string().optional(),
@@ -31,6 +32,7 @@ export let listFonts = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: fonts,
         fonts: items.map((f: any) => ({
           fontName: f.name,
           isGoogleFont: f.isGoogleFont,

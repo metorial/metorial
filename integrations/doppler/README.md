@@ -1,6 +1,12 @@
 # Doppler
 
-Manage secrets and environment variables across projects, environments, and configurations. Store, retrieve, update, and delete secrets with support for version history, rollback, and secret references. Organize secrets into projects with environment-specific configs (development, staging, production). Issue and revoke dynamic secret leases for short-lived credentials. Configure automatic secret syncing to third-party services like AWS, GCP, and Vercel. Share secrets securely via expiring links. Manage workplace users, groups, service accounts, and role-based access controls. Set up webhooks to trigger actions when secrets change. Restrict config access via trusted IP whitelisting. Create change request workflows requiring approval before secret modifications. View activity and audit logs for compliance tracking.
+Manage projects, environments, configs, and secrets in Doppler. Read and update secrets, list names without retrieving values, maintain project-wide secret notes, export secrets as downloadable files, inspect change history and activity logs, roll back changes, and configure webhooks and trusted IPs. Use Doppler Share to create expiring links for individual values.
+
+Connect with a Doppler Personal, Service, or Service Account token. Available operations depend on its permissions: config-scoped Service Tokens cannot administer projects or workplace settings. `get_current_token` returns the actual token identity. Discover project and config identifiers through `manage_projects` and `manage_configs`.
+
+Use `export_secrets` for JSON, ENV, YAML, Docker, or .NET JSON downloads. Including dynamic secrets creates leases once for that export. The deprecated `download_secrets` retains its original key-value output for existing callers. Locking a config prevents renaming and deletion; it does not prevent secret updates.
+
+See [the API reference](https://docs.doppler.com/reference/api) and [tool details](docs/SPEC.md).
 
 ## License
 

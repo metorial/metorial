@@ -7,11 +7,12 @@
     "send proposals to clients",
     "track proposal activity",
     "manage client records",
-    "create reusable templates",
     "manage pricing line items",
     "filter proposals by status",
-    "configure webhook subscriptions",
     "manage proposal sections",
-    "retrieve account and users"
+    "retrieve account and users",
+    "discover and retrieve templates",
+    "search clients and proposals",
+    "discover proposal senders and preparers"
   ]
 }

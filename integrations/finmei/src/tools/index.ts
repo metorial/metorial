@@ -1,5 +1,9 @@
 export * from './create-invoice';
 export * from './delete-invoice';
+export * from './download-expense-file';
+export * from './download-invoice';
+export * from './get-expense';
+export * from './get-invoice';
 export * from './get-product';
 export * from './get-profile';
 export * from './list-currencies';
@@ -12,3 +16,4 @@ export * from './manage-customer';
 export * from './manage-expense';
 export * from './manage-payment';
 export * from './manage-product';
+export * from './update-invoice';

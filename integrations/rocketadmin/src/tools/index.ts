@@ -2,6 +2,8 @@ export * from './add-row';
 export * from './delete-row';
 export * from './export-csv';
 export * from './get-audit-logs';
+export * from './get-current-user';
+export * from './get-my-company';
 export * from './get-rows';
 export * from './list-connections';
 export * from './list-tables';

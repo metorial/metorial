@@ -1,4 +1,5 @@
 export * from './generate-asset';
+export * from './generation';
 export * from './get-render';
 export * from './manage-assets';
 export * from './manage-sources';

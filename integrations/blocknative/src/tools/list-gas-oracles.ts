@@ -22,6 +22,9 @@ export let listGasOracles = SlateTool.create(spec, {
   name: 'List Gas Oracles',
   key: 'list_gas_oracles',
   description: `Lists all on-chain gas estimation oracle contracts supported by Blocknative. Returns metadata including oracle contract addresses by version, RPC URLs, and block explorer links for each supported chain. Useful for interacting with on-chain gas oracles directly.`,
+  instructions: [
+    'Blocknative announced its API services would stop after June 19, 2026. This tool retains the legacy endpoint contract; current service availability is not guaranteed.'
+  ],
   tags: {
     readOnly: true
   }

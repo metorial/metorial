@@ -33,6 +33,7 @@ Use this to optimize posts for reach and engagement by inserting up to a specifi
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       post: z.string().describe('The post text with hashtags added')
     })
   )
@@ -46,6 +47,7 @@ Use this to optimize posts for reach and engagement by inserting up to a specifi
 
     return {
       output: {
+        raw: { ...result },
         post: result.post
       },
       message: `Added hashtags to post: "${result.post}"`

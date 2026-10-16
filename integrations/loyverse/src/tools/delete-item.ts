@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteItem = SlateTool.create(spec, {
   name: 'Delete Item',
   key: 'delete_item',
-  description: `Delete an item (product) from the catalog by its ID. This is a permanent operation.`,
+  description: `Delete an item (product) from the catalog by its ID.`,
   tags: { destructive: true }
 })
   .input(

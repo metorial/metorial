@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate, providerDate } from '../lib/response';
 import { spec } from '../spec';
 
 let answerSchema = z.object({
@@ -25,7 +26,7 @@ let commentSchema = z.object({
 export let getQuestion = SlateTool.create(spec, {
   name: 'Get Question',
   key: 'get_question',
-  description: `Retrieve a question by its ID along with its answers and comments. Returns the full question details including body, score, tags, and optionally linked/related questions.`,
+  description: `Retrieve a question by its ID along with its answers and comments. Returns the full question details including body, score, tags, with paginated answers and comments.`,
   tags: {
     readOnly: true
   }
@@ -33,6 +34,19 @@ export let getQuestion = SlateTool.create(spec, {
   .input(
     z.object({
       questionId: z.string().describe('The ID of the question to retrieve'),
+      answersPage: z.number().optional().describe('Page of answers to include, starting at 1'),
+      answersPageSize: z
+        .number()
+        .optional()
+        .describe('Answers per page, from 0 to 100 (default 30)'),
+      commentsPage: z
+        .number()
+        .optional()
+        .describe('Page of comments to include, starting at 1'),
+      commentsPageSize: z
+        .number()
+        .optional()
+        .describe('Comments per page, from 0 to 100 (default 30)'),
       includeAnswers: z
         .boolean()
         .optional()
@@ -63,6 +77,14 @@ export let getQuestion = SlateTool.create(spec, {
         .describe('When the question last had activity (ISO 8601)'),
       ownerDisplayName: z.string().optional().describe('Display name of the author'),
       ownerUserId: z.number().optional().describe('User ID of the author'),
+      answersHasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether the included answers have another page'),
+      commentsHasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether the included comments have another page'),
       answers: z.array(answerSchema).optional().describe('Answers to the question'),
       comments: z.array(commentSchema).optional().describe('Comments on the question')
     })
@@ -77,20 +99,24 @@ export let getQuestion = SlateTool.create(spec, {
     let questionResult = await client.getQuestionsByIds([ctx.input.questionId]);
     let q = questionResult.items[0];
     if (!q) {
-      throw new Error(`Question with ID ${ctx.input.questionId} not found.`);
+      throw createApiServiceError(`Question with ID ${ctx.input.questionId} not found.`);
     }
 
     let answers: any[] | undefined;
+    let answersHasMore: boolean | undefined;
+    let commentsHasMore: boolean | undefined;
     if (ctx.input.includeAnswers) {
       let answersResult = await client.getQuestionAnswers(ctx.input.questionId, {
-        pageSize: 30
+        page: ctx.input.answersPage,
+        pageSize: ctx.input.answersPageSize ?? 30
       });
+      answersHasMore = answersResult.hasMore;
       answers = answersResult.items.map((a: any) => ({
         answerId: a.answer_id,
         score: a.score,
-        isAccepted: a.is_accepted ?? false,
+        isAccepted: a.is_accepted,
         body: a.body,
-        creationDate: new Date(a.creation_date * 1000).toISOString(),
+        creationDate: providerDate(a.creation_date),
         ownerDisplayName: a.owner?.display_name,
         ownerUserId: a.owner?.user_id
       }));
@@ -99,13 +125,15 @@ export let getQuestion = SlateTool.create(spec, {
     let comments: any[] | undefined;
     if (ctx.input.includeComments) {
       let commentsResult = await client.getQuestionComments(ctx.input.questionId, {
-        pageSize: 30
+        page: ctx.input.commentsPage,
+        pageSize: ctx.input.commentsPageSize ?? 30
       });
+      commentsHasMore = commentsResult.hasMore;
       comments = commentsResult.items.map((c: any) => ({
         commentId: c.comment_id,
         score: c.score,
         body: c.body,
-        creationDate: new Date(c.creation_date * 1000).toISOString(),
+        creationDate: providerDate(c.creation_date),
         ownerDisplayName: c.owner?.display_name,
         ownerUserId: c.owner?.user_id
       }));
@@ -120,15 +148,15 @@ export let getQuestion = SlateTool.create(spec, {
       answerCount: q.answer_count,
       viewCount: q.view_count,
       isAnswered: q.is_answered,
-      tags: q.tags ?? [],
-      creationDate: new Date(q.creation_date * 1000).toISOString(),
-      lastActivityDate: q.last_activity_date
-        ? new Date(q.last_activity_date * 1000).toISOString()
-        : undefined,
+      tags: q.tags,
+      creationDate: providerDate(q.creation_date),
+      lastActivityDate: optionalProviderDate(q.last_activity_date),
       ownerDisplayName: q.owner?.display_name,
       ownerUserId: q.owner?.user_id,
       answers,
-      comments
+      comments,
+      answersHasMore,
+      commentsHasMore
     };
 
     return {

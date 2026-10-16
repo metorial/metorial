@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let scholarResultSchema = z.object({
@@ -51,6 +51,7 @@ export let scholarSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       totalResults: z.number().optional().describe('Total number of results'),
       scholarResults: z.array(scholarResultSchema).describe('Academic paper results'),
@@ -58,6 +59,37 @@ export let scholarSearch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.query?.trim() &&
+      !ctx.input.citesArticleId?.trim() &&
+      !ctx.input.clusterArticleId?.trim()
+    ) {
+      throw createApiServiceError('Provide a query, citesArticleId, or clusterArticleId.', {
+        reason: 'invalid_scholar_query'
+      });
+    }
+    if (
+      ctx.input.sortByDate &&
+      (ctx.input.yearFrom !== undefined || ctx.input.yearTo !== undefined)
+    ) {
+      throw createApiServiceError('sortByDate cannot be combined with yearFrom or yearTo.', {
+        reason: 'invalid_scholar_filter'
+      });
+    }
+    if (ctx.input.num !== undefined && ctx.input.num > 20) {
+      throw createApiServiceError('Google Scholar supports at most 20 results per page.', {
+        reason: 'invalid_scholar_count'
+      });
+    }
+    if (
+      ctx.input.yearFrom !== undefined &&
+      ctx.input.yearTo !== undefined &&
+      ctx.input.yearFrom > ctx.input.yearTo
+    ) {
+      throw createApiServiceError('yearFrom cannot be later than yearTo.', {
+        reason: 'invalid_scholar_year_range'
+      });
+    }
     let client = new SearchApiClient({ token: ctx.auth.token });
 
     let data = await client.search({
@@ -75,27 +107,31 @@ export let scholarSearch = SlateTool.create(spec, {
       hl: ctx.input.language
     });
 
-    let scholarResults = (data.organic_results || []).map((r: any) => ({
-      position: r.position,
-      title: r.title,
-      link: r.link,
-      snippet: r.snippet,
-      publicationInfo: r.publication_info?.summary,
-      citedByCount: r.inline_links?.cited_by?.total,
-      citedByLink: r.inline_links?.cited_by?.link,
-      relatedArticlesLink: r.inline_links?.related_articles?.link,
-      resourceLink: r.resources?.[0]?.link,
-      resourceType: r.resources?.[0]?.file_format
-    }));
+    let scholarResults = resultArray(data.organic_results, 'organic_results').map(
+      (r: any) => ({
+        position: r.position,
+        title: r.title,
+        link: r.link,
+        snippet: r.snippet,
+        publicationInfo: r.publication ?? r.publication_info?.summary,
+        citedByCount: r.inline_links?.cited_by?.total,
+        citedByLink: r.inline_links?.cited_by?.link,
+        relatedArticlesLink:
+          r.inline_links?.related_articles_link ?? r.inline_links?.related_articles?.link,
+        resourceLink: r.resource?.link ?? r.resources?.[0]?.link,
+        resourceType: r.resource?.format ?? r.resources?.[0]?.file_format
+      })
+    );
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         totalResults: data.search_information?.total_results,
         scholarResults,
         currentPage: data.pagination?.current
       },
-      message: `Found ${scholarResults.length} scholarly result${scholarResults.length !== 1 ? 's' : ''} for "${ctx.input.query || 'citation lookup'}".`
+      message: `Found on this page: ${scholarResults.length} scholarly result${scholarResults.length !== 1 ? 's' : ''} for "${ctx.input.query || 'citation lookup'}".`
     };
   })
   .build();

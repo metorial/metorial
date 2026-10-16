@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeeminderClient } from '../lib/client';
-import { chargeSchema } from '../lib/schemas';
+import { chargeSchema, mapCharge } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createCharge = SlateTool.create(spec, {
@@ -30,7 +30,8 @@ export let createCharge = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
     let raw = await client.createCharge({
@@ -40,16 +41,12 @@ export let createCharge = SlateTool.create(spec, {
       dryrun: ctx.input.dryrun
     });
 
+    let charge = mapCharge(raw);
     return {
-      output: {
-        chargeId: raw.id,
-        amount: raw.amount,
-        note: raw.note,
-        userId: raw.user_id || ctx.auth.username
-      },
+      output: charge,
       message: ctx.input.dryrun
-        ? `Dry run: would charge **$${ctx.input.amount}** to user **${ctx.auth.username}**.`
-        : `Charged **$${ctx.input.amount}** to user **${ctx.auth.username}**.`
+        ? `Dry run: would charge **$${ctx.input.amount}** to user **${charge.userId}**.`
+        : `Charged **$${ctx.input.amount}** to user **${charge.userId}**.`
     };
   })
   .build();

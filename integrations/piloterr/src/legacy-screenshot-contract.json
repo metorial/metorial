@@ -1,0 +1,27 @@
+{
+  "key": "screenshot_webpage",
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Full URL of the webpage to screenshot"
+      }
+    },
+    "required": ["url"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "screenshotData": {
+        "description": "Screenshot image data or URL returned by the API"
+      }
+    },
+    "required": ["screenshotData"],
+    "additionalProperties": false
+  },
+  "handlerSuffix": "(async ctx => {\n    let client = new PiloterrClient(ctx.auth.token);\n    let result = await client.screenshotWebsite({ url: ctx.input.url });\n\n    return {\n      output: { screenshotData: result },\n      message: `Captured screenshot of **${ctx.input.url}**.`\n    };\n  })\n  .build();\n"
+}

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateProject = SlateTool.create(spec, {
@@ -36,10 +36,7 @@ export let updateProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createClient(ctx);
 
     let projectData: Record<string, any> = {};
     if (ctx.input.name) projectData.name = ctx.input.name;
@@ -55,7 +52,7 @@ export let updateProject = SlateTool.create(spec, {
     let project = await client.updateProject(ctx.input.projectId, projectData);
 
     return {
-      output: { project: project || {} },
+      output: { project },
       message: `Updated project **${ctx.input.projectId}**`
     };
   })

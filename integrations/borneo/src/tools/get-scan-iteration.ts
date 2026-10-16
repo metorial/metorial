@@ -14,6 +14,10 @@ export let getScanIteration = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organisationId: z
+        .number()
+        .optional()
+        .describe('Organisation ID from get_current_user. Omit to use the token default.'),
       scanIterationId: z.string().describe('ID of the scan iteration to retrieve')
     })
   )
@@ -31,22 +35,23 @@ export let getScanIteration = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      organisationId: ctx.input.organisationId
     });
 
     let result = await client.getScanIteration(ctx.input.scanIterationId);
-    let data = result?.data ?? result;
+    let data = result;
 
     return {
       output: {
-        iterationId: data?.id ?? ctx.input.scanIterationId,
+        iterationId: data.scanIterationId,
         scanId: data?.scanId,
         status: data?.status,
         startedAt: data?.startedAt,
         completedAt: data?.completedAt,
         ...data
       },
-      message: `Retrieved scan iteration **${ctx.input.scanIterationId}**. Status: **${data?.status ?? 'unknown'}**.`
+      message: `Retrieved scan iteration **${ctx.input.scanIterationId}**.`
     };
   })
   .build();

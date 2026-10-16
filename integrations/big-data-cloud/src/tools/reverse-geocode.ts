@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { timeZoneSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let reverseGeocodeTool = SlateTool.create(spec, {
@@ -39,6 +40,7 @@ export let reverseGeocodeTool = SlateTool.create(spec, {
         postcode: z.string().optional().describe('Postal code'),
         plusCode: z.string().optional().describe('Open Location Code (Plus Code)'),
         localityLanguageRequested: z.string().optional(),
+        timeZone: timeZoneSchema.optional().describe('Provider time zone information'),
         timezone: z
           .object({
             name: z.string().optional().describe('IANA timezone name'),

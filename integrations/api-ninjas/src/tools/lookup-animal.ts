@@ -18,6 +18,7 @@ export let lookupAnimal = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       animals: z
         .array(
           z.object({
@@ -54,6 +55,7 @@ export let lookupAnimal = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         animals: animals.map((a: any) => ({
           name: a.name,
           taxonomy: a.taxonomy

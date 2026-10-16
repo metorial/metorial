@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,6 +13,11 @@ export let getConferencesVenues = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      year: z.number().optional().describe('Season year for conference membership'),
+      classification: z
+        .enum(['fbs', 'fcs', 'ii', 'ii/iii', 'iii'])
+        .optional()
+        .describe('Conference division classification'),
       includeConferences: z
         .boolean()
         .optional()
@@ -32,11 +37,19 @@ export let getConferencesVenues = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.includeConferences && !ctx.input.includeVenues) {
+      throw createApiServiceError('Select at least one result to retrieve.', {
+        reason: 'no_result_selected'
+      });
+    }
     let client = new Client({ token: ctx.auth.token });
     let results: any = {};
 
     if (ctx.input.includeConferences) {
-      results.conferences = await client.getConferences();
+      results.conferences = await client.getConferences({
+        year: ctx.input.year,
+        classification: ctx.input.classification
+      });
     }
 
     if (ctx.input.includeVenues) {

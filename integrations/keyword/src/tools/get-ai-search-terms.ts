@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getCollection } from '../lib/response';
 import { spec } from '../spec';
 
 export let getAiSearchTerms = SlateTool.create(spec, {
@@ -25,7 +26,7 @@ export let getAiSearchTerms = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let data = await client.listAiSearchTerms(ctx.input.domainId);
-    let searchTerms = Array.isArray(data) ? data : (data?.search_terms ?? data?.data ?? []);
+    let searchTerms = getCollection(data, 'search_terms');
 
     return {
       output: { searchTerms },

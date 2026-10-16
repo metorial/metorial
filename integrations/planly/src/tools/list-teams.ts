@@ -1,15 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  nullableString,
+  optionalNumber,
+  rawSchema,
+  requiredString,
+  responseArray,
+  responseData,
+  responseRecord,
+  scalarString,
+  teamIdSchema
+} from '../lib/responses';
 import { spec } from '../spec';
 
 let teamSchema = z.object({
-  teamId: z.string().describe('Unique team identifier'),
+  teamId: teamIdSchema,
   name: z.string().describe('Team name'),
   picture: z.string().nullable().optional().describe('Team avatar URL'),
   role: z.string().optional().describe('Your role in this team'),
   userCount: z.number().optional().describe('Number of team members'),
-  channelCount: z.number().optional().describe('Number of connected channels')
+  channelCount: z.number().optional().describe('Number of connected channels'),
+  raw: rawSchema
 });
 
 export let listTeams = SlateTool.create(spec, {
@@ -30,17 +42,17 @@ export let listTeams = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listTeams();
-    let teams = (result.data || result || []).map((t: any) => ({
-      teamId: t.id,
-      name: t.name,
-      picture: t.picture || null,
-      role: t.role,
-      userCount: t.users,
-      channelCount: t.channels
-    }));
-
-    return {
-      output: { teams },
-      message: `Found ${teams.length} team(s).`
-    };
+    let teams = responseArray(responseData(result), 'teams').map(value => {
+      let team = responseRecord(value, 'team');
+      return {
+        teamId: requiredString(team.id, 'team ID'),
+        name: requiredString(team.name, 'team name'),
+        picture: nullableString(team.picture),
+        role: scalarString(team.role),
+        userCount: optionalNumber(team.users),
+        channelCount: optionalNumber(team.channels),
+        raw: team
+      };
+    });
+    return { output: { teams }, message: `Found ${teams.length} team(s).` };
   });

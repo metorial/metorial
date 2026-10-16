@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'npm',
   name: 'npm',
   description:
-    'Node Package Manager registry — search, retrieve metadata, download counts, publish packages, and manage tokens.',
+    'Search npm packages, inspect metadata, downloads and security advisories, and manage distribution tags, deprecations, tokens and trusted publishers.',
   metadata: {},
   config,
   auth

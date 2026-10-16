@@ -1,8 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAxios, normalizeOAuthTokenResponse, requestAxiosData, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { GistClient } from './lib/client';
+import { gistApiError, requiredId, requireValue } from './lib/response';
 
 let api = createAxios({
-  baseURL: 'https://api.getgist.com'
+  baseURL: 'https://api.getgist.com',
+  timeout: 30000,
+  maxRedirects: 0
 });
 
 export let auth = SlateAuth.create()
@@ -65,32 +69,31 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let response = await api.post('/oauth/token', {
-        grant_type: 'authorization_code',
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        redirect_uri: ctx.redirectUri,
-        code: ctx.code
-      });
-
-      return {
-        output: {
-          token: response.data.access_token
-        }
-      };
+      let data = await requestAxiosData<any>(
+        'Exchange OAuth authorization code',
+        () =>
+          api.post(
+            '/oauth/token',
+            new URLSearchParams({
+              grant_type: 'authorization_code',
+              client_id: ctx.clientId,
+              client_secret: ctx.clientSecret,
+              redirect_uri: ctx.redirectUri,
+              code: ctx.code
+            }).toString(),
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+          ),
+        gistApiError
+      );
+      let token = normalizeOAuthTokenResponse(data, { providerLabel: 'Gist' });
+      return { output: { token: requireValue(token.token, 'OAuth access token') } };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
-      let response = await api.get('/token', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data;
+      let data = await new GistClient({ token: ctx.output.token }).getWorkspaceMeta();
       return {
         profile: {
-          id: data.workspace_id ? String(data.workspace_id) : undefined,
+          id: requiredId(data.workspace_id),
           name: data.workspace_name || undefined
         }
       };
@@ -108,22 +111,16 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: requireValue(ctx.input.token, 'API key')
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await api.get('/token', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data;
+      let data = await new GistClient({ token: ctx.output.token }).getWorkspaceMeta();
       return {
         profile: {
-          id: data.workspace_id ? String(data.workspace_id) : undefined,
+          id: requiredId(data.workspace_id),
           name: data.workspace_name || undefined
         }
       };

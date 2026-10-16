@@ -44,11 +44,11 @@ export let updateContact = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = {};
-    if (ctx.input.firstName) body.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) body.last_name = ctx.input.lastName;
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.companyId) body.company_id = ctx.input.companyId;
-    if (ctx.input.address) {
+    if (ctx.input.firstName !== undefined) body.first_name = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) body.last_name = ctx.input.lastName;
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.companyId !== undefined) body.company_id = ctx.input.companyId;
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -56,9 +56,9 @@ export let updateContact = SlateTool.create(spec, {
         postal_code: ctx.input.address.postalCode
       };
     }
-    if (ctx.input.countryCode) body.country_code = ctx.input.countryCode;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.countryCode !== undefined) body.country_code = ctx.input.countryCode;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
     if (ctx.input.isHot !== undefined) body.is_hot = ctx.input.isHot;
 
     await client.updateContact(ctx.input.contactId, body);

@@ -59,10 +59,7 @@ export let getSlaInformationTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let result = await client.getSlaInformation(ctx.input.issueIdOrKey);
 

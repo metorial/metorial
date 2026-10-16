@@ -1,57 +1,32 @@
-Let me get the actual webhook payload details from the Ko-fi help page.# Slates Specification for Ko-fi
+# Ko-fi integration specification
 
-## Overview
+## Supported capability
 
-Ko-fi is a platform that enables creators to receive donations (tips), sell digital and physical products through a shop, offer membership subscriptions, and accept commissions from supporters. It provides a simple way for fans to financially support creators without requiring a subscription model. Ko-fi does not offer a traditional REST API; its integration capability is limited to outbound webhooks for payment events.
+Ko-fi's documented API sends outbound payment notifications. The integration has no callable actions and no account identity lookup. One manual webhook group, `payments`, exposes `donation_received` for the published `Donation` type and `payment_received` as an all-payments companion. Payment types remain provider-supplied strings; the public documentation does not define a complete machine-readable event enum.
 
-## Authentication
+## Authentication and setup
 
-Ko-fi uses a **Verification Token** to authenticate webhook payloads. There is no OAuth2 flow or API key-based authentication for a request-based API.
+The existing `verification_token` authentication method and its `token` input/output are preserved. A nonblank token is required at runtime, with its exact bytes retained. Authentication stores this credential and does not claim remote validation. The connection configuration remains empty.
 
-- In your Ko-fi account, locate the verification token in the advanced settings on the webhooks management page at `ko-fi.com/manage/webhooks`.
-- The verification token is a UUID (e.g., `3401eedb-7a5e-4ceb-aa43-40038281222f`) included in every webhook payload as the `verification_token` field.
-- It validates incoming requests to ensure they originate from Ko-fi using a verification token for enhanced security.
-- Your webhook listener should compare the `verification_token` in the incoming payload against the token from your Ko-fi account settings to verify authenticity.
+A person must configure the URL at [Ko-fi webhook settings](https://ko-fi.com/manage/webhooks). Manual setup stores the same verification token in the registration, independent of connection auth. Finish setup before saving or testing the URL in Ko-fi. Incoming payment tokens must match the saved registration; routing uses a SHA-256 digest of the verified token and the connection token. Tokens are compared using fixed-size digests and constant-time comparison. No token appears in emitted payment data, routing matchers, or rejection messages.
 
-## Features
+## Delivery contract
 
-Ko-fi does not provide a traditional REST API with callable endpoints. The API is currently limited to when a payment is made. For instance, a webhook can notify you when you receive a membership payment but cannot inform you if the membership has ended.
+The receiver accepts HTTP POST with `application/x-www-form-urlencoded` and exactly one `data` field containing JSON. This follows the `data = { ... }` wrapper shown in the official payment example. It rejects malformed UTF-8, percent encoding, JSON, missing credentials, mismatched registration tokens, and invalid payment fields. Valid deliveries return HTTP 200.
 
-### Payment Notifications via Webhook
+The payment schema preserves common typed fields from the official example: `message_id`, `timestamp`, `type`, `is_public`, `from_name`, `message`, `amount`, `url`, `email`, `currency`, `is_subscription_payment`, `is_first_subscription_payment`, `kofi_transaction_id`, `shop_items`, `tier_name`, and `shipping`. Unknown payment fields and nested metadata are retained; `verification_token` is removed. Amounts remain decimal strings and timestamps remain original strings. Optional metadata is not fabricated.
 
-The sole integration feature is receiving outbound webhook notifications when payments occur on your Ko-fi page. When a payment is made, Ko-fi will send an HTTP POST request containing all the payment data.
+Ko-fi documents retries using the same `message_id`; this is the event idempotency key and mapped event ID. Ko-fi's public documentation supplies no HMAC protocol or authenticated replay-time tolerance. No invented timestamp expiry is imposed, so legitimate delayed retries remain acceptable. Token possession authenticates a delivery; it does not cryptographically sign the remaining body. The provider documents no URL challenge or ping protocol.
 
-The webhook payload includes details such as:
+The integration does not infer cancellation, refund, or membership-ended events from payments.
 
-- Supporter name, email, message, and whether the donation is public or private
-- Payment amount and currency
-- Transaction type (`Donation`, `Subscription`, `Shop Order`, `Commission`)
-- Subscription-specific fields (whether it's a first or recurring payment, tier name)
-- Shop order items (with direct link codes for digital products)
-- Shipping information (for physical products)
-- A unique transaction ID and message ID
+## Official evidence and verification limits
 
-**Limitations:**
+Verified on 2026-10-15:
 
-- While they do not have a full blown API, they do have a webhook that we can redirect to our own endpoints. There is no way to query Ko-fi data, manage pages, create products, or perform any read/write operations via API.
-- Your listener should return a status code of 200. If Ko-fi doesn't receive this status code, it will retry a reasonable number of times with the same message_id.
-- The webhook is one-way and outbound only; you cannot subscribe to specific event types — all payment events are sent to a single configured URL.
+- [API and webhook help](https://help.ko-fi.com/hc/en-us/articles/360004162298-Does-Ko-fi-have-an-API-or-webhook): outbound payment POSTs, HTTP 200 acknowledgement, retry `message_id`, test payments, and no membership-ended notification.
+- [Published single-tip payload](https://help.ko-fi.com/hc/article_attachments/16595546601629): `data` wrapper, verification token, `Donation` discriminator, string amount, IDs, supporter fields, and nullable metadata. The example timestamp is 2024-01-25; acceptance proves the published shape, not a live delivery.
+- [Published URL setup image](https://help.ko-fi.com/hc/article_attachments/16595465747741): HTTPS receive URL configured manually in the UI.
+- [Webhook management](https://ko-fi.com/manage/webhooks): redirected to login during this audit. Its signed-in documentation and full event-type examples were not inspected.
 
-## Events
-
-Ko-fi supports outbound webhooks that fire on payment events. You head over to your webhooks page and specify the URL where Ko-fi should send the webhook.
-
-### Payment Events
-
-Webhooks are automated messages sent when something happens on Ko-fi. On Ko-fi, webhooks are sent when a payment happens. The `type` field in the payload distinguishes between event types:
-
-- **Donation**: Triggers for every new donation. A one-time tip from a supporter.
-- **Subscription**: Triggers for all Ko-fi subscription events (first-time and recurring). Includes both initial and recurring membership payments. The `is_first_subscription_payment` field differentiates between the two. May include `tier_name` if membership tiers are configured.
-- **Commission**: Triggers for all Ko-fi commission events. Fired when a commission payment is made.
-- **Shop Order**: Triggers for all Ko-fi shop order events. Includes `shop_items` with product details and may include shipping information for physical goods.
-
-**Limitations:**
-
-- The API is currently limited to when a payment is made. A webhook can notify you when you receive a membership payment but cannot inform you if the membership has ended.
-- There is no support for events like membership cancellations, refunds, or page updates.
-- Only a single webhook URL can be configured per Ko-fi account.
+Root trigger contracts validate advertisement, manual setup, token and identity boundaries, malformed bodies, redaction, retry-stable IDs, routing, selection, and mapping against the published example. No live callback, provider registration, payment, authenticated browser, or live E2E was exercised.

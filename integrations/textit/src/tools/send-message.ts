@@ -21,6 +21,7 @@ export let sendMessage = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       messageUuid: z.string().describe('UUID of the sent message'),
       contactUuid: z.string().describe('UUID of the recipient contact'),
       text: z.string().describe('Text of the sent message'),
@@ -35,18 +36,19 @@ export let sendMessage = SlateTool.create(spec, {
       contact: ctx.input.contactUuid,
       text: ctx.input.text,
       attachments: ctx.input.attachments,
-      quick_replies: ctx.input.quickReplies
+      quick_replies: ctx.input.quickReplies?.map(text => ({ text }))
     });
 
     return {
       output: {
+        raw: message,
         messageUuid: message.uuid,
         contactUuid: message.contact.uuid,
         text: message.text,
         status: message.status,
         createdOn: message.created_on
       },
-      message: `Message sent to **${message.contact.name || message.contact.uuid}** (status: ${message.status}).`
+      message: `Message created for **${message.contact.name || message.contact.uuid}** (status: ${message.status}).`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-Now let me get more details from the API documentation page:# Slates Specification for Remote Retrieval
+# Remote Retrieval API Specification
 
 ## Overview
 
@@ -33,6 +33,12 @@ Create equipment return orders by specifying the type of equipment, order type, 
 
 Create multiple orders at once by uploading a CSV file. Each row represents a single order with fields for equipment type, order type, employee details, and company information. A CSV template is available for download from the documentation.
 
+The `create_orders_from_csv` tool accepts the complete CSV text and uploads it as the multipart `order_file` field. The `create_return_order` tool accepts structured order details instead.
+
+### Current User
+
+Use `get_current_user` to validate the connected API key and retrieve its associated email address.
+
 ### Order Retrieval and Tracking
 
 Retrieve a list of all orders or get details for a specific order. Orders include:
@@ -48,6 +54,11 @@ Retrieve the registered company profile information, including company name, ema
 ### Device Pricing
 
 Retrieve real-time pricing for all supported equipment types. Monitor sizes are categorized as standard (17–23 inches) and Monitor_27 (24–27 inches).
+
+## API References
+
+- [Official API documentation](https://www.remoteretrieval.com/api-integration)
+- [Official Postman collection](https://www.remoteretrieval.com/api-collection/RR-Enterprise-API-Collection-New.postman_collection.json)
 
 ## Events
 

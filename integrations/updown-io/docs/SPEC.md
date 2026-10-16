@@ -1,4 +1,4 @@
-# Slates Specification for Updown.io
+# Updown.io Integration Specification
 
 ## Overview
 
@@ -90,3 +90,18 @@ Fired when an SSL certificate that was approaching expiration has been renewed. 
 ### Performance Drop
 
 Fired when the APDEX score drops more than 30% below the lowest value of the previous 5 hours. Includes the percentage drop and recent hourly APDEX metrics.
+
+## Response and API Notes
+
+- `get_check` optionally includes last-hour `metrics` and recent `results`.
+- `get_downtimes` fetches one page of 100 events; use `nextPage` to try the next page when a page is full. `results` includes requests before downtime and recovery. A full page does not prove another page exists.
+- `get_metrics` omits the `group` parameter by default, returning aggregate statistics in `summary`. Explicit `time` or `host` grouping returns entries in `metrics` under the actual provider keys. The API does not return uptime for grouped metrics; no uptime is inferred. Original responses remain available in `raw`.
+- Some configured recipient channels have no `value`, such as Slack, Telegram, and Zapier. These entries retain their ID, type, name, and complete original data. Creating an API-supported recipient still returns its required value.
+- Status-page responses include their actual `accessKey`, including null, and original response data.
+- `list_node_ips` uses the documented JSON IP-list endpoints for all, IPv4, or IPv6 addresses.
+- `create_pulse_check` creates a heartbeat check without a monitored URL. Save the private endpoint returned on creation: GET endpoints redact that URL. This tool does not send a heartbeat. The existing `create_check` retains its required URL input.
+- Read-only API keys support GET requests only and hide basic-auth URL credentials. Avoid updating a check URL with a redacted value.
+- This single monitoring API has no documented current-user/account identity endpoint.
+
+API reference: https://updown.io/api
+Pulse monitoring: https://updown.io/doc/how-pulse-cron-monitoring-works

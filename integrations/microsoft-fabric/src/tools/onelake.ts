@@ -1,4 +1,4 @@
-import { createBase64Attachment, SlateTool } from '@slates/provider';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { fabricValidationError } from '../lib/errors';
 import {
@@ -7,7 +7,7 @@ import {
   validateOptionalOneLakePath
 } from '../lib/paths';
 import { spec } from '../spec';
-import { createOneLakeClient } from './common';
+import { createOneLakeClient, resolveAuthToken } from './common';
 
 let workspaceReferenceSchema = {
   workspaceId: z
@@ -246,7 +246,7 @@ export let onelakeDownloadFile = SlateTool.create(spec, {
   name: 'OneLake Download File',
   key: 'onelake_download_file',
   description:
-    'Official upstream MCP name: onelake_download_file. Download a OneLake file and return the file content as an attachment.',
+    'Official upstream MCP name: onelake_download_file. Download a OneLake file and prepare a downloadable file.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -262,7 +262,7 @@ export let onelakeDownloadFile = SlateTool.create(spec, {
       filePath: z.string().describe('Downloaded file path.'),
       contentType: z.string().describe('MIME type returned by OneLake.'),
       size: z.number().describe('Downloaded file size in bytes.'),
-      attachmentCount: z.number().describe('Number of attachments returned.'),
+      attachmentCount: z.number().describe('Number of downloadable files prepared.'),
       etag: z.string().optional().describe('OneLake file ETag.'),
       lastModified: z.string().optional().describe('OneLake last modified time.')
     })
@@ -276,6 +276,16 @@ export let onelakeDownloadFile = SlateTool.create(spec, {
       filePath: ctx.input.filePath
     });
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.downloadUrl,
+      mimeType: result.contentType,
+      headers: {
+        Authorization: `Bearer ${resolveAuthToken(ctx, 'storageToken')}`,
+        'x-ms-version': '2023-11-03'
+      }
+    });
+
     return {
       output: {
         workspace,
@@ -287,8 +297,7 @@ export let onelakeDownloadFile = SlateTool.create(spec, {
         etag: result.etag,
         lastModified: result.lastModified
       },
-      attachments: [createBase64Attachment(result.base64, result.contentType)],
-      message: `Downloaded **${ctx.input.filePath}** from OneLake as an attachment.`
+      message: `Retrieved **${ctx.input.filePath}** from OneLake and prepared it for download.`
     };
   })
   .build();
@@ -498,6 +507,13 @@ export let onelakeGetTableConfig = SlateTool.create(spec, {
   })
   .build();
 
+let catalogPrefixSchema = z
+  .string()
+  .optional()
+  .describe(
+    'Prefix returned in overrides.prefix by onelake_get_table_config. Omit to use the workspace/item path for existing connections.'
+  );
+
 export let onelakeListTableNamespaces = SlateTool.create(spec, {
   name: 'OneLake List Table Namespaces',
   key: 'onelake_list_table_namespaces',
@@ -505,7 +521,7 @@ export let onelakeListTableNamespaces = SlateTool.create(spec, {
     'Official upstream MCP name: onelake_list_table_namespaces. List Iceberg table namespaces for a Fabric item.',
   tags: { readOnly: true, destructive: false }
 })
-  .input(z.object(workspaceAndItemSchema))
+  .input(z.object({ ...workspaceAndItemSchema, catalogPrefix: catalogPrefixSchema }))
   .output(
     z.object({
       workspace: z.string().describe('Resolved workspace reference.'),
@@ -516,7 +532,11 @@ export let onelakeListTableNamespaces = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let workspace = resolveWorkspaceReference(ctx.input);
     let item = resolveItemReference(ctx.input);
-    let namespaces = await createOneLakeClient(ctx).listTableNamespaces({ workspace, item });
+    let namespaces = await createOneLakeClient(ctx).listTableNamespaces({
+      workspace,
+      item,
+      catalogPrefix: ctx.input.catalogPrefix
+    });
 
     return {
       output: { workspace, item, namespaces },
@@ -535,6 +555,7 @@ export let onelakeGetTableNamespace = SlateTool.create(spec, {
   .input(
     z.object({
       ...workspaceAndItemSchema,
+      catalogPrefix: catalogPrefixSchema,
       namespace: z.string().optional().describe('Namespace name. Alias: schema.'),
       schema: z.string().optional().describe('Schema name alias for namespace.')
     })
@@ -554,7 +575,8 @@ export let onelakeGetTableNamespace = SlateTool.create(spec, {
     let metadata = await createOneLakeClient(ctx).getTableNamespace({
       workspace,
       item,
-      namespace
+      namespace,
+      catalogPrefix: ctx.input.catalogPrefix
     });
 
     return {
@@ -574,6 +596,7 @@ export let onelakeListTables = SlateTool.create(spec, {
   .input(
     z.object({
       ...workspaceAndItemSchema,
+      catalogPrefix: catalogPrefixSchema,
       namespace: z.string().optional().describe('Namespace name. Alias: schema.'),
       schema: z.string().optional().describe('Schema name alias for namespace.')
     })
@@ -590,7 +613,12 @@ export let onelakeListTables = SlateTool.create(spec, {
     let workspace = resolveWorkspaceReference(ctx.input);
     let item = resolveItemReference(ctx.input);
     let namespace = resolveNamespace(ctx.input);
-    let tables = await createOneLakeClient(ctx).listTables({ workspace, item, namespace });
+    let tables = await createOneLakeClient(ctx).listTables({
+      workspace,
+      item,
+      namespace,
+      catalogPrefix: ctx.input.catalogPrefix
+    });
 
     return {
       output: { workspace, item, namespace, tables },
@@ -609,6 +637,7 @@ export let onelakeGetTable = SlateTool.create(spec, {
   .input(
     z.object({
       ...workspaceAndItemSchema,
+      catalogPrefix: catalogPrefixSchema,
       namespace: z.string().optional().describe('Namespace name. Alias: schema.'),
       schema: z.string().optional().describe('Schema name alias for namespace.'),
       table: z.string().describe('Table name.')
@@ -631,7 +660,8 @@ export let onelakeGetTable = SlateTool.create(spec, {
       workspace,
       item,
       namespace,
-      table: ctx.input.table
+      table: ctx.input.table,
+      catalogPrefix: ctx.input.catalogPrefix
     });
 
     return {

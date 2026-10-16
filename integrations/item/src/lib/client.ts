@@ -56,6 +56,8 @@ export type ItemFieldDefinition = {
   number_max?: number | null;
   number_decimal_places?: number | null;
   currency_decimal_places?: number | null;
+  percentage_decimal_places?: number | null;
+  value_scale?: 'percentage_units' | null;
   default_value?: string | null;
   visibility_type?: string;
 };
@@ -234,18 +236,18 @@ const parseObjectTypeSchema = (
   let objectType = requireRecord(value, operation, label);
   let fields = objectType.fields;
 
-  if (fields !== undefined && fields !== null && !Array.isArray(fields)) {
+  if (fields !== undefined && !Array.isArray(fields)) {
     throw malformedResponse(operation, `${label}.fields must be an array.`);
   }
 
-  let fieldList: unknown[] = Array.isArray(fields) ? fields : [];
+  let fieldList = fields as unknown[] | undefined;
 
   return {
     ...objectType,
     id: requirePositiveInteger(objectType.id, operation, `${label}.id`),
     slug: requireString(objectType.slug, operation, `${label}.slug`),
     display_name: requireString(objectType.display_name, operation, `${label}.display_name`),
-    fields: fieldList.map((field, index) =>
+    fields: fieldList?.map((field, index) =>
       parseFieldDefinition(field, operation, `${label}.fields[${index}]`)
     )
   } as ItemObjectTypeSchema;

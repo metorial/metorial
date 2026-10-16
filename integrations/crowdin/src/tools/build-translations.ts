@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { attachDownload } from '../lib/downloads';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let buildTranslationsTool = SlateTool.create(spec, {
@@ -13,7 +15,7 @@ export let buildTranslationsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       action: z.enum(['build', 'status', 'download', 'list']).describe('Action to perform'),
       buildId: z.number().optional().describe('Build ID (required for status/download)'),
       targetLanguageIds: z
@@ -36,9 +38,12 @@ export let buildTranslationsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       buildId: z.number().optional().describe('Build ID'),
       status: z.string().optional().describe('Build status'),
       progress: z.number().optional().describe('Build progress percentage'),
+      expiresAt: z.string().optional().describe('Provider URL expiration timestamp'),
+      pagination: z.object({ offset: z.number(), limit: z.number() }).optional(),
       downloadUrl: z.string().optional().describe('URL to download the built translations'),
       builds: z
         .array(
@@ -46,7 +51,7 @@ export let buildTranslationsTool = SlateTool.create(spec, {
             buildId: z.number(),
             status: z.string(),
             progress: z.number(),
-            createdAt: z.string()
+            createdAt: z.string().optional()
           })
         )
         .optional()
@@ -56,6 +61,10 @@ export let buildTranslationsTool = SlateTool.create(spec, {
     let client = createClient(ctx);
     let { projectId, action } = ctx.input;
 
+    if (ctx.input.skipUntranslatedStrings && ctx.input.skipUntranslatedFiles)
+      throw createApiServiceError(
+        'skipUntranslatedStrings and skipUntranslatedFiles cannot both be true.'
+      );
     if (action === 'build') {
       let build = await client.buildTranslations(projectId, {
         branchId: ctx.input.branchId,
@@ -67,6 +76,7 @@ export let buildTranslationsTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: client.lastResponse,
           buildId: build.id,
           status: build.status,
           progress: build.progress
@@ -76,12 +86,13 @@ export let buildTranslationsTool = SlateTool.create(spec, {
     }
 
     if (action === 'status') {
-      if (!ctx.input.buildId) throw new Error('buildId is required for status');
+      if (!ctx.input.buildId) throw createApiServiceError('buildId is required for status');
 
       let build = await client.getBuildStatus(projectId, ctx.input.buildId);
 
       return {
         output: {
+          raw: client.lastResponse,
           buildId: build.id,
           status: build.status,
           progress: build.progress
@@ -91,14 +102,21 @@ export let buildTranslationsTool = SlateTool.create(spec, {
     }
 
     if (action === 'download') {
-      if (!ctx.input.buildId) throw new Error('buildId is required for download');
+      if (!ctx.input.buildId) throw createApiServiceError('buildId is required for download');
 
       let download = await client.downloadBuild(projectId, ctx.input.buildId);
+      const file = await attachDownload(ctx, download, {
+        kind: 'build',
+        projectId,
+        buildId: ctx.input.buildId
+      });
 
       return {
         output: {
+          raw: client.lastResponse,
           buildId: ctx.input.buildId,
-          downloadUrl: download.url
+          downloadUrl: download.url,
+          expiresAt: file.expiresAt
         },
         message: `Build **${ctx.input.buildId}** download URL is ready.`
       };
@@ -115,15 +133,15 @@ export let buildTranslationsTool = SlateTool.create(spec, {
         buildId: item.data.id,
         status: item.data.status,
         progress: item.data.progress,
-        createdAt: item.data.createdAt
+        createdAt: item.data.createdAt ?? undefined
       }));
 
       return {
-        output: { builds },
+        output: { raw: client.lastResponse, builds, pagination: result.pagination },
         message: `Found **${builds.length}** builds.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

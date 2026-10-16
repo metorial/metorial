@@ -34,7 +34,7 @@ export let sendMail = SlateTool.create(spec, {
     'Variable fields (varField1-10) correspond to merge fields in your template.'
   ],
   constraints: [
-    'Rate limited to 15 requests per second.',
+    'Rate limited to 3 requests per second or 180 requests per minute per API key.',
     'Only US and Canadian addresses are supported.'
   ],
   tags: {

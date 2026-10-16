@@ -11,6 +11,10 @@ export type MessageFilterParams = PaginationParams & {
   includeSpam?: boolean;
   includeBlocked?: boolean;
   includeTrash?: boolean;
+  includeUnauthenticated?: boolean;
+  from?: string[];
+  to?: string[];
+  subject?: string[];
 };
 
 export type PaginatedResponse<K extends string, T> = {
@@ -20,6 +24,7 @@ export type PaginatedResponse<K extends string, T> = {
 } & Record<K, T[]>;
 
 export type Inbox = {
+  email: string;
   inbox_id: string;
   pod_id: string;
   display_name?: string;
@@ -55,6 +60,8 @@ export type Message = {
 };
 
 export type Thread = {
+  count?: number;
+  next_page_token?: string;
   thread_id: string;
   inbox_id: string;
   labels: string[];
@@ -79,7 +86,7 @@ export type Draft = {
   inbox_id: string;
   client_id?: string;
   labels?: string[];
-  to: string[];
+  to?: string[];
   cc?: string[];
   bcc?: string[];
   reply_to?: string[];
@@ -89,6 +96,7 @@ export type Draft = {
   html?: string;
   attachments?: Attachment[];
   in_reply_to?: string;
+  forward_of?: string;
   references?: string[];
   send_status?: string;
   send_at?: string;
@@ -98,7 +106,7 @@ export type Draft = {
 
 export type Attachment = {
   attachment_id: string;
-  filename: string;
+  filename?: string;
   size: number;
   content_type?: string;
   content_disposition?: string;
@@ -139,9 +147,11 @@ export type Pod = {
 };
 
 export type Webhook = {
+  pod_id?: string;
+  inbox_id?: string;
   webhook_id: string;
   url: string;
-  event_types: string[];
+  event_types?: string[];
   secret: string;
   enabled: boolean;
   pod_ids?: string[];
@@ -162,6 +172,8 @@ export type ListEntry = {
 };
 
 export type SendMessageParams = {
+  idempotencyKey?: string;
+  trackOpens?: boolean;
   to: string[];
   cc?: string[];
   bcc?: string[];
@@ -184,6 +196,8 @@ export type SendAttachment = {
 };
 
 export type ReplyParams = {
+  idempotencyKey?: string;
+  trackOpens?: boolean;
   text?: string;
   html?: string;
   replyAll?: boolean;
@@ -197,7 +211,12 @@ export type ReplyParams = {
 };
 
 export type CreateDraftParams = {
-  to: string[];
+  to?: string[];
+  forwardOf?: string;
+  replyAll?: boolean;
+  addLabels?: string[];
+  removeLabels?: string[];
+  clearSendAt?: boolean;
   cc?: string[];
   bcc?: string[];
   replyTo?: string[];

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listNfcTags = SlateTool.create(spec, {
   name: 'List NFC Tags',
   key: 'list_nfc_tags',
-  description: `List and search NFC tags in your Beaconstac account. Returns tag details including their UID, scan counter, associated campaigns, and state. NFC tags are provisioned through hardware and managed via this API.`,
+  description: `List and search NFC tags in your Uniqode account. Returns tag details including their UID, scan counter, associated campaigns, and state. NFC tags are provisioned through hardware and managed via this API.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +14,10 @@ export let listNfcTags = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: z
+        .string()
+        .optional()
+        .describe('Organization ID from list_organizations; overrides the configured default'),
       search: z.string().optional().describe('Search by NFC tag name or place name'),
       ordering: z
         .string()
@@ -27,6 +31,7 @@ export let listNfcTags = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       totalCount: z.number().describe('Total number of NFC tags'),
       nfcTags: z
         .array(
@@ -56,7 +61,7 @@ export let listNfcTags = SlateTool.create(spec, {
     let result = await client.listNfcTags({
       search: ctx.input.search,
       ordering: ctx.input.ordering,
-      organization: ctx.config.organizationId,
+      organization: ctx.input.organizationId ?? ctx.config.organizationId,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -64,19 +69,23 @@ export let listNfcTags = SlateTool.create(spec, {
     let nfcTags = result.results.map(tag => ({
       nfcTagId: tag.id,
       name: tag.name,
-      uid: tag.uid,
-      counter: tag.counter,
-      url: tag.url,
-      state: tag.state,
-      placeId: tag.place,
-      campaignContentType: tag.campaign?.content_type,
-      heartbeat: tag.heartbeat,
-      createdAt: tag.created,
-      updatedAt: tag.updated
+      uid: typeof tag.uid === 'string' ? tag.uid : undefined,
+      counter: typeof tag.counter === 'number' ? tag.counter : undefined,
+      url: typeof tag.url === 'string' ? tag.url : undefined,
+      state: typeof tag.state === 'string' ? tag.state : undefined,
+      placeId: typeof tag.place === 'number' ? tag.place : undefined,
+      campaignContentType:
+        typeof tag.campaign?.content_type === 'number'
+          ? tag.campaign?.content_type
+          : undefined,
+      heartbeat: typeof tag.heartbeat === 'string' ? tag.heartbeat : undefined,
+      createdAt: typeof tag.created === 'string' ? tag.created : undefined,
+      updatedAt: typeof tag.updated === 'string' ? tag.updated : undefined
     }));
 
     return {
       output: {
+        raw: result,
         totalCount: result.count,
         nfcTags
       },

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { BeaconchainClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,18 +26,9 @@ export let auth = SlateAuth.create()
         }
       };
     },
-    getProfile: async (ctx: any) => {
-      let ax = createAxios({
-        baseURL: 'https://beaconcha.in',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let _response = await ax.post('/api/v2/ethereum/state', {
-        chain: 'mainnet'
-      });
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let client = new BeaconchainClient({ token: ctx.output.token, chain: 'mainnet' });
+      await client.getChainState();
 
       return {
         profile: {

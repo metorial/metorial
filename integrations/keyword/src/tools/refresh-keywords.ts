@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord, requireText } from '../lib/response';
 import { spec } from '../spec';
 
 export let refreshKeywords = SlateTool.create(spec, {
@@ -18,7 +19,7 @@ export let refreshKeywords = SlateTool.create(spec, {
       includeSubGroups: z
         .boolean()
         .optional()
-        .describe('Whether to include sub-groups in the refresh (default: true)')
+        .describe('Whether to include sub-groups. Omit to use the provider default.')
     })
   )
   .output(
@@ -28,6 +29,8 @@ export let refreshKeywords = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.projectIds.length === 0)
+      throw createApiServiceError('Provide at least one project ID to refresh.');
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.refreshKeywords({
@@ -35,6 +38,10 @@ export let refreshKeywords = SlateTool.create(spec, {
       includeSubGroups: ctx.input.includeSubGroups
     });
 
+    requireText(
+      requireRecord(result, 'keyword refresh').message,
+      'Refresh confirmation returned by Keyword.com'
+    );
     return {
       output: {
         success: true,

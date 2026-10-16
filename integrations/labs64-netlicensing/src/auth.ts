@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
 
@@ -19,7 +20,10 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let encoded = btoa(`${ctx.input.username}:${ctx.input.password}`);
+      let encoded = Buffer.from(
+        `${ctx.input.username}:${ctx.input.password}`,
+        'utf8'
+      ).toString('base64');
       return {
         output: {
           token: encoded,
@@ -38,7 +42,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let encoded = btoa(`apiKey:${ctx.input.apiKey}`);
+      let encoded = Buffer.from(`apiKey:${ctx.input.apiKey}`, 'utf8').toString('base64');
       return {
         output: {
           token: encoded,

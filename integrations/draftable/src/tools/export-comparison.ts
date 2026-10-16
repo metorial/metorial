@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { attachExport } from '../lib/files';
 import { spec } from '../spec';
 
 export let exportComparison = SlateTool.create(spec, {
   name: 'Export Comparison',
   key: 'export_comparison',
-  description: `Initiates a PDF export of a comparison. Exports are processed asynchronously — use the returned export identifier to poll for completion with the **Get Export Status** tool. Four export kinds are available: left (deletions highlighted), right (insertions highlighted), combined (side-by-side), and single_page (redline view).`,
+  description: `Initiates a PDF export of a comparison. Exports are processed asynchronously — use the returned export identifier to poll for completion with the **Get Export Status** tool. Four export kinds are available: left (original document), right (revised document), combined (both documents), and single_page (redline view with highlights and deletion markers).`,
   instructions: [
     'The includeCoverPage option only applies when kind is "combined".',
     'After creating an export, poll its status using the Get Export Status tool until ready=true.'
@@ -22,7 +23,7 @@ export let exportComparison = SlateTool.create(spec, {
       kind: z
         .enum(['left', 'right', 'combined', 'single_page'])
         .describe(
-          'Export kind: "left" shows deletions, "right" shows insertions, "combined" shows side-by-side, "single_page" shows redline view'
+          'Export kind: "left" shows the original document, "right" shows the revised document, "combined" shows both documents, "single_page" shows a redline view'
         ),
       includeCoverPage: z
         .boolean()
@@ -41,9 +42,14 @@ export let exportComparison = SlateTool.create(spec, {
       downloadUrl: z
         .string()
         .nullable()
+        .optional()
         .describe('URL to download the exported PDF. Available when ready is true.'),
       failed: z.boolean().describe('Whether the export processing failed'),
-      errorMessage: z.string().nullable().describe('Error message if the export failed')
+      errorMessage: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Error message if the export failed')
     })
   )
   .handleInvocation(async ctx => {
@@ -58,6 +64,8 @@ export let exportComparison = SlateTool.create(spec, {
       includeCoverPage: ctx.input.includeCoverPage
     });
 
+    await attachExport(ctx, result);
+
     return {
       output: {
         exportIdentifier: result.identifier,
@@ -68,7 +76,7 @@ export let exportComparison = SlateTool.create(spec, {
         failed: result.failed,
         errorMessage: result.errorMessage
       },
-      message: `Export **${result.identifier}** created for comparison **${result.comparisonIdentifier}** (kind: ${result.kind}). Status: ${result.ready ? 'ready' : 'processing'}.`
+      message: `Export **${result.identifier}** created for comparison **${result.comparisonIdentifier}** (kind: ${result.kind}). Status: ${result.failed ? 'failed' : result.ready ? 'ready' : 'processing'}.`
     };
   })
   .build();

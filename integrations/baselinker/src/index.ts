@@ -3,10 +3,13 @@ import { spec } from './spec';
 import {
   addOrderPayment,
   createOrder,
+  downloadShippingLabel,
   getCouriers,
   getExternalStorages,
   getInventories,
   getInventoryProducts,
+  getOrderJournal,
+  getOrderReturnOptions,
   getOrderStatuses,
   getOrders,
   manageCourierShipments,
@@ -21,6 +24,9 @@ export let provider = Slate.create({
   tools: [
     getOrders,
     createOrder,
+    downloadShippingLabel,
+    getOrderJournal,
+    getOrderReturnOptions,
     updateOrder,
     manageOrderProducts,
     addOrderPayment,

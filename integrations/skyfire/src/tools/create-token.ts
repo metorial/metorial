@@ -11,10 +11,10 @@ export let createToken = SlateTool.create(spec, {
 - **KYA**: Verifies agent identity without payment
 - **KYA+PAY**: Combines identity verification and payment authorization
 
-Use a seller service ID (from the service directory) or a seller domain/URL to target the token. Set an appropriate expiration window (5–10 minutes recommended for one-time use).`,
+Use a seller service ID from search_services for any token type. External seller domains or URLs support identity-only KYA tokens and require an organization buyer key.`,
   instructions: [
     'For PAY or KYA+PAY tokens, tokenAmount is required and must be a positive decimal string within your wallet balance.',
-    'Provide either sellerServiceId or sellerDomainOrUrl, not both.',
+    'Provide either sellerServiceId or sellerDomainOrUrl, not both. Domain-based tokens support only kya and require an organization buyer key.',
     'Default expiration is 5 minutes for domain-based tokens and 24 hours for service ID-based tokens.'
   ],
   tags: {
@@ -25,8 +25,10 @@ Use a seller service ID (from the service directory) or a seller domain/URL to t
   .input(
     z.object({
       type: z
-        .enum(['kya', 'pay', 'kya+pay'])
-        .describe('Token type: kya (identity only), pay (payment only), or kya+pay (both)'),
+        .enum(['kya', 'pay', 'kya+pay', 'kya-pay'])
+        .describe(
+          'Token type: kya (identity only), pay (payment only), or kya-pay (both; kya+pay is also accepted)'
+        ),
       tokenAmount: z
         .string()
         .optional()
@@ -53,7 +55,8 @@ Use a seller service ID (from the service directory) or a seller domain/URL to t
     z.object({
       token: z
         .string()
-        .describe('Signed JWT token to pass to the seller when calling their API')
+        .describe('Signed JWT token to pass to the seller when calling their API'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -70,7 +73,7 @@ Use a seller service ID (from the service directory) or a seller domain/URL to t
     });
 
     return {
-      output: result,
+      output: { ...result, raw: result },
       message: `Created **${ctx.input.type}** token${ctx.input.tokenAmount ? ` for $${ctx.input.tokenAmount}` : ''}.`
     };
   })

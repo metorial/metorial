@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, redactProviderData } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAccountInfo = SlateTool.create(spec, {
@@ -56,10 +56,13 @@ export let getAccountInfo = SlateTool.create(spec, {
       output.contentCategories = await client.getContentCategories();
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved account information.`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved account information.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -89,9 +92,12 @@ export let getExecutiveReport = SlateTool.create(spec, {
       output.contactGrowth = await client.getContactGrowthReport();
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved executive report.`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved executive report.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

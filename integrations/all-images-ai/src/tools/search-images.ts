@@ -16,12 +16,17 @@ export let searchImages = SlateTool.create(spec, {
       search: z.string().optional().describe('Keywords to search for'),
       filterFree: z.boolean().optional().describe('Only return free images'),
       limit: z.number().optional().describe('Number of results per page'),
-      offset: z.number().optional().describe('Starting position for pagination')
+      offset: z.number().optional().describe('Starting position for pagination'),
+      sort: z.string().optional().describe('Provider sort expression')
     })
   )
   .output(
     z.object({
-      filteredResults: z.number().describe('Total number of matching images'),
+      filteredResults: z.number().optional().describe('Total number of matching images'),
+      resultCountMetadata: z
+        .unknown()
+        .optional()
+        .describe('Unmodified provider result count metadata, when provided'),
       images: z
         .array(
           z.object({
@@ -49,12 +54,13 @@ export let searchImages = SlateTool.create(spec, {
       search: ctx.input.search,
       filterFree: ctx.input.filterFree,
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      sort: ctx.input.sort
     });
 
     return {
       output: result,
-      message: `Found **${result.filteredResults}** images${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}. Returned **${result.images.length}** results.`
+      message: `${result.filteredResults !== undefined ? `Found **${result.filteredResults}** images. ` : ''}Returned **${result.images.length}** results${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

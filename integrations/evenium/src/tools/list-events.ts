@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  dateFilterSchemas,
+  eventSchema,
+  pageMetadata,
+  pageMetadataSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listEvents = SlateTool.create(spec, {
@@ -22,44 +28,24 @@ export let listEvents = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Only return events created/modified since this date (RFC 3339 format, e.g. 2024-01-01T00:00:00Z)'
+          'Legacy provider since filter (RFC 3339). Prefer the explicit start/end/creation date filters.'
         ),
       until: z
         .string()
         .optional()
-        .describe('Only return events created/modified until this date (RFC 3339 format)'),
+        .describe(
+          'Legacy provider until filter (RFC 3339). Prefer the explicit start/end/creation date filters.'
+        ),
+      ...dateFilterSchemas,
       firstResult: z.number().optional().describe('Offset for pagination (0-based)'),
       maxResults: z.number().optional().describe('Maximum number of results to return')
     })
   )
-  .output(
-    z.object({
-      events: z.array(
-        z.object({
-          eventId: z.string().describe('Unique event identifier'),
-          title: z.string().describe('Event title'),
-          description: z.string().optional().describe('Event description'),
-          startDate: z.string().describe('Event start date (RFC 3339)'),
-          endDate: z.string().optional().describe('Event end date (RFC 3339)'),
-          creationDate: z.string().optional().describe('Event creation date (RFC 3339)'),
-          status: z.string().optional().describe('Event status'),
-          url: z.string().optional().describe('Event URL')
-        })
-      ),
-      totalCount: z.string().describe('Total number of matching events')
-    })
-  )
+  .output(z.object({ events: z.array(eventSchema), ...pageMetadataSchema }))
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let result = await client.listEvents({
-      title: ctx.input.title,
-      status: ctx.input.status,
-      since: ctx.input.since,
-      until: ctx.input.until,
-      firstResult: ctx.input.firstResult,
-      maxResults: ctx.input.maxResults
-    });
+    let result = await client.listEvents(ctx.input);
 
     let events = result.events.map(e => ({
       eventId: e.id,
@@ -69,13 +55,14 @@ export let listEvents = SlateTool.create(spec, {
       endDate: e.endDate,
       creationDate: e.creationDate,
       status: e.status,
-      url: e.url
+      url: e.url,
+      raw: e.raw
     }));
 
     return {
       output: {
         events,
-        totalCount: result.totalCount
+        ...pageMetadata(result)
       },
       message: `Found **${events.length}** event(s)${ctx.input.title ? ` matching "${ctx.input.title}"` : ''}.`
     };

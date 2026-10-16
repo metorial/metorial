@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createEmbedToken = SlateTool.create(spec, {
   name: 'Create Embed Token',
   key: 'create_embed_token',
-  description: `Generate a short-lived (15-minute) token for embedding a private Felt map. The token allows unauthenticated visitors to view the map without logging in. Each token must be associated with a workspace member's email.`,
+  description: `Generate a 12-hour token for embedding a private Felt map. The token allows unauthenticated visitors to view the map without logging in. Each token must be associated with a workspace member's email.`,
   instructions: [
     'The user_email must belong to a member of the Felt workspace with viewer, editor, or admin role.',
     'Use the token as a query parameter in the embed URL: https://felt.com/embed/map/{mapId}?token={token}'
@@ -35,7 +35,7 @@ export let createEmbedToken = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.createEmbedToken(ctx.input.mapId, ctx.input.userEmail);
 
-    let embedUrl = `https://felt.com/embed/map/${ctx.input.mapId}?token=${result.token}`;
+    let embedUrl = `https://felt.com/embed/map/${encodeURIComponent(ctx.input.mapId)}?token=${encodeURIComponent(result.token)}`;
 
     return {
       output: {

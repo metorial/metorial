@@ -36,7 +36,8 @@ export let getCoupon = SlateTool.create(spec, {
         .nullable()
         .describe('Minimum purchase amount required'),
       usageLimit: z.number().nullable().describe('Maximum redemption count'),
-      notes: z.string().nullable().describe('Internal notes')
+      notes: z.string().nullable().describe('Internal notes'),
+      raw: z.record(z.string(), z.unknown()).describe('Original coupon details')
     })
   )
   .handleInvocation(async ctx => {
@@ -44,9 +45,10 @@ export let getCoupon = SlateTool.create(spec, {
 
     let coupon = await client.getCoupon(ctx.input.couponId);
 
-    let discountDesc = coupon.percentOff
-      ? `${coupon.percentOff}% off`
-      : `${(coupon.amountOff ?? 0) / 100} off (fixed)`;
+    let discountDesc =
+      coupon.percentOff !== null
+        ? `${coupon.percentOff}% off`
+        : `${(coupon.amountOff ?? 0) / 100} off (fixed)`;
 
     return {
       output: coupon,

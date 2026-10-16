@@ -1,6 +1,10 @@
 # Open Weather Map
 
-Retrieve current weather conditions, forecasts, and historical weather data for any location worldwide. Access air quality indices and pollutant concentrations. Convert location names to coordinates and vice versa via geocoding. Get solar irradiance data and energy production estimates. Retrieve weather map tile layers for visual representation. Monitor road weather risk conditions.  Retrieve severe weather alerts. Access fire danger assessments and agricultural monitoring data. Supports queries by geographic coordinates, with configurable units, languages, and response formats.
+Retrieve current conditions, five-day forecasts, One Call forecasts and government alerts, historical weather, air quality, geocoding results, and downloadable weather map tiles. Set metric, imperial, or standard units and a weather-description language.
+
+Connect with an [OpenWeather API key](https://home.openweathermap.org/api_keys). Current weather, five-day forecasts, geocoding, air pollution, and the five Weather Maps 1.0 layers use their documented public endpoints. One Call API 3.0 requires a separate subscription. The map tool returns a downloadable PNG and a tile endpoint without the API key.
+
+See [supported tools and limits](./docs/SPEC.md).
 
 ## License
 

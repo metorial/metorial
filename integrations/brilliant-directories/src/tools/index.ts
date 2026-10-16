@@ -6,6 +6,7 @@ export * from './delete-lead';
 export * from './delete-member';
 export * from './delete-post';
 export * from './delete-review';
+export * from './discovery';
 export * from './get-lead';
 export * from './get-member';
 export * from './get-member-transactions';

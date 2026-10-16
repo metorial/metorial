@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listForms = SlateTool.create(spec, {
@@ -17,7 +17,7 @@ export let listForms = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe(
-          'Filter by archived status. True for archived forms, false for active forms, omit for all.'
+          'Filter by archived status. True for archived forms; false or omitted returns active forms.'
         ),
       formId: z
         .string()
@@ -38,12 +38,12 @@ export let listForms = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let forms = await client.listForms(ctx.input.isArchived);
-    let formsArray = Array.isArray(forms) ? forms : [];
+    let formsArray = requireList(forms, 'list-forms');
 
     let fields: unknown[] | undefined;
     if (ctx.input.formId) {
       let result = await client.listFormFields(ctx.input.formId);
-      fields = Array.isArray(result) ? result : [];
+      fields = requireList(result, 'list-forms');
     }
 
     return {

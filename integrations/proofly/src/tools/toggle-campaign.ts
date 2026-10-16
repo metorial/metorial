@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prooflyBoolean } from '../lib/response';
 import { spec } from '../spec';
 
 export let toggleCampaign = SlateTool.create(spec, {
@@ -14,7 +15,9 @@ export let toggleCampaign = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      campaignId: z.string().describe('The ID of the campaign to toggle')
+      campaignId: z
+        .string()
+        .describe('Campaign ID. Call list_campaigns to discover campaign IDs.')
     })
   )
   .output(
@@ -27,7 +30,13 @@ export let toggleCampaign = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.toggleCampaign(ctx.input.campaignId);
 
-    let enabled = result.enabled ?? result.active ?? result.is_enabled;
+    let enabled = isApiErrorRecord(result)
+      ? prooflyBoolean(result.enabled, result.active, result.is_enabled)
+      : result === 'Campaign successfully enabled'
+        ? true
+        : result === 'Campaign successfully disabled'
+          ? false
+          : undefined;
 
     return {
       output: {

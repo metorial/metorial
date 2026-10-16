@@ -14,8 +14,14 @@ export let duplicateWorkspaceTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceTemplateId: z.string().describe('UUID of the workspace template to duplicate'),
-      projectId: z.string().describe('UUID of the target project'),
+      workspaceTemplateId: z
+        .string()
+        .describe(
+          'Workspace template ID. Call list_workspace_templates to discover templates.'
+        ),
+      projectId: z
+        .string()
+        .describe('Target project ID. Call list_projects to discover projects.'),
       name: z
         .string()
         .optional()
@@ -26,7 +32,8 @@ export let duplicateWorkspaceTemplate = SlateTool.create(spec, {
     z.object({
       duplicationRequestId: z
         .string()
-        .describe('UUID of the duplication request for tracking progress')
+        .describe('UUID of the duplication request for tracking progress'),
+      raw: z.record(z.string(), z.any()).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -39,7 +46,8 @@ export let duplicateWorkspaceTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        duplicationRequestId: result.duplication_request_id
+        duplicationRequestId: result.duplication_request_id,
+        raw: result
       },
       message: `Duplication request created. Request ID: \`${result.duplication_request_id}\`. Use "Get Duplication Status" to track progress.`
     };
@@ -65,8 +73,8 @@ export let getDuplicationStatus = SlateTool.create(spec, {
       requestId: z.string().describe('Duplication request UUID'),
       status: z.string().describe('Status: INIT, IN_PROGRESS, ERROR, or COMPLETED'),
       createdAt: z.string().describe('Unix timestamp of creation'),
-      completedAt: z.string().nullable().describe('Unix timestamp of completion'),
-      erroredAt: z.string().nullable().describe('Unix timestamp of error'),
+      completedAt: z.string().nullable().optional().describe('Unix timestamp of completion'),
+      erroredAt: z.string().nullable().optional().describe('Unix timestamp of error'),
       targetProject: z
         .object({
           projectId: z.string(),
@@ -82,7 +90,8 @@ export let getDuplicationStatus = SlateTool.create(spec, {
             targetDesignName: z.string()
           })
         )
-        .describe('Duplicated design mappings')
+        .describe('Duplicated design mappings'),
+      raw: z.record(z.string(), z.any()).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -95,8 +104,18 @@ export let getDuplicationStatus = SlateTool.create(spec, {
         requestId: result.request_id,
         status: result.status,
         createdAt: String(result.created_at_ts),
-        completedAt: result.completed_at_ts !== null ? String(result.completed_at_ts) : null,
-        erroredAt: result.errored_at_ts !== null ? String(result.errored_at_ts) : null,
+        completedAt:
+          result.completed_at_ts === undefined
+            ? undefined
+            : result.completed_at_ts === null
+              ? null
+              : String(result.completed_at_ts),
+        erroredAt:
+          result.errored_at_ts === undefined
+            ? undefined
+            : result.errored_at_ts === null
+              ? null
+              : String(result.errored_at_ts),
         targetProject: {
           projectId: result.target_project.id,
           name: result.target_project.name,
@@ -106,7 +125,8 @@ export let getDuplicationStatus = SlateTool.create(spec, {
           originalDesignId: d.original_design_id,
           targetDesignId: d.target_design_id,
           targetDesignName: d.target_design_name
-        }))
+        })),
+        raw: result
       },
       message: `Duplication request \`${result.request_id}\`: **${result.status}**. ${result.designs.length} design(s) duplicated into project **${result.target_project.name}**.`
     };

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { CultsClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -20,6 +21,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      new CultsClient(ctx.input);
       return {
         output: {
           token: ctx.input.token,
@@ -32,34 +34,13 @@ export let auth = SlateAuth.create()
       output: { token: string; username: string };
       input: { username: string; token: string };
     }) => {
-      let axios = createAxios({
-        baseURL: 'https://cults3d.com'
-      });
-
-      let basicToken = Buffer.from(`${ctx.output.username}:${ctx.output.token}`).toString(
-        'base64'
-      );
-
-      let response = await axios.post(
-        '/graphql',
-        {
-          query: `{ myself { user { nick imageUrl } } }`
-        },
-        {
-          headers: {
-            Authorization: `Basic ${basicToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      let user = response.data?.data?.myself?.user;
+      let user = await new CultsClient(ctx.output).getAuthenticationProfile();
 
       return {
         profile: {
-          id: user?.nick,
-          name: user?.nick,
-          imageUrl: user?.imageUrl
+          id: user.nick,
+          name: user.nick,
+          imageUrl: user.imageUrl
         }
       };
     }

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, responseList } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageSubscriptionType = SlateTool.create(spec, {
@@ -21,6 +22,7 @@ export let manageSubscriptionType = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       subscriptionTypes: z
         .array(
           z.object({
@@ -38,36 +40,42 @@ export let manageSubscriptionType = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'list': {
         let data = await client.listSubscriptionTypes();
-        let types = (data.subscription_types || []).map((t: any) => ({
-          subscriptionTypeId: String(t.id),
+        let types = responseList(data.subscription_types).map((t: any) => ({
+          subscriptionTypeId: requiredId(t.id),
           name: t.name
         }));
         return {
-          output: { subscriptionTypes: types },
+          output: { rawResponse: client.responses, subscriptionTypes: types },
           message: `Found **${types.length}** subscription types.`
         };
       }
 
       case 'attach': {
-        if (!ctx.input.subscriptionTypeId) throw new Error('subscriptionTypeId is required');
+        if (!ctx.input.subscriptionTypeId)
+          throw createApiServiceError('subscriptionTypeId is required');
+        if (!ctx.input.contactId && !ctx.input.email)
+          throw createApiServiceError('Provide contactId or email.');
         let body: Record<string, any> = {};
         if (ctx.input.contactId) body.contact_id = ctx.input.contactId;
         if (ctx.input.email) body.email = ctx.input.email;
         await client.attachSubscriptionType(ctx.input.subscriptionTypeId, body);
         return {
-          output: { success: true },
+          output: { rawResponse: client.responses, success: true },
           message: `Contact attached to subscription type **${ctx.input.subscriptionTypeId}**.`
         };
       }
 
       case 'detach': {
-        if (!ctx.input.subscriptionTypeId) throw new Error('subscriptionTypeId is required');
+        if (!ctx.input.subscriptionTypeId)
+          throw createApiServiceError('subscriptionTypeId is required');
+        if (!ctx.input.contactId && !ctx.input.email)
+          throw createApiServiceError('Provide contactId or email.');
         let body: Record<string, any> = {};
         if (ctx.input.contactId) body.contact_id = ctx.input.contactId;
         if (ctx.input.email) body.email = ctx.input.email;
         await client.detachSubscriptionType(ctx.input.subscriptionTypeId, body);
         return {
-          output: { success: true },
+          output: { rawResponse: client.responses, success: true },
           message: `Contact detached from subscription type **${ctx.input.subscriptionTypeId}**.`
         };
       }

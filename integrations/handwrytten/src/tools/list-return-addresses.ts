@@ -46,8 +46,11 @@ export let listReturnAddresses = SlateTool.create(spec, {
       address2: a.address2 ?? undefined,
       city: a.city ?? undefined,
       state: a.state ?? undefined,
-      zip: a.zip ?? undefined,
-      isDefault: a.default === 1 || a.default === '1' || a.is_default === true || undefined
+      zip: a.zip != null ? String(a.zip) : undefined,
+      isDefault:
+        a.default === undefined && a.is_default === undefined
+          ? undefined
+          : a.default === true || a.default === 1 || a.default === '1' || a.is_default === true
     }));
 
     return {

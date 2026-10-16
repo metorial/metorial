@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let getDeviceData = SlateTool.create(spec, {
   ],
   constraints: [
     'Maximum of 288 records per request.',
-    'API rate limited to 1 request/second per API key.'
+    'API rate limited to 1 request/second per API key and 3 requests/second per application key.'
   ],
   tags: {
     destructive: false,
@@ -28,9 +28,7 @@ export let getDeviceData = SlateTool.create(spec, {
         .min(1)
         .max(288)
         .optional()
-        .describe(
-          'Maximum number of records to return (max 288). Defaults to the API default.'
-        ),
+        .describe('Maximum number of records to return (max 288). The API default is 288.'),
       endDate: z
         .string()
         .optional()
@@ -55,8 +53,13 @@ export let getDeviceData = SlateTool.create(spec, {
     });
 
     let endDateEpoch: number | undefined;
-    if (ctx.input.endDate) {
+    if (ctx.input.endDate !== undefined) {
       endDateEpoch = new Date(ctx.input.endDate).getTime();
+      if (!ctx.input.endDate.trim() || !Number.isFinite(endDateEpoch)) {
+        throw createApiServiceError('Provide a valid ISO 8601 datetime for endDate.', {
+          reason: 'ambient_weather_invalid_end_date'
+        });
+      }
     }
 
     let data = await client.getDeviceData(ctx.input.macAddress, {

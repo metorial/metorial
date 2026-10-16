@@ -1,17 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { accountCodeField, resolveAccountCode } from '../lib/account';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
-  description: `Retrieve your More Trees account details including account name, credit balance, forest name, and forest slug. Uses the account code from configuration to look up your account.`,
+  description: `Retrieve your More Trees account details including account name, credit balance, forest name, and forest slug. Provide the account code from Settings > Account Settings, or use the account code already saved on your connection.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ accountCode: accountCodeField }))
   .output(
     z.object({
       accountName: z.string().describe('Name of the account'),
@@ -26,7 +27,9 @@ export let getAccountInfo = SlateTool.create(spec, {
       publicValidationKey: ctx.auth.publicValidationKey
     });
 
-    let account = await client.getAccountInfo(ctx.config.accountCode);
+    let account = await client.getAccountInfo(
+      resolveAccountCode(ctx.input.accountCode, ctx.config)
+    );
 
     return {
       output: account,

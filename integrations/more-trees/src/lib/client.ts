@@ -1,23 +1,117 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
 
-let userManagementHttp = createAxios({
-  baseURL:
-    'https://user-management-service.platform.moretrees.eco/user-management-api/external'
+let createMoreTreesHttp = (baseURL: string) =>
+  createAuthenticatedAxios({
+    baseURL,
+    timeout: 30_000,
+    headers: { Accept: 'application/json' },
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'More Trees',
+        reason: 'more_trees_api_error'
+      })
+  });
+
+let userManagementHttp = createMoreTreesHttp(
+  'https://user-management-service.platform.moretrees.eco/user-management-api/external'
+);
+
+let projectManagementHttp = createMoreTreesHttp(
+  'https://project-management-service.platform.moretrees.eco/project-management-api/external'
+);
+
+let transactionManagementHttp = createMoreTreesHttp(
+  'https://transaction-management-service.platform.moretrees.eco/transaction-management-api/external'
+);
+
+let basicApiHttp = createMoreTreesHttp('https://api.moretrees.eco/v1/basic');
+
+let accountResponse = z.object({
+  account_name: z.string(),
+  credit_balance: z.number(),
+  forest_name: z.string(),
+  forest_slug: z.string()
 });
 
-let projectManagementHttp = createAxios({
-  baseURL:
-    'https://project-management-service.platform.moretrees.eco/project-management-api/external'
+let forestResponse = z.object({
+  forest_name: z.string(),
+  logo_url: z.string(),
+  brand_color: z.string(),
+  totals: z.object({
+    trees_planted: z.number(),
+    trees_gifted: z.number(),
+    trees_received: z.number(),
+    co2_captured: z.number(),
+    projects_supported: z.number()
+  })
 });
 
-let transactionManagementHttp = createAxios({
-  baseURL:
-    'https://transaction-management-service.platform.moretrees.eco/transaction-management-api/external'
+let projectsResponse = z.array(
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    description: z.string(),
+    country: z.string(),
+    project_type: z.string(),
+    supplier_name: z.string(),
+    default: z.boolean(),
+    project_image: z.string(),
+    trees: z
+      .array(
+        z.object({
+          id: z.number(),
+          name: z.string(),
+          description: z.string(),
+          tonnes_c02: z.number(),
+          credits_required: z.number(),
+          default: z.boolean(),
+          tree_image: z.string()
+        })
+      )
+      .nullish()
+  })
+);
+
+let plantResponse = z.object({
+  test: z.boolean(),
+  credits_used: z.number(),
+  credits_remaining: z.number(),
+  project_id: z.number(),
+  tree_id: z.number()
 });
 
-let basicApiHttp = createAxios({
-  baseURL: 'https://api.moretrees.eco/v1/basic'
+let selfPlantResponse = plantResponse.extend({
+  plant_for_others: z.boolean().nullish()
 });
+
+let giftPlantResponse = plantResponse.extend({
+  recipients: z
+    .array(
+      z.object({
+        account_code: z.string(),
+        account_name: z.string(),
+        quantity: z.number()
+      })
+    )
+    .nullish()
+});
+
+let parseMoreTreesResponse = <T>(schema: z.ZodType<T>, data: unknown, operation: string) => {
+  let result = schema.safeParse(data);
+  if (!result.success) {
+    throw createApiServiceError(`More Trees returned an unexpected ${operation} response.`, {
+      reason: 'more_trees_invalid_response'
+    });
+  }
+  return result.data;
+};
 
 export interface MoreTreesClientConfig {
   token: string;
@@ -112,6 +206,9 @@ export class Client {
   private publicValidationKey: string;
 
   constructor(config: MoreTreesClientConfig) {
+    if (!config.token.trim() || !config.publicValidationKey.trim()) {
+      throw createApiServiceError('Reconnect with your API Key and Public Validation Key.');
+    }
     this.token = config.token;
     this.publicValidationKey = config.publicValidationKey;
   }
@@ -133,11 +230,15 @@ export class Client {
   }
 
   async getAccountInfo(accountCode: string): Promise<AccountInfo> {
-    let response = await userManagementHttp.get(`/accounts/${accountCode}`, {
-      headers: this.apiKeyHeaders
-    });
+    if (!accountCode.trim()) {
+      throw createApiServiceError('Provide accountCode from Settings > Account Settings.');
+    }
+    let response = await userManagementHttp.get(
+      `/accounts/${encodeURIComponent(accountCode.trim())}`,
+      { headers: this.apiKeyHeaders }
+    );
 
-    let data = response.data;
+    let data = parseMoreTreesResponse(accountResponse, response.data, 'account information');
     return {
       accountName: data.account_name,
       creditBalance: data.credit_balance,
@@ -147,11 +248,15 @@ export class Client {
   }
 
   async getForestInfo(forestSlugOrAccountCode: string): Promise<ForestInfo> {
-    let response = await userManagementHttp.get(`/forest/${forestSlugOrAccountCode}`, {
-      headers: this.apiKeyHeaders
-    });
+    if (!forestSlugOrAccountCode.trim()) {
+      throw createApiServiceError('Provide a forest slug or account code.');
+    }
+    let response = await userManagementHttp.get(
+      `/forest/${encodeURIComponent(forestSlugOrAccountCode.trim())}`,
+      { headers: this.apiKeyHeaders }
+    );
 
-    let data = response.data;
+    let data = parseMoreTreesResponse(forestResponse, response.data, 'forest information');
     return {
       forestName: data.forest_name,
       logoUrl: data.logo_url,
@@ -171,8 +276,8 @@ export class Client {
       headers: this.publicHeaders
     });
 
-    let data = response.data as any[];
-    return data.map((project: any) => ({
+    let data = parseMoreTreesResponse(projectsResponse, response.data, 'project list');
+    return data.map(project => ({
       projectId: project.id,
       name: project.name,
       description: project.description,
@@ -181,7 +286,7 @@ export class Client {
       supplierName: project.supplier_name,
       isDefault: project.default,
       projectImage: project.project_image,
-      trees: (project.trees || []).map((tree: any) => ({
+      trees: (project.trees || []).map(tree => ({
         treeId: tree.id,
         name: tree.name,
         description: tree.description,
@@ -194,21 +299,20 @@ export class Client {
   }
 
   async plantForSelf(request: PlantForSelfRequest): Promise<PlantResult> {
-    let body: Record<string, any> = {
+    let body = pickDefined({
       payment_account_code: request.paymentAccountCode,
       plant_for_others: false,
-      quantity: request.quantity
-    };
-
-    if (request.projectId !== undefined) body.project_id = request.projectId;
-    if (request.treeId !== undefined) body.tree_id = request.treeId;
-    if (request.test !== undefined) body.test = request.test;
+      quantity: request.quantity,
+      project_id: request.projectId,
+      tree_id: request.treeId,
+      test: request.test
+    });
 
     let response = await transactionManagementHttp.post('/plant', body, {
       headers: this.apiKeyHeaders
     });
 
-    let data = response.data;
+    let data = parseMoreTreesResponse(selfPlantResponse, response.data, 'planting');
     return {
       test: data.test,
       plantForOthers: data.plant_for_others ?? false,
@@ -220,29 +324,27 @@ export class Client {
   }
 
   async plantForOthers(request: PlantForOthersRequest): Promise<PlantResult> {
-    let body: Record<string, any> = {
+    let body = pickDefined({
       payment_account_code: request.paymentAccountCode,
       plant_for_others: true,
-      recipients: request.recipients.map(r => {
-        let recipient: Record<string, any> = {
+      recipients: request.recipients.map(r =>
+        pickDefined({
           name: r.name,
-          quantity: r.quantity
-        };
-        if (r.accountCode) recipient.account_code = r.accountCode;
-        if (r.email) recipient.email = r.email;
-        return recipient;
-      })
-    };
-
-    if (request.projectId !== undefined) body.project_id = request.projectId;
-    if (request.treeId !== undefined) body.tree_id = request.treeId;
-    if (request.test !== undefined) body.test = request.test;
+          quantity: r.quantity,
+          account_code: r.accountCode?.trim() ? r.accountCode : undefined,
+          email: r.email?.trim() ? r.email : undefined
+        })
+      ),
+      project_id: request.projectId,
+      tree_id: request.treeId,
+      test: request.test
+    });
 
     let response = await transactionManagementHttp.post('/plant', body, {
       headers: this.apiKeyHeaders
     });
 
-    let data = response.data;
+    let data = parseMoreTreesResponse(giftPlantResponse, response.data, 'gifting');
     return {
       test: data.test,
       plantForOthers: true,
@@ -250,7 +352,7 @@ export class Client {
       creditsRemaining: data.credits_remaining,
       projectId: data.project_id,
       treeId: data.tree_id,
-      recipients: (data.recipients || []).map((r: any) => ({
+      recipients: (data.recipients || []).map(r => ({
         accountCode: r.account_code,
         accountName: r.account_name,
         quantity: r.quantity
@@ -263,17 +365,27 @@ export class Client {
       headers: this.publicHeaders
     });
 
-    let data = response.data;
+    let data: unknown = response.data;
+    let creditBalance = isApiErrorRecord(data) ? (data.credit_balance ?? data.credits) : data;
+    if (typeof creditBalance !== 'number' || !Number.isFinite(creditBalance)) {
+      throw createApiServiceError(
+        'More Trees returned an unexpected credit balance response.'
+      );
+    }
     return {
-      creditBalance: data.credit_balance ?? data.credits ?? data
+      creditBalance
     };
   }
 
-  async getCarbonOffset(): Promise<Record<string, any>> {
+  async getCarbonOffset(): Promise<Record<string, unknown>> {
     let response = await basicApiHttp.get('/carbonOffset', {
       headers: this.publicHeaders
     });
 
-    return response.data;
+    return parseMoreTreesResponse(
+      z.record(z.string(), z.unknown()),
+      response.data,
+      'carbon offset'
+    );
   }
 }

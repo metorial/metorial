@@ -21,9 +21,9 @@ let transferSchema = z
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
-  description: `Generate an image from a Placid template by populating its dynamic layers with data. Supports text, images, shapes, browser screenshots, barcodes/QR codes, and ratings. The generated image can optionally be transferred to S3-compatible storage. Use \`create_now\` for synchronous generation or poll the returned status for async results.`,
+  description: `Generate an image from a Placid template by populating its dynamic layers with data. Supports text, images, shapes, browser screenshots, barcodes/QR codes, and ratings. The generated image can optionally be transferred to S3-compatible storage. Use \`createNow\` for synchronous generation or poll the returned status for async results.`,
   instructions: [
-    'Layer names must match those defined in the template. Use the List Templates or Get Template tool to discover available layers.',
+    'Layer names must match those defined in the template. Use manage_templates with action list or get to discover available layers.',
     'Layer properties depend on the layer type: text layers use "text", picture layers use "image", shape layers use "background_color", etc.',
     'If a layer property is not specified, the template default is used.'
   ],
@@ -90,7 +90,7 @@ export let generateImage = SlateTool.create(spec, {
     if (ctx.input.width !== undefined) modifications.width = ctx.input.width;
     if (ctx.input.height !== undefined) modifications.height = ctx.input.height;
     if (ctx.input.filename) modifications.filename = ctx.input.filename;
-    if (ctx.input.format) modifications.format = ctx.input.format;
+    if (ctx.input.format) modifications.image_format = ctx.input.format;
     if (ctx.input.dpi !== undefined) modifications.dpi = ctx.input.dpi;
     if (ctx.input.colorMode) modifications.color_mode = ctx.input.colorMode;
 
@@ -103,6 +103,13 @@ export let generateImage = SlateTool.create(spec, {
       passthrough: ctx.input.passthrough,
       createNow: ctx.input.createNow
     });
+
+    if (result.status === 'finished' && result.image_url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.image_url
+      });
+    }
 
     return {
       output: {

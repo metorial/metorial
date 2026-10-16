@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let addressDetailSchema = z.object({
-  value: z.string().describe('Formatted address'),
-  unrestrictedValue: z.string().describe('Full address'),
+  value: z.string().optional().describe('Formatted address'),
+  unrestrictedValue: z.string().optional().describe('Full address'),
   postalCode: z.string().nullable().describe('Postal code'),
   country: z.string().nullable().describe('Country'),
   countryIsoCode: z.string().nullable().describe('ISO country code'),
@@ -41,11 +42,16 @@ Use this for precise address lookups when you have a specific identifier rather 
     z.object({
       query: z.string().describe('FIAS ID, KLADR code, cadastral number, or GeoNames/OSM ID'),
       count: z.number().optional().describe('Number of results (max 20)'),
+      division: z
+        .enum(['ADMINISTRATIVE', 'MUNICIPAL'])
+        .optional()
+        .describe('Administrative or municipal address division'),
       language: z.enum(['ru', 'en']).optional().describe('Response language')
     })
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       addresses: z.array(addressDetailSchema).describe('Matched addresses')
     })
   )
@@ -58,12 +64,13 @@ Use this for precise address lookups when you have a specific identifier rather 
     let data = await client.findById('address', {
       query: ctx.input.query,
       count: ctx.input.count,
-      language: ctx.input.language || ctx.config.language
+      division: ctx.input.division,
+      language: ctx.input.language ?? ctx.config.language
     });
 
-    let addresses = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
-      unrestrictedValue: s.unrestricted_value || '',
+    let addresses = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
+      unrestrictedValue: s.unrestricted_value ?? undefined,
       postalCode: s.data?.postal_code ?? null,
       country: s.data?.country ?? null,
       countryIsoCode: s.data?.country_iso_code ?? null,
@@ -87,7 +94,10 @@ Use this for precise address lookups when you have a specific identifier rather 
     }));
 
     return {
-      output: { addresses },
+      output: {
+        rawData: data,
+        addresses
+      },
       message:
         addresses.length > 0
           ? `Found **${addresses.length}** address(es) for "${ctx.input.query}": ${addresses[0]?.value || 'N/A'}`

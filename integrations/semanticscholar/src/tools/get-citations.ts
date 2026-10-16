@@ -151,7 +151,7 @@ Each result includes citation context snippets, intent classification, and metad
 
     if (ctx.input.direction === 'citations') {
       let result = await client.getPaperCitations(ctx.input.paperId, params);
-      let citations = result.data || [];
+      let citations = result.data;
 
       return {
         output: {
@@ -159,11 +159,11 @@ Each result includes citation context snippets, intent classification, and metad
           next: result.next,
           citations
         },
-        message: `Retrieved **${citations.length}** citations for paper "${ctx.input.paperId}".${result.next ? ` More results available at offset ${result.next}.` : ''}`
+        message: `Retrieved **${citations.length}** citations for paper "${ctx.input.paperId}".${result.next !== undefined ? ` More results available at offset ${result.next}.` : ''}`
       };
     } else {
       let result = await client.getPaperReferences(ctx.input.paperId, params);
-      let references = result.data || [];
+      let references = result.data;
 
       return {
         output: {
@@ -171,7 +171,7 @@ Each result includes citation context snippets, intent classification, and metad
           next: result.next,
           references
         },
-        message: `Retrieved **${references.length}** references for paper "${ctx.input.paperId}".${result.next ? ` More results available at offset ${result.next}.` : ''}`
+        message: `Retrieved **${references.length}** references for paper "${ctx.input.paperId}".${result.next !== undefined ? ` More results available at offset ${result.next}.` : ''}`
       };
     }
   })

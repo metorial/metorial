@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'apiverve',
   name: 'APIVerve',
   description:
-    'Access 300+ utility, data, and AI-powered APIs through a single unified interface. Covers data validation, text analysis, finance, weather, geography, AI/computer vision, domain data, and more.',
+    'Validate data, analyze and translate text, convert currencies, inspect domains, retrieve weather and IP locations, generate QR codes, and monitor APIVerve account usage.',
   metadata: {},
   config,
   auth

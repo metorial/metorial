@@ -1,6 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  Client,
+  type PaginatedResponse,
+  type SymplaParticipant,
+  validateSymplaOutput
+} from '../lib/client';
 import { spec } from '../spec';
 
 let participantSchema = z.object({
@@ -15,6 +20,12 @@ let participantSchema = z.object({
   ticketSalePrice: z.number().describe('Ticket sale price'),
   checkedIn: z.boolean().describe('Whether the participant has checked in'),
   checkedInDate: z.string().describe('Check-in date, if checked in')
+});
+
+let outputSchema = z.object({
+  participants: z.array(participantSchema).describe('List of participants'),
+  hasNextPage: z.boolean().describe('Whether more pages are available'),
+  totalQuantity: z.number().describe('Total number of results')
 });
 
 export let listParticipantsTool = SlateTool.create(spec, {
@@ -38,17 +49,11 @@ export let listParticipantsTool = SlateTool.create(spec, {
       sort: z.enum(['ASC', 'DESC']).optional().describe('Sort direction')
     })
   )
-  .output(
-    z.object({
-      participants: z.array(participantSchema).describe('List of participants'),
-      hasNextPage: z.boolean().describe('Whether more pages are available'),
-      totalQuantity: z.number().describe('Total number of results')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let result: any;
+    let result: PaginatedResponse<SymplaParticipant>;
     if (ctx.input.orderId) {
       result = await client.listParticipantsByOrder(ctx.input.eventId, ctx.input.orderId, {
         page: ctx.input.page,
@@ -65,29 +70,29 @@ export let listParticipantsTool = SlateTool.create(spec, {
       });
     }
 
-    let participants = result.data.map((p: any) => ({
-      participantId: p.id ?? 0,
-      orderId: p.order_id ?? '',
-      firstName: p.first_name ?? '',
-      lastName: p.last_name ?? '',
-      email: p.email ?? '',
-      ticketNumber: p.ticket_number ?? '',
-      ticketNumStart: p.ticket_num_start ?? '',
-      ticketName: p.ticket_name ?? '',
-      ticketSalePrice: p.ticket_sale_price ?? 0,
-      checkedIn: p.checkin?.checked_in ?? false,
-      checkedInDate: p.checkin?.checked_in_date ?? ''
+    let participants = result.data.map(p => ({
+      participantId: p.id,
+      orderId: p.order_id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      email: p.email,
+      ticketNumber: p.ticket_number,
+      ticketNumStart: p.ticket_num_start,
+      ticketName: p.ticket_name,
+      ticketSalePrice: p.ticket_sale_price,
+      checkedIn: p.checkin?.checked_in,
+      checkedInDate: p.checkin?.checked_in_date
     }));
 
     let scope = ctx.input.orderId
       ? `order ${ctx.input.orderId}`
       : `event ${ctx.input.eventId}`;
     return {
-      output: {
+      output: validateSymplaOutput(outputSchema, {
         participants,
         hasNextPage: result.pagination.hasNext,
         totalQuantity: result.pagination.quantity
-      },
+      }),
       message: `Found **${participants.length}** participants for ${scope}.${result.pagination.hasNext ? ' More pages available.' : ''}`
     };
   })

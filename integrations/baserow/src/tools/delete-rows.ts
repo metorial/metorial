@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteRows = SlateTool.create(spec, {
@@ -13,7 +13,11 @@ export let deleteRows = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tableId: z.number().describe('The ID of the table to delete rows from'),
+      tableId: z
+        .number()
+        .describe(
+          'The ID of the table to delete rows from. Discover with list_token_tables, or list_databases then list_tables for JWT connections.'
+        ),
       rowIds: z.array(z.number()).min(1).describe('Array of row IDs to delete')
     })
   )
@@ -23,11 +27,7 @@ export let deleteRows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
     await client.deleteRows(ctx.input.tableId, ctx.input.rowIds);
 

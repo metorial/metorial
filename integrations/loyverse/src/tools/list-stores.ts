@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { spec } from '../spec';
 
 let storeSchema = z.object({
@@ -26,6 +26,23 @@ export let listStores = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      storeIds: z.array(z.string()).optional().describe('Only return stores with these IDs'),
+      createdAtMin: z
+        .string()
+        .optional()
+        .describe('Only return stores created at or after this ISO 8601 UTC timestamp'),
+      createdAtMax: z
+        .string()
+        .optional()
+        .describe('Only return stores created at or before this ISO 8601 UTC timestamp'),
+      updatedAtMin: z
+        .string()
+        .optional()
+        .describe('Only return stores updated at or after this ISO 8601 UTC timestamp'),
+      updatedAtMax: z
+        .string()
+        .optional()
+        .describe('Only return stores updated at or before this ISO 8601 UTC timestamp'),
       limit: z.number().min(1).max(250).optional().describe('Number of stores to return'),
       cursor: z.string().optional().describe('Pagination cursor'),
       showDeleted: z.boolean().optional().describe('Include deleted stores')
@@ -40,6 +57,11 @@ export let listStores = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listStores({
+      storeIds: joinIds(ctx.input.storeIds),
+      createdAtMin: ctx.input.createdAtMin,
+      createdAtMax: ctx.input.createdAtMax,
+      updatedAtMin: ctx.input.updatedAtMin,
+      updatedAtMax: ctx.input.updatedAtMax,
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       showDeleted: ctx.input.showDeleted

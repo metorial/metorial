@@ -5,7 +5,9 @@ import { spec } from '../spec';
 
 let pollutantDetailSchema = z
   .object({
-    concentration: z.number().describe('Pollutant concentration in ug/m3 (CO in mg/m3)'),
+    concentration: z
+      .number()
+      .describe('Pollutant concentration in the unit reported in units for this pollutant'),
     aqiUs: z.number().describe('AQI value based on US EPA standard'),
     aqiChina: z.number().describe('AQI value based on China MEP standard')
   })
@@ -16,7 +18,7 @@ export let getNearestAirQuality = SlateTool.create(spec, {
   key: 'get_nearest_air_quality',
   description: `Retrieve air quality and weather data for the nearest city to a given location. Supports lookup by GPS coordinates (latitude/longitude) or by IP-based geolocation when no coordinates are provided. Useful when the exact city name is unknown.`,
   instructions: [
-    'Provide latitude and longitude for precise location lookup, or omit both to use IP-based geolocation.'
+    "Provide latitude and longitude for precise location lookup, or omit both to use the API request server's IP-based geolocation."
   ],
   tags: {
     readOnly: true
@@ -27,11 +29,15 @@ export let getNearestAirQuality = SlateTool.create(spec, {
       latitude: z
         .number()
         .optional()
-        .describe('Latitude coordinate (e.g. 34.0522). Omit for IP-based geolocation.'),
+        .describe(
+          'Latitude from -90 to 90 (e.g. 34.0522). Provide with longitude, or omit both for server IP geolocation.'
+        ),
       longitude: z
         .number()
         .optional()
-        .describe('Longitude coordinate (e.g. -118.2437). Omit for IP-based geolocation.')
+        .describe(
+          'Longitude from -180 to 180 (e.g. -118.2437). Provide with latitude, or omit both for server IP geolocation.'
+        )
     })
   )
   .output(
@@ -48,7 +54,11 @@ export let getNearestAirQuality = SlateTool.create(spec, {
         humidityPercent: z.number().describe('Humidity percentage'),
         windSpeedMs: z.number().describe('Wind speed in m/s'),
         windDirectionDegrees: z.number().describe('Wind direction in degrees (0-360)'),
-        iconCode: z.string().describe('Weather icon code')
+        iconCode: z.string().describe('Weather icon code'),
+        heatIndexCelsius: z
+          .number()
+          .optional()
+          .describe('Felt temperature in Celsius, when available')
       }),
       pollution: z.object({
         timestamp: z.string().describe('Measurement timestamp (ISO 8601)'),
@@ -73,7 +83,17 @@ export let getNearestAirQuality = SlateTool.create(spec, {
           pollution: z.array(z.record(z.string(), z.any())).optional()
         })
         .optional()
-        .describe('Historical data (Enterprise plan)')
+        .describe('Historical data (Enterprise plan)'),
+      dailyForecasts: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Daily AQI and weather forecasts, when available on the API plan'),
+      units: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'Provider concentration units keyed by pollutant code, such as p2, p1, o3, n2, s2, and co'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -102,7 +122,8 @@ export let getNearestAirQuality = SlateTool.create(spec, {
         humidityPercent: data.current.weather.hu,
         windSpeedMs: data.current.weather.ws,
         windDirectionDegrees: data.current.weather.wd,
-        iconCode: data.current.weather.ic
+        iconCode: data.current.weather.ic,
+        heatIndexCelsius: data.current.weather.heatIndex
       },
       pollution: {
         timestamp: data.current.pollution.ts,
@@ -118,7 +139,9 @@ export let getNearestAirQuality = SlateTool.create(spec, {
         carbonMonoxide: mapPollutant(data.current.pollution.co)
       },
       forecasts: data.forecasts,
-      history: data.history
+      history: data.history,
+      dailyForecasts: data.forecasts_daily,
+      units: data.units
     };
 
     let aqiLabel = getAqiLabel(output.pollution.aqiUs);

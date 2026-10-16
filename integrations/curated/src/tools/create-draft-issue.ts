@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { publicationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createDraftIssue = SlateTool.create(spec, {
   name: 'Create Draft Issue',
   key: 'create_draft_issue',
-  description: `Create a new draft newsletter issue for a publication. The draft is created using the publication's default settings and can then be edited through the Curated web interface.`,
+  description: `Create a new draft newsletter issue for a publication. The draft is created using the publication's default settings and can then be edited through the Curated web interface. Call list_publications to discover the publication ID.`,
   constraints: [
     'Issues cannot be published via the API; publishing must be done through the Curated web interface.'
   ],
@@ -16,11 +17,15 @@ export let createDraftIssue = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      publicationId: z.string().describe('ID of the publication to create the draft issue for')
+      publicationId: publicationIdSchema
     })
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional metadata'),
       issueId: z.number().describe('Database ID of the new draft issue'),
       issueNumber: z.number().describe('Issue number'),
       title: z.string().describe('Title of the draft issue'),
@@ -35,6 +40,7 @@ export let createDraftIssue = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: issue,
         issueId: issue.id,
         issueNumber: issue.number,
         title: issue.title,

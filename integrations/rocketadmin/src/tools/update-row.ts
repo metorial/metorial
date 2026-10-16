@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateRow = SlateTool.create(spec, {
@@ -17,7 +17,11 @@ export let updateRow = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       tableName: z.string().describe('Name of the table'),
       primaryKey: z
         .record(z.string(), z.unknown())
@@ -36,19 +40,20 @@ export let updateRow = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
+      success: z.boolean().optional().describe('Whether Rocketadmin confirmed the operation'),
       row: z.record(z.string(), z.unknown()).optional().describe('The updated row'),
       updatedCount: z.number().optional().describe('Number of rows updated in bulk operation')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      masterPassword: ctx.input.masterPassword
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
+    if (ctx.input.primaryKey && ctx.input.bulkPrimaryKeys) {
+      throw createApiServiceError('Provide either primaryKey or bulkPrimaryKeys, not both.');
+    }
     if (ctx.input.bulkPrimaryKeys && ctx.input.bulkPrimaryKeys.length > 0) {
-      let _result = await client.bulkUpdateRows(
+      let result = await client.bulkUpdateRows(
         ctx.input.connectionId,
         ctx.input.tableName,
         ctx.input.bulkPrimaryKeys,
@@ -56,14 +61,15 @@ export let updateRow = SlateTool.create(spec, {
       );
       return {
         output: {
-          updatedCount: ctx.input.bulkPrimaryKeys.length
+          raw: result,
+          success: true
         },
-        message: `Bulk updated **${ctx.input.bulkPrimaryKeys.length}** row(s) in **${ctx.input.tableName}**.`
+        message: `Rocketadmin confirmed the bulk update in **${ctx.input.tableName}**. The API does not return an affected-row count.`
       };
     }
 
     if (!ctx.input.primaryKey) {
-      throw new Error('Either primaryKey or bulkPrimaryKeys must be provided');
+      throw createApiServiceError('Either primaryKey or bulkPrimaryKeys must be provided');
     }
 
     let row = await client.updateRow(

@@ -20,7 +20,8 @@ let documentSideSchema = z.object({
       'xls',
       'csv',
       'odt',
-      'txt'
+      'txt',
+      'md'
     ])
     .describe('File type of the document'),
   displayName: z.string().optional().describe('Display name shown in the comparison viewer')
@@ -35,7 +36,7 @@ export let createComparison = SlateTool.create(spec, {
     'Set isPublic to true if the comparison should be viewable without authentication.'
   ],
   constraints: [
-    'Supported file types: pdf, docx, docm, doc, rtf, pptx, pptm, ppt, xlsx, xlsm, xls, csv, odt, txt.',
+    'File-format availability depends on the Draftable deployment. Confirm support before using Excel, CSV, or ODT files.',
     'If expiryTime is provided, it must be a UTC ISO 8601 timestamp in the future.'
   ],
   tags: {
@@ -72,23 +73,48 @@ export let createComparison = SlateTool.create(spec, {
       comparisonIdentifier: z.string().describe('Unique identifier for the comparison'),
       left: z.object({
         fileType: z.string().describe('File type of the left document'),
-        sourceUrl: z.string().nullable().describe('Source URL of the left document'),
-        displayName: z.string().nullable().describe('Display name of the left document')
+        sourceUrl: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Source URL of the left document'),
+        displayName: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Display name of the left document')
       }),
       right: z.object({
         fileType: z.string().describe('File type of the right document'),
-        sourceUrl: z.string().nullable().describe('Source URL of the right document'),
-        displayName: z.string().nullable().describe('Display name of the right document')
+        sourceUrl: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Source URL of the right document'),
+        displayName: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Display name of the right document')
       }),
       isPublic: z.boolean().describe('Whether the comparison is publicly accessible'),
       creationTime: z.string().describe('UTC timestamp when the comparison was created'),
       expiryTime: z
         .string()
         .nullable()
+        .optional()
         .describe('UTC timestamp when the comparison will expire'),
       ready: z.boolean().describe('Whether the comparison processing is complete'),
-      failed: z.boolean().nullable().describe('Whether the comparison processing failed'),
-      errorMessage: z.string().nullable().describe('Error message if the comparison failed')
+      failed: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe('Whether the comparison processing failed'),
+      errorMessage: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Error message if the comparison failed')
     })
   )
   .handleInvocation(async ctx => {
@@ -125,7 +151,7 @@ export let createComparison = SlateTool.create(spec, {
         failed: result.failed,
         errorMessage: result.errorMessage
       },
-      message: `Created comparison **${result.identifier}** comparing ${result.left.fileType} ↔ ${result.right.fileType}. Status: ${result.ready ? 'ready' : 'processing'}.`
+      message: `Created comparison **${result.identifier}** comparing ${result.left.fileType} ↔ ${result.right.fileType}. Status: ${result.failed ? 'failed' : result.ready ? 'ready' : 'processing'}.`
     };
   })
   .build();

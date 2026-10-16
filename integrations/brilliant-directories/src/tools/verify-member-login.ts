@@ -21,6 +21,10 @@ Returns whether the credentials are valid.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       loginResult: z.any().describe('The verification result.')
     })
   )
@@ -38,6 +42,7 @@ Returns whether the credentials are valid.`,
     return {
       output: {
         status: result.status,
+        raw: result,
         loginResult: result.message
       },
       message: `Login verification completed with status: **${result.status}**.`

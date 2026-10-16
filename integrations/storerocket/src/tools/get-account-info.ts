@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
-  description: `Retrieves the authenticated StoreRocket account information, including account details, plan information, and locator settings. Use this to verify account configuration, check the current plan, or review store locator settings.`,
+  description: `Retrieves the authenticated StoreRocket user profile from the documented V2 user endpoint. Returns the complete provider response, including the user ID, name, email, and company when returned.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,9 +15,7 @@ export let getAccountInfo = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      account: z
-        .any()
-        .describe('Account details including plan information and locator settings')
+      account: z.any().describe('Complete authenticated user-profile response')
     })
   )
   .handleInvocation(async ctx => {

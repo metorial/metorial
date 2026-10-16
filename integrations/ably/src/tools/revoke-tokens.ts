@@ -44,6 +44,7 @@ export let revokeTokens = SlateTool.create(spec, {
       revocations: z
         .array(
           z.object({
+            raw: z.any().optional().describe('Complete provider revocation record'),
             target: z.string().optional(),
             issuedBefore: z.number().optional(),
             appliesAt: z.number().optional()
@@ -53,7 +54,7 @@ export let revokeTokens = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyRestClient(ctx.auth.token);
+    let client = new AblyRestClient(ctx.auth.token, ctx.auth.authType);
 
     let result = await client.revokeTokens(ctx.input.keyName, {
       targets: ctx.input.targets,
@@ -64,7 +65,7 @@ export let revokeTokens = SlateTool.create(spec, {
     let revocations = Array.isArray(result) ? result : [result];
 
     return {
-      output: { revocations },
+      output: { revocations: revocations.map(record => ({ ...record, raw: record })) },
       message: `Revoked tokens matching **${ctx.input.targets.length}** target(s) for key **${ctx.input.keyName}**.`
     };
   })

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { accountCodeField, resolveAccountCode } from '../lib/account';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let getForestInfo = SlateTool.create(spec, {
   name: 'Get Forest Info',
   key: 'get_forest_info',
-  description: `Retrieve forest data including branding and plantation statistics. Returns the forest name, logo, brand color, and aggregate totals such as trees planted, trees gifted, trees received, CO2 captured, and number of projects supported. Can look up by forest slug or defaults to the configured account code.`,
+  description: `Retrieve forest data including branding and plantation statistics. Returns the forest name, logo, brand color, and aggregate totals such as trees planted, trees gifted, trees received, CO2 captured, and number of projects supported. Look up by forest slug or account code from Settings > Account Settings.`,
   tags: {
     readOnly: true
   }
@@ -17,8 +18,11 @@ export let getForestInfo = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Forest slug to look up. If omitted, uses your account code from configuration.'
-        )
+          'Forest slug or account code to look up. Call get_account_info to retrieve your forest slug. If omitted, uses accountCode or the account code already saved on your connection.'
+        ),
+      accountCode: accountCodeField.describe(
+        'Optional More Trees account code from Settings > Account Settings. Used when forestSlug is omitted; otherwise falls back to the account code already saved on your connection.'
+      )
     })
   )
   .output(
@@ -31,7 +35,7 @@ export let getForestInfo = SlateTool.create(spec, {
           treesPlanted: z.number().describe('Total trees planted'),
           treesGifted: z.number().describe('Total trees gifted to others'),
           treesReceived: z.number().describe('Total trees received from others'),
-          co2Captured: z.number().describe('Total CO2 captured in kg'),
+          co2Captured: z.number().describe('Total CO2 captured as reported by More Trees'),
           projectsSupported: z.number().describe('Number of projects supported')
         })
         .describe('Aggregate plantation statistics')
@@ -43,7 +47,7 @@ export let getForestInfo = SlateTool.create(spec, {
       publicValidationKey: ctx.auth.publicValidationKey
     });
 
-    let lookup = ctx.input.forestSlug || ctx.config.accountCode;
+    let lookup = ctx.input.forestSlug || resolveAccountCode(ctx.input.accountCode, ctx.config);
     let forest = await client.getForestInfo(lookup);
 
     return {

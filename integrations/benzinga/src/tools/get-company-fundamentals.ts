@@ -37,6 +37,7 @@ export let getCompanyFundamentalsTool = SlateTool.create(spec, {
       fundamentals: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of fundamentals data records'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of records returned')
     })
   )
@@ -48,16 +49,16 @@ export let getCompanyFundamentalsTool = SlateTool.create(spec, {
 
     switch (dataType) {
       case 'profile':
-        rawData = await client.getCompanyProfile({ symbols, asOf });
+        rawData = await client.getCompanyProfile({ symbols, asOf, period, reportType });
         break;
       case 'valuationRatios':
-        rawData = await client.getValuationRatios({ symbols, asOf });
+        rawData = await client.getValuationRatios({ symbols, asOf, period, reportType });
         break;
       case 'financials':
         rawData = await client.getFinancials({ symbols, asOf, period, reportType });
         break;
       default:
-        rawData = await client.getFundamentals({ symbols, asOf });
+        rawData = await client.getFundamentals({ symbols, asOf, period, reportType });
         break;
     }
 
@@ -65,6 +66,7 @@ export let getCompanyFundamentalsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: rawData,
         fundamentals,
         count: fundamentals.length
       },

@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonCursor,
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  validatePolygonLimit
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getTechnicalIndicators = SlateTool.create(spec, {
@@ -18,6 +25,7 @@ export let getTechnicalIndicators = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: polygonCursor,
       ticker: z.string().describe('Ticker symbol (e.g., AAPL, C:EURUSD, X:BTCUSD, I:SPX)'),
       indicator: z
         .enum(['sma', 'ema', 'rsi', 'macd'])
@@ -68,6 +76,7 @@ export let getTechnicalIndicators = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       ticker: z.string().optional().describe('Ticker symbol'),
       indicator: z.string().describe('Indicator name'),
       values: z
@@ -86,9 +95,11 @@ export let getTechnicalIndicators = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePolygonLimit(ctx.input.limit, 5000);
     let client = new PolygonClient(ctx.auth.token);
 
     let commonParams = {
+      cursor: ctx.input.cursor,
       ticker: ctx.input.ticker,
       timespan: ctx.input.timespan,
       adjusted: ctx.input.adjusted,
@@ -102,11 +113,20 @@ export let getTechnicalIndicators = SlateTool.create(spec, {
     let response: any;
 
     if (ctx.input.indicator === 'sma') {
-      response = await client.getSMA({ ...commonParams, window: ctx.input.window });
+      response = await client.getSMA({
+        ...commonParams,
+        window: ctx.input.window
+      });
     } else if (ctx.input.indicator === 'ema') {
-      response = await client.getEMA({ ...commonParams, window: ctx.input.window });
+      response = await client.getEMA({
+        ...commonParams,
+        window: ctx.input.window
+      });
     } else if (ctx.input.indicator === 'rsi') {
-      response = await client.getRSI({ ...commonParams, window: ctx.input.window });
+      response = await client.getRSI({
+        ...commonParams,
+        window: ctx.input.window
+      });
     } else {
       response = await client.getMACD({
         ...commonParams,
@@ -116,7 +136,7 @@ export let getTechnicalIndicators = SlateTool.create(spec, {
       });
     }
 
-    let results = response.results?.values || [];
+    let results = polygonRecords(response.results?.values, 'indicator values');
     let values = results.map((v: any) => ({
       timestamp: v.timestamp,
       value: v.value,
@@ -125,11 +145,14 @@ export let getTechnicalIndicators = SlateTool.create(spec, {
     }));
 
     return {
-      output: {
-        ticker: ctx.input.ticker,
-        indicator: ctx.input.indicator.toUpperCase(),
-        values
-      },
+      output: polygonOutput(
+        {
+          ticker: ctx.input.ticker,
+          indicator: ctx.input.indicator.toUpperCase(),
+          values
+        },
+        response
+      ),
       message: `Retrieved **${values.length}** ${ctx.input.indicator.toUpperCase()} data points for **${ctx.input.ticker}**.`
     };
   })

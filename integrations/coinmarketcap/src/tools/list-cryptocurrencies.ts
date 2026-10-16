@@ -104,6 +104,7 @@ export let listCryptocurrencies = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       cryptocurrencies: z
         .array(listingSchema)
         .describe('List of cryptocurrencies with market data')
@@ -143,7 +144,24 @@ export let listCryptocurrencies = SlateTool.create(spec, {
       dateAdded: listing.dateAdded,
       tags: listing.tags || [],
       platform: listing.platform,
-      quote: listing.quote || {}
+      quote: Object.fromEntries(
+        Object.entries(listing.quote || {}).map(([currency, quote]) => [
+          currency,
+          {
+            price: quote.price ?? null,
+            volume24h: quote.volume24h ?? null,
+            volumeChange24h: quote.volumeChange24h ?? null,
+            percentChange1h: quote.percentChange1h ?? null,
+            percentChange24h: quote.percentChange24h ?? null,
+            percentChange7d: quote.percentChange7d ?? null,
+            percentChange30d: quote.percentChange30d ?? null,
+            marketCap: quote.marketCap ?? null,
+            marketCapDominance: quote.marketCapDominance ?? null,
+            fullyDilutedMarketCap: quote.fullyDilutedMarketCap ?? null,
+            lastUpdated: quote.lastUpdated ?? null
+          }
+        ])
+      )
     }));
 
     let count = cryptocurrencies.length;
@@ -153,7 +171,7 @@ export let listCryptocurrencies = SlateTool.create(spec, {
       : `No cryptocurrencies found matching the given criteria.`;
 
     return {
-      output: { cryptocurrencies },
+      output: { cryptocurrencies, raw: client.rawResponse },
       message: summary
     };
   })

@@ -64,6 +64,14 @@ export let mergePdfs = SlateTool.create(spec, {
       transfer: ctx.input.transfer
     });
 
+    if (result.status === 'finished' && result.pdf_url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.pdf_url,
+        mimeType: 'application/pdf'
+      });
+    }
+
     return {
       output: {
         pdfId: result.id,

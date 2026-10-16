@@ -1,15 +1,28 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private axios;
 
   constructor(params: { token: string; subdomain: string }) {
-    this.axios = createAxios({
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(params.subdomain)) {
+      throw createApiServiceError(
+        'Enter the Storeganise business code only, without a URL or path.'
+      );
+    }
+    if (!params.token.trim()) {
+      throw createApiServiceError('A Storeganise API key is required.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${params.subdomain}.storeganise.com/api/v1`,
-      headers: {
-        Authorization: `ApiKey ${params.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `ApiKey ${params.token}` },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Storeganise',
+          reason: 'storeganise_api_error',
+          nestedKeys: ['error', 'errors'],
+          extractResponse: (value, helpers) => helpers.getResponseWithBody(value)
+        })
     });
   }
 
@@ -21,7 +34,7 @@ export class Client {
   }
 
   async getSite(siteIdOrCode: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/sites/${siteIdOrCode}`, {
+    let response = await this.axios.get(`/admin/sites/${encodeURIComponent(siteIdOrCode)}`, {
       params: include ? { include } : undefined
     });
     return response.data;
@@ -43,14 +56,14 @@ export class Client {
   }
 
   async getUnit(unitId: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/units/${unitId}`, {
+    let response = await this.axios.get(`/admin/units/${encodeURIComponent(unitId)}`, {
       params: include ? { include } : undefined
     });
     return response.data;
   }
 
   async updateUnit(unitId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/admin/units/${unitId}`, data);
+    let response = await this.axios.put(`/admin/units/${encodeURIComponent(unitId)}`, data);
     return response.data;
   }
 
@@ -69,7 +82,7 @@ export class Client {
   }
 
   async getUser(userIdOrEmail: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/users/${userIdOrEmail}`, {
+    let response = await this.axios.get(`/admin/users/${encodeURIComponent(userIdOrEmail)}`, {
       params: include ? { include } : undefined
     });
     return response.data;
@@ -81,13 +94,14 @@ export class Client {
   }
 
   async updateUser(userId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/admin/users/${userId}`, data);
+    let response = await this.axios.put(`/admin/users/${encodeURIComponent(userId)}`, data);
     return response.data;
   }
 
   // ---- Invoices ----
 
   async listInvoices(params?: {
+    ids?: string;
     userId?: string;
     state?: string;
     updatedAfter?: string;
@@ -100,7 +114,7 @@ export class Client {
   }
 
   async getInvoice(invoiceId: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/invoices/${invoiceId}`, {
+    let response = await this.axios.get(`/admin/invoices/${encodeURIComponent(invoiceId)}`, {
       params: include ? { include } : undefined
     });
     return response.data;
@@ -112,21 +126,30 @@ export class Client {
   }
 
   async updateInvoice(invoiceId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/admin/invoices/${invoiceId}`, data);
+    let response = await this.axios.put(
+      `/admin/invoices/${encodeURIComponent(invoiceId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteInvoice(invoiceId: string): Promise<void> {
-    await this.axios.delete(`/admin/invoices/${invoiceId}`);
+    await this.axios.delete(`/admin/invoices/${encodeURIComponent(invoiceId)}`);
   }
 
   async addInvoicePayment(invoiceId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/admin/invoices/${invoiceId}/payments`, data);
+    let response = await this.axios.post(
+      `/admin/invoices/${encodeURIComponent(invoiceId)}/payments`,
+      data
+    );
     return response.data;
   }
 
   async addInvoiceComment(invoiceId: string, comment: string): Promise<any> {
-    let response = await this.axios.post(`/admin/invoices/${invoiceId}/history`, { comment });
+    let response = await this.axios.post(
+      `/admin/invoices/${encodeURIComponent(invoiceId)}/history`,
+      { comment }
+    );
     return response.data;
   }
 
@@ -141,19 +164,28 @@ export class Client {
     offset?: number;
     include?: string;
   }): Promise<any[]> {
-    let response = await this.axios.get('/admin/unit-rentals', { params });
-    return response.data;
-  }
-
-  async getUnitRental(rentalId: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/unit-rentals/${rentalId}`, {
-      params: include ? { include } : undefined
+    let { userId, ...filters } = params ?? {};
+    let response = await this.axios.get('/admin/unit-rentals', {
+      params: { ...filters, ownerId: userId }
     });
     return response.data;
   }
 
+  async getUnitRental(rentalId: string, include?: string): Promise<any> {
+    let response = await this.axios.get(
+      `/admin/unit-rentals/${encodeURIComponent(rentalId)}`,
+      {
+        params: include ? { include } : undefined
+      }
+    );
+    return response.data;
+  }
+
   async updateUnitRental(rentalId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/admin/unit-rentals/${rentalId}`, data);
+    let response = await this.axios.put(
+      `/admin/unit-rentals/${encodeURIComponent(rentalId)}`,
+      data
+    );
     return response.data;
   }
 
@@ -171,9 +203,12 @@ export class Client {
   }
 
   async getMoveInJob(jobId: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/jobs/unit-move-ins/${jobId}`, {
-      params: include ? { include } : undefined
-    });
+    let response = await this.axios.get(
+      `/admin/jobs/unit-move-ins/${encodeURIComponent(jobId)}`,
+      {
+        params: include ? { include } : undefined
+      }
+    );
     return response.data;
   }
 
@@ -183,17 +218,23 @@ export class Client {
   }
 
   async confirmMoveInJob(jobId: string): Promise<any> {
-    let response = await this.axios.put(`/admin/jobs/unit-move-ins/${jobId}/confirm`);
+    let response = await this.axios.put(
+      `/admin/jobs/unit-move-ins/${encodeURIComponent(jobId)}/confirm`
+    );
     return response.data;
   }
 
   async completeMoveInJob(jobId: string): Promise<any> {
-    let response = await this.axios.put(`/admin/jobs/unit-move-ins/${jobId}/complete`);
+    let response = await this.axios.put(
+      `/admin/jobs/unit-move-ins/${encodeURIComponent(jobId)}/complete`
+    );
     return response.data;
   }
 
   async cancelMoveInJob(jobId: string): Promise<any> {
-    let response = await this.axios.put(`/admin/jobs/unit-move-ins/${jobId}/cancel`);
+    let response = await this.axios.put(
+      `/admin/jobs/unit-move-ins/${encodeURIComponent(jobId)}/cancel`
+    );
     return response.data;
   }
 
@@ -211,9 +252,12 @@ export class Client {
   }
 
   async getMoveOutJob(jobId: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/jobs/unit-move-outs/${jobId}`, {
-      params: include ? { include } : undefined
-    });
+    let response = await this.axios.get(
+      `/admin/jobs/unit-move-outs/${encodeURIComponent(jobId)}`,
+      {
+        params: include ? { include } : undefined
+      }
+    );
     return response.data;
   }
 
@@ -223,12 +267,16 @@ export class Client {
   }
 
   async completeMoveOutJob(jobId: string): Promise<any> {
-    let response = await this.axios.put(`/admin/jobs/unit-move-outs/${jobId}/complete`);
+    let response = await this.axios.put(
+      `/admin/jobs/unit-move-outs/${encodeURIComponent(jobId)}/complete`
+    );
     return response.data;
   }
 
   async cancelMoveOutJob(jobId: string): Promise<any> {
-    let response = await this.axios.put(`/admin/jobs/unit-move-outs/${jobId}/cancel`);
+    let response = await this.axios.put(
+      `/admin/jobs/unit-move-outs/${encodeURIComponent(jobId)}/cancel`
+    );
     return response.data;
   }
 
@@ -246,14 +294,17 @@ export class Client {
   }
 
   async getValetOrder(orderId: string, include?: string): Promise<any> {
-    let response = await this.axios.get(`/admin/valet-orders/${orderId}`, {
+    let response = await this.axios.get(`/admin/valet-orders/${encodeURIComponent(orderId)}`, {
       params: include ? { include } : undefined
     });
     return response.data;
   }
 
   async updateValetOrder(orderId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/admin/valet-orders/${orderId}`, data);
+    let response = await this.axios.put(
+      `/admin/valet-orders/${encodeURIComponent(orderId)}`,
+      data
+    );
     return response.data;
   }
 
@@ -263,7 +314,7 @@ export class Client {
     data: Record<string, any>
   ): Promise<any> {
     let response = await this.axios.put(
-      `/admin/valet-orders/${orderId}/steps/${stepId}`,
+      `/admin/valet-orders/${encodeURIComponent(orderId)}/steps/${encodeURIComponent(stepId)}`,
       data
     );
     return response.data;
@@ -282,7 +333,7 @@ export class Client {
   }
 
   async getLead(leadId: string): Promise<any> {
-    let response = await this.axios.get(`/admin/leads/${leadId}`);
+    let response = await this.axios.get(`/admin/leads/${encodeURIComponent(leadId)}`);
     return response.data;
   }
 
@@ -292,7 +343,7 @@ export class Client {
   }
 
   async updateLead(leadId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/admin/leads/${leadId}`, data);
+    let response = await this.axios.put(`/admin/leads/${encodeURIComponent(leadId)}`, data);
     return response.data;
   }
 
@@ -317,14 +368,20 @@ export class Client {
   // ---- User History / Comments ----
 
   async addUserComment(userId: string, comment: string): Promise<any> {
-    let response = await this.axios.post(`/admin/users/${userId}/history`, { comment });
+    let response = await this.axios.post(
+      `/admin/users/${encodeURIComponent(userId)}/history`,
+      { comment }
+    );
     return response.data;
   }
 
   // ---- Unit Tasks ----
 
   async addUnitTask(unitId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/admin/units/${unitId}/tasks`, data);
+    let response = await this.axios.post(
+      `/admin/units/${encodeURIComponent(unitId)}/tasks`,
+      data
+    );
     return response.data;
   }
 }

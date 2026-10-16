@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { requireRecords, requireSuccess } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageLiveStream = SlateTool.create(spec, {
@@ -23,7 +24,15 @@ export let manageLiveStream = SlateTool.create(spec, {
         .optional()
         .describe('Stream ID (required for start, stop, reset, delete)'),
       name: z.string().optional().describe('Stream name (for create action)'),
-      description: z.string().optional().describe('Stream description (for create action)')
+      description: z.string().optional().describe('Stream description (for create action)'),
+      location: z
+        .string()
+        .optional()
+        .describe('Streaming region for create, such as us_central'),
+      streamType: z
+        .string()
+        .optional()
+        .describe('Streaming mode for create, such as passthrough')
     })
   )
   .output(
@@ -33,7 +42,13 @@ export let manageLiveStream = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('List of live stream objects (for list action)'),
-      streamId: z.string().optional().describe('Created stream ID')
+      streamId: z.string().optional().describe('Created stream ID'),
+      usage: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider live-stream quotas and usage'),
+      state: z.string().optional().describe('Provider state after a lifecycle operation'),
+      note: z.string().optional().describe('Provider note about the lifecycle operation')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,9 +57,12 @@ export let manageLiveStream = SlateTool.create(spec, {
 
     if (action === 'list') {
       let data = await client.listLiveStreams();
-      let streams = data?.streams || data?.items || [];
+      let streams = requireRecords(
+        data?.live_streams ?? data?.streams ?? data?.items,
+        'live stream'
+      );
       return {
-        output: { success: true, streams },
+        output: { success: requireSuccess(data), streams, usage: data.usage },
         message: `Found **${streams.length}** live streams.`
       };
     }
@@ -52,25 +70,27 @@ export let manageLiveStream = SlateTool.create(spec, {
     if (action === 'create') {
       let data = await client.createLiveStream({
         name: ctx.input.name,
-        description: ctx.input.description
+        description: ctx.input.description,
+        location: ctx.input.location,
+        type: ctx.input.streamType
       });
       return {
         output: {
-          success: data.success === true,
-          streamId: data.stream_id || data.id
+          success: requireSuccess(data),
+          streamId: data.liveid ?? data.stream_id ?? data.id
         },
-        message: `Live stream **${ctx.input.name || 'Untitled'}** created.`
+        message: 'Created the live stream.'
       };
     }
 
     if (!ctx.input.streamId) {
-      throw new Error('streamId is required for this action');
+      throw createApiServiceError('streamId is required for this action');
     }
 
     if (action === 'start') {
       let data = await client.startLiveStream(ctx.input.streamId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data), state: data.state, note: data.note },
         message: `Live stream \`${ctx.input.streamId}\` started.`
       };
     }
@@ -78,7 +98,7 @@ export let manageLiveStream = SlateTool.create(spec, {
     if (action === 'stop') {
       let data = await client.stopLiveStream(ctx.input.streamId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data), state: data.state, note: data.note },
         message: `Live stream \`${ctx.input.streamId}\` stopped.`
       };
     }
@@ -86,7 +106,7 @@ export let manageLiveStream = SlateTool.create(spec, {
     if (action === 'reset') {
       let data = await client.resetLiveStream(ctx.input.streamId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data), state: data.state, note: data.note },
         message: `Live stream \`${ctx.input.streamId}\` reset.`
       };
     }
@@ -94,11 +114,11 @@ export let manageLiveStream = SlateTool.create(spec, {
     if (action === 'delete') {
       let data = await client.deleteLiveStream(ctx.input.streamId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data), state: data.state, note: data.note },
         message: `Live stream \`${ctx.input.streamId}\` deleted.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

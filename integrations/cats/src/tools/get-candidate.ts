@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCandidate = SlateTool.create(spec, {
@@ -41,6 +42,7 @@ export let getCandidate = SlateTool.create(spec, {
       phones: z.array(z.any()).optional().describe('Phone numbers'),
       address: z.any().optional().describe('Address'),
       socialMediaUrls: z.array(z.any()).optional().describe('Social media URLs'),
+      raw: z.any().optional().describe('Complete provider response, retaining null values'),
       links: z.any().optional().describe('HAL links for related resources')
     })
   )
@@ -50,29 +52,36 @@ export let getCandidate = SlateTool.create(spec, {
 
     return {
       output: {
-        candidateId: (data.id ?? ctx.input.candidateId).toString(),
-        firstName: data.first_name,
-        lastName: data.last_name,
-        middleName: data.middle_name,
-        title: data.title,
-        currentEmployer: data.current_employer,
-        keySkills: data.key_skills,
-        dateAvailable: data.date_available,
-        currentPay: data.current_pay,
-        desiredPay: data.desired_pay,
-        isWillingToRelocate: data.is_willing_to_relocate,
-        isActive: data.is_active,
-        isHot: data.is_hot,
-        notes: data.notes,
-        source: data.source,
-        website: data.website,
-        countryCode: data.country_code,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        emails: data._embedded?.emails,
-        phones: data._embedded?.phones,
+        candidateId: requiredId(data?.id, 'record'),
+        firstName: data.first_name ?? undefined,
+        lastName: data.last_name ?? undefined,
+        middleName: data.middle_name ?? undefined,
+        title: data.title ?? undefined,
+        currentEmployer: data.current_employer ?? undefined,
+        keySkills: data.key_skills ?? undefined,
+        dateAvailable: data.date_available ?? undefined,
+        currentPay: data.current_pay ?? undefined,
+        desiredPay: data.desired_pay ?? undefined,
+        isWillingToRelocate: data.is_willing_to_relocate ?? undefined,
+        isActive: data.is_active ?? undefined,
+        isHot: data.is_hot ?? undefined,
+        notes: data.notes ?? undefined,
+        source: data.source ?? undefined,
+        website: data.website ?? undefined,
+        countryCode: data.country_code ?? undefined,
+        createdAt: data.date_created ?? undefined,
+        updatedAt: data.date_modified ?? undefined,
+        emails:
+          data._embedded?.emails ??
+          (data.emails && typeof data.emails === 'object'
+            ? Object.entries(data.emails)
+                .filter(([, value]) => typeof value === 'string')
+                .map(([kind, email]) => ({ email, is_primary: kind === 'primary' }))
+            : undefined),
+        phones: data._embedded?.phones ?? undefined,
         address: data._embedded?.address ?? data.address,
-        socialMediaUrls: data.social_media_urls,
+        socialMediaUrls: data.social_media_urls ?? undefined,
+        raw: data,
         links: data._links
       },
       message: `Retrieved candidate **${data.first_name ?? ''} ${data.last_name ?? ''}** (ID: ${ctx.input.candidateId}).`

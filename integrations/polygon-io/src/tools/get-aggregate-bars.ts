@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  aggregateNextFrom,
+  cursorInput,
+  cursorOutput,
+  nextCursor,
+  requiredTicker,
+  responseRows
+} from '../lib/response';
 import { spec } from '../spec';
 
 let barSchema = z.object({
@@ -27,15 +35,21 @@ export let getAggregateBars = SlateTool.create(spec, {
 Supports configurable timespans from seconds to years and adjustable multipliers. Results can be adjusted for stock splits.`,
   instructions: [
     'Use ticker format "C:EURUSD" for forex pairs, "X:BTCUSD" for crypto, and "O:" prefix for options.',
-    'Date range uses YYYY-MM-DD format or Unix millisecond timestamps.'
+    'Date range uses YYYY-MM-DD format or Unix millisecond timestamps.',
+    'For the next page, pass nextFrom as from and nextCursor as cursor; keep the other inputs unchanged.'
   ],
-  constraints: ['Maximum of 50,000 results per request.'],
+  constraints: [
+    'The limit applies to at most 50,000 underlying base aggregates, so the number of returned bars may be smaller.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      cursor: cursorInput.describe(
+        'Opaque nextCursor from a prior response. Also set from to that response’s nextFrom.'
+      ),
       ticker: z.string().describe('Ticker symbol (e.g., "AAPL", "C:EURUSD", "X:BTCUSD")'),
       multiplier: z
         .number()
@@ -63,16 +77,25 @@ Supports configurable timespans from seconds to years and adjustable multipliers
         .number()
         .optional()
         .default(120)
-        .describe('Maximum number of results to return (max 50000)')
+        .describe(
+          'Maximum number of base aggregates used to build the returned bars (max 50000)'
+        )
     })
   )
   .output(
     z.object({
+      nextCursor: cursorOutput,
+      nextFrom: z
+        .string()
+        .optional()
+        .describe(
+          'Start value from the provider’s next-page URL. Use as from with nextCursor.'
+        ),
       ticker: z.string().describe('Ticker symbol'),
       queryCount: z.number().optional().describe('Number of results in the response'),
       resultsCount: z.number().optional().describe('Total number of results for the query'),
       adjusted: z.boolean().optional().describe('Whether results are adjusted for splits'),
-      bars: z.array(barSchema).describe('Array of OHLCV aggregate bars')
+      bars: z.array(barSchema).optional().describe('Array of OHLCV aggregate bars')
     })
   )
   .handleInvocation(async ctx => {
@@ -86,29 +109,32 @@ Supports configurable timespans from seconds to years and adjustable multipliers
       to: ctx.input.to,
       adjusted: ctx.input.adjusted,
       sort: ctx.input.sort,
+      cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
 
-    let bars = (data.results || []).map((r: any) => ({
-      open: r.o,
-      high: r.h,
-      low: r.l,
-      close: r.c,
-      volume: r.v,
-      volumeWeighted: r.vw,
-      timestamp: r.t,
-      transactions: r.n
+    let bars = responseRows(data.results)?.map((r: any) => ({
+      open: r.o ?? undefined,
+      high: r.h ?? undefined,
+      low: r.l ?? undefined,
+      close: r.c ?? undefined,
+      volume: r.v ?? undefined,
+      volumeWeighted: r.vw ?? undefined,
+      timestamp: r.t ?? undefined,
+      transactions: r.n ?? undefined
     }));
 
     return {
       output: {
-        ticker: data.ticker || ctx.input.ticker,
-        queryCount: data.queryCount,
-        resultsCount: data.resultsCount,
-        adjusted: data.adjusted,
+        nextCursor: nextCursor(data),
+        nextFrom: aggregateNextFrom(data),
+        ticker: requiredTicker(data.ticker),
+        queryCount: data.queryCount ?? undefined,
+        resultsCount: data.resultsCount ?? undefined,
+        adjusted: data.adjusted ?? undefined,
         bars
       },
-      message: `Retrieved **${bars.length}** aggregate bars for **${ctx.input.ticker}** (${ctx.input.multiplier} ${ctx.input.timespan}) from ${ctx.input.from} to ${ctx.input.to}.`
+      message: `Retrieved **${bars?.length ?? 0}** aggregate bars for **${ctx.input.ticker}** (${ctx.input.multiplier} ${ctx.input.timespan}) from ${ctx.input.from} to ${ctx.input.to}.`
     };
   })
   .build();

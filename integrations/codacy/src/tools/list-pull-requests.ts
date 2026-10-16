@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listPullRequests = SlateTool.create(spec, {
@@ -15,7 +15,19 @@ export let listPullRequests = SlateTool.create(spec, {
   .input(
     z.object({
       repositoryName: z.string().describe('Name of the repository to list pull requests for.'),
-      search: z.string().optional().describe('Search text to filter pull requests by title.'),
+      search: z
+        .string()
+        .optional()
+        .describe('Search mode: last-updated or merged. For title search, use textQuery.'),
+      textQuery: z
+        .string()
+        .optional()
+        .describe('Search text to filter pull requests by title.'),
+      targetBranch: z.string().optional().describe('Filter by target branch.'),
+      includeNotAnalyzed: z
+        .boolean()
+        .optional()
+        .describe('Include pull requests that have not been analyzed.'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response.'),
       limit: z
         .number()
@@ -27,6 +39,10 @@ export let listPullRequests = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       pullRequests: z
         .array(
           z.object({
@@ -60,12 +76,18 @@ export let listPullRequests = SlateTool.create(spec, {
 
     let response = await client.listRepositoryPullRequests(ctx.input.repositoryName, {
       search: ctx.input.search,
+      textQuery: ctx.input.textQuery,
+      targetBranch: ctx.input.targetBranch,
+      includeNotAnalyzed: ctx.input.includeNotAnalyzed,
       cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
 
     let pullRequests = (response.data ?? []).map((pr: any) => ({
-      pullRequestNumber: pr.pullRequest?.number ?? pr.number ?? 0,
+      pullRequestNumber: requireCodacyNumber(
+        pr.pullRequest?.number ?? pr.number,
+        'pullRequest.number'
+      ),
       title: pr.pullRequest?.title ?? pr.title ?? undefined,
       status: pr.pullRequest?.status ?? pr.status ?? undefined,
       originBranch: pr.pullRequest?.originBranch ?? pr.originBranch ?? undefined,
@@ -81,6 +103,7 @@ export let listPullRequests = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         pullRequests,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

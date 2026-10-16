@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -97,6 +97,9 @@ Supports click events (with positions), conversion events (with purchase/addToCa
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.events.length > 1000) {
+      throw createApiServiceError('Send at most 1000 events per request.');
+    }
     let client = new AlgoliaClient({
       applicationId: ctx.auth.applicationId,
       token: ctx.auth.token,
@@ -104,6 +107,9 @@ Supports click events (with positions), conversion events (with purchase/addToCa
     });
 
     let eventsPayload = ctx.input.events.map(event => {
+      if (event.timestamp !== undefined && !Number.isFinite(Date.parse(event.timestamp))) {
+        throw createApiServiceError('Event timestamp must be a valid ISO 8601 date and time.');
+      }
       let mapped: Record<string, any> = {
         eventType: event.eventType,
         eventName: event.eventName,

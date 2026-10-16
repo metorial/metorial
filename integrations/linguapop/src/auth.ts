@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -13,13 +13,21 @@ export let auth = SlateAuth.create()
     key: 'api_key',
 
     inputSchema: z.object({
-      apiKey: z.string()
+      apiKey: z
+        .string()
+        .describe('API key from an active integration in the Linguapop dashboard')
     }),
 
     getOutput: async ctx => {
+      let token = ctx.input.apiKey.trim();
+      if (!token) {
+        throw createApiServiceError(
+          'Provide an API key from an active Linguapop integration.'
+        );
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token
         }
       };
     }

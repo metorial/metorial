@@ -8,6 +8,7 @@ import {
   getTrendingCoins,
   listCoins,
   listReferenceCurrencies,
+  listTags,
   searchCoins
 } from './tools';
 export let provider = Slate.create({
@@ -20,7 +21,8 @@ export let provider = Slate.create({
     getCoinPriceHistory,
     getTrendingCoins,
     getGlobalStats,
-    listReferenceCurrencies
+    listReferenceCurrencies,
+    listTags
   ],
   triggers: []
 });

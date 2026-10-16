@@ -14,6 +14,10 @@ export let createAndScheduleScan = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organisationId: z
+        .number()
+        .optional()
+        .describe('Organisation ID from get_current_user. Omit to use the token default.'),
       scheduleType: z
         .enum(['one-time', 'recurring'])
         .describe('Whether this is a one-time or recurring scan'),
@@ -30,8 +34,33 @@ export let createAndScheduleScan = SlateTool.create(spec, {
       inspectionPolicyId: z
         .string()
         .optional()
-        .describe('Inspection policy ID to apply during scanning'),
-      scanLimit: z.number().optional().describe('Maximum number of resources to scan'),
+        .describe(
+          'Legacy field unsupported by the provider API. Use inspectionPolicy instead.'
+        ),
+      inspectionPolicy: z
+        .object({
+          collectTokens: z.boolean().optional(),
+          maskDetails: z.boolean().optional(),
+          infotypes: z.array(z.string()).optional(),
+          compliance: z.array(z.string()).optional()
+        })
+        .optional()
+        .describe('Sensitive-data inspection policy options.'),
+      scanLimits: z
+        .object({
+          samplePercentage: z.number().optional(),
+          maxCumulativeDataSizeMb: z.number().optional(),
+          itemsPerBatch: z.number().optional(),
+          sampleDurationMinutes: z.number().optional()
+        })
+        .optional()
+        .describe('Data-volume and sampling limits; no resource-count limit is supported.'),
+      scanLimit: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy resource-count limit unsupported by the provider API. Use scanLimits instead.'
+        ),
       cronExpression: z.string().optional().describe('Cron expression for recurring scans'),
       name: z.string().optional().describe('Name for the scan')
     })
@@ -49,7 +78,8 @@ export let createAndScheduleScan = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      organisationId: ctx.input.organisationId
     });
 
     let result = await client.createAndScheduleScan({
@@ -59,16 +89,18 @@ export let createAndScheduleScan = SlateTool.create(spec, {
       resourceType: ctx.input.resourceType,
       resourceIds: ctx.input.resourceIds,
       inspectionPolicyId: ctx.input.inspectionPolicyId,
+      inspectionPolicy: ctx.input.inspectionPolicy,
+      scanLimits: ctx.input.scanLimits,
       scanLimit: ctx.input.scanLimit,
       cronExpression: ctx.input.cronExpression,
       name: ctx.input.name
     });
 
-    let data = result?.data ?? result;
+    let data = result;
 
     return {
       output: {
-        scanId: data?.id ?? data?.scanId,
+        scanId: data.scanId,
         status: data?.status,
         scheduleType: data?.scheduleType,
         createdAt: data?.createdAt,

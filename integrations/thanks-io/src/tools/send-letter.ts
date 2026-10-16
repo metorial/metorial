@@ -1,17 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ThanksIoClient } from '../lib/client';
+import { mapRadiusSearch, radiusSearchSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
   name: z.string().optional().describe('Recipient full name'),
   company: z.string().optional().describe('Recipient company name'),
-  address: z.string().describe('Street address'),
+  address: z.string().optional().describe('Street address'),
   address2: z.string().optional().describe('Address line 2'),
-  city: z.string().describe('City'),
-  province: z.string().describe('State/province code'),
-  postalCode: z.string().describe('ZIP/postal code'),
+  city: z.string().optional().describe('City'),
+  province: z.string().optional().describe('State/province code'),
+  postalCode: z.string().optional().describe('ZIP/postal code'),
   country: z.string().optional().describe('Country code (US or CA)'),
+  email: z
+    .string()
+    .optional()
+    .describe('Email for paid address lookup if no mailing address is supplied'),
+  phone: z.string().optional().describe('Recipient phone'),
   custom1: z.string().optional().describe('Custom field 1'),
   custom2: z.string().optional().describe('Custom field 2'),
   custom3: z.string().optional().describe('Custom field 3'),
@@ -29,7 +35,9 @@ Set **preview** to true to generate a visual preview without placing an order.`,
     'Use pdfOnlyUrl to send a complete PDF document without a generated cover letter.',
     'Use additionalPagesUrl to attach extra PDF pages after the cover letter.'
   ],
-  constraints: ['Only US and Canadian addresses are accepted.'],
+  constraints: [
+    'Recipient addresses must be supported by Thanks.io for the selected mail type.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -38,6 +46,23 @@ Set **preview** to true to generate a visual preview without placing an order.`,
   .input(
     z.object({
       letterType: z.enum(['windowed', 'windowless']).describe('Envelope type'),
+      creativeId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Saved creative ID from list_creatives; omit design, message, handwriting, background and gift card settings when used'
+        ),
+      radiusSearch: radiusSearchSchema.optional(),
+      notificationEmails: z
+        .string()
+        .optional()
+        .describe('Comma-separated email addresses for order notifications'),
+      metadata: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Order metadata, at most 8192 JSON bytes'),
       frontImageUrl: z
         .string()
         .optional()
@@ -81,6 +106,7 @@ Set **preview** to true to generate a visual preview without placing an order.`,
       status: z.string().optional().describe('Order status'),
       totalRecipients: z.number().optional().describe('Estimated number of recipients'),
       authorizationTotal: z.number().optional().describe('Total cost in cents'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       previews: z.array(z.string()).optional().describe('Preview image URLs')
     })
   )
@@ -96,6 +122,8 @@ Set **preview** to true to generate a visual preview without placing an order.`,
       province: r.province,
       postal_code: r.postalCode,
       country: r.country,
+      email: r.email,
+      phone: r.phone,
       custom1: r.custom1,
       custom2: r.custom2,
       custom3: r.custom3,
@@ -104,6 +132,10 @@ Set **preview** to true to generate a visual preview without placing an order.`,
 
     let result = await client.sendLetter({
       letterType: ctx.input.letterType,
+      creativeId: ctx.input.creativeId,
+      radiusSearch: mapRadiusSearch(ctx.input.radiusSearch),
+      emailAdditional: ctx.input.notificationEmails,
+      metadata: ctx.input.metadata,
       frontImageUrl: ctx.input.frontImageUrl,
       imageTemplate: ctx.input.imageTemplateId,
       message: ctx.input.message,
@@ -127,7 +159,11 @@ Set **preview** to true to generate a visual preview without placing an order.`,
     });
 
     let isPreview = ctx.input.preview === true;
-    let previews = isPreview ? ((result.data as any)?.previews as string[]) || [] : undefined;
+    let previewData = result.data as { previews?: string[] } | undefined;
+    let previews = isPreview ? previewData?.previews || [] : undefined;
+    for (let url of previews || []) {
+      await ctx.addAttachment({ type: 'url', url });
+    }
 
     return {
       output: {
@@ -135,7 +171,8 @@ Set **preview** to true to generate a visual preview without placing an order.`,
         status: isPreview ? 'preview' : (result.status as string),
         totalRecipients: result.total_estimated_recipients as number | undefined,
         authorizationTotal: result.authorization_total as number | undefined,
-        previews
+        previews,
+        raw: result
       },
       message: isPreview
         ? `Generated **${previews?.length || 0}** letter preview(s).`

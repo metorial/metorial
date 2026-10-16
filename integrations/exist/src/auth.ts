@@ -1,9 +1,29 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client, existApiError, requireText } from './lib/client';
 
-let http = createAxios({
-  baseURL: 'https://exist.io'
+let http = createAuthenticatedAxios({
+  baseURL: 'https://exist.io',
+  timeout: 30_000,
+  contentType: 'application/x-www-form-urlencoded',
+  errorAdapter: existApiError
 });
+
+let getConnectionProfile = async (output: { token: string; authType?: string }) => {
+  let profile = await new Client(output).getProfile();
+  return {
+    profile: {
+      id: profile.username,
+      name: `${profile.first_name} ${profile.last_name}`.trim() || profile.username,
+      imageUrl: profile.avatar
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -88,71 +108,66 @@ export let auth = SlateAuth.create()
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         state: ctx.state,
-        scope: ctx.scopes.join('+')
+        scope: ctx.scopes.join(' ')
       });
       return {
         url: `https://exist.io/oauth2/authorize?${params.toString()}`
       };
     },
     handleCallback: async ctx => {
-      let response = await http.post('/oauth2/access_token', {
-        grant_type: 'authorization_code',
-        code: ctx.code,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        redirect_uri: ctx.redirectUri
-      });
-
-      let expiresAt = new Date(Date.now() + response.data.expires_in * 1000).toISOString();
+      let response = await http.post(
+        '/oauth2/access_token',
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: ctx.code,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          redirect_uri: ctx.redirectUri
+        }).toString()
+      );
 
       return {
         output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          expiresAt,
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Exist',
+            required: true
+          }),
           authType: 'oauth' as const
         }
       };
     },
-    handleTokenRefresh: async (ctx: any) => {
-      let response = await http.post('/oauth2/access_token', {
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
-
-      let expiresAt = new Date(Date.now() + response.data.expires_in * 1000).toISOString();
-
-      return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          expiresAt,
-          authType: 'oauth' as const
-        }
-      };
-    },
-    getProfile: async (ctx: {
-      output: { token: string };
-      input: Record<string, never>;
-      scopes: string[];
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string };
+      clientId: string;
+      clientSecret: string;
     }) => {
-      let response = await http.get('/api/2/accounts/profile/', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError(
+          'The Exist refresh token is missing. Reconnect using OAuth2.'
+        );
+      let response = await http.post(
+        '/oauth2/access_token',
+        new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        }).toString()
+      );
 
       return {
-        profile: {
-          id: response.data.username,
-          name:
-            `${response.data.first_name || ''} ${response.data.last_name || ''}`.trim() ||
-            response.data.username,
-          email: response.data.email,
-          imageUrl: response.data.avatar
+        output: {
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Exist',
+            required: true,
+            previousRefreshToken: ctx.output.refreshToken
+          }),
+          authType: 'oauth' as const
         }
       };
-    }
+    },
+    getProfile: async (ctx: { output: { token: string } }) =>
+      getConnectionProfile({ ...ctx.output, authType: 'oauth' })
   })
   .addCustomAuth({
     type: 'auth.custom',
@@ -163,10 +178,19 @@ export let auth = SlateAuth.create()
       password: z.string().describe('Your Exist password')
     }),
     getOutput: async ctx => {
-      let response = await http.post('/api/2/auth/simple-token/', {
-        username: ctx.input.username,
-        password: ctx.input.password
-      });
+      requireText(ctx.input.username, 'Exist username');
+      requireText(ctx.input.password, 'Exist password');
+      let response = await http.post(
+        '/api/2/auth/simple-token/',
+        new URLSearchParams({
+          username: ctx.input.username,
+          password: ctx.input.password
+        }).toString()
+      );
+      if (typeof response.data?.token !== 'string' || !response.data.token.trim())
+        throw createApiServiceError(
+          'Exist did not return an access token. Check your username and password.'
+        );
 
       return {
         output: {
@@ -175,23 +199,6 @@ export let auth = SlateAuth.create()
         }
       };
     },
-    getProfile: async (ctx: {
-      output: { token: string };
-      input: { username: string; password: string };
-    }) => {
-      let response = await http.get('/api/2/accounts/profile/', {
-        headers: { Authorization: `Token ${ctx.output.token}` }
-      });
-
-      return {
-        profile: {
-          id: response.data.username,
-          name:
-            `${response.data.first_name || ''} ${response.data.last_name || ''}`.trim() ||
-            response.data.username,
-          email: response.data.email,
-          imageUrl: response.data.avatar
-        }
-      };
-    }
+    getProfile: async (ctx: { output: { token: string } }) =>
+      getConnectionProfile({ ...ctx.output, authType: 'simple_token' })
   });

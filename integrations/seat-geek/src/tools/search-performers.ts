@@ -36,7 +36,7 @@ let performerSchema = z.object({
     .array(
       z.object({
         provider: z.string().describe('External service provider (e.g., "spotify", "lastfm")'),
-        linkId: z.string().describe('Provider-specific ID'),
+        linkId: z.string().optional().describe('Provider-specific ID when supplied'),
         url: z.string().describe('External URL')
       })
     )
@@ -86,12 +86,17 @@ export let searchPerformers = SlateTool.create(spec, {
         .optional()
         .describe('Filter by genre slug (e.g., "rock", "hip-hop")'),
       primaryGenreSlug: z.string().optional().describe('Filter by primary genre slug'),
+      sort: z
+        .enum(['score.asc', 'score.desc', 'id.asc', 'id.desc'])
+        .optional()
+        .describe('Sort performers; default score.desc'),
       page: z.number().optional().describe('Page number (1-indexed). Default: 1'),
       perPage: z.number().optional().describe('Results per page. Default: 10')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       performers: z.array(performerSchema).describe('List of matching performers'),
       total: z.number().describe('Total number of matching performers'),
       page: z.number().describe('Current page number'),
@@ -108,16 +113,18 @@ export let searchPerformers = SlateTool.create(spec, {
 
     let params: Record<string, string> = {};
 
+    if (ctx.input.sort) params.sort = ctx.input.sort;
     if (ctx.input.query) params.q = ctx.input.query;
     if (ctx.input.performerIds?.length) params.id = ctx.input.performerIds.join(',');
     if (ctx.input.slug) params.slug = ctx.input.slug;
     if (ctx.input.taxonomyName) params['taxonomies.name'] = ctx.input.taxonomyName;
-    if (ctx.input.taxonomyId) params['taxonomies.id'] = String(ctx.input.taxonomyId);
+    if (ctx.input.taxonomyId !== undefined)
+      params['taxonomies.id'] = String(ctx.input.taxonomyId);
     if (ctx.input.genreSlug) params['genres.slug'] = ctx.input.genreSlug;
     if (ctx.input.primaryGenreSlug)
       params['genres[primary].slug'] = ctx.input.primaryGenreSlug;
-    if (ctx.input.page) params.page = String(ctx.input.page);
-    if (ctx.input.perPage) params.per_page = String(ctx.input.perPage);
+    if (ctx.input.page !== undefined) params.page = String(ctx.input.page);
+    if (ctx.input.perPage !== undefined) params.per_page = String(ctx.input.perPage);
 
     let response = await client.searchPerformers(params);
 
@@ -144,7 +151,7 @@ export let searchPerformers = SlateTool.create(spec, {
       })),
       links: (p.links || []).map(l => ({
         provider: l.provider,
-        linkId: l.id,
+        linkId: l.id ?? undefined,
         url: l.url
       })),
       divisions: (p.divisions || []).map(d => ({
@@ -174,7 +181,7 @@ export let searchPerformers = SlateTool.create(spec, {
     }
 
     return {
-      output: { performers, total, page, perPage },
+      output: { raw: response, performers, total, page, perPage },
       message: summaryParts.join('\n')
     };
   })

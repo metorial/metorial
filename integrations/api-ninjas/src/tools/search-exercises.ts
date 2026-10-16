@@ -13,6 +13,16 @@ export let searchExercises = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Results to skip for pagination; premium only'),
+      equipments: z
+        .string()
+        .optional()
+        .describe('Comma-separated equipment filter, such as dumbbell,flat bench'),
       name: z
         .string()
         .optional()
@@ -43,6 +53,7 @@ export let searchExercises = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       exercises: z
         .array(
           z.object({
@@ -51,7 +62,9 @@ export let searchExercises = SlateTool.create(spec, {
             muscle: z.string().describe('Primary target muscle'),
             difficulty: z.string().describe('Difficulty level'),
             instructions: z.string().describe('How to perform the exercise'),
-            equipment: z.string().optional().describe('Required equipment')
+            equipment: z.string().optional().describe('Required equipment'),
+            equipments: z.array(z.string()).optional().describe('Required equipment names'),
+            safetyInfo: z.string().optional().describe('Safety guidance and movement cues')
           })
         )
         .describe('List of matching exercises')
@@ -60,6 +73,8 @@ export let searchExercises = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let params: Record<string, string | number> = {};
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
+    if (ctx.input.equipments !== undefined) params.equipments = ctx.input.equipments;
     if (ctx.input.name) params.name = ctx.input.name;
     if (ctx.input.type) params.type = ctx.input.type;
     if (ctx.input.muscle) params.muscle = ctx.input.muscle;
@@ -74,11 +89,21 @@ export let searchExercises = SlateTool.create(spec, {
       muscle: e.muscle,
       difficulty: e.difficulty,
       instructions: e.instructions,
-      equipment: e.equipment
+      equipment:
+        typeof e.equipment === 'string'
+          ? e.equipment
+          : Array.isArray(e.equipments)
+            ? e.equipments.join(', ')
+            : undefined,
+      equipments: e.equipments ?? undefined,
+      safetyInfo: e.safety_info ?? undefined
     }));
 
     return {
-      output: { exercises: mapped },
+      output: {
+        raw: result,
+        exercises: mapped
+      },
       message: `Found **${mapped.length}** exercise(s)${ctx.input.muscle ? ` targeting **${ctx.input.muscle}**` : ''}.`
     };
   })

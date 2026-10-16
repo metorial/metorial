@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageVolunteerRoles = SlateTool.create(spec, {
@@ -43,14 +43,14 @@ export let manageVolunteerRoles = SlateTool.create(spec, {
           ctx.input.instanceId,
           ctx.input.showQuantity
         );
-        let rolesArray = Array.isArray(roles) ? roles : [];
+        let rolesArray = requireList(roles, 'manage-volunteer-roles');
         return {
           output: { roles: rolesArray },
           message: `Found **${rolesArray.length}** volunteer roles for event instance (ID: ${ctx.input.instanceId}).`
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required to create a role');
+        if (!ctx.input.name) throw createApiServiceError('name is required to create a role');
         let role = await client.addVolunteerRole(
           ctx.input.instanceId,
           ctx.input.name,
@@ -62,10 +62,11 @@ export let manageVolunteerRoles = SlateTool.create(spec, {
         };
       }
       case 'remove': {
-        if (!ctx.input.roleId) throw new Error('roleId is required to remove a role');
+        if (!ctx.input.roleId)
+          throw createApiServiceError('roleId is required to remove a role');
         let result = await client.removeVolunteerRole(ctx.input.instanceId, ctx.input.roleId);
         return {
-          output: { success: result === true || result === 'true' },
+          output: { success: requireSuccess(result) },
           message: `Removed volunteer role (ID: ${ctx.input.roleId}) from event instance (ID: ${ctx.input.instanceId}).`
         };
       }

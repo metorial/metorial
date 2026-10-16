@@ -10,6 +10,8 @@ export let config = SlateConfig.create(
     devMode: z
       .boolean()
       .default(false)
-      .describe('Enable development mode for free access with limited data size (~1MB).')
+      .describe(
+        'Legacy setting retained for saved connections. BigML retired development mode; requests use the production API.'
+      )
   })
 );

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireCodacyString } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listFiles = SlateTool.create(spec, {
@@ -28,6 +28,10 @@ export let listFiles = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       files: z
         .array(
           z.object({
@@ -36,7 +40,7 @@ export let listFiles = SlateTool.create(spec, {
             totalIssues: z.number().optional().describe('Total number of issues in the file.'),
             complexity: z.number().optional().describe('File complexity score.'),
             coverage: z.number().optional().describe('Code coverage percentage.'),
-            duplication: z.number().optional().describe('Duplication percentage.')
+            duplication: z.number().optional().describe('Number of duplicated lines.')
           })
         )
         .describe('List of files with quality metrics.'),
@@ -55,16 +59,17 @@ export let listFiles = SlateTool.create(spec, {
     });
 
     let files = (response.data ?? []).map((file: any) => ({
-      path: file.path ?? '',
+      path: requireCodacyString(file.path, 'file.path'),
       gradeLetter: file.gradeLetter ?? undefined,
       totalIssues: file.totalIssues ?? undefined,
       complexity: file.complexity ?? undefined,
-      coverage: file.coverage ?? undefined,
+      coverage: file.coverageWithDecimals ?? file.coverage ?? undefined,
       duplication: file.duplication ?? undefined
     }));
 
     return {
       output: {
+        raw: response,
         files,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

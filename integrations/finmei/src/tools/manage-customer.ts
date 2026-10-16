@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import { FinmeiClient, readEntity } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCustomer = SlateTool.create(spec, {
@@ -75,8 +75,10 @@ export let manageCustomer = SlateTool.create(spec, {
       };
     }
 
+    if (!Object.keys(updateData).length)
+      throw createApiServiceError('Provide at least one customer field to update.');
     let result = await client.updateCustomer(ctx.input.customerId, updateData);
-    let customer = result?.data ?? result;
+    let customer = readEntity(result, 'customer');
 
     return {
       output: {

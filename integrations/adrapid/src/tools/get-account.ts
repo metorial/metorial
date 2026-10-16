@@ -17,7 +17,8 @@ export let getAccount = SlateTool.create(spec, {
     z.object({
       userId: z.string().describe('Unique identifier of the account'),
       email: z.string().optional().describe('Email address of the account'),
-      name: z.string().optional().describe('Name or username of the account')
+      name: z.string().optional().describe('Name or username of the account'),
+      raw: z.record(z.string(), z.any()).describe('Complete provider account response')
     })
   )
   .handleInvocation(async ctx => {
@@ -29,7 +30,8 @@ export let getAccount = SlateTool.create(spec, {
       output: {
         userId: account.userId,
         email: account.email,
-        name: account.name
+        name: account.name,
+        raw: account.raw
       },
       message: `Account: **${account.name || account.email || account.userId}**`
     };

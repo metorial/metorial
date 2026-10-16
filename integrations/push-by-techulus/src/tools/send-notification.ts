@@ -26,8 +26,11 @@ export let sendNotification = SlateTool.create(spec, {
   key: 'send_notification',
   description: `Send a push notification to all devices connected to your account or team. The target depends on the API key used during authentication: an account API key sends to all personal devices, while a team API key sends to all team members' devices.
 
-Supports customizing the notification with a sound, channel, link, image, and time-sensitive delivery (iOS only). Can be sent **synchronously** (waits for delivery confirmation) or **asynchronously** (returns immediately).`,
-  instructions: ['Use async mode for accounts with more than 10 devices to avoid timeouts.'],
+Supports customizing the notification with a sound, channel, link, image, and time-sensitive delivery (iOS only). Synchronous requests return per-device delivery results when available. Asynchronous requests return an acknowledgement and do not confirm device delivery.`,
+  instructions: [
+    'Use async mode for teams or accounts with more than 10 devices to avoid timeouts.',
+    'Inspect responses for individual device failures even when success is true.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -52,13 +55,24 @@ Supports customizing the notification with a sound, channel, link, image, and ti
         .boolean()
         .optional()
         .default(false)
-        .describe('Send asynchronously without waiting for delivery confirmation')
+        .describe('Return an acknowledgement without waiting for per-device delivery results')
     })
   )
   .output(
     z.object({
       success: z.boolean().describe('Whether the notification was sent successfully'),
-      message: z.string().optional().describe('Response message from the API')
+      message: z.string().optional().describe('Response message from the API'),
+      responses: z
+        .array(
+          z
+            .object({
+              success: z.boolean(),
+              message: z.string().optional()
+            })
+            .passthrough()
+        )
+        .optional()
+        .describe('Per-device delivery results returned by synchronous requests')
     })
   )
   .handleInvocation(async ctx => {
@@ -78,14 +92,17 @@ Supports customizing the notification with a sound, channel, link, image, and ti
       ? await client.sendNotificationAsync(options)
       : await client.sendNotification(options);
 
+    let failedDevices = result.responses?.filter(response => !response.success).length ?? 0;
+
     return {
       output: {
         success: result.success,
-        message: result.message
+        message: result.message,
+        responses: result.responses
       },
-      message: result.success
-        ? `Notification **"${ctx.input.title}"** sent successfully${ctx.input.async ? ' (async)' : ''}.`
-        : `Failed to send notification: ${result.message ?? result.error ?? 'Unknown error'}`
+      message: ctx.input.async
+        ? `Notification **"${ctx.input.title}"** accepted for asynchronous delivery.`
+        : `Notification **"${ctx.input.title}"** processed.${failedDevices ? ` ${failedDevices} device result(s) reported a failure; inspect responses.` : ''}`
     };
   })
   .build();

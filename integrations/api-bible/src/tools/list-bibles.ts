@@ -19,6 +19,15 @@ let countrySchema = z.object({
 
 let bibleSchema = z.object({
   bibleId: z.string().describe('Unique identifier for the Bible version'),
+  copyright: z
+    .string()
+    .optional()
+    .describe('Copyright information when full details are requested'),
+  info: z.string().optional().describe('Publisher information'),
+  audioBibles: z
+    .array(z.object({ id: z.string(), name: z.string(), nameLocal: z.string() }).passthrough())
+    .optional()
+    .describe('Related audio editions'),
   name: z.string().describe('Name of the Bible version'),
   nameLocal: z.string().describe('Localized name of the Bible version'),
   abbreviation: z.string().describe('Short abbreviation (e.g., KJV, NIV)'),
@@ -41,6 +50,10 @@ export let listBibles = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      includeFullDetails: z
+        .boolean()
+        .optional()
+        .describe('Include copyright and publisher information'),
       language: z
         .string()
         .optional()
@@ -69,33 +82,37 @@ export let listBibles = SlateTool.create(spec, {
 
     let result = await client.listBibles({
       language: ctx.input.language,
+      includeFullDetails: ctx.input.includeFullDetails,
       abbreviation: ctx.input.abbreviation,
       name: ctx.input.name,
       ids: ctx.input.ids
     });
 
-    let bibles = (result.data || []).map(b => ({
-      bibleId: b.bibleId,
-      name: b.name || '',
-      nameLocal: b.nameLocal || '',
-      abbreviation: b.abbreviation || '',
-      abbreviationLocal: b.abbreviationLocal || '',
-      description: b.description || '',
-      descriptionLocal: b.descriptionLocal || '',
+    let bibles = result.data.map(b => ({
+      bibleId: b.id,
+      copyright: b.copyright,
+      info: b.info,
+      audioBibles: b.audioBibles,
+      name: b.name,
+      nameLocal: b.nameLocal,
+      abbreviation: b.abbreviation,
+      abbreviationLocal: b.abbreviationLocal,
+      description: b.description,
+      descriptionLocal: b.descriptionLocal,
       language: {
-        languageId: b.language?.id || '',
-        name: b.language?.name || '',
-        nameLocal: b.language?.nameLocal || '',
-        script: b.language?.script || '',
-        scriptDirection: b.language?.scriptDirection || ''
+        languageId: b.language?.id,
+        name: b.language?.name,
+        nameLocal: b.language?.nameLocal,
+        script: b.language?.script,
+        scriptDirection: b.language?.scriptDirection
       },
-      countries: (b.countries || []).map(c => ({
+      countries: b.countries.map(c => ({
         countryId: c.id,
         name: c.name,
         nameLocal: c.nameLocal
       })),
-      type: b.type || '',
-      updatedAt: b.updatedAt || ''
+      type: b.type,
+      updatedAt: b.updatedAt
     }));
 
     return {

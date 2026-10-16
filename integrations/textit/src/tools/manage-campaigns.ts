@@ -26,6 +26,7 @@ export let manageCampaigns = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       campaignUuid: z.string(),
       name: z.string(),
       archived: z.boolean(),
@@ -35,7 +36,7 @@ export let manageCampaigns = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
-    let campaign: any;
+    let campaign: Awaited<ReturnType<Client['createCampaign']>>;
 
     if (ctx.input.action === 'create') {
       campaign = await client.createCampaign({
@@ -51,6 +52,7 @@ export let manageCampaigns = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: campaign,
         campaignUuid: campaign.uuid,
         name: campaign.name,
         archived: campaign.archived,

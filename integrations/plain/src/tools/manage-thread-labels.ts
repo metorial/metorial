@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,6 +40,15 @@ export let manageThreadLabels = SlateTool.create(spec, {
 
     let added = 0;
     let removed = 0;
+    if (ctx.input.removeLabelIds?.length) {
+      let thread = await client.getThread(ctx.input.threadId);
+      let labelIds = new Set(thread.labels.map((label: any) => label.id));
+      if (ctx.input.removeLabelIds.some(id => !labelIds.has(id))) {
+        throw createApiServiceError(
+          'Every removeLabelIds entry must belong to the specified thread; use get_thread to find its labels'
+        );
+      }
+    }
 
     if (ctx.input.addLabelTypeIds && ctx.input.addLabelTypeIds.length > 0) {
       await client.addLabels({
@@ -51,7 +60,6 @@ export let manageThreadLabels = SlateTool.create(spec, {
 
     if (ctx.input.removeLabelIds && ctx.input.removeLabelIds.length > 0) {
       await client.removeLabels({
-        threadId: ctx.input.threadId,
         labelIds: ctx.input.removeLabelIds
       });
       removed = ctx.input.removeLabelIds.length;

@@ -1,5 +1,27 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { CanvasClient, createCanvasHttp, normalizeCanvasDomain } from './lib/client';
+
+let domainSchema = z
+  .string()
+  .describe('Your Canvas instance domain, such as school.instructure.com');
+
+async function getProfile(ctx: { output: { token: string; canvasDomain: string } }) {
+  let profile = await new CanvasClient(ctx.output).getSelf();
+  if (profile.id === undefined || profile.id === null) {
+    throw createApiServiceError(
+      'Canvas did not return a user ID. Reconnect your Canvas account.'
+    );
+  }
+  return {
+    profile: {
+      id: String(profile.id),
+      email: profile.primary_email || profile.login_id,
+      name: profile.name,
+      imageUrl: profile.avatar_url
+    }
+  };
+}
 
 export let auth = SlateAuth.create()
   .output(
@@ -14,327 +36,345 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'OAuth2',
     key: 'oauth2',
-
-    inputSchema: z.object({
-      canvasDomain: z
-        .string()
-        .describe('Your Canvas instance domain (e.g., myschool.instructure.com)')
-    }),
-
+    inputSchema: z.object({ canvasDomain: domainSchema }),
     scopes: [
       {
-        title: 'User Profile',
-        description: 'Access user profile information',
+        title: 'Get user profile',
+        description: 'Get user profile',
         scope: 'url:GET|/api/v1/users/:user_id/profile'
       },
+      { title: 'List courses', description: 'List courses', scope: 'url:GET|/api/v1/courses' },
+      { title: 'Get course', description: 'Get course', scope: 'url:GET|/api/v1/courses/:id' },
       {
-        title: 'List Courses',
-        description: 'List courses for the current user or account',
-        scope: 'url:GET|/api/v1/courses'
+        title: 'List course creation accounts',
+        description: 'List course creation accounts',
+        scope: 'url:GET|/api/v1/course_creation_accounts'
       },
       {
-        title: 'Manage Courses',
-        description: 'Create and update courses',
+        title: 'Create course',
+        description: 'Create course',
         scope: 'url:POST|/api/v1/accounts/:account_id/courses'
       },
       {
-        title: 'Get Course',
-        description: 'Retrieve a single course by ID',
-        scope: 'url:GET|/api/v1/courses/:id'
-      },
-      {
-        title: 'Update Course',
-        description: 'Update course settings',
+        title: 'Update course',
+        description: 'Update course',
         scope: 'url:PUT|/api/v1/courses/:id'
       },
       {
-        title: 'Delete Course',
-        description: 'Delete or conclude a course',
+        title: 'Delete or conclude course',
+        description: 'Delete or conclude course',
         scope: 'url:DELETE|/api/v1/courses/:id'
       },
       {
-        title: 'List Users',
-        description: 'List users in an account',
-        scope: 'url:GET|/api/v1/accounts/:account_id/users'
-      },
-      {
-        title: 'List Course Users',
-        description: 'List users enrolled in a course',
+        title: 'List course users',
+        description: 'List course users',
         scope: 'url:GET|/api/v1/courses/:course_id/users'
       },
       {
-        title: 'List Enrollments',
-        description: 'List enrollments in a course',
+        title: 'List enrollments',
+        description: 'List enrollments',
         scope: 'url:GET|/api/v1/courses/:course_id/enrollments'
       },
       {
-        title: 'Create Enrollment',
-        description: 'Enroll a user in a course',
+        title: 'Enroll user',
+        description: 'Enroll user',
         scope: 'url:POST|/api/v1/courses/:course_id/enrollments'
       },
       {
-        title: 'List Assignments',
-        description: 'List assignments in a course',
+        title: 'Remove enrollment',
+        description: 'Remove enrollment',
+        scope: 'url:DELETE|/api/v1/courses/:course_id/enrollments/:id'
+      },
+      {
+        title: 'List assignments',
+        description: 'List assignments',
         scope: 'url:GET|/api/v1/courses/:course_id/assignments'
       },
       {
-        title: 'Get Assignment',
-        description: 'Get a single assignment',
+        title: 'Get assignment',
+        description: 'Get assignment',
         scope: 'url:GET|/api/v1/courses/:course_id/assignments/:id'
       },
       {
-        title: 'Create Assignment',
-        description: 'Create a new assignment',
+        title: 'Create assignment',
+        description: 'Create assignment',
         scope: 'url:POST|/api/v1/courses/:course_id/assignments'
       },
       {
-        title: 'Update Assignment',
-        description: 'Update an existing assignment',
+        title: 'Update assignment',
+        description: 'Update assignment',
         scope: 'url:PUT|/api/v1/courses/:course_id/assignments/:id'
       },
       {
-        title: 'Delete Assignment',
-        description: 'Delete an assignment',
+        title: 'Delete assignment',
+        description: 'Delete assignment',
         scope: 'url:DELETE|/api/v1/courses/:course_id/assignments/:id'
       },
       {
-        title: 'List Submissions',
-        description: 'List submissions for an assignment',
+        title: 'List assignment groups',
+        description: 'List assignment groups',
+        scope: 'url:GET|/api/v1/courses/:course_id/assignment_groups'
+      },
+      {
+        title: 'List submissions',
+        description: 'List submissions',
         scope: 'url:GET|/api/v1/courses/:course_id/assignments/:assignment_id/submissions'
       },
       {
-        title: 'Update Submission',
-        description: 'Grade or comment on a submission',
+        title: 'Grade submission',
+        description: 'Grade submission',
         scope:
           'url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id'
       },
       {
-        title: 'List Modules',
-        description: 'List modules in a course',
+        title: 'List modules',
+        description: 'List modules',
         scope: 'url:GET|/api/v1/courses/:course_id/modules'
       },
       {
-        title: 'Create Module',
-        description: 'Create a new module',
+        title: 'Create module',
+        description: 'Create module',
         scope: 'url:POST|/api/v1/courses/:course_id/modules'
       },
       {
-        title: 'Update Module',
-        description: 'Update a module',
+        title: 'Update module',
+        description: 'Update module',
         scope: 'url:PUT|/api/v1/courses/:course_id/modules/:id'
       },
       {
-        title: 'List Discussion Topics',
-        description: 'List discussion topics in a course',
+        title: 'Delete module',
+        description: 'Delete module',
+        scope: 'url:DELETE|/api/v1/courses/:course_id/modules/:id'
+      },
+      {
+        title: 'List module items',
+        description: 'List module items',
+        scope: 'url:GET|/api/v1/courses/:course_id/modules/:module_id/items'
+      },
+      {
+        title: 'Create module item',
+        description: 'Create module item',
+        scope: 'url:POST|/api/v1/courses/:course_id/modules/:module_id/items'
+      },
+      {
+        title: 'List discussions',
+        description: 'List discussions',
         scope: 'url:GET|/api/v1/courses/:course_id/discussion_topics'
       },
       {
-        title: 'Create Discussion Topic',
-        description: 'Create a new discussion topic',
+        title: 'Get discussion',
+        description: 'Get discussion',
+        scope: 'url:GET|/api/v1/courses/:course_id/discussion_topics/:topic_id'
+      },
+      {
+        title: 'Create discussion',
+        description: 'Create discussion',
         scope: 'url:POST|/api/v1/courses/:course_id/discussion_topics'
       },
       {
-        title: 'List Pages',
-        description: 'List wiki pages in a course',
+        title: 'Update discussion',
+        description: 'Update discussion',
+        scope: 'url:PUT|/api/v1/courses/:course_id/discussion_topics/:topic_id'
+      },
+      {
+        title: 'Delete discussion',
+        description: 'Delete discussion',
+        scope: 'url:DELETE|/api/v1/courses/:course_id/discussion_topics/:topic_id'
+      },
+      {
+        title: 'List pages',
+        description: 'List pages',
         scope: 'url:GET|/api/v1/courses/:course_id/pages'
       },
       {
-        title: 'Create Page',
-        description: 'Create a wiki page',
+        title: 'Get page',
+        description: 'Get page',
+        scope: 'url:GET|/api/v1/courses/:course_id/pages/:url_or_id'
+      },
+      {
+        title: 'Create page',
+        description: 'Create page',
         scope: 'url:POST|/api/v1/courses/:course_id/pages'
       },
       {
-        title: 'List Files',
-        description: 'List files in a course',
-        scope: 'url:GET|/api/v1/courses/:course_id/files'
+        title: 'Update page',
+        description: 'Update page',
+        scope: 'url:PUT|/api/v1/courses/:course_id/pages/:url_or_id'
       },
       {
-        title: 'List Calendar Events',
+        title: 'Delete page',
+        description: 'Delete page',
+        scope: 'url:DELETE|/api/v1/courses/:course_id/pages/:url_or_id'
+      },
+      {
+        title: 'List files',
+        description: 'List files',
+        scope: 'url:GET|/api/v1/courses/:course_id/files'
+      },
+      { title: 'Get file', description: 'Get file', scope: 'url:GET|/api/v1/files/:id' },
+      {
+        title: 'Download file',
+        description: 'Download file',
+        scope: 'url:GET|/files/:file_id/download'
+      },
+      {
+        title: 'List calendar events',
         description: 'List calendar events',
         scope: 'url:GET|/api/v1/calendar_events'
       },
       {
-        title: 'Create Calendar Event',
-        description: 'Create a calendar event',
+        title: 'Create calendar event',
+        description: 'Create calendar event',
         scope: 'url:POST|/api/v1/calendar_events'
       },
       {
-        title: 'List Conversations',
-        description: 'List conversations for the current user',
+        title: 'Update calendar event',
+        description: 'Update calendar event',
+        scope: 'url:PUT|/api/v1/calendar_events/:id'
+      },
+      {
+        title: 'Delete calendar event',
+        description: 'Delete calendar event',
+        scope: 'url:DELETE|/api/v1/calendar_events/:id'
+      },
+      {
+        title: 'List conversations',
+        description: 'List conversations',
         scope: 'url:GET|/api/v1/conversations'
       },
       {
-        title: 'Create Conversation',
-        description: 'Send a message',
+        title: 'Get conversation',
+        description: 'Get conversation',
+        scope: 'url:GET|/api/v1/conversations/:id'
+      },
+      {
+        title: 'Send message',
+        description: 'Send message',
         scope: 'url:POST|/api/v1/conversations'
       },
       {
-        title: 'List Quizzes',
-        description: 'List quizzes in a course',
+        title: 'Get classic quiz',
+        description: 'Get classic quiz',
+        scope: 'url:GET|/api/v1/courses/:course_id/quizzes/:id'
+      },
+      {
+        title: 'List classic quizzes',
+        description: 'List classic quizzes',
         scope: 'url:GET|/api/v1/courses/:course_id/quizzes'
       },
       {
-        title: 'List Groups',
-        description: 'List groups in a context',
-        scope: 'url:GET|/api/v1/courses/:course_id/groups'
+        title: 'Course activity analytics',
+        description: 'Course activity analytics',
+        scope: 'url:GET|/api/v1/courses/:course_id/analytics/activity'
       },
       {
-        title: 'List Rubrics',
-        description: 'List rubrics in a course',
-        scope: 'url:GET|/api/v1/courses/:course_id/rubrics'
+        title: 'Course assignment analytics',
+        description: 'Course assignment analytics',
+        scope: 'url:GET|/api/v1/courses/:course_id/analytics/assignments'
+      },
+      {
+        title: 'Course student analytics',
+        description: 'Course student analytics',
+        scope: 'url:GET|/api/v1/courses/:course_id/analytics/student_summaries'
       }
     ],
-
     getAuthorizationUrl: async ctx => {
-      let domain = ctx.input.canvasDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      let domain = normalizeCanvasDomain(ctx.input.canvasDomain);
       let params = new URLSearchParams({
         client_id: ctx.clientId,
         response_type: 'code',
         redirect_uri: ctx.redirectUri,
         state: ctx.state
       });
-
-      if (ctx.scopes.length > 0) {
-        params.set('scope', ctx.scopes.join(' '));
-      }
-
+      if (ctx.scopes.length > 0) params.set('scope', ctx.scopes.join(' '));
       return {
-        url: `https://${domain}/login/oauth2/auth?${params.toString()}`,
+        url: `https://${domain}/login/oauth2/auth?${params}`,
         input: { canvasDomain: domain }
       };
     },
-
     handleCallback: async ctx => {
-      let domain = ctx.input.canvasDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      let http = createAxios({
-        baseURL: `https://${domain}`
-      });
-
-      let response = await http.post('/login/oauth2/token', {
-        grant_type: 'authorization_code',
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri
-      });
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
+      let domain = normalizeCanvasDomain(ctx.input.canvasDomain);
+      let response = await createCanvasHttp(domain).post(
+        '/login/oauth2/token',
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          code: ctx.code,
+          redirect_uri: ctx.redirectUri
+        }),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Canvas',
+            operation: 'token exchange'
+          }),
           canvasDomain: domain
         }
       };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let domain = ctx.output.canvasDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      let http = createAxios({
-        baseURL: `https://${domain}`
-      });
-
-      let response = await http.post('/login/oauth2/token', {
-        grant_type: 'refresh_token',
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        refresh_token: ctx.output.refreshToken
-      });
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: ctx.output.refreshToken,
-          expiresAt,
-          canvasDomain: domain
-        }
+    handleTokenRefresh: async (ctx: {
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        canvasDomain: string;
       };
-    },
-
-    getProfile: async (ctx: {
-      output: { token: string; canvasDomain: string };
-      input: { canvasDomain: string };
-      scopes: string[];
+      clientId: string;
+      clientSecret: string;
     }) => {
-      let domain = ctx.output.canvasDomain;
-      let http = createAxios({
-        baseURL: `https://${domain}/api/v1`,
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/users/self/profile');
-      let profile = response.data;
-
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'A Canvas refresh token is required. Reconnect your Canvas account.'
+        );
+      }
+      let domain = normalizeCanvasDomain(ctx.output.canvasDomain);
+      let response = await createCanvasHttp(domain).post(
+        '/login/oauth2/token',
+        new URLSearchParams({
+          grant_type: 'refresh_token',
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          refresh_token: ctx.output.refreshToken
+        }),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
       return {
-        profile: {
-          id: String(profile.id),
-          email: profile.primary_email || profile.login_id,
-          name: profile.name,
-          imageUrl: profile.avatar_url
+        output: {
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Canvas',
+            operation: 'token refresh',
+            previousRefreshToken: ctx.output.refreshToken
+          }),
+          canvasDomain: domain
         }
       };
-    }
+    },
+    getProfile
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'Personal Access Token',
     key: 'personal_access_token',
-
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Your Canvas personal access token. Generate one from Account > Settings > New Access Token.'
+          'Canvas personal access token for testing your own account. Multi-user applications must use OAuth2.'
         ),
-      canvasDomain: z
-        .string()
-        .describe('Your Canvas instance domain (e.g., myschool.instructure.com)')
+      canvasDomain: domainSchema
     }),
-
     getOutput: async ctx => {
-      let domain = ctx.input.canvasDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('Enter your Canvas access token.');
       return {
         output: {
           token: ctx.input.token,
-          canvasDomain: domain
+          canvasDomain: normalizeCanvasDomain(ctx.input.canvasDomain)
         }
       };
     },
-
-    getProfile: async (ctx: {
-      output: { token: string; canvasDomain: string };
-      input: { token: string; canvasDomain: string };
-    }) => {
-      let domain = ctx.output.canvasDomain;
-      let http = createAxios({
-        baseURL: `https://${domain}/api/v1`,
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/users/self/profile');
-      let profile = response.data;
-
-      return {
-        profile: {
-          id: String(profile.id),
-          email: profile.primary_email || profile.login_id,
-          name: profile.name,
-          imageUrl: profile.avatar_url
-        }
-      };
-    }
+    getProfile
   });

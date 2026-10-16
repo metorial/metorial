@@ -34,7 +34,7 @@ Use this for advanced or custom queries not covered by the other tools. The quer
   .handleInvocation(async ctx => {
     let client = new BitqueryClient({
       token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion as 'v1' | 'v2'
+      apiVersion: ctx.auth.apiVersion
     });
 
     ctx.info('Executing custom GraphQL query');

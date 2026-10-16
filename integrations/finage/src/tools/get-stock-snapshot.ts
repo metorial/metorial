@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import {
+  finageNumber,
+  finageRecord,
+  finageRecords,
+  finageSymbol,
+  requiredFinageString
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getStockSnapshot = SlateTool.create(spec, {
@@ -25,6 +32,7 @@ export let getStockSnapshot = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       totalResults: z.number().optional().describe('Number of results returned'),
       quotes: z
         .array(
@@ -54,38 +62,45 @@ export let getStockSnapshot = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-
-    let symbolsStr = ctx.input.symbols?.map(s => s.toUpperCase()).join(',');
-
+    if (!ctx.input.includeQuotes && !ctx.input.includeTrades)
+      throw createApiServiceError('Enable includeQuotes, includeTrades, or both.');
+    let symbolsStr = ctx.input.symbols?.map(finageSymbol).join(',');
     let data = await client.getStockSnapshot({
       symbols: symbolsStr,
       quotes: ctx.input.includeQuotes,
       trades: ctx.input.includeTrades
     });
-
-    let quotes = (data.lastQuotes || []).map((q: any) => ({
-      symbol: q.s,
-      ask: q.a,
-      bid: q.b,
-      askSize: q.asz,
-      bidSize: q.bsz,
-      timestamp: q.t
-    }));
-
-    let trades = (data.lastTrades || []).map((t: any) => ({
-      symbol: t.s,
-      price: t.p,
-      size: t.sz,
-      timestamp: t.t
-    }));
-
+    let response = finageRecord(data);
+    let quotes = ctx.input.includeQuotes
+      ? finageRecords(response.lastQuotes).map(q => ({
+          ...pickDefined({
+            ask: finageNumber(q.a),
+            bid: finageNumber(q.b),
+            askSize: finageNumber(q.asz),
+            bidSize: finageNumber(q.bsz),
+            timestamp: finageNumber(q.t)
+          }),
+          symbol: requiredFinageString(q.s, 'a stock symbol')
+        }))
+      : undefined;
+    let trades = ctx.input.includeTrades
+      ? finageRecords(response.lastTrades).map(t => ({
+          ...pickDefined({
+            price: finageNumber(t.p),
+            size: finageNumber(t.sz),
+            timestamp: finageNumber(t.t)
+          }),
+          symbol: requiredFinageString(t.s, 'a stock symbol')
+        }))
+      : undefined;
     return {
-      output: {
-        totalResults: data.totalResults,
-        quotes: ctx.input.includeQuotes ? quotes : undefined,
-        trades: ctx.input.includeTrades ? trades : undefined
-      },
-      message: `Snapshot returned **${data.totalResults || 0}** results${symbolsStr ? ` for ${symbolsStr}` : ''}.`
+      output: pickDefined({
+        totalResults: finageNumber(response.totalResults),
+        quotes,
+        trades,
+        raw: data
+      }),
+      message: `Retrieved stock snapshot${symbolsStr ? ` for ${symbolsStr}` : ''}.`
     };
   })
   .build();

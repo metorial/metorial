@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let healthCheck = SlateTool.create(spec, {
   name: 'Health Check',
   key: 'health_check',
-  description: `Verifies that the StoreRocket API is accessible and responding. Use this to confirm API connectivity and that your authentication credentials are valid before performing other operations.`,
+  description: `Checks whether the legacy StoreRocket ping endpoint responds successfully. Returns healthy false on request failure. The current public REST guide does not describe this endpoint; a successful ping does not prove access to project resources.`,
   tags: {
     destructive: false,
     readOnly: true

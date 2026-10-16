@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExecutionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -61,8 +61,10 @@ export let processData = SlateTool.create(spec, {
     let client = new ExecutionClient({ token: ctx.auth.token });
 
     if (ctx.input.mode === 'json_path') {
-      if (!ctx.input.jsonData) throw new Error('jsonData is required for json_path mode.');
-      if (!ctx.input.jsonPath) throw new Error('jsonPath is required for json_path mode.');
+      if (!ctx.input.jsonData)
+        throw createApiServiceError('jsonData is required for json_path mode.');
+      if (!ctx.input.jsonPath)
+        throw createApiServiceError('jsonPath is required for json_path mode.');
 
       let result = await client.jsonPathQuery({
         json: ctx.input.jsonData,
@@ -74,10 +76,12 @@ export let processData = SlateTool.create(spec, {
         message: `JSONPath query executed. Found ${Array.isArray(result) ? result.length : 1} result(s).`
       };
     } else {
-      if (!ctx.input.text) throw new Error('text is required for regex mode.');
-      if (!ctx.input.regexPattern) throw new Error('regexPattern is required for regex mode.');
+      if (ctx.input.text === undefined)
+        throw createApiServiceError('text is required for regex mode.');
+      if (ctx.input.regexPattern === undefined)
+        throw createApiServiceError('regexPattern is required for regex mode.');
       if (!ctx.input.regexOperation)
-        throw new Error('regexOperation is required for regex mode.');
+        throw createApiServiceError('regexOperation is required for regex mode.');
 
       let result = await client.regexOperation({
         text: ctx.input.text,

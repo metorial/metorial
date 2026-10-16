@@ -9,13 +9,13 @@ export let auth = SlateAuth.create()
   )
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Token',
+    name: 'API Authentication Key',
     key: 'api_token',
     inputSchema: z.object({
       apiToken: z
         .string()
         .describe(
-          'Your Apilio API token. You can find it on your profile page at https://apilio.herokuapp.com/user'
+          'Your preformatted Basic authentication key from your Apilio profile at https://apilio.herokuapp.com/user. Paste the encoded key with or without the Basic prefix; do not use your web login password.'
         )
     }),
     getOutput: async ctx => {

@@ -13,6 +13,14 @@ export let listGroups = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
+      manualOnly: z
+        .boolean()
+        .optional()
+        .describe('Restrict results to static groups with editable membership.'),
       groupUuid: z.string().optional().describe('Filter by group UUID'),
       name: z.string().optional().describe('Filter by group name')
     })
@@ -29,6 +37,8 @@ export let listGroups = SlateTool.create(spec, {
           count: z.number()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean()
     })
   )
@@ -36,7 +46,10 @@ export let listGroups = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listGroups({
+      cursor: ctx.input.cursor,
       uuid: ctx.input.groupUuid,
+      manual_only:
+        ctx.input.manualOnly === undefined ? undefined : Number(ctx.input.manualOnly),
       name: ctx.input.name
     });
 
@@ -52,6 +65,8 @@ export let listGroups = SlateTool.create(spec, {
     return {
       output: {
         groups,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${groups.length}** group(s).`

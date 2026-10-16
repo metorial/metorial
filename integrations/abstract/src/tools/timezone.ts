@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AbstractClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,6 +54,10 @@ export let timezone = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete time or conversion response'),
       baseTimezone: timezoneInfoSchema
         .optional()
         .describe('Timezone info for the base/requested location'),
@@ -67,8 +71,9 @@ export let timezone = SlateTool.create(spec, {
     let { mode, location, targetLocation, datetime } = ctx.input;
 
     if (mode === 'convert') {
-      if (!targetLocation) throw new Error('targetLocation is required for "convert" mode.');
-      if (!datetime) throw new Error('datetime is required for "convert" mode.');
+      if (!targetLocation)
+        throw createApiServiceError('targetLocation is required for "convert" mode.');
+      if (!datetime) throw createApiServiceError('datetime is required for "convert" mode.');
 
       let result = await client.convertTimezone({
         baseLocation: location,
@@ -81,13 +86,14 @@ export let timezone = SlateTool.create(spec, {
         datetime: data?.datetime ?? undefined,
         timezone: data?.timezone_name ?? undefined,
         timezoneAbbreviation: data?.timezone_abbreviation ?? undefined,
-        utcOffset: data?.utc_offset ?? undefined,
+        utcOffset: data?.utc_offset != null ? String(data.utc_offset) : undefined,
         isDst: data?.is_dst ?? undefined,
         gmtOffset: data?.gmt_offset != null ? Number(data.gmt_offset) : undefined
       });
 
       return {
         output: {
+          rawResponse: isApiErrorRecord(result) ? result : undefined,
           baseTimezone: result.base_location
             ? mapTimezoneInfo(result.base_location)
             : undefined,
@@ -102,12 +108,13 @@ export let timezone = SlateTool.create(spec, {
 
       return {
         output: {
+          rawResponse: isApiErrorRecord(result) ? result : undefined,
           baseTimezone: {
             requestedLocation: result.requested_location ?? location,
             datetime: result.datetime ?? undefined,
             timezone: result.timezone_name ?? undefined,
             timezoneAbbreviation: result.timezone_abbreviation ?? undefined,
-            utcOffset: result.utc_offset ?? undefined,
+            utcOffset: result.utc_offset != null ? String(result.utc_offset) : undefined,
             isDst: result.is_dst ?? undefined,
             gmtOffset: result.gmt_offset != null ? Number(result.gmt_offset) : undefined
           }

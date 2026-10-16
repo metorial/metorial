@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SensiboClient } from '../lib/client';
+import { checked, SensiboClient } from '../lib/client';
 import { spec } from '../spec';
 
 let deviceSummarySchema = z.object({
@@ -19,6 +19,10 @@ let deviceSummarySchema = z.object({
   roomName: z.string().optional().describe('Name of the room the device is in')
 });
 
+let outputSchema = z.object({
+  devices: z.array(deviceSummarySchema).describe('List of Sensibo devices')
+});
+
 export let listDevicesTool = SlateTool.create(spec, {
   name: 'List Devices',
   key: 'list_devices',
@@ -28,34 +32,37 @@ export let listDevicesTool = SlateTool.create(spec, {
   }
 })
   .input(z.object({}))
-  .output(
-    z.object({
-      devices: z.array(deviceSummarySchema).describe('List of Sensibo devices')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new SensiboClient(ctx.auth.token);
-    let devices = await client.listDevices();
+    let result = await (async () => {
+      let devices = await client.listDevices();
 
-    let mapped = devices.map((d: any) => ({
-      deviceId: d.id,
-      name: d.room?.name || d.id,
-      temperatureUnit: d.temperatureUnit,
-      on: d.acState?.on,
-      mode: d.acState?.mode,
-      targetTemperature: d.acState?.targetTemperature,
-      fanLevel: d.acState?.fanLevel,
-      currentTemperature: d.measurements?.temperature,
-      currentHumidity: d.measurements?.humidity,
-      productModel: d.productModel,
-      firmwareVersion: d.firmwareVersion,
-      isAlive: d.connectionStatus?.isAlive,
-      roomName: d.room?.name
-    }));
+      let mapped = devices.map((d: any) => ({
+        deviceId: d.id,
+        name: d.room?.name,
+        temperatureUnit: d.temperatureUnit,
+        on: d.acState?.on,
+        mode: d.acState?.mode,
+        targetTemperature: d.acState?.targetTemperature,
+        fanLevel: d.acState?.fanLevel,
+        currentTemperature: d.measurements?.temperature,
+        currentHumidity: d.measurements?.humidity,
+        productModel: d.productModel,
+        firmwareVersion: d.firmwareVersion,
+        isAlive: d.connectionStatus?.isAlive,
+        roomName: d.room?.name
+      }));
 
+      return {
+        output: { devices: mapped },
+        message: `Found **${mapped.length}** Sensibo device(s): ${mapped.map((d: any) => `${d.name} (${d.deviceId})`).join(', ')}.`
+      };
+    })();
     return {
-      output: { devices: mapped },
-      message: `Found **${mapped.length}** Sensibo device(s): ${mapped.map((d: any) => `${d.name} (${d.deviceId})`).join(', ')}.`
+      ...result,
+      output: checked(outputSchema, client.sanitize(result.output), 'tool output'),
+      message: client.sanitize(result.message)
     };
   })
   .build();

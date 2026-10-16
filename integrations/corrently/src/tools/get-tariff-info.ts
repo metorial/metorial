@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,6 +22,7 @@ export let getTariffInfo = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       components: z
         .array(
           z.object({
@@ -41,7 +42,7 @@ export let getTariffInfo = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let zip = ctx.input.zip || ctx.config.zip;
     if (!zip) {
-      throw new Error('A German postal code (zip) is required.');
+      throw createApiServiceError('A German postal code (zip) is required.');
     }
 
     let client = new Client({ token: ctx.auth.token });
@@ -51,14 +52,14 @@ export let getTariffInfo = SlateTool.create(spec, {
     });
 
     let components = (result.components || []).map(comp => ({
-      description: comp.describtion,
+      description: comp.description ?? comp.describtion,
       unitPrice: comp.per,
       totalSum: comp.sum,
-      frequency: comp.mutlityplier
+      frequency: comp.multiplier ?? comp.mutlityplier
     }));
 
     return {
-      output: { components },
+      output: { raw: result, components },
       message: `Retrieved **${components.length}** tariff components for postal code **${zip}**.`
     };
   })

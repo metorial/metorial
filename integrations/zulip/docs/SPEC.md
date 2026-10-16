@@ -1,123 +1,123 @@
-Now let me get more details on the Zulip REST API authentication and the real-time events system:Now let me fetch the HTTP headers documentation page for more auth details:Now I have enough information to write the specification. Let me compile it.
+# Zulip API Specification
 
-# Slates Specification for Zulip
+This integration uses the Zulip REST API for Zulip Cloud and self-hosted servers.
 
-## Overview
+## Authentication and identity
 
-Zulip is an open-source team chat application that organizes conversations into channels (streams) with threaded topics. It offers both a hosted cloud service (Zulip Cloud) and a self-hosted option. The Zulip REST API powers the Zulip web and mobile apps, so anything you can do in Zulip, you can do with Zulip's REST API.
+Connect with the full server URL, the user's or bot's Zulip API email address,
+and its API key. Requests use HTTP Basic authentication with the email as the
+username and API key as the password. HTTP self-hosted servers are supported.
+Server URLs must not contain embedded credentials, query parameters, or fragments.
+The realm belongs to the saved credentials; no second realm setting is required.
+API access uses the account's permissions, with no OAuth scopes or token refresh.
 
-## Authentication
+Call `get_user` with no inputs to retrieve the authenticated account using
+`GET /api/v1/users/me`. Its output includes the account ID, API email, role,
+connected server, profile data, and administrator/owner flags when returned.
+Specify `userId` or `email` to inspect another accessible profile; `userId` takes
+precedence when both are supplied. Real email addresses are only exposed when
+Zulip permits the caller to see them.
 
-Zulip uses **API key authentication** via HTTP Basic authentication. There is no OAuth2 flow for API access.
+## Supported tools
 
-**Credentials required:**
+| Area | Tools |
+| --- | --- |
+| Messages | `send_message`, `get_messages`, `get_message`, `update_message`, `delete_message` |
+| Reactions and flags | `manage_reactions`, `manage_message_flags` |
+| Channels | `list_channels`, `get_channel`, `create_or_subscribe_channel`, `update_channel`, `archive_channel`, `get_channel_topics` |
+| Subscriptions | `list_subscriptions`, `manage_subscriptions` |
+| Users | `list_users`, `get_user`, `set_user_status`, `get_user_presence` |
+| Groups and invitations | `manage_user_groups`, `send_invitation` |
+| Files | `upload_file`, `list_files` |
+| Server | `get_server_settings` |
 
-- **Email address** (used as the "username")
-- **API key** (used as the "password")
-- **Server URL** (the base URL of the Zulip server, e.g., `https://your-org.zulipchat.com` for Zulip Cloud or a custom domain for self-hosted)
+Permissions depend on the account role and organization/channel permission
+settings. Successful writes do not perform extra reads that could require
+additional permissions. Server feature levels determine which newer optional
+fields are supported; `get_server_settings` exposes the advertised version and
+feature level. These tools cover one Zulip API product.
 
-If you're making your own HTTP requests, you'll want to send the appropriate HTTP basic authentication headers. Specifically, requests are authenticated using HTTP `Basic` auth where the email address is the username and the API key is the password, sent via the `Authorization` header. In `curl`, this is represented as `-u EMAIL_ADDRESS:API_KEY`.
+## Message search and pagination
 
-**Obtaining an API key:**
+`get_messages` keeps the default anchor `newest`, with 20 messages before it and
+zero after it. Use narrow filters for channels, topics, senders, direct messages,
+and full-text search. A filter can be negated. To continue backward, use the
+oldest returned message ID as the next anchor; to continue forward, use the
+newest returned ID. Set `includeAnchor: false` to avoid repeating that message.
+Stop when the corresponding `foundOldest` or `foundNewest` flag is true.
+`applyMarkdown: false` requests original Markdown instead of rendered HTML.
+The complete response preserves message flags, history limits, and other server
+metadata. Other list endpoints return their complete accessible collections
+without a pagination cursor.
 
-- An API key is how a bot identifies itself to Zulip. For the official clients, such as the Python bindings, we recommend downloading a zuliprc file. This file contains an API key and other necessary configuration values for using the Zulip API with a specific account on a Zulip server.
-- For human users: Navigate to Personal settings → Account & privacy → API Key in the Zulip web/desktop app.
-- For bots: You will likely want to create a bot, unless you're using the API to interact with your own account. Bot API keys are available through the bot management UI.
-- Programmatically: POST `https://your-org.zulipchat.com/api/v1/fetch_api_key`. This API endpoint is used by clients such as the Zulip mobile and terminal apps to implement password-based authentication. Given the user's Zulip login credentials, it returns a Zulip API key that the client can use to make requests as the user.
+Reaction metadata exposes actual user IDs and optional emoji namespaces. Pass an
+existing reaction's `emojiCode` and `reactionType` when the exact emoji identity
+matters. Status emojis accept these identifiers as well. The legacy `away` input
+is retained; on modern servers it controls the inverse of presence availability.
 
-**Important considerations:**
+## Channel creation compatibility
 
-- Since Zulip can be self-hosted, the server URL is a required custom input. For Zulip Cloud, the URL is `https://{organization}.zulipchat.com`.
-- There are no scopes — the API key grants full access to everything the authenticated user/bot has permission to do based on their role in the organization.
-- Zulip has a role-based permissions system (Owner, Administrator, Moderator, Member, Guest) that determines what actions an API key holder can perform.
+`create_or_subscribe_channel` calls `POST /api/v1/users/me/subscriptions`.
+Zulip creates a missing channel when permitted, or subscribes to an existing one.
+The returned `subscribed` and `alreadySubscribed` maps describe actual changes,
+keyed by user ID on modern servers and by API email on older servers.
+A new subscription does not prove that a channel was newly created.
 
-## Features
+`create_channel` remains available with its original inputs, outputs, request,
+and behavior, but is deprecated in favor of `create_or_subscribe_channel`.
+Its original required `created` output inferred channel creation from the
+absence of existing subscriptions, which the provider response cannot establish.
+Its original `alreadySubscribed` field also retains its legacy mapping.
+Use the replacement for accurate subscription outcomes. No provider retirement
+is implied by this compatibility deprecation.
 
-### Messaging
+## File workflows
 
-Send, retrieve, edit, and delete messages in channels (streams) or as direct messages (1:1 and group). Messages support Zulip-flavored Markdown formatting, emoji reactions, file attachments, and read receipts. Messages can be searched and filtered using Zulip's "narrow" query system. Message flags (e.g., read, starred) can be managed per-user.
+`upload_file` accepts a filename and standard base64 file bytes, sends a multipart
+upload, and returns the actual provider URL and metadata. Include that URL in
+`send_message` content to share the upload. Initially only the uploader can
+access it. The file size limit comes from the server configuration; large uploads
+may time out. Resumable uploads are not exposed.
 
-- Messages are organized into channels and topics.
-- Supports scheduled messages for future delivery.
-- Supports message reminders.
-- File uploads are supported for attachments.
+`list_files` returns the caller's uploaded file IDs, path IDs, sizes, provider
+upload timestamps, and referencing message IDs. Timestamps are returned without
+inventing a unit conversion: Zulip 12 feature level 443 changed them from
+milliseconds to seconds. Current `message_ids` and older `messages` references
+are supported. These tools return metadata and do not download file content.
 
-### Channels (Streams) Management
+## Official references
 
-Create, update, archive, and list channels. Manage channel subscriptions for users, including subscribing and unsubscribing. Retrieve topics within a channel, manage default channels, and organize channels into folders.
-
-- Channels can be public or private.
-- Per-user subscription settings (e.g., notification preferences, pin, mute) can be configured.
-- Topic-level preferences (e.g., muting, visibility) are supported.
-
-### User Management
-
-Retrieve, create, update, deactivate, and reactivate users. Manage user statuses, presence information, and typing indicators. Supports user groups with membership and subgroup management.
-
-- User profiles include custom profile fields.
-- Alert words can be configured per user.
-- Users can be muted/unmuted.
-
-### Organization & Server Configuration
-
-Retrieve and update organization-level settings, including custom emoji, linkifiers, code playgrounds, and custom profile fields. Manage data exports and realm-level defaults for user settings.
-
-- Custom emoji can be uploaded and managed.
-- Linkifiers allow automatic URL pattern matching in messages.
-
-### Invitations
-
-Send email invitations or create reusable invitation links to invite new users to an organization. Existing invitations can be managed (resend, revoke).
-
-### Drafts & Saved Snippets
-
-Create, retrieve, edit, and delete message drafts and saved snippets for reuse.
-
-### Outgoing Webhooks
-
-Outgoing webhooks allow you to build or set up Zulip integrations which are notified when certain types of messages are sent in Zulip. When one of those events is triggered, we'll send an HTTP POST payload to the webhook's configured URL.
-
-- Triggered when the bot is mentioned or receives a direct message.
-- Zulip supports outgoing webhooks both in a clean native Zulip format, as well as a format that's compatible with Slack's outgoing webhook API.
-
-## Events
-
-Zulip provides a **real-time events API** based on long-polling, rather than traditional outgoing webhooks to external URLs. This powerful endpoint can be used to register a Zulip "event queue" (subscribed to certain types of "events", or updates to the messages and other Zulip data the current user has access to), as well as to fetch the current state of that data.
-
-The mechanism works as follows: a client registers an event queue via `POST /api/v1/register`, specifying which `event_types` to subscribe to, and then polls for new events via `GET /api/v1/events` using long-polling. The server will queue events for up to 10 minutes of inactivity. After 10 minutes, your event queue will be garbage-collected. The server will send heartbeat events every minute, which makes it easy to implement a robust client that does not miss events unless the client loses network connectivity with the Zulip server for 10 minutes or longer.
-
-### Message Events
-
-New messages sent to channels or direct messages the user has access to. Includes message edits, deletions, and topic/channel moves. Can be filtered by narrow (e.g., specific channel, DMs only).
-
-### Reaction Events
-
-Emoji reactions added to or removed from messages.
-
-### Presence Events
-
-Updates to user online/offline/idle presence status.
-
-### Typing Events
-
-Typing start/stop indicators from other users in conversations.
-
-### Channel Events
-
-Channel creation, updates (name, description, permissions), and archival. Subscription changes (users joining/leaving channels).
-
-### User Events
-
-User profile changes (name, avatar, role, timezone, custom profile fields), user creation, and deactivation.
-
-### Organization/Realm Events
-
-Changes to organization-level settings, custom emoji, linkifiers, code playgrounds, custom profile fields, and user groups.
-
-### Message Flag Events
-
-Changes to personal message flags (e.g., read, starred) for the authenticated user.
-
-### Subscription Events
-
-Changes to the authenticated user's channel subscriptions and per-subscription settings (e.g., notification preferences).
+- [REST API overview](https://zulip.com/api/rest)
+- [Authentication headers](https://zulip.com/api/http-headers)
+- [Get own user](https://zulip.com/api/get-own-user)
+- [Get users](https://zulip.com/api/get-users)
+- [Get a user](https://zulip.com/api/get-user)
+- [Get a user by email](https://zulip.com/api/get-user-by-email)
+- [Send messages](https://zulip.com/api/send-message)
+- [Get messages](https://zulip.com/api/get-messages)
+- [Get one message](https://zulip.com/api/get-message)
+- [Edit messages](https://zulip.com/api/update-message)
+- [Delete messages](https://zulip.com/api/delete-message)
+- [Add reactions](https://zulip.com/api/add-reaction)
+- [Remove reactions](https://zulip.com/api/remove-reaction)
+- [Personal message flags](https://zulip.com/api/update-message-flags)
+- [Get channels](https://zulip.com/api/get-streams)
+- [Get channel metadata](https://zulip.com/api/get-stream-by-id)
+- [Subscribe and create channels](https://zulip.com/api/subscribe)
+- [Unsubscribe](https://zulip.com/api/unsubscribe)
+- [Update channels](https://zulip.com/api/update-stream)
+- [Archive channels](https://zulip.com/api/archive-stream)
+- [Topics](https://zulip.com/api/get-stream-topics)
+- [Subscribed channels](https://zulip.com/api/get-subscriptions)
+- [Status](https://zulip.com/api/update-status)
+- [User presence](https://zulip.com/api/get-user-presence)
+- [Organization presence](https://zulip.com/api/get-presence)
+- [User groups](https://zulip.com/api/get-user-groups)
+- [Create user groups](https://zulip.com/api/create-user-group)
+- [Update user groups](https://zulip.com/api/update-user-group)
+- [Update group members](https://zulip.com/api/update-user-group-members)
+- [Email invitations](https://zulip.com/api/send-invites)
+- [Reusable invitations](https://zulip.com/api/create-invite-link)
+- [Upload files](https://zulip.com/api/upload-file)
+- [Uploaded files](https://zulip.com/api/get-attachments)
+- [Server settings](https://zulip.com/api/get-server-settings)

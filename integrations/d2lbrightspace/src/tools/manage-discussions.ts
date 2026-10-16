@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { richText } from '../lib/response';
 import { spec } from '../spec';
 
 export let listDiscussionForums = SlateTool.create(spec, {
@@ -11,7 +12,11 @@ export let listDiscussionForums = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       forumId: z
         .string()
         .optional()
@@ -56,10 +61,10 @@ export let listDiscussionForums = SlateTool.create(spec, {
       let topics = items.map((t: any) => ({
         topicId: String(t.TopicId),
         forumId: String(t.ForumId),
-        name: t.Name,
-        description: t.Description?.Text || t.Description?.Content,
-        isHidden: t.IsHidden,
-        isLocked: t.IsLocked
+        name: t.Name ?? undefined,
+        description: richText(t.Description),
+        isHidden: t.IsHidden ?? undefined,
+        isLocked: t.IsLocked ?? undefined
       }));
 
       return {
@@ -72,10 +77,10 @@ export let listDiscussionForums = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : [];
     let forums = items.map((f: any) => ({
       forumId: String(f.ForumId),
-      name: f.Name,
-      description: f.Description?.Text || f.Description?.Content,
-      isHidden: f.IsHidden,
-      isLocked: f.IsLocked
+      name: f.Name ?? undefined,
+      description: richText(f.Description),
+      isHidden: f.IsHidden ?? undefined,
+      isLocked: f.IsLocked ?? undefined
     }));
 
     return {
@@ -93,11 +98,18 @@ export let createDiscussionForum = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       name: z.string().describe('Forum name'),
       description: z.string().optional().describe('Forum description (HTML supported)'),
       isHidden: z.boolean().optional().describe('Whether the forum is hidden'),
-      isLocked: z.boolean().optional().describe('Whether the forum is locked'),
+      isLocked: z
+        .boolean()
+        .optional()
+        .describe('Legacy forum locking flag; LE API 1.56 and later ignore this value'),
       allowAnonymousPosts: z.boolean().optional().describe('Allow anonymous posts')
     })
   )
@@ -110,22 +122,28 @@ export let createDiscussionForum = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
 
-    let forumData: any = {
-      Name: ctx.input.name
+    let forumData = {
+      Name: ctx.input.name,
+      Description: { Text: '', Html: ctx.input.description ?? '' },
+      IsHidden: ctx.input.isHidden ?? false,
+      IsLocked: ctx.input.isLocked ?? false,
+      AllowAnonymous: ctx.input.allowAnonymousPosts ?? false,
+      RequiresApproval: false,
+      ShowDescriptionInTopics: false,
+      StartDate: null,
+      EndDate: null,
+      PostStartDate: null,
+      PostEndDate: null,
+      DisplayInCalendar: false,
+      DisplayPostDatesInCalendar: false
     };
-    if (ctx.input.description)
-      forumData.Description = { Content: ctx.input.description, Type: 'Html' };
-    if (ctx.input.isHidden !== undefined) forumData.IsHidden = ctx.input.isHidden;
-    if (ctx.input.isLocked !== undefined) forumData.IsLocked = ctx.input.isLocked;
-    if (ctx.input.allowAnonymousPosts !== undefined)
-      forumData.AllowAnonymous = ctx.input.allowAnonymousPosts;
 
     let result = await client.createDiscussionForum(ctx.input.orgUnitId, forumData);
 
     return {
       output: {
         forumId: String(result.ForumId),
-        name: result.Name
+        name: result.Name ?? undefined
       },
       message: `Created discussion forum **${result.Name}** (ID: ${result.ForumId}).`
     };
@@ -140,7 +158,11 @@ export let createDiscussionTopic = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       forumId: z.string().describe('Forum ID to create the topic in'),
       name: z.string().describe('Topic name'),
       description: z.string().optional().describe('Topic description (HTML supported)'),
@@ -163,17 +185,33 @@ export let createDiscussionTopic = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
 
-    let topicData: any = {
-      Name: ctx.input.name
+    if (ctx.input.allowAnonymousPosts && ctx.input.mustPostToParticipate)
+      throw createApiServiceError(
+        'Anonymous posting cannot be combined with requiring a post before participation.',
+        { reason: 'brightspace_discussion_settings' }
+      );
+
+    let topicData = {
+      Name: ctx.input.name,
+      Description: { Content: ctx.input.description ?? '', Type: 'Html' },
+      IsHidden: ctx.input.isHidden ?? false,
+      IsLocked: ctx.input.isLocked ?? false,
+      AllowAnonymousPosts: ctx.input.allowAnonymousPosts ?? false,
+      MustPostToParticipate: ctx.input.mustPostToParticipate ?? false,
+      RequiresApproval: false,
+      StartDate: null,
+      EndDate: null,
+      UnlockStartDate: null,
+      UnlockEndDate: null,
+      ScoreOutOf: null,
+      IsAutoScore: false,
+      IncludeNonScoredValues: false,
+      ScoringType: null,
+      RatingType: null,
+      DisplayInCalendar: false,
+      DisplayUnlockDatesInCalendar: false,
+      GroupTypeId: null
     };
-    if (ctx.input.description)
-      topicData.Description = { Content: ctx.input.description, Type: 'Html' };
-    if (ctx.input.isHidden !== undefined) topicData.IsHidden = ctx.input.isHidden;
-    if (ctx.input.isLocked !== undefined) topicData.IsLocked = ctx.input.isLocked;
-    if (ctx.input.allowAnonymousPosts !== undefined)
-      topicData.AllowAnonymous = ctx.input.allowAnonymousPosts;
-    if (ctx.input.mustPostToParticipate !== undefined)
-      topicData.MustPostToParticipate = ctx.input.mustPostToParticipate;
 
     let result = await client.createDiscussionTopic(
       ctx.input.orgUnitId,
@@ -185,7 +223,7 @@ export let createDiscussionTopic = SlateTool.create(spec, {
       output: {
         topicId: String(result.TopicId),
         forumId: String(result.ForumId),
-        name: result.Name
+        name: result.Name ?? undefined
       },
       message: `Created discussion topic **${result.Name}** (ID: ${result.TopicId}) in forum ${ctx.input.forumId}.`
     };
@@ -200,7 +238,11 @@ export let listDiscussionPosts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       forumId: z.string().describe('Forum ID'),
       topicId: z.string().describe('Topic ID'),
       threadsOnly: z.boolean().optional().describe('Only return top-level threads'),
@@ -247,13 +289,13 @@ export let listDiscussionPosts = SlateTool.create(spec, {
       postId: String(p.PostId),
       threadId: p.ThreadId ? String(p.ThreadId) : undefined,
       parentPostId: p.ParentPostId ? String(p.ParentPostId) : undefined,
-      subject: p.Subject,
-      message: p.Message?.Text || p.Message?.Content || p.Message?.Html,
+      subject: p.Subject ?? undefined,
+      message: richText(p.Message),
       postedByUserId: p.PostingUserId ? String(p.PostingUserId) : undefined,
-      postedByName: p.PostingUserDisplayName,
-      datePosted: p.DatePosted,
-      isAnonymous: p.IsAnonymous,
-      replyCount: p.ReplyCount
+      postedByName: p.PostingUserDisplayName ?? undefined,
+      datePosted: p.DatePosted ?? undefined,
+      isAnonymous: p.IsAnonymous ?? undefined,
+      replyCount: p.ReplyPostIds?.length ?? p.ReplyCount ?? undefined
     }));
 
     return {
@@ -271,7 +313,11 @@ export let createDiscussionPost = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       forumId: z.string().describe('Forum ID'),
       topicId: z.string().describe('Topic ID'),
       subject: z.string().describe('Post subject'),
@@ -291,9 +337,19 @@ export let createDiscussionPost = SlateTool.create(spec, {
 
     let postData: any = {
       Subject: ctx.input.subject,
-      Message: { Content: ctx.input.message, Type: 'Html' }
+      Message: { Content: ctx.input.message, Type: 'Html' },
+      ParentPostId: null,
+      IsAnonymous: ctx.input.isAnonymous ?? false
     };
-    if (ctx.input.parentPostId) postData.ParentPostId = Number(ctx.input.parentPostId);
+    if (ctx.input.parentPostId) {
+      let parentPostId = Number(ctx.input.parentPostId);
+      if (!Number.isSafeInteger(parentPostId) || parentPostId < 1)
+        throw createApiServiceError(
+          'Provide a valid numeric parent post ID from list_discussion_posts.',
+          { reason: 'brightspace_post_id' }
+        );
+      postData.ParentPostId = parentPostId;
+    }
     if (ctx.input.isAnonymous !== undefined) postData.IsAnonymous = ctx.input.isAnonymous;
 
     let result = await client.createDiscussionPost(
@@ -306,7 +362,7 @@ export let createDiscussionPost = SlateTool.create(spec, {
     return {
       output: {
         postId: String(result.PostId),
-        subject: result.Subject
+        subject: result.Subject ?? undefined
       },
       message: `Created discussion post **${result.Subject || ctx.input.subject}** (ID: ${result.PostId}).`
     };

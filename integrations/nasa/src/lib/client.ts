@@ -1,18 +1,29 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let nasaApi = createAxios({
+let nasaError = (error: unknown) =>
+  buildApiServiceError(error, { providerLabel: 'NASA', reason: 'nasa_api_error' });
+
+let nasaApi = createAuthenticatedAxios({
+  errorAdapter: nasaError,
+  timeout: 60000,
   baseURL: 'https://api.nasa.gov'
 });
 
-let nasaImageApi = createAxios({
+let nasaImageApi = createAuthenticatedAxios({
+  errorAdapter: nasaError,
+  timeout: 60000,
   baseURL: 'https://images-api.nasa.gov'
 });
 
-let eonetApi = createAxios({
+let eonetApi = createAuthenticatedAxios({
+  errorAdapter: nasaError,
+  timeout: 60000,
   baseURL: 'https://eonet.gsfc.nasa.gov/api/v3'
 });
 
-let tleApi = createAxios({
+let tleApi = createAuthenticatedAxios({
+  errorAdapter: nasaError,
+  timeout: 60000,
   baseURL: 'https://tle.ivanstanojevic.me/api/tle'
 });
 
@@ -52,6 +63,24 @@ export class NasaClient {
     return data;
   }
 
+  async getCurrentApod(
+    opts: { date?: string; startDate?: string; endDate?: string; count?: number } = {}
+  ) {
+    let { data } = await createAuthenticatedAxios({
+      baseURL: 'https://science.nasa.gov',
+      errorAdapter: nasaError,
+      timeout: 60000
+    }).get('/wp-json/wp/v2/apod-basic', {
+      params: this.params({
+        date: opts.date,
+        start_date: opts.startDate,
+        end_date: opts.endDate,
+        count: opts.count
+      })
+    });
+    return data;
+  }
+
   // ── NeoWs ─────────────────────────────────────────────────
 
   async getNeoFeed(opts: { startDate: string; endDate?: string }) {
@@ -65,7 +94,7 @@ export class NasaClient {
   }
 
   async getNeoLookup(asteroidId: string) {
-    let { data } = await nasaApi.get(`/neo/rest/v1/neo/${asteroidId}`, {
+    let { data } = await nasaApi.get(`/neo/rest/v1/neo/${encodeURIComponent(asteroidId)}`, {
       params: this.params()
     });
     return data;
@@ -183,12 +212,13 @@ export class NasaClient {
         lon: opts.lon,
         date: opts.date,
         dim: opts.dim
-      })
+      }),
+      responseType: 'arraybuffer'
     });
     return data;
   }
 
-  async getEarthAssets(opts: { lat: number; lon: number; date: string; dim?: number }) {
+  async getEarthAssets(opts: { lat: number; lon: number; date?: string; dim?: number }) {
     let { data } = await nasaApi.get('/planetary/earth/assets', {
       params: this.params({
         lat: opts.lat,
@@ -211,6 +241,10 @@ export class NasaClient {
     keywords?: string;
     nasaId?: string;
     page?: number;
+    pageSize?: number;
+    title?: string;
+    location?: string;
+    photographer?: string;
   }) {
     let { data } = await nasaImageApi.get('/search', {
       params: {
@@ -221,19 +255,33 @@ export class NasaClient {
         year_end: opts.yearEnd,
         keywords: opts.keywords,
         nasa_id: opts.nasaId,
-        page: opts.page
+        page: opts.page,
+        page_size: opts.pageSize,
+        title: opts.title,
+        location: opts.location,
+        photographer: opts.photographer
       }
     });
     return data;
   }
 
   async getNasaImageAsset(nasaId: string) {
-    let { data } = await nasaImageApi.get(`/asset/${nasaId}`);
+    let { data } = await nasaImageApi.get(`/asset/${encodeURIComponent(nasaId)}`);
     return data;
   }
 
   async getNasaImageMetadata(nasaId: string) {
-    let { data } = await nasaImageApi.get(`/metadata/${nasaId}`);
+    let { data } = await nasaImageApi.get(`/metadata/${encodeURIComponent(nasaId)}`);
+    return data;
+  }
+
+  async getNasaImageCaptions(nasaId: string) {
+    let { data } = await nasaImageApi.get(`/captions/${encodeURIComponent(nasaId)}`);
+    return data;
+  }
+
+  async getEonetSources() {
+    let { data } = await eonetApi.get('/sources');
     return data;
   }
 
@@ -261,7 +309,8 @@ export class NasaClient {
 
   async getTechPortProject(projectId: number) {
     let { data } = await nasaApi.get(`/techport/api/projects/${projectId}`, {
-      params: this.params()
+      params: this.params(),
+      headers: { Accept: 'application/json' }
     });
     return data;
   }
@@ -270,7 +319,8 @@ export class NasaClient {
     let { data } = await nasaApi.get('/techport/api/projects', {
       params: this.params({
         updatedSince: opts.updatedSince
-      })
+      }),
+      headers: { Accept: 'application/json' }
     });
     return data;
   }
@@ -284,7 +334,9 @@ export class NasaClient {
     orderBy?: string;
     format?: string;
   }) {
-    let { data } = await createAxios({
+    let { data } = await createAuthenticatedAxios({
+      errorAdapter: nasaError,
+      timeout: 60000,
       baseURL: 'https://exoplanetarchive.ipac.caltech.edu'
     }).get('/TAP/sync', {
       params: {
@@ -298,50 +350,122 @@ export class NasaClient {
   // ── SSD/CNEOS ─────────────────────────────────────────────
 
   async getSsdCloseApproach(
-    opts: { dateMin?: string; dateMax?: string; distMax?: string; body?: string } = {}
+    opts: {
+      dateMin?: string;
+      dateMax?: string;
+      distMax?: string;
+      body?: string;
+      designation?: string;
+      includeDiameter?: boolean;
+      includeFullName?: boolean;
+      sort?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
   ) {
-    let { data } = await createAxios({ baseURL: 'https://ssd-api.jpl.nasa.gov' }).get(
-      '/cad.api',
-      {
-        params: {
-          'date-min': opts.dateMin,
-          'date-max': opts.dateMax,
-          'dist-max': opts.distMax,
-          body: opts.body
-        }
+    let { data } = await createAuthenticatedAxios({
+      errorAdapter: nasaError,
+      timeout: 60000,
+      baseURL: 'https://ssd-api.jpl.nasa.gov'
+    }).get('/cad.api', {
+      params: {
+        'date-min': opts.dateMin,
+        'date-max': opts.dateMax,
+        'dist-max': opts.distMax,
+        body: opts.body,
+        des: opts.designation,
+        diameter: opts.includeDiameter,
+        fullname: opts.includeFullName,
+        sort: opts.sort,
+        limit: opts.limit,
+        'limit-from': opts.offset
       }
-    );
+    });
     return data;
   }
 
   async getSsdFireballs(
     opts: { dateMin?: string; dateMax?: string; minEnergy?: number; reqLoc?: boolean } = {}
   ) {
-    let { data } = await createAxios({ baseURL: 'https://ssd-api.jpl.nasa.gov' }).get(
-      '/fireball.api',
-      {
-        params: {
-          'date-min': opts.dateMin,
-          'date-max': opts.dateMax,
-          'min-energy': opts.minEnergy,
-          'req-loc': opts.reqLoc
-        }
+    let { data } = await createAuthenticatedAxios({
+      errorAdapter: nasaError,
+      timeout: 60000,
+      baseURL: 'https://ssd-api.jpl.nasa.gov'
+    }).get('/fireball.api', {
+      params: {
+        'date-min': opts.dateMin,
+        'date-max': opts.dateMax,
+        'energy-min': opts.minEnergy === undefined ? undefined : opts.minEnergy / 1e10,
+        'req-loc': opts.reqLoc
       }
-    );
+    });
     return data;
   }
 
   async getSsdSmallBody(opts: { designation?: string; spkId?: number; searchName?: string }) {
-    let { data } = await createAxios({ baseURL: 'https://ssd-api.jpl.nasa.gov' }).get(
-      '/sbdb.api',
-      {
-        params: {
-          des: opts.designation,
-          spk: opts.spkId,
-          sstr: opts.searchName
-        }
+    let { data } = await createAuthenticatedAxios({
+      errorAdapter: nasaError,
+      timeout: 60000,
+      baseURL: 'https://ssd-api.jpl.nasa.gov'
+    }).get('/sbdb.api', {
+      params: {
+        des: opts.designation,
+        spk: opts.spkId,
+        sstr: opts.searchName,
+        'phys-par': true,
+        discovery: true
       }
-    );
+    });
+    if (data.code !== undefined && Number(data.code) !== 200) {
+      throw createApiServiceError(
+        `Small-body lookup failed: ${data.message ?? data.code}. Refine the designation or search name.`,
+        { upstreamCode: String(data.code) }
+      );
+    }
     return data;
   }
 }
+
+export let validateInteger = (
+  value: number | undefined,
+  name: string,
+  minimum: number,
+  maximum = Number.MAX_SAFE_INTEGER
+) => {
+  if (
+    value !== undefined &&
+    (!Number.isSafeInteger(value) || value < minimum || value > maximum)
+  ) {
+    throw createApiServiceError(
+      `${name} must be an integer between ${minimum} and ${maximum}.`
+    );
+  }
+};
+
+export let validateDate = (value: string | undefined, name: string) => {
+  if (
+    value !== undefined &&
+    (!/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+      !Number.isFinite(Date.parse(value)) ||
+      new Date(value).toISOString().slice(0, 10) !== value)
+  ) {
+    throw createApiServiceError(`${name} must be a valid date in YYYY-MM-DD format.`);
+  }
+};
+
+export let validateDateRange = (
+  start: string | undefined,
+  end: string | undefined,
+  maximumDays?: number
+) => {
+  validateDate(start, 'Start date');
+  validateDate(end, 'End date');
+  if (start && end) {
+    let days = (Date.parse(end) - Date.parse(start)) / 86400000;
+    if (days < 0 || (maximumDays !== undefined && days > maximumDays)) {
+      throw createApiServiceError(
+        `End date must be on or after start date${maximumDays === undefined ? '' : ` and within ${maximumDays} days`}.`
+      );
+    }
+  }
+};

@@ -44,6 +44,10 @@ Can optionally send lead email notifications to matched members.`
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       lead: z.any().describe('The newly created lead record.')
     })
   )
@@ -79,6 +83,7 @@ Can optionally send lead email notifications to matched members.`
     return {
       output: {
         status: result.status,
+        raw: result,
         lead: result.message
       },
       message: `Created new lead${ctx.input.leadName ? ` **${ctx.input.leadName}**` : ''}.`

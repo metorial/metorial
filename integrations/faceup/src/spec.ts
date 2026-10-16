@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'faceup',
   name: 'FaceUp',
   description:
-    'Whistleblowing and compliance case management platform for receiving anonymous reports, managing investigations, and maintaining audit trails.',
+    'Query compliance reporting statistics, retrieve report metadata, and synchronize the employee directory in FaceUp.',
   metadata: {},
   config,
   auth

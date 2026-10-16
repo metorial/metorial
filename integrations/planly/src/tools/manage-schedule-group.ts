@@ -1,6 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  nullableString,
+  rawSchema,
+  requiredString,
+  responseArray,
+  responseData,
+  responseRecord,
+  scalarString,
+  teamIdSchema,
+  upsertGroups
+} from '../lib/responses';
 import { spec } from '../spec';
 
 let scheduleEntryInput = z.object({
@@ -28,14 +39,15 @@ let scheduleGroupResultSchema = z.object({
   scheduleGroupId: z.string().optional().describe('ID of the schedule group'),
   status: z.string().optional().describe('Group status (draft or scheduled)'),
   publishOn: z.string().nullable().optional().describe('Scheduled publish time'),
-  scheduleCount: z.number().optional().describe('Number of schedules in the group')
+  scheduleCount: z.number().optional().describe('Number of schedules in the group'),
+  raw: rawSchema
 });
 
 export let manageScheduleGroup = SlateTool.create(spec, {
   name: 'Manage Schedule Group',
   key: 'manage_schedule_group',
   description: `Create, update, or delete schedule groups for coordinated multi-channel publishing. Groups bundle multiple scheduled posts to publish across channels simultaneously.
-Use **create** to make a new group (as draft or scheduled), **update** to modify an existing group, or **delete** to remove groups.`,
+Use **create** to make a new group (as draft or scheduled), **update** to modify an existing group, or **delete** to remove groups. Call list_teams to discover the team ID.`,
   instructions: [
     'To create a draft group, set status to "draft". Drafts are not published until changed to "scheduled".',
     'When updating, provide the existing scheduleGroupId in the group.',
@@ -49,7 +61,9 @@ Use **create** to make a new group (as draft or scheduled), **update** to modify
   .input(
     z.object({
       action: z.enum(['create', 'update', 'delete']).describe('Operation to perform'),
-      teamId: z.string().optional().describe('Team ID (required for create and update)'),
+      teamId: teamIdSchema
+        .optional()
+        .describe('Team ID from list_teams (required for create and update)'),
       scheduleGroupIds: z
         .array(z.string())
         .optional()
@@ -84,7 +98,7 @@ Use **create** to make a new group (as draft or scheduled), **update** to modify
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.scheduleGroupIds || ctx.input.scheduleGroupIds.length === 0) {
-        throw new Error('scheduleGroupIds is required for delete action');
+        throw createApiServiceError('scheduleGroupIds is required for delete action');
       }
       await client.deleteScheduleGroups(ctx.input.scheduleGroupIds);
       return {
@@ -94,10 +108,16 @@ Use **create** to make a new group (as draft or scheduled), **update** to modify
     }
 
     if (!ctx.input.teamId) {
-      throw new Error('teamId is required for create/update actions');
+      throw createApiServiceError('teamId is required for create/update actions');
     }
     if (!ctx.input.schedules || ctx.input.schedules.length === 0) {
-      throw new Error('schedules is required for create/update actions');
+      throw createApiServiceError('schedules is required for create/update actions');
+    }
+
+    if (ctx.input.action === 'update' && !ctx.input.scheduleGroupId?.trim()) {
+      throw createApiServiceError(
+        'scheduleGroupId is required for update. Call list_schedule_groups to discover groups.'
+      );
     }
 
     let groupInput = {
@@ -118,13 +138,36 @@ Use **create** to make a new group (as draft or scheduled), **update** to modify
       ctx.input.validateOnly
     );
 
-    let data = result.data || result;
-    let groups = (Array.isArray(data) ? data : [data]).map((g: any) => ({
-      scheduleGroupId: g.id,
-      status: g.status,
-      publishOn: g.publishOn || g.publish_on,
-      scheduleCount: g.schedules?.length
-    }));
+    let data = responseData(result);
+    let validationOnly = ctx.input.validateOnly === true;
+    let groups =
+      validationOnly &&
+      (data === null ||
+        data === undefined ||
+        (typeof data === 'object' &&
+          !Array.isArray(data) &&
+          !('upsert' in data) &&
+          !('id' in data)))
+        ? undefined
+        : upsertGroups(data).map(value => {
+            let group = responseRecord(value, 'schedule group');
+            return {
+              scheduleGroupId: requiredString(group.id, 'schedule group ID'),
+              status: scalarString(group.status),
+              publishOn: nullableString(
+                group.publishOn !== undefined ? group.publishOn : group.publish_on
+              ),
+              scheduleCount:
+                group.schedules === undefined
+                  ? undefined
+                  : responseArray(group.schedules, 'group schedules').length,
+              raw: group
+            };
+          });
+
+    if (!validationOnly && groups?.length === 0) {
+      throw createApiServiceError('Planly did not return created or updated schedule groups.');
+    }
 
     return {
       output: { groups, success: true },

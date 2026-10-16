@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> Plisio
 
-Create cryptocurrency payment invoices, process withdrawals, and manage balances across 30+ cryptocurrencies. Send single or mass payouts to external wallets, estimate network fees, look up exchange rates against 167 fiat currencies, and retrieve fee plans. Create permanent deposit addresses, view transaction history, list supported cryptocurrencies, and receive webhook callbacks for invoice status updates. Supports white-label payment page customization for custom-built payment UIs.
+Create and retrieve cryptocurrency invoices, send single or mass withdrawals, and inspect balances, exchange rates, transaction history, and fee plans. Identify the shop connected to your API key and create or list permanent deposit addresses when white-label processing is enabled. Invoice callbacks can be directed to your own service; this integration does not register event triggers.
+
+Amounts use the selected cryptocurrency's units, without conversion to atomic units. Withdrawal amounts remain decimal strings. Invoices retain their hosted payment URL and, in white-label mode, include the provider's extended details and a downloadable QR image when a valid PNG is returned.
+
+Official API reference: [Plisio documentation](https://plisio.net/documentation).
 
 ## License
 

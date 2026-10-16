@@ -14,8 +14,16 @@ export let listComparisons = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Maximum number of comparisons to return'),
-      offset: z.number().optional().describe('Number of comparisons to skip for pagination')
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum number of comparisons to return. Draftable returns at most 300 per page.'
+        ),
+      offset: z
+        .number()
+        .optional()
+        .describe('Non-negative integer number of comparisons to skip for pagination')
     })
   )
   .output(
@@ -26,20 +34,33 @@ export let listComparisons = SlateTool.create(spec, {
           comparisonIdentifier: z.string().describe('Unique identifier of the comparison'),
           left: z.object({
             fileType: z.string().describe('File type of the left document'),
-            displayName: z.string().nullable().describe('Display name of the left document')
+            displayName: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Display name of the left document')
           }),
           right: z.object({
             fileType: z.string().describe('File type of the right document'),
-            displayName: z.string().nullable().describe('Display name of the right document')
+            displayName: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Display name of the right document')
           }),
           isPublic: z.boolean().describe('Whether the comparison is publicly accessible'),
           creationTime: z.string().describe('UTC timestamp when the comparison was created'),
           expiryTime: z
             .string()
             .nullable()
+            .optional()
             .describe('UTC timestamp when the comparison will expire'),
           ready: z.boolean().describe('Whether the comparison processing is complete'),
-          failed: z.boolean().nullable().describe('Whether the comparison processing failed')
+          failed: z
+            .boolean()
+            .nullable()
+            .optional()
+            .describe('Whether the comparison processing failed')
         })
       )
     })

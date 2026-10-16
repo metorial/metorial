@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { requireString, requireSuccess } from '../lib/response';
 import { spec } from '../spec';
 
 export let createGallery = SlateTool.create(spec, {
@@ -50,9 +51,9 @@ export let createGallery = SlateTool.create(spec, {
 
     return {
       output: {
-        galleryId: data.fid || '',
+        galleryId: requireString(data.fid, 'the created gallery ID'),
         uploadUrl: data.upload_url,
-        success: data.success === true
+        success: requireSuccess(data)
       },
       message: `Gallery **${ctx.input.name || data.fid}** created successfully with ID \`${data.fid}\`.`
     };

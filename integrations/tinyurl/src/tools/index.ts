@@ -1,4 +1,5 @@
 export { archiveTinyUrl } from './archive-tinyurl';
+export { countTinyUrls } from './count-tinyurls';
 export { createTinyUrl } from './create-tinyurl';
 export { deleteTinyUrl } from './delete-tinyurl';
 export { getAnalytics } from './get-analytics';

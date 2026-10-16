@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { requireAblyAuth } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,6 +25,7 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      requireAblyAuth(ctx.input.apiKey, 'api_key', 'api_key');
       return {
         output: {
           token: ctx.input.apiKey,
@@ -44,6 +46,7 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      requireAblyAuth(ctx.input.controlToken, 'control_token', 'control_token');
       return {
         output: {
           token: ctx.input.controlToken,

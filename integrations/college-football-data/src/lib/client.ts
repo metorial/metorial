@@ -1,15 +1,136 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('Enter a College Football Data API key.', {
+        reason: 'missing_api_key'
+      });
+    }
     this.axios = createAxios({
       baseURL: 'https://api.collegefootballdata.com',
       headers: {
-        Authorization: `Bearer ${config.token}`
+        Authorization: `Bearer ${config.token.trim()}`
       }
     });
+  }
+
+  private async get(path: string, params: Record<string, unknown> = {}, expectsArray = true) {
+    for (let [name, value] of Object.entries(params)) {
+      if (typeof value === 'string' && !value.trim()) {
+        throw createApiServiceError(`${name} must not be blank.`, {
+          reason: 'invalid_parameter'
+        });
+      }
+      if (typeof value === 'number') {
+        let allowsFraction =
+          name === 'threshold' ||
+          (name === 'week' &&
+            ['/rankings', '/stats/game/advanced', '/stats/game/havoc'].includes(path));
+        if (
+          !Number.isFinite(value) ||
+          (!allowsFraction &&
+            (!Number.isInteger(value) || value < -2147483648 || value > 2147483647))
+        ) {
+          throw createApiServiceError(
+            `${name} must be ${allowsFraction ? 'a finite number' : 'a 32-bit integer'}.`,
+            { reason: 'invalid_parameter' }
+          );
+        }
+      }
+    }
+    for (let [lower, upper] of [
+      ['startWeek', 'endWeek'],
+      ['minYear', 'maxYear'],
+      ['startYear', 'endYear']
+    ] as const) {
+      if (
+        typeof params[lower] === 'number' &&
+        typeof params[upper] === 'number' &&
+        params[lower] > params[upper]
+      ) {
+        throw createApiServiceError(`${lower} must not exceed ${upper}.`, {
+          reason: 'invalid_range'
+        });
+      }
+    }
+    let requiresYearOrTeam = [
+      '/stats/season',
+      '/stats/season/advanced',
+      '/stats/game/advanced',
+      '/ratings/core',
+      '/ratings/sp',
+      '/ratings/srs',
+      '/ratings/fpi',
+      '/ppa/teams',
+      '/player/returning',
+      '/records',
+      '/recruiting/players'
+    ];
+    if (
+      requiresYearOrTeam.includes(path) &&
+      params.year === undefined &&
+      params.team === undefined
+    ) {
+      throw createApiServiceError('Provide year or team for this query.', {
+        reason: 'missing_filter'
+      });
+    }
+    if (
+      path === '/ppa/players/season' &&
+      params.year === undefined &&
+      params.playerId === undefined
+    ) {
+      throw createApiServiceError('Provide year or playerId for player PPA.', {
+        reason: 'missing_filter'
+      });
+    }
+    if (path === '/lines' && params.year === undefined && params.gameId === undefined) {
+      throw createApiServiceError('Provide year or gameId when retrieving betting lines.', {
+        reason: 'missing_filter'
+      });
+    }
+    try {
+      let response = await this.axios.get(path, { params });
+      if (
+        (expectsArray && !Array.isArray(response.data)) ||
+        (!expectsArray &&
+          response.data !== null &&
+          (typeof response.data !== 'object' || Array.isArray(response.data)))
+      ) {
+        throw createApiServiceError(
+          'College Football Data returned an unexpected response; expected the documented data shape.',
+          { reason: 'invalid_response' }
+        );
+      }
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'College Football Data',
+        reason: 'college_football_data_request_failed',
+        operation: `GET ${path}`,
+        extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure),
+        nestedKeys: ['errors', 'error', 'message', 'details'],
+        extractMessage: (failure, helpers) => {
+          let response = helpers.getResponseWithBody(failure);
+          let body = response?.data;
+          let details: string[] = [];
+          helpers.collectDetails(body, details, {
+            nestedKeys: ['errors', 'error', 'message', 'details']
+          });
+          if (helpers.isRecord(body) && helpers.isRecord(body.fields)) {
+            for (let [field, issue] of Object.entries(body.fields)) {
+              let fieldDetails: string[] = [];
+              helpers.collectDetails(issue, fieldDetails);
+              if (fieldDetails.length) details.push(`${field}: ${fieldDetails.join('; ')}`);
+            }
+          }
+          return details.length ? details.join(' - ') : undefined;
+        }
+      });
+    }
   }
 
   // ---- Games & Schedules ----
@@ -22,21 +143,19 @@ export class Client {
     conference?: string;
     classification?: string;
     gameId?: number;
+    home?: string;
+    away?: string;
   }) {
-    let response = await this.axios.get('/games', {
-      params: { ...params, id: params.gameId }
-    });
-    return response.data;
+    let { gameId, ...filters } = params;
+    return this.get('/games', { ...filters, id: gameId });
   }
 
   async getGameTeamStats(gameId: number) {
-    let response = await this.axios.get(`/games/${gameId}/teams`);
-    return response.data;
+    return this.get('/games/teams', { id: gameId });
   }
 
   async getGamePlayerStats(gameId: number) {
-    let response = await this.axios.get(`/games/${gameId}/players`);
-    return response.data;
+    return this.get('/games/players', { id: gameId });
   }
 
   async getGameWeather(params: {
@@ -46,8 +165,7 @@ export class Client {
     conference?: string;
     seasonType?: string;
   }) {
-    let response = await this.axios.get(`/games/weather`, { params });
-    return response.data;
+    return this.get(`/games/weather`, params);
   }
 
   async getGameMedia(params: {
@@ -57,35 +175,29 @@ export class Client {
     conference?: string;
     seasonType?: string;
   }) {
-    let response = await this.axios.get('/games/media', { params });
-    return response.data;
+    return this.get('/games/media', params);
   }
 
-  async getCalendar(params: { year: number; seasonType?: string }) {
-    let response = await this.axios.get('/calendar', { params });
-    return response.data;
+  async getCalendar(params: { year: number }) {
+    return this.get('/calendar', params);
   }
 
-  async getScoreboard() {
-    let response = await this.axios.get('/live/scoreboard');
-    return response.data;
+  async getScoreboard(params?: { classification?: string; conference?: string }) {
+    return this.get('/scoreboard', params);
   }
 
   async getLiveGame(gameId: number) {
-    let response = await this.axios.get(`/live/games/${gameId}`);
-    return response.data;
+    return this.get('/live/plays', { gameId }, false);
   }
 
   // ---- Teams ----
 
   async getTeams(params?: { conference?: string; year?: number }) {
-    let response = await this.axios.get('/teams', { params });
-    return response.data;
+    return this.get('/teams', params);
   }
 
   async getFbsTeams(params?: { year?: number }) {
-    let response = await this.axios.get('/teams/fbs', { params });
-    return response.data;
+    return this.get('/teams/fbs', params);
   }
 
   async getMatchup(params: {
@@ -94,40 +206,33 @@ export class Client {
     minYear?: number;
     maxYear?: number;
   }) {
-    let response = await this.axios.get('/teams/matchup', { params });
-    return response.data;
+    return this.get('/teams/matchup', params, false);
   }
 
   async getTeamATS(params: { year: number; conference?: string; team?: string }) {
-    let response = await this.axios.get('/teams/ats', { params });
-    return response.data;
+    return this.get('/teams/ats', params);
   }
 
   async getRoster(params?: { team?: string; year?: number; classification?: string }) {
-    let response = await this.axios.get('/roster', { params });
-    return response.data;
+    return this.get('/roster', params);
   }
 
   async getTalent(params: { year: number }) {
-    let response = await this.axios.get('/talent', { params });
-    return response.data;
+    return this.get('/talent', params);
   }
 
   async getRecords(params?: { year?: number; team?: string; conference?: string }) {
-    let response = await this.axios.get('/records', { params });
-    return response.data;
+    return this.get('/records', params);
   }
 
   // ---- Conferences & Venues ----
 
-  async getConferences() {
-    let response = await this.axios.get('/conferences');
-    return response.data;
+  async getConferences(params?: { year?: number; classification?: string }) {
+    return this.get('/conferences', params);
   }
 
   async getVenues() {
-    let response = await this.axios.get('/venues');
-    return response.data;
+    return this.get('/venues');
   }
 
   // ---- Players ----
@@ -137,9 +242,11 @@ export class Client {
     year?: number;
     team?: string;
     limit?: number;
+    position?: string;
   }) {
-    let response = await this.axios.get('/player/search', { params });
-    return response.data;
+    let { limit, ...filters } = params;
+    let players = await this.get('/player/search', filters);
+    return limit === undefined ? players : players.slice(0, limit);
   }
 
   async getPlayerUsage(params: {
@@ -150,8 +257,7 @@ export class Client {
     playerId?: number;
     excludeGarbageTime?: boolean;
   }) {
-    let response = await this.axios.get('/player/usage', { params });
-    return response.data;
+    return this.get('/player/usage', params);
   }
 
   async getReturningProduction(params?: {
@@ -159,13 +265,11 @@ export class Client {
     team?: string;
     conference?: string;
   }) {
-    let response = await this.axios.get('/player/returning', { params });
-    return response.data;
+    return this.get('/player/returning', params);
   }
 
   async getTransferPortal(params: { year: number }) {
-    let response = await this.axios.get('/player/transfer', { params });
-    return response.data;
+    return this.get('/player/portal', params);
   }
 
   // ---- Statistics ----
@@ -179,8 +283,7 @@ export class Client {
     seasonType?: string;
     category?: string;
   }) {
-    let response = await this.axios.get('/stats/player/season', { params });
-    return response.data;
+    return this.get('/stats/player/season', params);
   }
 
   async getTeamSeasonStats(params?: {
@@ -190,13 +293,11 @@ export class Client {
     startWeek?: number;
     endWeek?: number;
   }) {
-    let response = await this.axios.get('/stats/season', { params });
-    return response.data;
+    return this.get('/stats/season', params);
   }
 
   async getStatCategories() {
-    let response = await this.axios.get('/stats/categories');
-    return response.data;
+    return this.get('/stats/categories');
   }
 
   async getAdvancedSeasonStats(params?: {
@@ -206,8 +307,7 @@ export class Client {
     startWeek?: number;
     endWeek?: number;
   }) {
-    let response = await this.axios.get('/stats/season/advanced', { params });
-    return response.data;
+    return this.get('/stats/season/advanced', params);
   }
 
   async getAdvancedGameStats(params?: {
@@ -218,8 +318,7 @@ export class Client {
     excludeGarbageTime?: boolean;
     seasonType?: string;
   }) {
-    let response = await this.axios.get('/stats/game/advanced', { params });
-    return response.data;
+    return this.get('/stats/game/advanced', params);
   }
 
   // ---- Recruiting ----
@@ -231,13 +330,11 @@ export class Client {
     state?: string;
     classification?: string;
   }) {
-    let response = await this.axios.get('/recruiting/players', { params });
-    return response.data;
+    return this.get('/recruiting/players', params);
   }
 
   async getTeamRecruitingRankings(params?: { year?: number; team?: string }) {
-    let response = await this.axios.get('/recruiting/teams', { params });
-    return response.data;
+    return this.get('/recruiting/teams', params);
   }
 
   async getRecruitingGroups(params?: {
@@ -247,25 +344,21 @@ export class Client {
     startYear?: number;
     endYear?: number;
   }) {
-    let response = await this.axios.get('/recruiting/groups', { params });
-    return response.data;
+    return this.get('/recruiting/groups', params);
   }
 
   // ---- Ratings & Rankings ----
 
   async getSPRatings(params?: { year?: number; team?: string }) {
-    let response = await this.axios.get('/ratings/sp', { params });
-    return response.data;
+    return this.get('/ratings/sp', params);
   }
 
   async getConferenceSPRatings(params?: { year?: number; conference?: string }) {
-    let response = await this.axios.get('/ratings/sp/conferences', { params });
-    return response.data;
+    return this.get('/ratings/sp/conferences', params);
   }
 
   async getSRSRatings(params?: { year?: number; team?: string; conference?: string }) {
-    let response = await this.axios.get('/ratings/srs', { params });
-    return response.data;
+    return this.get('/ratings/srs', params);
   }
 
   async getEloRatings(params?: {
@@ -275,18 +368,15 @@ export class Client {
     team?: string;
     conference?: string;
   }) {
-    let response = await this.axios.get('/ratings/elo', { params });
-    return response.data;
+    return this.get('/ratings/elo', params);
   }
 
   async getFPIRatings(params?: { year?: number; team?: string; conference?: string }) {
-    let response = await this.axios.get('/ratings/fpi', { params });
-    return response.data;
+    return this.get('/ratings/fpi', params);
   }
 
   async getRankings(params: { year: number; seasonType?: string; week?: number }) {
-    let response = await this.axios.get('/rankings', { params });
-    return response.data;
+    return this.get('/rankings', params);
   }
 
   // ---- Plays & Drives ----
@@ -302,13 +392,11 @@ export class Client {
     seasonType?: string;
     classification?: string;
   }) {
-    let response = await this.axios.get('/plays', { params });
-    return response.data;
+    return this.get('/plays', params);
   }
 
   async getPlayTypes() {
-    let response = await this.axios.get('/plays/types');
-    return response.data;
+    return this.get('/plays/types');
   }
 
   async getPlayStats(params?: {
@@ -317,8 +405,7 @@ export class Client {
     team?: string;
     gameId?: number;
   }) {
-    let response = await this.axios.get('/plays/stats', { params });
-    return response.data;
+    return this.get('/plays/stats', params);
   }
 
   async getDrives(params: {
@@ -330,15 +417,13 @@ export class Client {
     defense?: string;
     conference?: string;
   }) {
-    let response = await this.axios.get('/drives', { params });
-    return response.data;
+    return this.get('/drives', params);
   }
 
   // ---- PPA & Win Probability ----
 
-  async getPredictedPoints() {
-    let response = await this.axios.get('/ppa/predicted/points');
-    return response.data;
+  async getPredictedPoints(params: { down: number; distance: number }) {
+    return this.get('/ppa/predicted', params);
   }
 
   async getTeamSeasonPPA(params?: {
@@ -347,8 +432,7 @@ export class Client {
     conference?: string;
     excludeGarbageTime?: boolean;
   }) {
-    let response = await this.axios.get('/ppa/season', { params });
-    return response.data;
+    return this.get('/ppa/teams', params);
   }
 
   async getTeamGamePPA(params: {
@@ -358,8 +442,7 @@ export class Client {
     conference?: string;
     excludeGarbageTime?: boolean;
   }) {
-    let response = await this.axios.get('/ppa/game', { params });
-    return response.data;
+    return this.get('/ppa/games', params);
   }
 
   async getPlayerSeasonPPA(params?: {
@@ -367,12 +450,11 @@ export class Client {
     team?: string;
     conference?: string;
     position?: string;
-    playerId?: number;
-    threshold?: string;
+    playerId?: string;
+    threshold?: number;
     excludeGarbageTime?: boolean;
   }) {
-    let response = await this.axios.get('/ppa/players/season', { params });
-    return response.data;
+    return this.get('/ppa/players/season', params);
   }
 
   async getPlayerGamePPA(params?: {
@@ -380,18 +462,16 @@ export class Client {
     week?: number;
     team?: string;
     position?: string;
-    playerId?: number;
-    threshold?: string;
+    playerId?: string;
+    threshold?: number;
     seasonType?: string;
     excludeGarbageTime?: boolean;
   }) {
-    let response = await this.axios.get('/ppa/players/game', { params });
-    return response.data;
+    return this.get('/ppa/players/games', params);
   }
 
   async getWinProbability(params: { gameId: number }) {
-    let response = await this.axios.get('/metrics/wp', { params });
-    return response.data;
+    return this.get('/metrics/wp', params);
   }
 
   async getPregameWinProbability(params: {
@@ -400,13 +480,11 @@ export class Client {
     seasonType?: string;
     team?: string;
   }) {
-    let response = await this.axios.get('/metrics/wp/pregame', { params });
-    return response.data;
+    return this.get('/metrics/wp/pregame', params);
   }
 
   async getFieldGoalExpectedPoints() {
-    let response = await this.axios.get('/metrics/fg/ep');
-    return response.data;
+    return this.get('/metrics/fg/ep');
   }
 
   // ---- Betting ----
@@ -418,9 +496,11 @@ export class Client {
     conference?: string;
     seasonType?: string;
     gameId?: number;
+    home?: string;
+    away?: string;
+    provider?: string;
   }) {
-    let response = await this.axios.get('/games/betting', { params });
-    return response.data;
+    return this.get('/lines', params);
   }
 
   // ---- Adjusted Metrics ----
@@ -430,8 +510,7 @@ export class Client {
     team?: string;
     conference?: string;
   }) {
-    let response = await this.axios.get('/wepa/team/season', { params });
-    return response.data;
+    return this.get('/wepa/team/season', params);
   }
 
   async getAdjustedPlayerPassing(params?: {
@@ -440,8 +519,7 @@ export class Client {
     conference?: string;
     position?: string;
   }) {
-    let response = await this.axios.get('/wepa/players/passing', { params });
-    return response.data;
+    return this.get('/wepa/players/passing', params);
   }
 
   async getAdjustedPlayerRushing(params?: {
@@ -450,13 +528,11 @@ export class Client {
     conference?: string;
     position?: string;
   }) {
-    let response = await this.axios.get('/wepa/players/rushing', { params });
-    return response.data;
+    return this.get('/wepa/players/rushing', params);
   }
 
   async getKickerPAARRatings(params?: { year?: number; team?: string; conference?: string }) {
-    let response = await this.axios.get('/wepa/players/kicking', { params });
-    return response.data;
+    return this.get('/wepa/players/kicking', params);
   }
 
   // ---- Coaches ----
@@ -469,8 +545,8 @@ export class Client {
     minYear?: number;
     maxYear?: number;
   }) {
-    let response = await this.axios.get('/coaches', { params });
-    return response.data;
+    let { school, ...filters } = params ?? {};
+    return this.get('/coaches', { ...filters, team: school });
   }
 
   // ---- Draft ----
@@ -481,14 +557,59 @@ export class Client {
     college?: string;
     position?: string;
   }) {
-    let response = await this.axios.get('/draft/picks', { params });
-    return response.data;
+    let { nflTeam, college, ...filters } = params ?? {};
+    return this.get('/draft/picks', { ...filters, team: nflTeam, school: college });
   }
 
   // ---- Advanced Box Score ----
 
   async getAdvancedBoxScore(gameId: number) {
-    let response = await this.axios.get(`/game/${gameId}/box/advanced`);
-    return response.data;
+    return this.get('/game/box/advanced', { id: gameId }, false);
+  }
+
+  async getAccountInfo() {
+    let account = await this.get('/info', {}, false);
+    if (account === null) {
+      throw createApiServiceError(
+        'College Football Data did not authenticate this API key. Reconnect with a current key.',
+        { reason: 'unauthenticated' }
+      );
+    }
+    return account;
+  }
+
+  async getSchedule(params: {
+    year?: number;
+    seasonType?: string;
+    week?: number;
+    classification?: string;
+    conference?: string;
+  }) {
+    let explicit = [params.year, params.seasonType, params.week].filter(
+      value => value !== undefined
+    ).length;
+    if (explicit !== 0 && explicit !== 3) {
+      throw createApiServiceError(
+        'For an explicit schedule, provide year, seasonType, and week together, or omit all three for the active or next slate.',
+        { reason: 'incomplete_schedule_window' }
+      );
+    }
+    return this.get('/games/schedule', params, false);
+  }
+
+  async getTeamOverview(params: { year: number; team: string }) {
+    return this.get('/teams/season/overview', params, false);
+  }
+
+  async getPlayerOverview(params: { year: number; playerId: number }) {
+    return this.get('/player/season/overview', params, false);
+  }
+
+  async getPlayoffBracket(params: { year: number }) {
+    return this.get('/playoffs/cfp', params, false);
+  }
+
+  async getCoreRatings(params: { year: number; team?: string; conference?: string }) {
+    return this.get('/ratings/core', params);
   }
 }

@@ -25,6 +25,7 @@ Use this to pull content from URLs for social media sharing, content curation, o
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       title: z.string().optional().describe('Title of the article or page'),
       articleText: z
         .string()
@@ -41,6 +42,7 @@ Use this to pull content from URLs for social media sharing, content curation, o
       let result = await client.extractArticle(ctx.input.url);
       return {
         output: {
+          raw: { ...result },
           title: result.title,
           articleText: result.text
         },
@@ -52,6 +54,7 @@ Use this to pull content from URLs for social media sharing, content curation, o
       let result = await client.linkPreview(ctx.input.url);
       return {
         output: {
+          raw: { ...result },
           title: result.title,
           description: result.description,
           imageUrl: result.image
@@ -60,13 +63,15 @@ Use this to pull content from URLs for social media sharing, content curation, o
       };
     }
 
-    // image extraction
     let result = await client.extractImageFromUrl(ctx.input.url);
+    let imageUrl = result.top_image ?? result.url;
+    if (imageUrl) await ctx.addAttachment({ type: 'url', url: imageUrl });
     return {
       output: {
-        imageUrl: result.url
+        raw: { ...result },
+        imageUrl: result.top_image ?? result.url
       },
-      message: `Extracted top image: ${result.url}`
+      message: `Extracted top image: ${result.top_image ?? result.url}`
     };
   })
   .build();

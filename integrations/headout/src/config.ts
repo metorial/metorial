@@ -7,10 +7,10 @@ export let config = SlateConfig.create(
       .enum(['production', 'sandbox'])
       .default('production')
       .describe(
-        'API environment. Production uses www.headout.com, sandbox uses sandbox.api.test-headout.com.'
+        'API environment. Production uses www.headout.com, sandbox uses sandbox.api.dev-headout.com.'
       ),
     languageCode: z
-      .enum(['EN', 'ES', 'FR', 'IT', 'DE', 'PT', 'NL'])
+      .enum(['EN', 'ES', 'FR', 'IT', 'DE', 'PT', 'NL', 'PL'])
       .default('EN')
       .describe('Default language for API responses.'),
     currencyCode: z

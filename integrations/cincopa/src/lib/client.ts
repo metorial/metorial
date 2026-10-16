@@ -1,7 +1,28 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
-let axios = createAxios({
-  baseURL: 'https://api.cincopa.com/v2'
+let cincopaError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Cincopa',
+    reason: 'cincopa_api_error',
+    extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+    detailKeys: ['message', 'error', 'exception', 'code']
+  });
+
+let axios = createAuthenticatedAxios({
+  baseURL: 'https://api.cincopa.com/v2',
+  errorAdapter: cincopaError
+});
+
+axios.interceptors.response.use(response => {
+  if (isApiErrorRecord(response.data) && response.data.success === false) {
+    throw cincopaError({ response: { status: response.status, data: response.data } });
+  }
+  return response;
 });
 
 export class CincopaClient {
@@ -30,11 +51,19 @@ export class CincopaClient {
 
   // ─── Gallery Methods ────────────────────────────────
 
-  async listGalleries(options?: { page?: number; pageSize?: number }): Promise<any> {
+  async listGalleries(options?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    filterTags?: string;
+  }): Promise<any> {
     let response = await axios.get('/gallery.list.json', {
       params: this.params({
         page: options?.page,
-        page_size: options?.pageSize
+        page_size: options?.pageSize,
+        items_per_page: options?.pageSize,
+        search: options?.search,
+        filter_tags: options?.filterTags
       })
     });
     return response.data;
@@ -97,7 +126,8 @@ export class CincopaClient {
       params: this.params({
         fid: options.galleryId,
         page: options.page,
-        page_size: options.pageSize
+        page_size: options.pageSize,
+        items_per_page: options.pageSize
       })
     });
     return response.data;
@@ -127,7 +157,8 @@ export class CincopaClient {
       params: this.params({
         fid: options.galleryId,
         rid: options.rid,
-        delete_asset: options.deleteAsset ? 'yes' : 'no'
+        delete_asset: options.deleteAsset ? 'yes' : 'no',
+        delete_assets: options.deleteAsset ? 'yes' : 'no'
       })
     });
     return response.data;
@@ -158,14 +189,21 @@ export class CincopaClient {
     search?: string;
     referenceId?: string;
     type?: string;
+    rid?: string;
+    tag?: string;
+    details?: string;
   }): Promise<any> {
     let response = await axios.get('/asset.list.json', {
       params: this.params({
         page: options?.page,
         page_size: options?.pageSize,
+        items_per_page: options?.pageSize,
         search: options?.search,
         reference_id: options?.referenceId,
-        type: options?.type
+        type: options?.type,
+        rid: options?.rid,
+        tag: options?.tag,
+        details: options?.details
       })
     });
     return response.data;
@@ -313,11 +351,18 @@ export class CincopaClient {
     return response.data;
   }
 
-  async createLiveStream(options: { name?: string; description?: string }): Promise<any> {
+  async createLiveStream(options: {
+    name?: string;
+    description?: string;
+    location?: string;
+    type?: string;
+  }): Promise<any> {
     let response = await axios.get('/live.create.json', {
       params: this.params({
         name: options.name,
-        description: options.description
+        description: options.description,
+        location: options.location,
+        type: options.type
       })
     });
     return response.data;
@@ -325,28 +370,28 @@ export class CincopaClient {
 
   async startLiveStream(streamId: string): Promise<any> {
     let response = await axios.get('/live.start.json', {
-      params: this.params({ stream_id: streamId })
+      params: this.params({ stream_id: streamId, liveid: streamId })
     });
     return response.data;
   }
 
   async stopLiveStream(streamId: string): Promise<any> {
     let response = await axios.get('/live.stop.json', {
-      params: this.params({ stream_id: streamId })
+      params: this.params({ stream_id: streamId, liveid: streamId })
     });
     return response.data;
   }
 
   async resetLiveStream(streamId: string): Promise<any> {
     let response = await axios.get('/live.reset.json', {
-      params: this.params({ stream_id: streamId })
+      params: this.params({ stream_id: streamId, liveid: streamId })
     });
     return response.data;
   }
 
   async deleteLiveStream(streamId: string): Promise<any> {
     let response = await axios.get('/live.delete.json', {
-      params: this.params({ stream_id: streamId })
+      params: this.params({ stream_id: streamId, liveid: streamId })
     });
     return response.data;
   }
@@ -390,6 +435,55 @@ export class CincopaClient {
         permissions: options?.permissions,
         ttl: options?.ttl
       })
+    });
+    return response.data;
+  }
+
+  async setMediaMetadata(
+    kind: 'asset' | 'gallery',
+    fields: Record<string, unknown>
+  ): Promise<any> {
+    let response = await axios.post(`/${kind}.set_meta.json`, undefined, {
+      params: pickDefined({ api_token: this.apiToken, ...fields })
+    });
+    return response.data;
+  }
+
+  async downloadGallery(galleryId: string, type?: 'original' | 'resized'): Promise<any> {
+    let response = await axios.get('/gallery.download.json', {
+      params: this.params({ fid: galleryId, type })
+    });
+    return response.data;
+  }
+
+  async importMedia(options: {
+    input: string;
+    fid?: string;
+    rid?: string;
+    type?: string;
+  }): Promise<any> {
+    let response = await axios.post('/asset.upload_from_url.json', undefined, {
+      params: pickDefined({ api_token: this.apiToken, ...options })
+    });
+    return response.data;
+  }
+
+  async abortImport(statusId: string): Promise<any> {
+    let response = await axios.post('/asset.upload_from_url_abort.json', undefined, {
+      params: this.params({ status_id: statusId })
+    });
+    return response.data;
+  }
+
+  async portalSubdomain(
+    action: 'check' | 'save' | 'rename' | 'remove',
+    fields: Record<string, unknown>
+  ): Promise<any> {
+    let route = action === 'save' ? 'set' : action;
+    let response = await axios.request({
+      method: action === 'check' ? 'GET' : 'POST',
+      url: `/portal.${route}.json`,
+      params: pickDefined({ api_token: this.apiToken, ...fields })
     });
     return response.data;
   }

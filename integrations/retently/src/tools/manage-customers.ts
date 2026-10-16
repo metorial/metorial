@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,9 @@ let customerPropertySchema = z.object({
   type: z
     .enum(['string', 'date', 'integer', 'collection', 'boolean'])
     .describe('Property data type'),
-  value: z.union([z.string(), z.number(), z.boolean()]).describe('Property value')
+  value: z
+    .union([z.string(), z.number(), z.boolean()])
+    .describe('Property value. For collection properties, use comma-separated text.')
 });
 
 let customerInputSchema = z.object({
@@ -17,6 +19,11 @@ let customerInputSchema = z.object({
   lastName: z.string().optional().describe('Customer last name'),
   company: z.string().optional().describe('Company name'),
   tags: z.array(z.string()).optional().describe('Tags to assign to the customer'),
+  unsetProperties: z
+    .array(z.string())
+    .optional()
+    .describe('Property names or labels to remove'),
+  unsetTags: z.array(z.string()).optional().describe('Tag names to remove'),
   properties: z
     .array(customerPropertySchema)
     .optional()
@@ -75,12 +82,16 @@ Supports bulk operations for up to 1,000 customers per request.`,
     let client = new Client(ctx.auth.token);
 
     if (ctx.input.action === 'create_or_update') {
+      if (ctx.input.customers.length > 1000)
+        throw createApiServiceError('Create or update at most 1,000 customers per request.');
       let subscribers = ctx.input.customers.map(c => ({
         email: c.email,
         first_name: c.firstName,
         last_name: c.lastName,
         company: c.company,
         tags: c.tags,
+        unset_properties: c.unsetProperties,
+        unset_tags: c.unsetTags,
         properties: normalizeProperties(c.properties)
       }));
 

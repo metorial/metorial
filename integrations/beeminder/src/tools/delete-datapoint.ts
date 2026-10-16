@@ -22,7 +22,8 @@ export let deleteDatapoint = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
     let raw = await client.deleteDatapoint(ctx.input.goalSlug, ctx.input.datapointId);

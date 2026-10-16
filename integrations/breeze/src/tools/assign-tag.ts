@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let assignTag = SlateTool.create(spec, {
@@ -31,7 +31,7 @@ export let assignTag = SlateTool.create(spec, {
     }
 
     return {
-      output: { success: result === true || result === 'true' },
+      output: { success: requireSuccess(result) },
       message: `Tag (ID: ${ctx.input.tagId}) ${ctx.input.action === 'assign' ? 'assigned to' : 'unassigned from'} person (ID: ${ctx.input.personId}).`
     };
   })

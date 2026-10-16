@@ -6,9 +6,10 @@ import { spec } from '../spec';
 export let listTemplates = SlateTool.create(spec, {
   name: 'List Templates',
   key: 'list_templates',
-  description: `Retrieve all image templates on your account, or list all versions of a specific template. Returns template metadata including HTML, CSS, rendering configuration, and usage counts.`,
+  description: `Retrieve a page of image templates on your account, or a page of versions of a specific template. Returns template metadata including HTML, CSS, rendering configuration, and usage counts.`,
   instructions: [
-    'Omit `templateId` to list all templates. Provide a `templateId` to list all versions of that template.'
+    'Omit `templateId` to list templates. Provide a `templateId` to list versions of that template.',
+    'For another page, pass the returned pagination cursor as maxVersion.'
   ],
   tags: {
     destructive: false,
@@ -21,7 +22,17 @@ export let listTemplates = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'If provided, lists all versions of this specific template. Otherwise lists all templates.'
+          'If provided, lists versions of this specific template. Otherwise lists templates.'
+        ),
+      count: z
+        .number()
+        .optional()
+        .describe('Number of templates or versions per page (1-100)'),
+      maxVersion: z
+        .number()
+        .optional()
+        .describe(
+          'Pagination version cursor from the previous result; omit for the first page'
         )
     })
   )
@@ -31,6 +42,7 @@ export let listTemplates = SlateTool.create(spec, {
         .array(
           z.object({
             templateId: z.string().describe('Unique identifier for the template'),
+            templateVersion: z.number().describe('Version of the template'),
             name: z.string().optional().describe('Name of the template'),
             description: z.string().optional().describe('Description of the template'),
             html: z.string().describe('HTML markup of the template'),
@@ -47,10 +59,21 @@ export let listTemplates = SlateTool.create(spec, {
             createdAt: z
               .string()
               .optional()
-              .describe('Timestamp when the template was created')
+              .describe('Timestamp when the template was created'),
+            raw: z
+              .record(z.string(), z.unknown())
+              .describe(
+                'Original template metadata, including nulls, with credentials removed'
+              )
           })
         )
-        .describe('List of templates or template versions')
+        .describe('List of templates or template versions'),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .describe('Provider pagination metadata; use the next cursor for maxVersion'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Provider list response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
@@ -59,17 +82,19 @@ export let listTemplates = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let templates = ctx.input.templateId
-      ? await client.getTemplateVersions(ctx.input.templateId)
-      : await client.listTemplates();
+    let result = await client.listTemplates(
+      ctx.input.templateId,
+      ctx.input.count,
+      ctx.input.maxVersion
+    );
 
     let label = ctx.input.templateId
       ? `versions of template **${ctx.input.templateId}**`
       : 'template(s)';
 
     return {
-      output: { templates },
-      message: `Retrieved **${templates.length}** ${label}.`
+      output: result,
+      message: `Retrieved **${result.templates.length}** ${label}.`
     };
   })
   .build();

@@ -1,5 +1,9 @@
 export { createDonation } from './create-donation';
 export { getCampaign } from './get-campaign';
+export { getCurrentUser } from './get-current-user';
+export { getDonation } from './get-donation';
+export { getProfile } from './get-profile';
+export { getSubscription } from './get-subscription';
 export { listCampaigns } from './list-campaigns';
 export { listDonations } from './list-donations';
 export { listProducts } from './list-products';

@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'semantic-scholar',
   name: 'Semantic Scholar',
   description:
-    'Search and retrieve academic paper metadata, citation graphs, author profiles, and recommendations from over 200 million scientific publications.',
+    'Search and retrieve academic paper metadata, citation graphs, author profiles, and recommendations from scientific publications.',
   metadata: {},
   config,
   auth

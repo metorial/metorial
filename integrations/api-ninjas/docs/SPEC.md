@@ -1,73 +1,47 @@
-Now I have a comprehensive view of API Ninjas' offerings. Let me verify the authentication details from a specific API doc page.
+# API Ninjas
 
-# Slates Specification for API Ninjas
+This integration exposes 25 read-only tools in six selectable API areas. Requests use the API Ninjas HTTPS API and the `X-Api-Key` header. Obtain a key from your account dashboard. The connection requires no other settings and does not use OAuth.
 
-## Overview
+## Supported tools
 
-API Ninjas is a data API platform that provides over 100 production-ready REST APIs across categories such as finance, technology, AI/computer vision, places, text processing, transportation, health, and entertainment. All APIs are accessible through a single API key and a unified base URL (`https://api.api-ninjas.com/v1/`). The platform is read-only and data-oriented — it serves reference data, real-time market data, and utility functions rather than managing user resources.
+| Area | Tool | Official endpoint documentation |
+| --- | --- | --- |
+| Finance | `get_stock_price` | [Stock Price](https://api-ninjas.com/api/stockprice), `/v1/stockprice` |
+| Finance | `get_exchange_rate` | [Exchange Rate](https://api-ninjas.com/api/exchangerate), `/v1/exchangerate` |
+| Finance | `get_commodity_price` | [Commodity Price](https://api-ninjas.com/api/commodityprice), `/v1/commodityprice` |
+| Finance | `get_crypto_price` | [Crypto Price](https://api-ninjas.com/api/cryptoprice), `/v1/cryptoprice` |
+| Finance | `convert_currency` | [Convert Currency](https://api-ninjas.com/api/convertcurrency), `/v1/convertcurrency` |
+| Places and Weather | `get_weather`, `get_weather_forecast` | [Weather](https://api-ninjas.com/api/weather), `/v1/weather`, `/v1/weatherforecast` |
+| Places and Weather | `get_air_quality` | [Air Quality](https://api-ninjas.com/api/airquality), `/v1/airquality` |
+| Places and Weather | `geocode_location` | [Geocoding](https://api-ninjas.com/api/geocoding), `/v1/geocoding`, `/v1/reversegeocoding` |
+| Places and Weather | `search_countries` | [Country](https://api-ninjas.com/api/country), `/v1/country` |
+| Places and Weather | `search_cities` | [City](https://api-ninjas.com/api/city), `/v1/city` |
+| Places and Weather | `get_world_time` | [World Time](https://api-ninjas.com/api/worldtime), `/v1/worldtime` |
+| Text and Language | `analyze_sentiment` | [Sentiment](https://api-ninjas.com/api/sentiment), `/v1/sentiment` |
+| Text and Language | `compare_text_similarity` | [Text Similarity](https://api-ninjas.com/api/textsimilarity), `/v1/textsimilarity` |
+| Text and Language | `lookup_word` | [Dictionary](https://api-ninjas.com/api/dictionary) and [Thesaurus](https://api-ninjas.com/api/thesaurus) |
+| Health and Wellness | `get_nutrition` | [Nutrition](https://api-ninjas.com/api/nutrition), `/v1/nutrition` |
+| Health and Wellness | `search_exercises` | [Exercises](https://api-ninjas.com/api/exercises), `/v1/exercises` |
+| Entertainment and Reference | `get_quotes` | [Quotes](https://api-ninjas.com/api/quotes), `/v2/quotes` |
+| Entertainment and Reference | `get_trivia` | [Trivia](https://api-ninjas.com/api/trivia), `/v1/trivia` |
+| Entertainment and Reference | `get_historical_events` | [Historical Events](https://api-ninjas.com/api/historicalevents), `/v1/historicalevents` |
+| Entertainment and Reference | `get_holidays` | [Holidays](https://api-ninjas.com/api/holidays), `/v2/holidays` |
+| Entertainment and Reference | `lookup_animal` | [Animals](https://api-ninjas.com/api/animals), `/v1/animals` |
+| Internet and Contact Validation | `lookup_ip` | [IP Lookup](https://api-ninjas.com/api/iplookup), `/v1/iplookup` |
+| Internet and Contact Validation | `lookup_domain` | [WHOIS](https://api-ninjas.com/api/whois) and [DNS Lookup](https://api-ninjas.com/api/dnslookup) |
+| Internet and Contact Validation | `validate_contact` | [Validate Email](https://api-ninjas.com/api/validateemail) and [Validate Phone](https://api-ninjas.com/api/validatephone) |
 
-## Authentication
+## Behavior and limits
 
-API Ninjas uses **API Key** authentication. A single API key grants access to all available APIs.
+- Provide both latitude and longitude, or a city, for location lookups. Weather also accepts a US ZIP code. Coordinates take precedence when multiple methods are provided. World time accepts an IANA timezone, which takes precedence over other location fields.
+- Free stock prices represent the latest completed trading session; free crypto prices update hourly, exchange rates update daily, and commodity prices reflect the last completed daily settlement. Premium plans provide live prices/rates. Quotes are deterministic, and quotes, exercises, historical events, trivia, and city searches expose applicable pagination controls without adding paid parameters by default.
+- Commodity quotes include their currency and unit. Some commodities use `USX` (US cents), so the numeric price should be interpreted with those fields.
+- Nutrition calories and protein availability depend on the plan. Unavailable calories are not reported as zero or included in a fabricated total.
+- Country populations use thousands; city populations use people. Country results retain the full statistics returned by the provider.
+- Reverse geocoding results may omit matched-place latitude and longitude; these summaries are then omitted. The requested lookup point and nested airport coordinates are not substituted for place coordinates.
+- WHOIS date summaries use the earliest reported timestamp as an ISO date; original date arrays remain available. DNS SOA records carry structured fields and may have no scalar `value`.
+- Email and phone validation return the provider's validity status. Phone time zones are a separate array; they are never used as a line type. MX availability is omitted when the provider does not explicitly return it.
+- Original provider data is retained alongside typed summaries, including unavailable values and fields added by the provider.
+- Premium restrictions apply to some filters, pagination, historical holiday years, richer data, and commercial use. Provider errors retain their details; see [error codes](https://api-ninjas.com/error-codes).
 
-- **How to obtain**: Sign up for a free account at [api-ninjas.com](https://api-ninjas.com/register). The API key is available in your account dashboard.
-- **How to pass the key**: Include the API key in the `X-Api-Key` HTTP request header on every request.
-
-Example:
-
-```
-GET https://api.api-ninjas.com/v1/quotes
-X-Api-Key: YOUR_API_KEY
-```
-
-There are no OAuth flows, scopes, or additional credentials required. Some premium APIs or features (e.g., non-.com domain lookups) require a paid subscription, but authentication remains the same.
-
-## Features
-
-### Finance Data
-
-Access real-time and reference financial data including stock prices, commodity prices, cryptocurrency prices, exchange rates, currency conversion, ETF details, mutual fund info, market capitalization, earnings reports, earnings call transcripts, insider trading data, and S&P 500 company data. Also includes banking utilities such as BIN lookup, IBAN validation, SWIFT code search, and routing number lookup.
-
-### Tax & Economic Data
-
-Retrieve tax rates (income tax, sales tax, property tax, VAT), inflation data, interest rates (central bank, LIBOR, mortgage), GDP data, and unemployment statistics. Includes calculators for income tax, sales tax, and mortgage payments.
-
-### Internet & Technology Utilities
-
-Tools for domain availability checks, WHOIS lookups, DNS and MX record lookups, IP geolocation, email validation, disposable email detection, phone number validation, URL lookup, user agent parsing, and web scraping. Also includes generators for barcodes, QR codes, and passwords.
-
-### AI & Computer Vision
-
-Machine learning-powered APIs for text sentiment analysis, text similarity scoring, text embeddings, face detection, image-to-text (OCR), and object detection in images.
-
-### Places & Geography
-
-Location data including country statistics, city data, geocoding/reverse geocoding, timezone info, postal/zip code lookup, air quality, weather, population data, GDP, working days by country, world time, and country flag images.
-
-### Text Processing
-
-Dictionary lookups, thesaurus (synonyms/antonyms), rhyming words, spell checking, language detection, profanity filtering, lorem ipsum generation, and random word generation.
-
-### Health & Wellness
-
-Nutrition data extraction from natural language text, calorie burn calculations, exercise lookups by muscle group, cocktail and recipe search, and hospital information (US).
-
-### Entertainment & Trivia
-
-Quotes, jokes, dad jokes, Chuck Norris jokes, facts, trivia questions, riddles, horoscopes, celebrity info, historical events, historical figures, advice, bucket list ideas, hobbies, emoji data, sudoku puzzles, and day-in-history lookups.
-
-### Animals
-
-Reference data for animal species, cat breeds, and dog breeds.
-
-### Transportation
-
-Technical specifications for aircraft, helicopters, motorcycles, and cars. Airport data, electric vehicle info, EV charger location search, and VIN lookup.
-
-### Miscellaneous Utilities
-
-Baby name generation, custom numerical counters, holiday dates, public holidays, company logo images, planetary and star data, random image generation, random user data generation, unit conversion, and university information (US/Canada).
-
-## Events
-
-The provider does not support events. API Ninjas is a stateless, data-retrieval-only platform with no webhooks, event subscriptions, or polling mechanisms.
+The supported tools do not register webhooks, perform resource mutations, or generate downloadable files. The broader API Ninjas catalog includes other APIs that this integration does not expose.

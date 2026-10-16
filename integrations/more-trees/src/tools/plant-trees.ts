@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { accountCodeField, resolveAccountCode } from '../lib/account';
+import { Client, type PlantResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let plantTrees = SlateTool.create(spec, {
   name: 'Plant Trees',
   key: 'plant_trees',
-  description: `Plant one or more trees for yourself or gift them to others. When planting for yourself, specify a quantity. When gifting, provide a list of recipients with their email or account code, name, and quantity. Optionally specify a project and tree type; defaults are used if omitted. Enable test mode for dry-run validation without persisting changes.`,
+  description: `Plant one or more trees for yourself or gift them to others. Provide the paying accountCode from Settings > Account Settings, or use the account code already saved on your connection. For yourself, specify a quantity. For gifts, provide recipients with their email or account code, name, and quantity. Optionally select a project and tree type with list_projects; defaults are used if omitted. Enable test mode for dry-run validation without persisting changes.`,
   instructions: [
     'Use the **List Projects** tool first to discover available project IDs and tree IDs before planting.',
     'Each recipient must have either an email or account code, plus a name and quantity.'
@@ -21,6 +22,7 @@ export let plantTrees = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountCode: accountCodeField,
       quantity: z
         .number()
         .int()
@@ -53,12 +55,12 @@ export let plantTrees = SlateTool.create(spec, {
         .number()
         .int()
         .optional()
-        .describe('Project ID to plant in. Uses default project if omitted.'),
+        .describe('Project ID from list_projects. Uses default project if omitted.'),
       treeId: z
         .number()
         .int()
         .optional()
-        .describe('Tree type ID to plant. Uses default tree if omitted.'),
+        .describe('Tree type ID from list_projects. Uses default tree if omitted.'),
       test: z
         .boolean()
         .optional()
@@ -91,22 +93,42 @@ export let plantTrees = SlateTool.create(spec, {
       publicValidationKey: ctx.auth.publicValidationKey
     });
 
-    let accountCode = ctx.config.accountCode;
-    let isGifting = ctx.input.recipients && ctx.input.recipients.length > 0;
+    let accountCode = resolveAccountCode(ctx.input.accountCode, ctx.config);
+    let recipients = ctx.input.recipients;
+    let isGifting = recipients !== undefined;
 
-    let result: any;
+    let result: PlantResult;
 
-    if (isGifting) {
+    if (recipients !== undefined) {
+      if (recipients.length === 0) {
+        throw createApiServiceError(
+          'Provide at least one recipient when gifting, or omit recipients to plant for yourself.'
+        );
+      }
+      for (let [index, recipient] of recipients.entries()) {
+        let hasEmail = Boolean(recipient.email?.trim());
+        let hasAccountCode = Boolean(recipient.accountCode?.trim());
+        if (hasEmail === hasAccountCode) {
+          throw createApiServiceError(
+            `Recipient ${index + 1} requires either email or accountCode, not both.`
+          );
+        }
+        if (!recipient.name.trim()) {
+          throw createApiServiceError(`Provide a name for recipient ${index + 1}.`);
+        }
+      }
       result = await client.plantForOthers({
         paymentAccountCode: accountCode,
-        recipients: ctx.input.recipients!,
+        recipients,
         projectId: ctx.input.projectId,
         treeId: ctx.input.treeId,
         test: ctx.input.test
       });
     } else {
       if (!ctx.input.quantity) {
-        throw new Error('Quantity is required when planting for yourself (not gifting).');
+        throw createApiServiceError(
+          'Quantity is required when planting for yourself (not gifting).'
+        );
       }
       result = await client.plantForSelf({
         paymentAccountCode: accountCode,

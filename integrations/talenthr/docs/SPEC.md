@@ -1,58 +1,35 @@
-The page requires JavaScript. Let me search for more specific API documentation details.Let me try to access the TalentHR API documentation and help center for more specific API details.Now I have enough information to compile the specification. Based on my research:
+# TalentHR API Integration
 
-- TalentHR is an HRIS by Epignosis for SMBs
-- It uses API key authentication (generated in Settings > Domain)
-- The API documentation is at apidocs.talenthr.io (JavaScript-rendered, couldn't access content)
-- From the Make.com integration, the API supports: employees (hire), departments, divisions, job titles, locations, time-off requests, absences
-- The public API is available on Essential plan and above
-- No evidence of webhooks or event subscriptions in TalentHR's own API
+Official API reference: [TalentHR API](https://apidocs.talenthr.io/).
 
-# Slates Specification for TalentHR
+## Authentication and API
 
-## Overview
+TalentHR's public API is `https://pubapi.talenthr.io/v1`. Requests require HTTPS and `Accept: application/json`. HTTP Basic authentication uses the API key as username and an ignored password. Generate keys in Settings > Domain > API. Read-only keys permit GET requests; write operations need a full key. The documented per-key rate limit is 2,000 requests per minute, with additional plan usage limits. OAuth, refresh tokens, and connection configuration are not used.
 
-TalentHR is a cloud-based Human Resource Information System (HRIS) built by Epignosis, designed for small to medium-sized businesses. It provides features including employee records management, candidate onboarding, time-off tracking, document management, organizational charts, employee profiles with custom fields, applicant tracking (ATS), performance reviews, and reporting. The public API is available on the Essential plan and above.
+## Tools
 
-## Authentication
+| Tools | API routes |
+| --- | --- |
+| `hire_employee`, `get_employee`, `update_employee` | `POST /employees/hire`, `GET /employees/{id}`, `PUT /employees/{id}` |
+| `list_employees` | `GET /directory` |
+| `list_organizational_structure` | `GET /departments`, `/divisions`, `/job-titles`, `/locations`, `/employment-statuses` |
+| `create_department`, `create_division`, `create_job_title`, `create_location` | Corresponding collection POST |
+| `list_time_off_requests`, `respond_time_off_request` | `GET /employees/{id}/time-off-requests`, `POST /employees/{id}/time-off-requests/{requestId}/reply` |
+| `get_time_off_budgets` | `GET /employees/{id}/time-off-budgets` |
+| `get_calendar` | `GET /calendar` |
+| `list_job_positions`, `list_job_applications` | `GET /job-positions`, `/ats-applicants`, `/job-positions/{id}/ats-applicants` |
+| `list_reference_data` | `GET /countries`, `/nationalities`, `/relationship-types`, `/languages`, `/time-off-types` |
 
-TalentHR uses API key authentication. To obtain your API key, navigate to Settings, select Domain in your TalentHR account. Generate a new API key from your API settings and store it securely, as you'll need it for authentication.
+## Behavior
 
-The API key is included in requests to authenticate. Based on integration platform documentation (Make.com), the connection requires:
+- Paginated tools fetch one page using limit 1–100 and a nonnegative integer offset. Existing integration defaults remain limit 100 and offset 0; the API defaults to 10 when limit is absent. Counts describe the returned page, and provider totals are separate optional fields.
+- Employee IDs retain public string input types and are validated as positive integer IDs before requests. Compensation remains numeric and allows at most two fractional digits.
+- Hiring sends a null manager when no manager is supplied, matching the documented head-of-company behavior. When a job record is supplied, unselected job relationships use documented nullable values. Onboarding meeting details must include the meeting employee, address, and time together.
+- `update_employee` accepts partial input, but TalentHR PUT requires first name, last name, and email. Missing required values are fetched from the existing employee profile. An unavailable or malformed profile stops the update; the tool does not invent identity values. A concurrent profile edit between read and write remains possible.
+- `create_location` requires address and remote status at runtime while preserving existing input optionalness. Missing values raise an actionable validation error before a request.
+- Time-off requests expose provider approval and cancellation flags. The legacy `status` string is included only if returned; it is not synthesized. Job-specific applicant results may omit update time and application count, so those legacy fields are included only when present. The provider's nested application details remain available.
+- Full provider responses are preserved. Budget decimal strings remain strings. No downloadable file tools or native triggers are registered. No suitable current-user/account identity endpoint is documented in the reviewed API collection.
 
-- **API Key**: Generated from TalentHR Settings > Domain section.
+## Verification boundary
 
-The API base URL follows the pattern based on your TalentHR domain. Full API documentation is available at [apidocs.talenthr.io](https://apidocs.talenthr.io/).
-
-## Features
-
-### Employee Management
-
-Manage the full employee lifecycle including hiring (creating new employees), viewing employee records, and managing employee data. Add new employees (hire) to the system. Employee profiles include contact details, job titles, departments, custom fields, and organizational hierarchy.
-
-### Organizational Structure
-
-Create and manage the building blocks of your organization's structure:
-
-- Create departments in your system.
-- Create divisions in the system.
-- Create job titles in the system.
-- Create locations in the system.
-
-### Time Off Management
-
-Manage employee absences and time-off requests through the API:
-
-- List employees who are absent on a specific period.
-- List employees out of the company today and tomorrow.
-- Respond to an employee's time off request (approve or reject).
-- TalentHR supports all standard leave types, including vacation, sick leave, and work-from-home days, as well as custom types like parental leave and time off in lieu.
-
-### Applicant Tracking
-
-TalentHR lets you create a branded careers page with your company's branding and open roles, and you can display job openings on your website using TalentHR's WordPress plugin, Zapier integration, or public API.
-
-- The API can be used to manage and expose job openings externally.
-
-## Events
-
-The provider does not support webhooks or purpose-built event subscription mechanisms through its API. TalentHR integrates with third-party automation platforms like Zapier and Make for workflow automation, but these rely on polling rather than native webhook support from TalentHR.
+The October 2026 refresh used public documentation, builds, schema checks, and offline fixtures only. It did not call TalentHR account endpoints, verify plan-specific features, register callbacks, or exercise live HR data. Optional custom-field administration, payroll/bonus records, asset management, and ATS mutations remain outside this integration's current scope.

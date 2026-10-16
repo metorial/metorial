@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateDateRange, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 let asteroidSummarySchema = z.object({
@@ -62,11 +62,18 @@ export let searchAsteroids = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      page: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Provider pagination metadata for catalog browsing'),
       totalCount: z.number().optional().describe('Total number of asteroids found'),
       asteroids: z.array(asteroidSummarySchema).describe('List of asteroid summaries')
     })
   )
   .handleInvocation(async ctx => {
+    validateDateRange(ctx.input.startDate, ctx.input.endDate, 7);
+    validateInteger(ctx.input.page, 'Page', 0);
+    validateInteger(ctx.input.size, 'Page size', 1);
     let client = new NasaClient({ token: ctx.auth.token });
 
     if (ctx.input.asteroidId) {
@@ -82,12 +89,18 @@ export let searchAsteroids = SlateTool.create(spec, {
       let result = await client.getNeoBrowse({ page: ctx.input.page, size: ctx.input.size });
       let asteroids = (result.near_earth_objects || []).map(mapAsteroid);
       return {
-        output: { totalCount: result.page?.total_elements, asteroids },
+        output: {
+          page: result.page,
+
+          totalCount: result.page?.total_elements,
+          asteroids
+        },
         message: `Browsing NEO catalog: returned ${asteroids.length} asteroids (page ${result.page?.number ?? 0}).`
       };
     }
 
     let startDate = ctx.input.startDate || new Date().toISOString().split('T')[0]!;
+    validateDateRange(startDate, ctx.input.endDate, 7);
     let result = await client.getNeoFeed({ startDate, endDate: ctx.input.endDate });
     let allAsteroids: any[] = [];
     for (let dateKey of Object.keys(result.near_earth_objects || {})) {
@@ -103,6 +116,15 @@ export let searchAsteroids = SlateTool.create(spec, {
   .build();
 
 let mapAsteroid = (neo: any) => {
+  if (
+    neo.id === undefined ||
+    typeof neo.name !== 'string' ||
+    typeof neo.is_potentially_hazardous_asteroid !== 'boolean'
+  ) {
+    throw createApiServiceError(
+      'NASA returned an asteroid without its identifier, name, or hazard classification.'
+    );
+  }
   let closeApproach = neo.close_approach_data?.[0];
   return {
     asteroidId: String(neo.id),
@@ -111,7 +133,7 @@ let mapAsteroid = (neo: any) => {
     absoluteMagnitude: neo.absolute_magnitude_h,
     estimatedDiameterMinKm: neo.estimated_diameter?.kilometers?.estimated_diameter_min,
     estimatedDiameterMaxKm: neo.estimated_diameter?.kilometers?.estimated_diameter_max,
-    isPotentiallyHazardous: neo.is_potentially_hazardous_asteroid ?? false,
+    isPotentiallyHazardous: neo.is_potentially_hazardous_asteroid,
     closeApproachDate: closeApproach?.close_approach_date,
     missDistanceKm: closeApproach?.miss_distance?.kilometers,
     relativeVelocityKmPerSec: closeApproach?.relative_velocity?.kilometers_per_second,

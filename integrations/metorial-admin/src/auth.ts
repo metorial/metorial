@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { createAxios, SlateAuth } from '@slates/provider';
+import { createAxios, getOAuthExpiresAtFromExpiresIn, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { type MetorialConfig, normalizeApiUrl, normalizeMetorialConfig } from './config';
 import { metorialOAuthError, metorialValidationError } from './lib/errors';
@@ -165,7 +165,7 @@ let expiresAtFromSeconds = (expiresIn: unknown) => {
         : undefined;
 
   return seconds && Number.isFinite(seconds)
-    ? new Date(Date.now() + seconds * 1000).toISOString()
+    ? getOAuthExpiresAtFromExpiresIn(seconds)
     : undefined;
 };
 
@@ -286,7 +286,7 @@ export let auth = SlateAuth.create()
         .string()
         .optional()
         .describe(
-          'Optional Metorial API base URL for OAuth. Defaults to the integration apiUrl config.'
+          'Optional Metorial API base URL for OAuth. Defaults to https://api.metorial.com; existing saved API URL settings remain supported.'
         )
     }),
 
@@ -418,7 +418,7 @@ export let auth = SlateAuth.create()
         .trim()
         .optional()
         .describe(
-          'Optional Metorial API base URL for API key auth. Defaults to the integration apiUrl config.'
+          'Optional Metorial API base URL for API key auth. Defaults to https://api.metorial.com; existing saved API URL settings remain supported.'
         )
     }),
     getOutput: async ctx => ({

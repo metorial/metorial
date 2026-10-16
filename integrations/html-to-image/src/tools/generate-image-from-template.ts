@@ -8,8 +8,9 @@ export let generateImageFromTemplate = SlateTool.create(spec, {
   key: 'generate_image_from_template',
   description: `Generate an image using a pre-defined template with dynamic variable substitution. Templates use Handlebars syntax (e.g., \`{{title_text}}\`) for placeholders. Provide template values to fill in the variables and produce a customized image. Useful for generating dynamic social sharing images, certificates, badges, and other templated visuals.`,
   instructions: [
-    'Template variables use Handlebars syntax. Pass variable values as key-value pairs in `templateValues`.',
-    'By default, the most recent template version is used. Specify `templateVersion` to target a specific version.'
+    'The provider requires templateValues. Pass the selected template variables as key-value pairs; use list_templates to inspect its Handlebars placeholders.',
+    'By default, the most recent template version is used. Specify `templateVersion` to target a specific version.',
+    'Rendering uses the saved template settings; use update_template to change the template layout or rendering configuration.'
   ],
   tags: {
     destructive: false,
@@ -46,17 +47,34 @@ export let generateImageFromTemplate = SlateTool.create(spec, {
       selector: z
         .string()
         .optional()
-        .describe('CSS selector to crop the image to a specific element')
+        .describe('CSS selector to crop the image to a specific element'),
+      format: z
+        .enum(['png', 'jpg', 'webp', 'pdf'])
+        .optional()
+        .describe('Format of the downloadable result; defaults to PNG')
     })
   )
   .output(
     z.object({
       imageId: z.string().describe('Unique identifier for the generated image'),
-      url: z.string().describe('Permanent CDN-cached URL of the generated image'),
+      url: z
+        .string()
+        .describe(
+          'Provider URL of the generated image, hosted while the account remains active'
+        ),
       pngUrl: z.string().describe('Direct URL to the PNG version'),
       jpgUrl: z.string().describe('Direct URL to the JPG version'),
       webpUrl: z.string().describe('Direct URL to the WebP version'),
-      pdfUrl: z.string().describe('Direct URL to the PDF version')
+      pdfUrl: z.string().describe('Direct URL to the PDF version'),
+      deliveryWarning: z
+        .string()
+        .optional()
+        .describe(
+          'File delivery warning if the image was created but could not be prepared for download'
+        ),
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
@@ -74,21 +92,30 @@ export let generateImageFromTemplate = SlateTool.create(spec, {
       deviceScale: ctx.input.deviceScale,
       viewportWidth: ctx.input.viewportWidth,
       viewportHeight: ctx.input.viewportHeight,
-      selector: ctx.input.selector
+      selector: ctx.input.selector,
+      format: ctx.input.format
     });
 
-    let baseUrl = result.url;
+    let format = ctx.input.format ?? 'png';
+    let deliveryWarning: string | undefined;
+    try {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result[`${format}Url`],
+        mimeType:
+          format === 'pdf' ? 'application/pdf' : `image/${format === 'jpg' ? 'jpeg' : format}`,
+        filename: `${result.imageId}.${format}`
+      });
+    } catch {
+      deliveryWarning =
+        'The image was created, but its file could not be prepared for download. Use download_image with this image ID; do not generate another image to retry delivery.';
+    }
 
     return {
-      output: {
-        imageId: result.imageId,
-        url: baseUrl,
-        pngUrl: `${baseUrl}.png`,
-        jpgUrl: `${baseUrl}.jpg`,
-        webpUrl: `${baseUrl}.webp`,
-        pdfUrl: `${baseUrl}.pdf`
-      },
-      message: `Image generated from template **${ctx.input.templateId}** successfully. Available at: ${baseUrl}`
+      output: { ...result, deliveryWarning },
+      message:
+        deliveryWarning ??
+        'Image generated from template successfully. Available for download.'
     };
   })
   .build();

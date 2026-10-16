@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
+export let rawSchema = z.record(z.string(), z.unknown());
+
 export let sslSchema = z
   .object({
     testedAt: z.string().optional(),
     expiresAt: z.string().optional(),
     valid: z.boolean().optional(),
-    error: z.string().optional().nullable()
+    error: z.string().optional().nullable(),
+    cert: rawSchema.optional().describe('Certificate details returned by the provider')
   })
   .optional()
   .nullable();
@@ -55,7 +58,12 @@ export let checkSchema = z.object({
     .describe('Custom HTTP headers sent with checks'),
   httpVerb: z.string().optional().nullable().describe('HTTP method used for checks'),
   httpBody: z.string().optional().nullable().describe('HTTP body sent with checks'),
-  ssl: sslSchema.describe('SSL certificate information')
+  ssl: sslSchema.describe('SSL certificate information'),
+  type: z.string().optional().describe('Monitoring protocol returned by the provider'),
+  domain: rawSchema.optional().nullable().describe('Domain expiration information'),
+  metrics: z.unknown().optional().describe('Last-hour metrics when requested'),
+  results: z.unknown().optional().describe('Detailed recent request results when requested'),
+  raw: rawSchema.optional().describe('Complete original check response')
 });
 
 export let downtimeSchema = z.object({
@@ -72,7 +80,10 @@ export let downtimeSchema = z.object({
     .boolean()
     .optional()
     .nullable()
-    .describe('Whether downtime was partial (e.g. IPv6-only)')
+    .describe('Whether downtime was partial (e.g. IPv6-only)'),
+  detailsUrl: z.string().optional().describe('Provider URL for investigating this downtime'),
+  results: z.unknown().optional().describe('Detailed requests before downtime and recovery'),
+  raw: rawSchema.optional().describe('Complete original downtime response')
 });
 
 export let metricsRequestsSchema = z.object({
@@ -99,7 +110,9 @@ export let metricsTimingsSchema = z.object({
 export let metricsEntrySchema = z.object({
   apdex: z.number().describe('APDEX score (0.0 to 1.0)'),
   requests: metricsRequestsSchema,
-  timings: metricsTimingsSchema
+  timings: metricsTimingsSchema,
+  group: z.string().optional().describe('Provider aggregation granularity, when supplied'),
+  raw: rawSchema.optional().describe('Complete original metrics entry')
 });
 
 export let recipientSchema = z.object({
@@ -112,8 +125,15 @@ export let recipientSchema = z.object({
   selected: z
     .boolean()
     .optional()
-    .describe('Whether recipient is selected by default for new checks')
+    .describe('Whether recipient is selected on existing checks at creation'),
+  immutable: z
+    .boolean()
+    .optional()
+    .describe('Whether this channel cannot move between checks'),
+  raw: rawSchema.optional().describe('Complete original recipient response')
 });
+
+export let listedRecipientSchema = recipientSchema.partial({ value: true });
 
 export let statusPageSchema = z.object({
   statusPageToken: z.string().describe('Unique identifier for the status page'),
@@ -133,7 +153,13 @@ export let statusPageSchema = z.object({
     .array(z.string())
     .optional()
     .nullable()
-    .describe('Ordered list of check tokens displayed on the page')
+    .describe('Ordered list of check tokens displayed on the page'),
+  accessKey: z
+    .string()
+    .optional()
+    .nullable()
+    .describe('Access key returned for protected pages'),
+  raw: rawSchema.optional().describe('Complete original status page response')
 });
 
 export let nodeSchema = z.object({
@@ -144,12 +170,14 @@ export let nodeSchema = z.object({
   country: z.string().describe('Country name'),
   countryCode: z.string().describe('ISO country code'),
   lat: z.number().describe('Latitude coordinate'),
-  lng: z.number().describe('Longitude coordinate')
+  lng: z.number().describe('Longitude coordinate'),
+  raw: rawSchema.optional().describe('Complete original monitoring node response')
 });
 
 export type Check = z.infer<typeof checkSchema>;
 export type Downtime = z.infer<typeof downtimeSchema>;
 export type MetricsEntry = z.infer<typeof metricsEntrySchema>;
+export type ListedRecipient = z.infer<typeof listedRecipientSchema>;
 export type Recipient = z.infer<typeof recipientSchema>;
 export type StatusPage = z.infer<typeof statusPageSchema>;
 export type Node = z.infer<typeof nodeSchema>;

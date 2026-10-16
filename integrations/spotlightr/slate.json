@@ -1,16 +1,19 @@
 {
   "name": "@metorial/spotlightr",
-  "description": "Manage hosted videos for marketing and e-learning. Create, list, update, and delete videos by uploading files or linking external URLs (YouTube, Vimeo, Google Drive). Update video sources without changing embed codes or watch page URLs. Copy player settings between videos. Retrieve video analytics including loads, plays, play rate, watch percentage, completion rate, and shares. Access individual view session data and ranked lists of top-performing videos.",
+  "description": "Manage Spotlightr videos for marketing and e-learning. Create videos from external URLs, list and delete videos, replace video sources, and update player settings. Organize project groups and manage embedding domains. Retrieve video metrics, view sessions, top videos, and global account search results. Expire course access records and gallery access codes.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "scheduling-and-calendars"],
   "skills": [
-    "create and upload videos",
+    "create videos from external URLs",
     "list and manage videos",
     "update video sources",
     "retrieve video analytics",
     "get top-performing videos",
     "copy player settings",
-    "capture leads via webhooks",
-    "track video watch events"
+    "manage project groups",
+    "manage embedding domains",
+    "search account resources",
+    "expire course access records",
+    "expire gallery access codes"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/spotlightr.svg"
 }

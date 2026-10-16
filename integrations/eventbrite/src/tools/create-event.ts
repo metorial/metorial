@@ -1,6 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getEventName } from '../lib/events';
+import { organizationIdSchema } from '../lib/schemas';
+import { validateEventTimes, validateIntegerFields } from '../lib/validation';
 import { spec } from '../spec';
 
 export let createEvent = SlateTool.create(spec, {
@@ -17,12 +20,7 @@ export let createEvent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z
-        .string()
-        .optional()
-        .describe(
-          'The organization ID. Falls back to the configured organization ID if not provided.'
-        ),
+      organizationId: organizationIdSchema,
       name: z.string().describe('The name/title of the event.'),
       description: z.string().optional().describe('HTML description of the event.'),
       startUtc: z.string().describe('UTC start time (e.g., "2024-12-25T18:00:00Z").'),
@@ -58,11 +56,13 @@ export let createEvent = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
     if (!orgId) {
-      throw new Error(
-        'Organization ID is required. Provide it in the input or configure it globally.'
+      throw createApiServiceError(
+        'Organization ID is required. Call get_user with includeOrganizations=true to discover IDs, then provide organizationId.'
       );
     }
 
+    validateIntegerFields(ctx.input, ['capacity']);
+    validateEventTimes(ctx.input);
     let client = new Client({ token: ctx.auth.token });
     let event = await client.createEvent(orgId, {
       name: { html: ctx.input.name },
@@ -83,9 +83,9 @@ export let createEvent = SlateTool.create(spec, {
     return {
       output: {
         eventId: event.id,
-        name: event.name?.html || event.name?.text || ctx.input.name,
-        url: event.url,
-        status: event.status
+        name: getEventName(event.name),
+        url: event.url ?? undefined,
+        status: event.status ?? undefined
       },
       message: `Created event **${ctx.input.name}** with ID \`${event.id}\` (status: ${event.status || 'draft'}).`
     };

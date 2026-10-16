@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,11 @@ export let auth = SlateAuth.create()
       apiKey: z.string().describe('Your API Ninjas API key from your account dashboard')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError(
+          'Enter an API Ninjas API key from your account dashboard.'
+        );
+      }
       return {
         output: {
           token: ctx.input.apiKey

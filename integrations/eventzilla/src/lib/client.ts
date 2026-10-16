@@ -1,14 +1,112 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+export let eventzillaApiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Eventzilla',
+    reason: 'eventzilla_api_error',
+    detailKeys: ['message', 'error_code', 'detail'],
+    nestedKeys: ['errors'],
+    extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+    extractUpstreamCode: (_error, response) =>
+      isApiErrorRecord(response?.data) && typeof response.data.error_code === 'string'
+        ? response.data.error_code
+        : undefined
+  });
+
+export let validateInteger = (value: number, field: string, minimum = 1) => {
+  if (!Number.isSafeInteger(value) || value < minimum)
+    throw createApiServiceError(
+      `${field} must be a safe integer greater than or equal to ${minimum}.`
+    );
+};
+
+let resourceId = (value: string, field: string) => {
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1)
+    throw createApiServiceError(
+      `${field} must be a positive integer identifier. Use the list tools to find the identifier.`
+    );
+  return encodeURIComponent(value);
+};
+
+let validatePagination = (params?: { offset?: number; limit?: number }) => {
+  if (params?.offset !== undefined) validateInteger(params.offset, 'offset', 0);
+  if (params?.limit !== undefined) validateInteger(params.limit, 'limit');
+};
+
+export type FreeTicketType = {
+  ticketTypeName: string;
+  quantityTotal: number;
+  ticketTypeDescription: string;
+  salesStartDate: string;
+  salesEndDate: string;
+  salesStartTime: string;
+  salesEndTime: string;
+  limitMinimum: number;
+  limitMaximum: number;
+  isVisible: boolean;
+  boxofficeOnly: boolean;
+  additionalInstructions?: string;
+  unlockCode?: string;
+};
+
+let freeTicketBody = (input: FreeTicketType) => {
+  validateInteger(input.quantityTotal, 'quantityTotal', 0);
+  validateInteger(input.limitMinimum, 'limitMinimum', 0);
+  validateInteger(input.limitMaximum, 'limitMaximum', 1);
+  if (input.limitMinimum > input.limitMaximum)
+    throw createApiServiceError('limitMinimum must not exceed limitMaximum.');
+  if (!input.ticketTypeName.trim())
+    throw createApiServiceError('ticketTypeName must not be empty.');
+  return {
+    ticket_type_name: input.ticketTypeName,
+    quantity_total: input.quantityTotal,
+    ticket_type_description: input.ticketTypeDescription,
+    sales_start_date: input.salesStartDate,
+    sales_end_date: input.salesEndDate,
+    sales_start_time: input.salesStartTime,
+    sales_end_time: input.salesEndTime,
+    limit_minimum: input.limitMinimum,
+    limit_maximum: input.limitMaximum,
+    is_visible: input.isVisible,
+    boxoffice_only: input.boxofficeOnly,
+    ...(input.additionalInstructions !== undefined
+      ? { additional_instructions: input.additionalInstructions }
+      : {}),
+    ...(input.unlockCode !== undefined ? { unlock_code: input.unlockCode } : {})
+  };
+};
 
 export class Client {
-  private http;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    if (!config.token.trim())
+      throw createApiServiceError('An Eventzilla API key is required.');
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://www.eventzillaapi.net/api/v2',
+      timeout: 30_000,
+      errorAdapter: eventzillaApiError,
+      authHeader: { name: 'x-api-key', value: config.token },
       headers: {
-        'x-api-key': config.token
+        Accept: 'application/json'
       }
+    });
+    this.http.interceptors.response.use(response => {
+      if (
+        isApiErrorRecord(response.data) &&
+        (response.data.error_code ||
+          (typeof response.data.status === 'number' && response.data.status >= 400))
+      ) {
+        throw eventzillaApiError({
+          response: { status: response.data.status, data: response.data }
+        });
+      }
+      return response;
     });
   }
 
@@ -27,16 +125,18 @@ export class Client {
     offset?: number;
     limit?: number;
   }): Promise<any> {
+    validatePagination(params);
     let response = await this.http.get('/events', { params });
     return response.data;
   }
 
   async getEvent(eventId: string): Promise<any> {
-    let response = await this.http.get(`/events/${eventId}`);
+    let response = await this.http.get(`/events/${resourceId(eventId, 'eventId')}`);
     return response.data;
   }
 
   async toggleSales(eventId: number, status: boolean): Promise<any> {
+    validateInteger(eventId, 'eventId');
     let response = await this.http.post('/events/togglesales', {
       eventid: eventId,
       status
@@ -47,7 +147,7 @@ export class Client {
   // ── Tickets ──
 
   async getEventTickets(eventId: string): Promise<any> {
-    let response = await this.http.get(`/events/${eventId}/tickets`);
+    let response = await this.http.get(`/events/${resourceId(eventId, 'eventId')}/tickets`);
     return response.data;
   }
 
@@ -60,17 +160,21 @@ export class Client {
       limit?: number;
     }
   ): Promise<any> {
-    let response = await this.http.get(`/events/${eventId}/attendees`, { params });
+    validatePagination(params);
+    let response = await this.http.get(`/events/${resourceId(eventId, 'eventId')}/attendees`, {
+      params
+    });
     return response.data;
   }
 
   async getAttendee(attendeeId: string): Promise<any> {
-    let response = await this.http.get(`/attendees/${attendeeId}`);
+    let response = await this.http.get(`/attendees/${resourceId(attendeeId, 'attendeeId')}`);
     return response.data;
   }
 
   async checkinAttendee(barcode: string, eventcheckin: boolean): Promise<any> {
-    let response = await this.http.post('/attendees/checkin', {
+    if (!barcode.trim()) throw createApiServiceError('The attendee barcode is required.');
+    let response = await this.http.post('/attendee/checkin', {
       barcode,
       eventcheckin
     });
@@ -86,12 +190,20 @@ export class Client {
       limit?: number;
     }
   ): Promise<any> {
-    let response = await this.http.get(`/events/${eventId}/transactions`, { params });
+    validatePagination(params);
+    let response = await this.http.get(
+      `/events/${resourceId(eventId, 'eventId')}/transactions`,
+      { params }
+    );
     return response.data;
   }
 
   async getTransaction(transactionIdOrRef: string): Promise<any> {
-    let response = await this.http.get(`/transactions/${transactionIdOrRef}`);
+    if (!transactionIdOrRef.trim())
+      throw createApiServiceError('A checkout ID or order reference is required.');
+    let response = await this.http.get(
+      `/transactions/${encodeURIComponent(transactionIdOrRef)}`
+    );
     return response.data;
   }
 
@@ -103,6 +215,8 @@ export class Client {
     comments: string;
     sendEmail?: boolean;
   }): Promise<any> {
+    validateInteger(params.eventId, 'eventId');
+    validateInteger(params.checkoutId, 'checkoutId');
     let response = await this.http.post('/events/order/confirm', {
       checkout_id: params.checkoutId,
       eventid: params.eventId,
@@ -117,6 +231,8 @@ export class Client {
     eventId: number;
     comments: string;
   }): Promise<any> {
+    validateInteger(params.eventId, 'eventId');
+    validateInteger(params.checkoutId, 'checkoutId');
     let response = await this.http.post('/events/order/cancel', {
       checkout_id: params.checkoutId,
       eventid: params.eventId,
@@ -128,7 +244,9 @@ export class Client {
   // ── Checkout ──
 
   async prepareCheckout(eventId: string, dateId: string): Promise<any> {
-    let response = await this.http.get(`/checkout/prepare/${eventId}/${dateId}`);
+    let response = await this.http.get(
+      `/checkout/prepare/${resourceId(eventId, 'eventId')}/${resourceId(dateId, 'dateId')}`
+    );
     return response.data;
   }
 
@@ -138,6 +256,14 @@ export class Client {
     ticketTypes: Array<{ ticketTypeId: number; quantity: number }>;
     discountCode?: string;
   }): Promise<any> {
+    validateInteger(params.eventId, 'eventId');
+    validateInteger(params.eventDateId, 'eventDateId');
+    if (!params.ticketTypes.length)
+      throw createApiServiceError('At least one ticket type is required.');
+    for (let ticket of params.ticketTypes) {
+      validateInteger(ticket.ticketTypeId, 'ticketTypeId');
+      validateInteger(ticket.quantity, 'quantity');
+    }
     let response = await this.http.post('/checkout/create', {
       eventid: params.eventId,
       eventdateid: params.eventDateId,
@@ -145,7 +271,7 @@ export class Client {
         ticket_type_id: t.ticketTypeId,
         quantity: t.quantity
       })),
-      ...(params.discountCode ? { discount_code: params.discountCode } : {})
+      ...(params.discountCode !== undefined ? { discount_code: params.discountCode } : {})
     });
     return response.data;
   }
@@ -168,6 +294,17 @@ export class Client {
     }>;
     paymentId: number;
   }): Promise<any> {
+    validateInteger(params.eventId, 'eventId');
+    validateInteger(params.checkoutId, 'checkoutId');
+    validateInteger(params.eventDateId, 'eventDateId');
+    validateInteger(params.paymentId, 'paymentId');
+    if (!params.tickets.length)
+      throw createApiServiceError('At least one attendee ticket is required.');
+    for (let ticket of params.tickets) {
+      validateInteger(ticket.ticketPriceId, 'ticketPriceId');
+      for (let answer of ticket.answers ?? [])
+        validateInteger(answer.questionId, 'questionId');
+    }
     let response = await this.http.post('/checkout/fillorder', {
       eventid: params.eventId,
       eventdateid: params.eventDateId,
@@ -206,6 +343,9 @@ export class Client {
     comments: string;
     sendEmail?: boolean;
   }): Promise<any> {
+    validateInteger(params.eventId, 'eventId');
+    validateInteger(params.checkoutId, 'checkoutId');
+    validateInteger(params.eventDateId, 'eventDateId');
     let response = await this.http.post('/checkout/confirm', {
       eventid: params.eventId,
       eventdateid: params.eventDateId,
@@ -217,15 +357,36 @@ export class Client {
     return response.data;
   }
 
+  async createFreeTicketType(eventId: string, input: FreeTicketType): Promise<unknown> {
+    let response = await this.http.post(
+      `/events/${resourceId(eventId, 'eventId')}/ticket-types`,
+      freeTicketBody(input)
+    );
+    return response.data;
+  }
+
+  async updateFreeTicketType(
+    eventId: string,
+    ticketTypeId: string,
+    input: FreeTicketType
+  ): Promise<unknown> {
+    let response = await this.http.patch(
+      `/events/${resourceId(eventId, 'eventId')}/ticket-types/${resourceId(ticketTypeId, 'ticketTypeId')}`,
+      freeTicketBody(input)
+    );
+    return response.data;
+  }
+
   // ── Users ──
 
   async listUsers(params?: { offset?: number; limit?: number }): Promise<any> {
-    let response = await this.http.get('/users/', { params });
+    validatePagination(params);
+    let response = await this.http.get('/users', { params });
     return response.data;
   }
 
   async getUser(userId: string): Promise<any> {
-    let response = await this.http.get(`/users/${userId}`);
+    let response = await this.http.get(`/users/${resourceId(userId, 'userId')}`);
     return response.data;
   }
 }

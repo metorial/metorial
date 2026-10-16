@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listRows = SlateTool.create(spec, {
@@ -14,7 +14,7 @@ export let listRows = SlateTool.create(spec, {
   ],
   constraints: [
     'Maximum page size is 200 rows.',
-    'Database Token auth only allows row operations, not structural changes.'
+    'Database Tokens can access row operations and field metadata; structural changes require JWT authentication.'
   ],
   tags: {
     readOnly: true
@@ -22,7 +22,11 @@ export let listRows = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tableId: z.number().describe('The ID of the table to list rows from'),
+      tableId: z
+        .number()
+        .describe(
+          'The ID of the table to list rows from. Discover with list_token_tables, or list_databases then list_tables for JWT connections.'
+        ),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       size: z.number().optional().describe('Number of rows per page (default 100, max 200)'),
       search: z.string().optional().describe('Full-text search query across all fields'),
@@ -41,6 +45,12 @@ export let listRows = SlateTool.create(spec, {
         .optional()
         .describe(
           'Filter parameters as key-value pairs, e.g. { "filter__field_123__equal": "value" }'
+        ),
+      filterTree: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Nested Baserow filter tree, for example { filter_type: "AND", filters: [{ field: 123, type: "equal", value: "Active" }] }. Use this or filters, not both.'
         ),
       viewId: z
         .number()
@@ -72,11 +82,7 @@ export let listRows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
     let result = await client.listRows({
       tableId: ctx.input.tableId,
@@ -86,20 +92,21 @@ export let listRows = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy,
       filterType: ctx.input.filterType,
       filters: ctx.input.filters as Record<string, string> | undefined,
+      filterTree: ctx.input.filterTree,
       viewId: ctx.input.viewId,
       userFieldNames: ctx.input.userFieldNames,
       include: ctx.input.include,
       exclude: ctx.input.exclude
     });
 
-    let rowCount = result.results?.length ?? 0;
+    let rowCount = result.results.length;
 
     return {
       output: {
         count: result.count,
         next: result.next,
         previous: result.previous,
-        rows: result.results ?? []
+        rows: result.results
       },
       message: `Retrieved **${rowCount}** rows from table ${ctx.input.tableId} (${result.count} total).`
     };

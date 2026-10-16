@@ -37,6 +37,7 @@ export let getNutrition = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       items: z
         .array(nutritionItemSchema)
         .describe('Nutrition data for each identified food item')
@@ -48,12 +49,12 @@ export let getNutrition = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : [result];
 
     let mapped = items.map((item: any) => ({
-      name: item.name,
+      name: item.name ?? undefined,
       servingSizeG: item.serving_size_g,
-      calories: item.calories,
+      calories: item.calories ?? undefined,
       fatTotalG: item.fat_total_g,
       fatSaturatedG: item.fat_saturated_g,
-      proteinG: item.protein_g,
+      proteinG: item.protein_g ?? undefined,
       sodiumMg: item.sodium_mg,
       potassiumMg: item.potassium_mg,
       cholesterolMg: item.cholesterol_mg,
@@ -62,11 +63,18 @@ export let getNutrition = SlateTool.create(spec, {
       sugarG: item.sugar_g
     }));
 
-    let totalCalories = mapped.reduce((sum: number, i: any) => sum + (i.calories ?? 0), 0);
+    let completeCalories =
+      mapped.length > 0 && mapped.every(item => typeof item.calories === 'number');
+    let calorieMessage = completeCalories
+      ? ` Total calories: **${mapped.reduce((sum, item) => sum + item.calories!, 0)} kcal**.`
+      : ' Total calories are unavailable for one or more items on this plan.';
 
     return {
-      output: { items: mapped },
-      message: `Found nutrition data for **${mapped.length}** item(s). Total calories: **${totalCalories} kcal**.`
+      output: {
+        raw: result,
+        items: mapped
+      },
+      message: `Found nutrition data for **${mapped.length}** item(s).${calorieMessage}`
     };
   })
   .build();

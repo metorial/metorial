@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonCursor,
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  validatePolygonLimit
+} from '../lib/response';
 import { spec } from '../spec';
 
 let aggregateBarSchema = z.object({
@@ -29,13 +36,16 @@ export let getAggregateBars = SlateTool.create(spec, {
     'Use YYYY-MM-DD format for date strings or Unix millisecond timestamps.',
     'For forex pairs, prefix the ticker with C: (e.g., C:EURUSD). For crypto, use X: (e.g., X:BTCUSD). For indices, use I: (e.g., I:SPX).'
   ],
-  constraints: ['Maximum of 50,000 results per request (default 5,000).'],
+  constraints: [
+    'Queries at most 50,000 base aggregates per request (default 5,000); the returned bar count can be lower.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      cursor: polygonCursor,
       ticker: z.string().describe('Ticker symbol (e.g., AAPL, C:EURUSD, X:BTCUSD, I:SPX)'),
       multiplier: z
         .number()
@@ -65,11 +75,14 @@ export let getAggregateBars = SlateTool.create(spec, {
         .number()
         .int()
         .optional()
-        .describe('Max number of results (max 50000, default 5000)')
+        .describe(
+          'Maximum base aggregates queried to construct the bars (max 50000, default 5000); this is not the returned bar count.'
+        )
     })
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       ticker: z.string().optional().describe('The ticker symbol'),
       adjusted: z.boolean().optional().describe('Whether results are adjusted for splits'),
       queryCount: z
@@ -81,9 +94,11 @@ export let getAggregateBars = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePolygonLimit(ctx.input.limit, 50000);
     let client = new PolygonClient(ctx.auth.token);
 
     let response = await client.getAggregateBars({
+      cursor: ctx.input.cursor,
       ticker: ctx.input.ticker,
       multiplier: ctx.input.multiplier,
       timespan: ctx.input.timespan,
@@ -94,7 +109,7 @@ export let getAggregateBars = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let bars = (response.results || []).map((r: any) => ({
+    let bars = polygonRecords(response.results).map((r: any) => ({
       open: r.o,
       high: r.h,
       low: r.l,
@@ -107,13 +122,16 @@ export let getAggregateBars = SlateTool.create(spec, {
     }));
 
     return {
-      output: {
-        ticker: response.ticker,
-        adjusted: response.adjusted,
-        queryCount: response.queryCount,
-        resultsCount: response.resultsCount,
-        bars
-      },
+      output: polygonOutput(
+        {
+          ticker: response.ticker,
+          adjusted: response.adjusted,
+          queryCount: response.queryCount,
+          resultsCount: response.resultsCount,
+          bars
+        },
+        response
+      ),
       message: `Retrieved **${bars.length}** aggregate bars for **${ctx.input.ticker}** (${ctx.input.multiplier} ${ctx.input.timespan}) from ${ctx.input.from} to ${ctx.input.to}.`
     };
   })

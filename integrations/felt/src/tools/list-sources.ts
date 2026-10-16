@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,10 @@ export let listSources = SlateTool.create(spec, {
               .describe('Connection type (e.g. s3_bucket, postgresql)'),
             syncStatus: z.string().nullable().describe('Current sync status'),
             automaticSync: z.string().nullable().describe('Automatic sync setting'),
-            lastSyncedAt: z.string().nullable().describe('Last sync timestamp')
+            lastSyncedAt: z
+              .string()
+              .nullable()
+              .describe('Last sync timestamp as returned by Felt, represented as a string')
           })
         )
         .describe('List of data sources')
@@ -40,13 +43,16 @@ export let listSources = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let sources = await client.listSources(ctx.input.workspaceId);
 
-    let mapped = (Array.isArray(sources) ? sources : []).map((s: any) => ({
+    if (!Array.isArray(sources)) {
+      throw createApiServiceError('Felt returned an invalid sources list. Try again.');
+    }
+    let mapped = sources.map((s: any) => ({
       sourceId: s.id,
       name: s.name ?? null,
       connectionType: s.connection_type ?? null,
       syncStatus: s.sync_status ?? null,
       automaticSync: s.automatic_sync ?? null,
-      lastSyncedAt: s.last_synced_at ?? null
+      lastSyncedAt: s.last_synced_at == null ? null : String(s.last_synced_at)
     }));
 
     return {

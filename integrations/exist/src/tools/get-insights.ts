@@ -8,7 +8,7 @@ export let getInsightsTool = SlateTool.create(spec, {
   key: 'get_insights',
   description: `Retrieve automatically generated insights about the user's data. Insights are events found within the user's tracked data, such as "Yesterday was your highest steps value in 30 days" or weekly/monthly summaries. Results are limited to your read scopes.`,
   instructions: [
-    'Use priority to filter: 1=today, 2=this week, 3=last week, 4=last month.',
+    'Use priority to filter: 1=real-time, 2=day-level, 3=week-level, 4=month-level.',
     'Use dateMin/dateMax (YYYY-MM-DD) to filter by target date range.'
   ],
   tags: {
@@ -22,13 +22,24 @@ export let getInsightsTool = SlateTool.create(spec, {
       priority: z
         .number()
         .optional()
-        .describe('Filter by priority: 1=today, 2=this week, 3=last week, 4=last month'),
+        .describe('Filter by priority: 1=real-time, 2=day-level, 3=week-level, 4=month-level'),
       limit: z.number().optional().describe('Number of results per page (max 100)'),
       page: z.number().optional().describe('Page number for pagination')
     })
   )
   .output(
     z.object({
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the next page, when returned'),
+      previousPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the previous page, when returned'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       totalCount: z.number().describe('Total number of insights'),
       insights: z
         .array(
@@ -74,6 +85,9 @@ export let getInsightsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        nextPageUrl: result.next,
+        previousPageUrl: result.previous,
+        raw: result,
         totalCount: result.count,
         insights,
         hasMore: result.next !== null

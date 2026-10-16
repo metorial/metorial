@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,6 +10,7 @@ export let updatePass = SlateTool.create(spec, {
   instructions: [
     'Provide values to update placeholder fields, and/or status to change the pass status.',
     'Valid status values: "valid", "invalid", "redeemed", "unpaid", "locked", "incomplete".',
+    'Changing status alone does not send a push notification.',
     'Set sendPush to true to manually trigger a push notification (only needed if automatic push is disabled).'
   ]
 })
@@ -49,6 +50,16 @@ export let updatePass = SlateTool.create(spec, {
     let { passTypeIdentifier, serialNumber } = ctx.input;
     let updatedValues: Record<string, any> | undefined;
     let updatedStatus: string | undefined;
+
+    if (
+      ctx.input.values === undefined &&
+      ctx.input.status === undefined &&
+      !ctx.input.sendPush
+    ) {
+      throw createApiServiceError(
+        'Provide values, status, or sendPush: true to update the pass.'
+      );
+    }
 
     if (ctx.input.values) {
       updatedValues = await client.updatePassValues(

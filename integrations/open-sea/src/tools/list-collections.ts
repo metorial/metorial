@@ -41,7 +41,10 @@ export let listCollections = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sort order for collections'),
-      limit: z.number().optional().describe('Number of results per page (max 200)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of results per page (provider maximum 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -62,8 +65,8 @@ export let listCollections = SlateTool.create(spec, {
     });
 
     let collections = (data.collections ?? []).map((c: any) => ({
-      collectionSlug: c.collection ?? '',
-      name: c.name ?? '',
+      collectionSlug: c.collection,
+      name: c.name,
       description: c.description ?? null,
       imageUrl: c.image_url ?? null,
       owner: c.owner ?? null,

@@ -9,7 +9,7 @@ export let updateCheck = SlateTool.create(spec, {
   key: 'update_check',
   description: `Update an existing uptime monitoring check's configuration. Modify the URL, check frequency, alert settings, HTTP configuration, monitoring locations, and more. Only provided fields are updated.`,
   instructions: [
-    'Set muteUntil to an ISO 8601 timestamp, "recovery", or "forever" to mute alerts. Set to empty string or null to unmute.'
+    'Set muteUntil to an ISO 8601 timestamp, "recovery", or "forever" to mute alerts. Set to an empty string to unmute. A null input is omitted.'
   ]
 })
   .input(

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,18 +37,43 @@ export let getLists = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getLists(ctx.input.page, ctx.input.pageSize);
+    if (
+      !isApiErrorRecord(result) ||
+      typeof result.count !== 'number' ||
+      !Number.isFinite(result.count) ||
+      (result.next !== null && typeof result.next !== 'string') ||
+      (result.previous !== null && typeof result.previous !== 'string') ||
+      !Array.isArray(result.results)
+    ) {
+      throw createApiServiceError(
+        'Sidetracker returned an invalid list response: count must be a number, next and previous must be strings or null, and results must be an array.',
+        { reason: 'sidetracker_invalid_list_response' }
+      );
+    }
 
     return {
       output: {
         count: result.count,
         nextPage: result.next,
         previousPage: result.previous,
-        lists: result.results.map(list => ({
-          listId: String(list.unique_id ?? ''),
-          name: String(list.name ?? ''),
-          description: String(list.description ?? ''),
-          preset: String(list.preset ?? '')
-        }))
+        lists: result.results.map(list => {
+          let unique_id = list?.unique_id;
+          let name = list?.name;
+          let description = list?.description;
+          let preset = list?.preset;
+          if (
+            typeof unique_id !== 'string' ||
+            typeof name !== 'string' ||
+            typeof description !== 'string' ||
+            typeof preset !== 'string'
+          ) {
+            throw createApiServiceError(
+              'Sidetracker returned a list without the string unique_id, name, description, and preset fields required for this result.',
+              { reason: 'sidetracker_invalid_list_response' }
+            );
+          }
+          return { listId: unique_id, name, description, preset };
+        })
       },
       message: `Retrieved **${result.results.length}** lists (${result.count} total).`
     };

@@ -3,18 +3,25 @@ import { spec } from './spec';
 import {
   convertCurrency,
   getAnalystData,
+  getApiUsage,
   getCompanyProfile,
   getDividendsAndSplits,
   getEarnings,
+  getEarningsCalendar,
+  getEarningsHistory,
+  getEndOfDayPrice,
   getEtfDetails,
   getExchangeRate,
   getFinancialStatements,
+  getFundData,
+  getMarketState,
   getMutualFundDetails,
   getPrice,
   getQuote,
   getTechnicalIndicator,
   getTimeSeries,
   listExchanges,
+  listTechnicalIndicators,
   searchSymbols
 } from './tools';
 export let provider = Slate.create({
@@ -34,7 +41,14 @@ export let provider = Slate.create({
     getEarnings,
     getEtfDetails,
     getMutualFundDetails,
-    listExchanges
+    listExchanges,
+    getEndOfDayPrice,
+    getApiUsage,
+    getMarketState,
+    getEarningsCalendar,
+    getEarningsHistory,
+    listTechnicalIndicators,
+    getFundData
   ],
   triggers: []
 });

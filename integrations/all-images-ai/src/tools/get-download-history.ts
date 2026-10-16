@@ -15,6 +15,7 @@ export let getDownloadHistory = SlateTool.create(spec, {
     z.object({
       limit: z.number().optional().describe('Number of results per page'),
       offset: z.number().optional().describe('Starting position for pagination'),
+      sort: z.string().optional().describe('Provider sort expression'),
       afterCreatedAt: z
         .string()
         .optional()
@@ -29,7 +30,12 @@ export let getDownloadHistory = SlateTool.create(spec, {
     z.object({
       filteredResults: z
         .number()
+        .optional()
         .describe('Total number of downloaded images matching filters'),
+      resultCountMetadata: z
+        .unknown()
+        .optional()
+        .describe('Unmodified provider result count metadata, when provided'),
       images: z
         .array(
           z.object({
@@ -50,13 +56,14 @@ export let getDownloadHistory = SlateTool.create(spec, {
     let result = await client.getDownloadedImages({
       limit: ctx.input.limit,
       offset: ctx.input.offset,
+      sort: ctx.input.sort,
       afterCreatedAt: ctx.input.afterCreatedAt,
       beforeCreatedAt: ctx.input.beforeCreatedAt
     });
 
     return {
       output: result,
-      message: `Found **${result.filteredResults}** downloaded images. Returned **${result.images.length}** results.`
+      message: `${result.filteredResults !== undefined ? `Found **${result.filteredResults}** downloaded images. ` : ''}Returned **${result.images.length}** results.`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateBalanceInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let redeemGiftCard = SlateTool.create(spec, {
@@ -28,6 +29,10 @@ export let redeemGiftCard = SlateTool.create(spec, {
         .optional()
         .describe('Units to redeem (for partial unit-backed redemptions)'),
       reason: z.string().optional().describe('Reason for the redemption'),
+      redeemedOn: z
+        .string()
+        .optional()
+        .describe('When the redemption occurred (UTC). Must be now or in the past.'),
       locationId: z.string().optional().describe('Location ID where the redemption occurs'),
       metadata: z
         .record(z.string(), z.string())
@@ -45,27 +50,25 @@ export let redeemGiftCard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateBalanceInput(ctx.input);
     let client = new Client({
       token: ctx.auth.token,
       testMode: ctx.config.testMode
     });
 
-    let result: any;
-    if (ctx.input.redeemInFull) {
-      result = await client.redeemGiftCardInFull(ctx.input.code, {
-        reason: ctx.input.reason,
-        locationId: ctx.input.locationId,
-        metadata: ctx.input.metadata
-      });
-    } else {
-      result = await client.redeemGiftCard(ctx.input.code, {
-        amount: ctx.input.amount,
-        units: ctx.input.units,
-        reason: ctx.input.reason,
-        locationId: ctx.input.locationId,
-        metadata: ctx.input.metadata
-      });
-    }
+    let details = {
+      reason: ctx.input.reason,
+      locationId: ctx.input.locationId,
+      redeemedOn: ctx.input.redeemedOn,
+      metadata: ctx.input.metadata
+    };
+    let result = ctx.input.redeemInFull
+      ? await client.redeemGiftCardInFull(ctx.input.code, details)
+      : await client.redeemGiftCard(ctx.input.code, {
+          ...details,
+          amount: ctx.input.amount,
+          units: ctx.input.units
+        });
 
     let redeemDesc = ctx.input.redeemInFull
       ? 'in full'

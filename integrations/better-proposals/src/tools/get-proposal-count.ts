@@ -26,8 +26,8 @@ export let getProposalCount = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
-        count: result.data
+        status: result.status,
+        count: result.count
       },
       message: `Retrieved proposal count.`
     };

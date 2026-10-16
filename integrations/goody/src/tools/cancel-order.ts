@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let cancelOrder = SlateTool.create(spec, {
@@ -27,10 +27,7 @@ export let cancelOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let o = await client.cancelOrder(ctx.input.orderId);
 
@@ -39,7 +36,7 @@ export let cancelOrder = SlateTool.create(spec, {
         orderId: o.id,
         status: o.status,
         recipientFirstName: o.recipient_first_name,
-        recipientLastName: o.recipient_last_name,
+        recipientLastName: o.recipient_last_name ?? null,
         referenceId: o.reference_id
       },
       message: `Order **${o.reference_id}** for **${o.recipient_first_name}** has been canceled.`

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let fetchUser = SlateTool.create(spec, {
   name: 'Fetch User',
   key: 'fetch_user',
-  description: `Fetch a Revolt user's profile information including username, display name, status, badges, and profile content. Use "@me" as the user ID to fetch the authenticated user.`,
+  description: `Fetch a Stoat user's profile information including username, display name, status, badges, and profile content. Use "@me" as the user ID to fetch the authenticated user.`,
   tags: {
     readOnly: true
   }
@@ -26,8 +26,8 @@ export let fetchUser = SlateTool.create(spec, {
       username: z.string().describe('Username'),
       discriminator: z.string().describe('User discriminator'),
       displayName: z.string().optional().describe('Display name'),
-      badges: z.number().describe('Badge bitfield'),
-      flags: z.number().describe('User flags bitfield'),
+      badges: z.number().optional().describe('Badge bitfield when provided'),
+      flags: z.number().optional().describe('User flags bitfield when provided'),
       online: z.boolean().describe('Whether the user is online'),
       isBot: z.boolean().describe('Whether the user is a bot'),
       statusText: z.string().optional().describe('User status text'),
@@ -45,13 +45,9 @@ export let fetchUser = SlateTool.create(spec, {
     let user = userId === '@me' ? await client.fetchSelf() : await client.fetchUser(userId);
 
     let profileContent: string | undefined;
-    if (ctx.input.includeProfile && userId !== '@me') {
-      try {
-        let profile = await client.fetchUserProfile(ctx.input.userId);
-        profileContent = profile.content ?? undefined;
-      } catch {
-        // Profile may not be accessible
-      }
+    if (ctx.input.includeProfile) {
+      let profile = await client.fetchUserProfile(user._id);
+      profileContent = profile.content ?? undefined;
     }
 
     return {
@@ -60,9 +56,9 @@ export let fetchUser = SlateTool.create(spec, {
         username: user.username,
         discriminator: user.discriminator,
         displayName: user.display_name ?? undefined,
-        badges: user.badges ?? 0,
-        flags: user.flags ?? 0,
-        online: user.online ?? false,
+        badges: user.badges ?? undefined,
+        flags: user.flags ?? undefined,
+        online: user.online,
         isBot: !!user.bot,
         statusText: user.status?.text ?? undefined,
         statusPresence: user.status?.presence ?? undefined,

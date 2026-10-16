@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'datarobot',
   name: 'DataRobot',
   description:
-    'Enterprise AI/ML platform for automated model building, deployment, and monitoring. Provides project management, AutoML, model registry, real-time and batch predictions, and MLOps monitoring.',
+    'Manage machine learning projects, Autopilot, datasets, model packages, deployments, serverless and batch predictions, and model monitoring.',
   metadata: {},
   config,
   auth

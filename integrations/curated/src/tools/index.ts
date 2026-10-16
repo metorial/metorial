@@ -3,6 +3,8 @@ export * from './create-link';
 export * from './delete-draft-issue';
 export * from './delete-link';
 export * from './get-issue';
+export * from './get-link';
+export * from './get-subscriber';
 export * from './list-categories';
 export * from './list-issues';
 export * from './list-links';

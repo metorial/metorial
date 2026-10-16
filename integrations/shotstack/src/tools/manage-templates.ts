@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EditClient } from '../lib/client';
+import { EditClient, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let createTemplateTool = SlateTool.create(spec, {
@@ -69,9 +69,9 @@ export let listTemplatesTool = SlateTool.create(spec, {
     let client = new EditClient(ctx.auth.token, ctx.config.environment);
     let result = await client.listTemplates();
 
-    let templates = (result.response?.data || []).map((t: any) => ({
-      templateId: t.id,
-      name: t.name,
+    let templates = result.response.templates.map((t: any) => ({
+      templateId: text(t.id, 'template ID'),
+      name: text(t.name, 'template name'),
       created: t.created,
       updated: t.updated
     }));

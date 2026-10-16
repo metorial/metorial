@@ -152,15 +152,15 @@ export let listShifts = SlateTool.create(spec, {
         netSales: s.net_sales,
         tip: s.tip,
         surcharge: s.surcharge,
-        taxes: (s.taxes ?? []).map((t: any) => ({
+        taxes: s.taxes?.map((t: any) => ({
           taxId: t.tax_id,
           moneyAmount: t.money_amount
         })),
-        payments: (s.payments ?? []).map((p: any) => ({
+        payments: s.payments?.map((p: any) => ({
           paymentTypeId: p.payment_type_id,
           moneyAmount: p.money_amount
         })),
-        cashMovements: (s.cash_movements ?? []).map((m: any) => ({
+        cashMovements: s.cash_movements?.map((m: any) => ({
           type: m.type,
           moneyAmount: m.money_amount,
           comment: m.comment,

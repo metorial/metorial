@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, rawSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCampaigns = SlateTool.create(spec, {
@@ -29,6 +29,9 @@ Supports fetching all campaigns, filtering by status, or retrieving a single cam
   )
   .output(
     z.object({
+      raw: rawSchema
+        .optional()
+        .describe('Original provider response, with credentials removed'),
       campaigns: z
         .array(
           z.object({
@@ -61,6 +64,7 @@ Supports fetching all campaigns, filtering by status, or retrieving a single cam
       let campaign = await client.getCampaign(ctx.input.campaignId);
       return {
         output: {
+          raw: campaign.raw,
           campaigns: [
             {
               campaignId: campaign.campaignId,
@@ -85,7 +89,7 @@ Supports fetching all campaigns, filtering by status, or retrieving a single cam
       ctx.input.pageSize,
       ctx.input.status
     );
-    let campaigns = (result.items ?? []).map(c => ({
+    let campaigns = result.items.map(c => ({
       campaignId: c.campaignId,
       name: c.name,
       fromName: c.fromName,
@@ -99,6 +103,7 @@ Supports fetching all campaigns, filtering by status, or retrieving a single cam
 
     return {
       output: {
+        raw: result.raw,
         campaigns,
         totalCount: result.itemsCount,
         currentPage: result.currentPage,

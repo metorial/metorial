@@ -43,16 +43,16 @@ export let getBulkListStatus = SlateTool.create(spec, {
 
     return {
       output: {
-        listId: String(list.listId || ctx.input.listId),
-        fileName: list.fileName || '',
-        status: list.status || '',
-        totalEmails: list.totalEmails ?? 0,
-        cleanCount: list.cleanCount ?? 0,
-        dirtyCount: list.dirtyCount ?? 0,
-        unknownCount: list.unknownCount ?? 0,
-        createdAt: list.createdAt || ''
+        listId: list.listId,
+        fileName: list.fileName,
+        status: list.status,
+        totalEmails: list.totalEmails,
+        cleanCount: list.cleanCount,
+        dirtyCount: list.dirtyCount,
+        unknownCount: list.unknownCount,
+        createdAt: list.createdAt
       },
-      message: `Bulk list **${list.fileName || ctx.input.listId}** — Status: **${list.status}**. Total: ${list.totalEmails ?? 0}, Clean: ${list.cleanCount ?? 0}, Dirty: ${list.dirtyCount ?? 0}, Unknown: ${list.unknownCount ?? 0}.`
+      message: `Bulk list **${list.fileName}** — Status: **${list.status}**. Total: ${list.totalEmails}, Clean: ${list.cleanCount}, Dirty: ${list.dirtyCount}, Unknown: ${list.unknownCount}.`
     };
   })
   .build();

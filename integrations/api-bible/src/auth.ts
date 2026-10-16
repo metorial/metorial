@@ -15,9 +15,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe(
-          'Your API.Bible API key. Found in your Dashboard settings after your application is approved.'
-        )
+        .describe('Your API.Bible API key from your app in the API.Bible dashboard.')
     }),
 
     getOutput: async ctx => {

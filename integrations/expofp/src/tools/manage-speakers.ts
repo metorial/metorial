@@ -61,13 +61,13 @@ export let getSessionSpeakers = SlateTool.create(spec, {
       output: {
         speakers: speakers.map(s => ({
           speakerId: s.id,
-          name: s.name ?? '',
-          company: s.company ?? '',
-          jobTitle: s.jobTitle ?? '',
-          position: s.position ?? '',
-          photo: s.photo ?? '',
-          linkedInUrl: s.linkedInUrl ?? '',
-          twitterUrl: s.twitterUrl ?? ''
+          name: s.name,
+          company: s.company,
+          jobTitle: s.jobTitle,
+          position: s.position,
+          photo: s.photo,
+          linkedInUrl: s.linkedInUrl,
+          twitterUrl: s.twitterUrl
         }))
       },
       message: `Found **${speakers.length}** speaker(s) for event ${ctx.input.eventId}.`

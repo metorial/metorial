@@ -29,6 +29,10 @@ export let addRepository = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       repositoryName: z.string().describe('Name of the added repository.'),
       provider: z.string().describe('Git provider of the repository.'),
       added: z.boolean().describe('Whether the repository was successfully added.')
@@ -38,15 +42,19 @@ export let addRepository = SlateTool.create(spec, {
     let client = createClient(ctx);
     let provider = ctx.input.provider ?? ctx.config.provider;
 
-    await client.addRepository(provider, ctx.input.repositoryFullPath);
+    let response = await client.addRepository(provider, ctx.input.repositoryFullPath);
 
+    let repository = response.data ?? response;
     let repoName =
-      ctx.input.repositoryFullPath.split('/').pop() ?? ctx.input.repositoryFullPath;
+      repository.name ??
+      ctx.input.repositoryFullPath.split('/').pop() ??
+      ctx.input.repositoryFullPath;
 
     return {
       output: {
+        raw: response,
         repositoryName: repoName,
-        provider,
+        provider: repository.provider ?? provider,
         added: true
       },
       message: `Repository **${ctx.input.repositoryFullPath}** has been added to Codacy for analysis.`

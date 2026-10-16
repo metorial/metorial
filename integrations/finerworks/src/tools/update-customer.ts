@@ -32,6 +32,7 @@ export let updateCustomer = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       success: z.boolean().describe('Whether the update was successful'),
       message: z.string().optional().describe('API response message')
     })
@@ -46,26 +47,27 @@ export let updateCustomer = SlateTool.create(spec, {
     let data = await client.updateCustomer(ctx.input.orderId, {
       first_name: ctx.input.firstName,
       last_name: ctx.input.lastName,
-      company_name: ctx.input.companyName ?? '',
+      company_name: ctx.input.companyName,
       address_1: ctx.input.address1,
-      address_2: ctx.input.address2 ?? '',
-      address_3: ctx.input.address3 ?? '',
+      address_2: ctx.input.address2,
+      address_3: ctx.input.address3,
       city: ctx.input.city,
-      state_code: ctx.input.stateCode ?? '',
-      province: ctx.input.province ?? '',
+      state_code: ctx.input.stateCode,
+      province: ctx.input.province,
       zip_postal_code: ctx.input.zipPostalCode,
       country_code: ctx.input.countryCode,
-      phone: ctx.input.phone ?? '',
-      email: ctx.input.email ?? '',
-      address_order_po: ''
+      phone: ctx.input.phone,
+      email: ctx.input.email,
+      address_order_po: undefined
     });
 
-    let success = data.success ?? false;
+    let success = data.success;
 
     return {
       output: {
+        raw: data,
         success,
-        message: data.message || undefined
+        message: data.message ?? undefined
       },
       message: success
         ? `Updated shipping address for order **${ctx.input.orderId}** to ${ctx.input.firstName} ${ctx.input.lastName}, ${ctx.input.city}, ${ctx.input.countryCode}`

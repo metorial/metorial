@@ -1,7 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let domainWhoisOutputSchema = z.object({
+  domainName: z.string().optional(),
+  status: z.array(z.string()).optional(),
+  nameservers: z.array(z.string()).optional(),
+  dates: z.any().optional().describe('Registration and update dates'),
+  expiration: z.any().optional().describe('Expiration date information'),
+  registrar: z.any().optional().describe('Registrar details'),
+  registrant: z.any().optional().describe('Registrant contact information'),
+  administrative: z.any().optional().describe('Administrative contact'),
+  technical: z.any().optional().describe('Technical contact'),
+  raw: z.any().describe('Full raw WHOIS response')
+});
 
 export let domainWhois = SlateTool.create(spec, {
   name: 'Domain WHOIS Lookup',
@@ -16,20 +30,7 @@ export let domainWhois = SlateTool.create(spec, {
       domain: z.string().describe('Domain name to look up (e.g., "example.com")')
     })
   )
-  .output(
-    z.object({
-      domainName: z.string().optional(),
-      status: z.array(z.string()).optional(),
-      nameservers: z.array(z.string()).optional(),
-      dates: z.any().optional().describe('Registration and update dates'),
-      expiration: z.any().optional().describe('Expiration date information'),
-      registrar: z.any().optional().describe('Registrar details'),
-      registrant: z.any().optional().describe('Registrant contact information'),
-      administrative: z.any().optional().describe('Administrative contact'),
-      technical: z.any().optional().describe('Technical contact'),
-      raw: z.any().describe('Full raw WHOIS response')
-    })
-  )
+  .output(domainWhoisOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.domainWhois({ domain: ctx.input.domain });
@@ -38,22 +39,54 @@ export let domainWhois = SlateTool.create(spec, {
     let domainData = search.domain ?? {};
 
     return {
-      output: {
+      output: normalizeOutput(domainWhoisOutputSchema, {
         domainName: domainData.name,
         status: domainData.status,
-        nameservers: domainData.nameservers,
-        dates: domainData.dates,
-        expiration: domainData.expiration,
+        nameservers: domainData.name_servers ?? domainData.nameservers,
+        dates:
+          domainData.dates ??
+          ([
+            domainData.created_date,
+            domainData.updated_date,
+            domainData.created_date_in_time,
+            domainData.updated_date_in_time
+          ].some(value => value !== undefined)
+            ? {
+                createdDate: domainData.created_date,
+                updatedDate: domainData.updated_date,
+                createdDateInTime: domainData.created_date_in_time,
+                updatedDateInTime: domainData.updated_date_in_time
+              }
+            : undefined),
+        expiration: domainData.expiration ?? domainData.expiration_date,
         registrar: search.registrar,
         registrant: search.registrant,
         administrative: search.administrative,
         technical: search.technical,
         raw: result
-      },
+      }),
       message: `WHOIS lookup for **${ctx.input.domain}**: registered with **${search.registrar?.name ?? 'unknown registrar'}**.`
     };
   })
   .build();
+
+let checkDomainReputationOutputSchema = z.object({
+  malicious: z.boolean().optional().describe('Whether the domain/IP is flagged as malicious'),
+  maliciousSources: z
+    .array(z.any())
+    .optional()
+    .describe('Sources that flagged the domain as malicious'),
+  blacklisted: z.boolean().optional().describe('Whether the domain/IP is on a DNSBL'),
+  blacklistDetectedCount: z
+    .number()
+    .optional()
+    .describe('Number of blacklists detecting the domain'),
+  blacklistProviders: z
+    .array(z.string())
+    .optional()
+    .describe('Blacklist providers that detected the domain'),
+  raw: z.any().describe('Full raw response')
+});
 
 export let checkDomainReputation = SlateTool.create(spec, {
   name: 'Check Domain Reputation',
@@ -72,28 +105,7 @@ export let checkDomainReputation = SlateTool.create(spec, {
         .describe('Type of reputation check to perform')
     })
   )
-  .output(
-    z.object({
-      malicious: z
-        .boolean()
-        .optional()
-        .describe('Whether the domain/IP is flagged as malicious'),
-      maliciousSources: z
-        .array(z.any())
-        .optional()
-        .describe('Sources that flagged the domain as malicious'),
-      blacklisted: z.boolean().optional().describe('Whether the domain/IP is on a DNSBL'),
-      blacklistDetectedCount: z
-        .number()
-        .optional()
-        .describe('Number of blacklists detecting the domain'),
-      blacklistProviders: z
-        .array(z.string())
-        .optional()
-        .describe('Blacklist providers that detected the domain'),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(checkDomainReputationOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let maliciousResult: any;
@@ -108,14 +120,14 @@ export let checkDomainReputation = SlateTool.create(spec, {
     }
 
     return {
-      output: {
+      output: normalizeOutput(checkDomainReputationOutputSchema, {
         malicious: maliciousResult?.malicious,
         maliciousSources: maliciousResult?.sources,
         blacklisted: dnsblResult?.blacklisted,
         blacklistDetectedCount: dnsblResult?.detected?.count,
         blacklistProviders: dnsblResult?.detected?.providers,
         raw: { malicious: maliciousResult, dnsbl: dnsblResult }
-      },
+      }),
       message: `Domain reputation check for **${ctx.input.domainOrIp}**: malicious=${maliciousResult?.malicious ?? 'N/A'}, blacklisted=${dnsblResult?.blacklisted ?? 'N/A'}.`
     };
   })

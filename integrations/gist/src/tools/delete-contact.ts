@@ -16,6 +16,7 @@ export let deleteContact = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       deleted: z.boolean().describe('Whether the contact was successfully deleted')
     })
   )
@@ -24,7 +25,7 @@ export let deleteContact = SlateTool.create(spec, {
     await client.deleteContact(ctx.input.contactId);
 
     return {
-      output: { deleted: true },
+      output: { rawResponse: client.responses, deleted: true },
       message: `Contact **${ctx.input.contactId}** has been deleted.`
     };
   })

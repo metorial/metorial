@@ -21,7 +21,8 @@ export let deleteUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the user was successfully deleted')
+      success: z.boolean().describe('Whether the user was successfully deleted'),
+      raw: z.unknown().optional().describe('Original response from MemberVault')
     })
   )
   .handleInvocation(async ctx => {
@@ -30,12 +31,12 @@ export let deleteUser = SlateTool.create(spec, {
       subdomain: ctx.config.subdomain
     });
 
-    await client.deleteUser({
+    let raw = await client.deleteUser({
       email: ctx.input.email
     });
 
     return {
-      output: { success: true },
+      output: { success: true, raw },
       message: `Permanently deleted user **${ctx.input.email}** and all their data.`
     };
   })

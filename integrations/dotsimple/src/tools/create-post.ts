@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DotSimpleClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let contentSchema = z.object({
@@ -50,6 +51,7 @@ export let createPost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       accountIds: z.array(z.number()).describe('Array of account IDs to post to'),
       versions: z.array(versionSchema).describe('Content versions for the post'),
       tagIds: z
@@ -80,7 +82,7 @@ export let createPost = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.createPost({

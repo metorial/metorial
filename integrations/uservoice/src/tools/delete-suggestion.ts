@@ -23,7 +23,8 @@ export let deleteSuggestion = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     await client.deleteSuggestion(ctx.input.suggestionId);

@@ -1,10 +1,13 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
+import { ablyError, requireAblyAuth } from './errors';
 
 export class AblyControlClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(accessToken: string) {
-    this.axios = createAxios({
+  constructor(accessToken: string, authType?: string) {
+    requireAblyAuth(accessToken, authType, 'control_token');
+    this.axios = createAuthenticatedAxios({
+      errorAdapter: ablyError,
       baseURL: 'https://control.ably.net/v1',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -17,6 +20,18 @@ export class AblyControlClient {
 
   async getTokenDetails(): Promise<any> {
     let response = await this.axios.get('/me');
+    return response.data;
+  }
+
+  async getStatistics(
+    scope: 'app' | 'account',
+    id: string,
+    params: Record<string, unknown>
+  ): Promise<any[]> {
+    let response = await this.axios.get(
+      `/${scope === 'app' ? 'apps' : 'accounts'}/${encodeURIComponent(id)}/stats`,
+      { params }
+    );
     return response.data;
   }
 
@@ -70,6 +85,7 @@ export class AblyControlClient {
     key: {
       name: string;
       capability: Record<string, string[]>;
+      revocableTokens?: boolean;
     }
   ): Promise<any> {
     let response = await this.axios.post(`/apps/${encodeURIComponent(appId)}/keys`, key);
@@ -82,6 +98,7 @@ export class AblyControlClient {
     key: {
       name?: string;
       capability?: Record<string, string[]>;
+      revocableTokens?: boolean;
     }
   ): Promise<any> {
     let response = await this.axios.patch(
@@ -113,6 +130,14 @@ export class AblyControlClient {
       pushEnabled?: boolean;
       tlsOnly?: boolean;
       exposeTimeserial?: boolean;
+      authenticated?: boolean;
+      batchingEnabled?: boolean;
+      batchingInterval?: number;
+      conflationEnabled?: boolean;
+      conflationInterval?: number;
+      conflationKey?: string;
+      mutableMessages?: boolean;
+      populateChannelRegistry?: boolean;
     }
   ): Promise<any> {
     let response = await this.axios.post(
@@ -131,6 +156,14 @@ export class AblyControlClient {
       pushEnabled?: boolean;
       tlsOnly?: boolean;
       exposeTimeserial?: boolean;
+      authenticated?: boolean;
+      batchingEnabled?: boolean;
+      batchingInterval?: number;
+      conflationEnabled?: boolean;
+      conflationInterval?: number;
+      conflationKey?: string;
+      mutableMessages?: boolean;
+      populateChannelRegistry?: boolean;
     }
   ): Promise<any> {
     let response = await this.axios.patch(

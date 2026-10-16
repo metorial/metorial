@@ -25,7 +25,8 @@ export let topHeadlines = SlateTool.create(spec, {
   description: `Retrieve live top and breaking news headlines. Filter by country, category, specific sources, or search with keywords. Ideal for monitoring current news in specific regions or topic areas. You cannot combine the **country** or **category** filters with the **sources** filter.`,
   instructions: [
     'Provide at least one of: country, category, sources, or query.',
-    'The country and category parameters cannot be used together with sources.'
+    'The country and category parameters cannot be used together with sources.',
+    'Call Discover Sources to find source identifiers. Use nextPage, when returned, as the page input with the same filters; your account plan may limit accessible results.'
   ],
   constraints: [
     'Article content is truncated to 200 characters.',
@@ -43,7 +44,7 @@ export let topHeadlines = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          '2-letter ISO 3166-1 country code (e.g. "us", "gb", "de"). Cannot be used with sources.'
+          '2-letter ISO 3166-1 country code supported by NewsAPI (currently "us"). Cannot be used with sources.'
         ),
       category: categoryEnum
         .optional()
@@ -66,7 +67,18 @@ export let topHeadlines = SlateTool.create(spec, {
   .output(
     z.object({
       totalResults: z.number().describe('Total number of matching headlines'),
-      articles: z.array(articleSchema).describe('List of headline articles')
+      articles: z.array(articleSchema).describe('List of headline articles'),
+      page: z.number().optional().describe('Requested page, or the provider default of 1'),
+      nextPage: z
+        .number()
+        .optional()
+        .describe(
+          'Next page when totalResults indicates more results; account plan limits may apply'
+        ),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response with original article metadata and status')
     })
   )
   .handleInvocation(async ctx => {
@@ -104,7 +116,13 @@ export let topHeadlines = SlateTool.create(spec, {
     return {
       output: {
         totalResults: result.totalResults,
-        articles
+        articles,
+        page: ctx.input.page ?? 1,
+        nextPage:
+          result.totalResults > (ctx.input.page ?? 1) * (ctx.input.pageSize ?? 20)
+            ? (ctx.input.page ?? 1) + 1
+            : undefined,
+        rawResponse: result
       },
       message: `Found **${result.totalResults}** headlines${filterDesc}. Returned **${articles.length}** results.`
     };

@@ -7,7 +7,10 @@ import {
   duplicateMap,
   exportLayer,
   getCurrentUser,
+  getFileUrl,
   getMap,
+  getProject,
+  getSource,
   importLayer,
   listElements,
   listLayers,
@@ -42,7 +45,10 @@ export let provider = Slate.create({
     listSources,
     manageSource,
     createEmbedToken,
-    getCurrentUser
+    getCurrentUser,
+    getProject,
+    getSource,
+    getFileUrl
   ],
   triggers: []
 });

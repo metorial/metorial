@@ -1,13 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DemioClient } from '../lib/client';
+import { DemioClient, eventDateSchema as providerEventDateSchema } from '../lib/client';
 import { spec } from '../spec';
 
 let eventDateSchema = z.object({
   dateId: z.number().describe('Unique ID of the event date/session'),
-  datetime: z.string().describe('Scheduled date and time of the session'),
+  datetime: z
+    .string()
+    .optional()
+    .describe('Scheduled date and time, absent for an undated on-demand session'),
   status: z.string().optional().describe('Status of the event date'),
-  timezone: z.string().optional().describe('Timezone of the event date')
+  timestamp: z.number().optional().describe('Scheduled time as a Unix timestamp'),
+  timezone: z.string().optional().describe('Timezone of the event date'),
+  raw: providerEventDateSchema
+    .optional()
+    .describe('Original session fields, preserving unavailable times as returned by Demio')
 });
 
 export let getEvent = SlateTool.create(spec, {
@@ -21,7 +28,11 @@ export let getEvent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      eventId: z.string().describe('The ID of the event to retrieve')
+      eventId: z.string().describe('Event ID from list_events'),
+      active: z
+        .boolean()
+        .optional()
+        .describe('Return only active sessions in a series when true')
     })
   )
   .output(
@@ -29,6 +40,15 @@ export let getEvent = SlateTool.create(spec, {
       eventId: z.number().describe('Unique ID of the event'),
       name: z.string().describe('Name of the event'),
       status: z.string().optional().describe('Status of the event'),
+      description: z.string().optional().describe('Description of the event'),
+      nextDateId: z
+        .number()
+        .optional()
+        .describe('Next unfinished session ID, absent when there is none'),
+      registrantsStayRegistered: z
+        .boolean()
+        .optional()
+        .describe('Whether registrants remain registered throughout a series'),
       eventType: z
         .string()
         .optional()
@@ -46,20 +66,25 @@ export let getEvent = SlateTool.create(spec, {
       apiSecret: ctx.auth.apiSecret
     });
 
-    let event = await client.getEvent(ctx.input.eventId);
+    let event = await client.getEvent(ctx.input.eventId, ctx.input.active);
 
     return {
       output: {
         eventId: event.id,
         name: event.name,
         status: event.status,
+        description: event.description ?? undefined,
+        nextDateId: event.next_date_id ?? undefined,
+        registrantsStayRegistered: event.registrants_stay_registered,
         eventType: event.type,
         registrationUrl: event.registration_url,
-        eventDates: event.event_dates?.map(d => ({
+        eventDates: (event.dates ?? event.event_dates)?.map(d => ({
           dateId: d.date_id,
-          datetime: d.datetime,
+          datetime: d.datetime ?? undefined,
           status: d.status,
-          timezone: d.timezone
+          timestamp: d.timestamp ?? undefined,
+          timezone: d.zone ?? d.timezone,
+          raw: d
         }))
       },
       message: `Retrieved event **${event.name}** (ID: ${event.id}).`

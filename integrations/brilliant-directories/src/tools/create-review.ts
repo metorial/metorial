@@ -34,6 +34,10 @@ export let createReview = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       review: z.any().describe('The newly created review record.')
     })
   )
@@ -69,6 +73,7 @@ export let createReview = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         review: result.message
       },
       message: `Created review **"${ctx.input.reviewTitle}"** for member ${ctx.input.userId}.`

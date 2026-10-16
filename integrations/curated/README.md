@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Curated
 
-Manage curated email newsletters, including collecting and organizing links, creating draft issues, managing subscribers, and retrieving publication data. List and retrieve publications, create and delete draft issues with categorized content, collect and update links with metadata, subscribe and unsubscribe emails, and retrieve category configurations. Note: issues cannot be published via the API and no webhook events are available.
+Manage Curated newsletters: discover publications, read issues and engagement statistics, create and delete drafts, collect and organize links, and manage email subscribers. Retrieve individual links and subscribers, discover category codes, and move links between collected items and draft issues. Publishing issues requires the Curated web interface.
+
+See the [API guide](docs/SPEC.md) for discovery, pagination, and subscription behavior.
 
 ## License
 

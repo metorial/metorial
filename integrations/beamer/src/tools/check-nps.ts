@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,7 +19,18 @@ export let checkNpsTool = SlateTool.create(spec, {
     z.object({
       userId: z.string().optional().describe('User ID to check'),
       userEmail: z.string().optional().describe('User email to check'),
-      beamerId: z.string().optional().describe('Beamer-generated user ID to check')
+      beamerId: z.string().optional().describe('Beamer-generated user ID to check'),
+      userFirstName: z.string().optional().describe('User first name'),
+      userLastName: z.string().optional().describe('User last name'),
+      filter: z.string().optional().describe('User segmentation filters'),
+      url: z.string().optional().describe('Current page URL for the user'),
+      createdAt: z.string().optional().describe('User signup date (ISO-8601)'),
+      language: z.string().optional().describe('User language'),
+      mobile: z.boolean().optional().describe('Whether the user is on a mobile device'),
+      multi: z
+        .boolean()
+        .optional()
+        .describe('Treat different user IDs on a device as separate users')
     })
   )
   .output(
@@ -30,14 +41,16 @@ export let checkNpsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = (await client.checkNps({
-      userId: ctx.input.userId,
-      userEmail: ctx.input.userEmail,
-      beamerId: ctx.input.beamerId
-    })) as Record<string, unknown>;
-
-    let eligible = !!result?.url || !!result?.showNps;
-    let npsUrl = (result?.url as string) ?? null;
+    if (
+      ![ctx.input.userId, ctx.input.userEmail, ctx.input.beamerId].some(value => value?.trim())
+    ) {
+      throw createApiServiceError(
+        'Provide userId, userEmail, or beamerId to identify the user.'
+      );
+    }
+    let result = await client.checkNps(ctx.input);
+    let eligible = result.shouldShow;
+    let npsUrl = result.url ?? null;
 
     return {
       output: {

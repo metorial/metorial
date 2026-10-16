@@ -49,7 +49,12 @@ export let upsertUser = SlateTool.create(spec, {
     if (ctx.input.phoneNumber) data.phoneNumber = ctx.input.phoneNumber;
     if (ctx.input.postcode) data.postcode = ctx.input.postcode;
     if (ctx.input.tags) data.tags = ctx.input.tags;
-    if (ctx.input.interaction) data.interaction = ctx.input.interaction;
+    if (ctx.input.interaction) {
+      data.interaction = {
+        categoryUuid: ctx.input.interaction.categoryUuid,
+        detail: { comment: ctx.input.interaction.detail }
+      };
+    }
     if (ctx.input.customFields) data.public = ctx.input.customFields;
 
     let result = await client.upsertUser(data);

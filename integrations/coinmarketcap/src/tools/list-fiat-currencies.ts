@@ -31,6 +31,7 @@ export let listFiatCurrencies = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       currencies: z.array(fiatEntrySchema).describe('List of supported fiat currencies')
     })
   )
@@ -55,7 +56,7 @@ export let listFiatCurrencies = SlateTool.create(spec, {
     }));
 
     return {
-      output: { currencies },
+      output: { currencies, raw: client.rawResponse },
       message: `Found **${currencies.length}** supported fiat currencies${ctx.input.includeMetals ? ' and precious metals' : ''}.`
     };
   })

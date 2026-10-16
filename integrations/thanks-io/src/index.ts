@@ -1,8 +1,13 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  countRadiusSearch,
+  estimateMailer,
+  getCreative,
+  listCreatives,
   listGiftcardBrands,
   listHandwritingStyles,
+  listOrderItems,
   listTemplates,
   manageMailingLists,
   manageOrders,
@@ -28,7 +33,12 @@ export let provider = Slate.create({
     listHandwritingStyles,
     listGiftcardBrands,
     manageSubAccounts,
-    radiusSearch
+    radiusSearch,
+    estimateMailer,
+    listCreatives,
+    getCreative,
+    listOrderItems,
+    countRadiusSearch
   ],
   triggers: []
 });

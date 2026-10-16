@@ -16,7 +16,7 @@ Use a template flipbook ID to copy styling from an existing flipbook.`,
     'Async mode returns a state field: "started", "processed", or "failed". The flipbook URL shows a not-found page until processing completes.'
   ],
   constraints: [
-    'Free plan is limited to 5 flipbooks. Paid plans offer unlimited conversions.',
+    'The free plan retains up to 5 flipbooks; further conversions remove the oldest publications.',
     'Logo placement requires Standard Plan or above.'
   ]
 })
@@ -49,6 +49,29 @@ Use a template flipbook ID to copy styling from an existing flipbook.`,
       downloadButton: z.boolean().optional().describe('Show download button on the flipbook.'),
       fullscreen: z.boolean().optional().describe('Show fullscreen button on the flipbook.'),
       share: z.boolean().optional().describe('Show share button on the flipbook.'),
+      privateNote: z
+        .string()
+        .optional()
+        .describe('Private management note, hidden from readers.'),
+      tags: z.string().optional().describe('Comma-separated organizational tags.'),
+      showInfo: z
+        .boolean()
+        .optional()
+        .describe('Show title, subtitle, and description on the background.'),
+      pageEffect: z
+        .enum([
+          'magazine',
+          'book',
+          'album',
+          'notebook',
+          'slideshow',
+          'cards',
+          'coverflow',
+          'onepage'
+        ])
+        .optional()
+        .describe('Reader page effect.'),
+      rightToLeft: z.boolean().optional().describe('Use right-to-left reading direction.'),
       navigationButtons: z
         .boolean()
         .optional()
@@ -85,12 +108,21 @@ Use a template flipbook ID to copy styling from an existing flipbook.`,
       downloadButton: ctx.input.downloadButton,
       fullscreen: ctx.input.fullscreen,
       share: ctx.input.share,
-      navigationButtons: ctx.input.navigationButtons
+      navigationButtons: ctx.input.navigationButtons,
+      privateNote: ctx.input.privateNote,
+      tags: ctx.input.tags,
+      showInfo: ctx.input.showInfo,
+      pageEffect: ctx.input.pageEffect,
+      rightToLeft: ctx.input.rightToLeft
     };
 
     let result = ctx.input.async
       ? await client.createFlipbookAsync(options)
       : await client.createFlipbookSync(options);
+
+    if (!ctx.input.async || result.state === 'processed') {
+      await ctx.addAttachment({ type: 'url', url: result.pdf, mimeType: 'application/pdf' });
+    }
 
     let mode = ctx.input.async ? 'asynchronously' : 'synchronously';
     let stateMsg = result.state ? ` (state: **${result.state}**)` : '';

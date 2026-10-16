@@ -1,6 +1,6 @@
 {
   "name": "@adobe/adobe-creative-cloud",
-  "description": "Manage Creative Cloud Libraries, assets, and elements including colors, images, logos, and graphics. Edit PSD files programmatically by manipulating layers, applying smart object edits, removing backgrounds, and using Generative Fill. Generate images from text prompts via Firefly AI, apply Lightroom presets and auto-adjustments, and merge data into InDesign templates to export as PDF, JPEG, or PNG. Search, license, and download Adobe Stock assets. Manage user accounts, product entitlements, and administrative roles. Upload and organize photos and videos in Lightroom cloud catalogs. Perform generative expand, object compositing, content tagging, and video localization with translate and lip-sync capabilities.",
+  "description": "Manage Creative Cloud Libraries and elements, edit PSD files, remove backgrounds, generate and expand images with Firefly, browse Lightroom catalogs, apply Lightroom edits, search and license Adobe Stock assets, manage enterprise users, and submit InDesign data merge jobs.",
   "categories": ["apis-and-http-requests", "document-processing"],
   "skills": [
     "manage creative cloud libraries",

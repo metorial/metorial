@@ -50,6 +50,7 @@ export let sendProposal = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       status: z.string().describe('Send status'),
       sentAt: z.string().describe('Timestamp when the proposal was sent'),
       senderId: z.number().nullable().describe('ID of the sender'),
@@ -57,7 +58,7 @@ export let sendProposal = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.sendProposal(ctx.input.proposalId, {
       email: ctx.input.recipientEmail,
       recipients: ctx.input.recipients,

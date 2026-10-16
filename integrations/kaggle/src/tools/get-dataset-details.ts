@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleList, kaggleRecord, kaggleSummary } from '../lib/responses';
 import { spec } from '../spec';
 
 let datasetFileSchema = z
@@ -35,6 +36,12 @@ export let getDatasetDetails = SlateTool.create(spec, {
     z.object({
       ownerSlug: z.string().describe('Dataset owner username'),
       datasetSlug: z.string().describe('Dataset slug/name'),
+      pageToken: z.string().optional().describe('Token for the next page of dataset files.'),
+      pageSize: z.number().optional().describe('Maximum number of dataset files to return.'),
+      includeStatus: z
+        .boolean()
+        .optional()
+        .describe('Whether to retrieve dataset processing status.'),
       versionNumber: z
         .number()
         .optional()
@@ -43,6 +50,14 @@ export let getDatasetDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Token for the next page of dataset files.'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original provider file-list and status responses.'),
       metadata: z
         .record(z.string(), z.any())
         .optional()
@@ -54,22 +69,36 @@ export let getDatasetDetails = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KaggleClient(ctx.auth);
 
-    let [metadata, filesData] = await Promise.all([
-      client.getDatasetMetadata(ctx.input.ownerSlug, ctx.input.datasetSlug).catch(() => null),
-      client
-        .listDatasetFiles(ctx.input.ownerSlug, ctx.input.datasetSlug, {
-          datasetVersionNumber: ctx.input.versionNumber
-        })
-        .catch(() => null)
+    let [metadataData, filesData, statusData] = await Promise.all([
+      client.getDatasetMetadata(ctx.input.ownerSlug, ctx.input.datasetSlug),
+      client.listDatasetFiles(ctx.input.ownerSlug, ctx.input.datasetSlug, {
+        datasetVersionNumber: ctx.input.versionNumber,
+        pageToken: ctx.input.pageToken,
+        pageSize: ctx.input.pageSize
+      }),
+      ctx.input.includeStatus
+        ? client.getDatasetStatus(ctx.input.ownerSlug, ctx.input.datasetSlug)
+        : undefined
     ]);
-
-    let files = filesData?.dataFiles ?? filesData ?? [];
+    let metadata = kaggleRecord(metadataData, 'dataset metadata');
+    let files = kaggleList(
+      filesData,
+      ['datasetFiles', 'dataFiles', 'files'],
+      'dataset files'
+    ).map(item => kaggleSummary(item, 'dataset file'));
+    let nextPageToken = Array.isArray(filesData)
+      ? undefined
+      : kaggleRecord(filesData, 'dataset files').nextPageToken;
+    let status =
+      statusData === undefined ? undefined : kaggleRecord(statusData, 'dataset status').status;
 
     return {
       output: {
-        metadata: metadata ?? undefined,
+        metadata,
         files,
-        status: undefined
+        nextPageToken: typeof nextPageToken === 'string' ? nextPageToken : undefined,
+        status: typeof status === 'string' ? status : undefined,
+        raw: { files: filesData, ...(statusData !== undefined ? { status: statusData } : {}) }
       },
       message: `Retrieved details for dataset **${ctx.input.ownerSlug}/${ctx.input.datasetSlug}** with ${files.length} file(s).`
     };

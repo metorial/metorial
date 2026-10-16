@@ -2,12 +2,16 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createTransaction,
+  getItem,
   getTeam,
+  getTransaction,
   listAttributes,
   listItems,
   listLocations,
   listPartners,
-  listTransactions
+  listTransactions,
+  manageItem,
+  manageTransaction
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -18,7 +22,11 @@ export let provider = Slate.create({
     listLocations,
     listPartners,
     listAttributes,
-    getTeam
+    getTeam,
+    getItem,
+    manageItem,
+    getTransaction,
+    manageTransaction
   ],
   triggers: []
 });

@@ -48,7 +48,8 @@ export let geocodeReverseTool = SlateTool.create(spec, {
           abbr: z.string().describe('Timezone abbreviation'),
           offset: z.string().describe('UTC offset')
         })
-        .describe('Timezone information')
+        .describe('Timezone information'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -65,27 +66,28 @@ export let geocodeReverseTool = SlateTool.create(spec, {
       zoom: ctx.input.zoom
     });
 
-    let tz = result.timezone ?? {};
+    let tz = result.timezone;
 
     return {
       output: {
-        found: result.found ?? false,
-        latitude: result.latitude ?? 0,
-        longitude: result.longitude ?? 0,
-        address: result.address ?? '',
-        city: result.city ?? '',
-        state: result.state ?? '',
-        postalCode: result.postalCode ?? '',
-        country: result.country ?? '',
-        countryCode: result.countryCode ?? '',
-        continentCode: result.continentCode ?? '',
-        locationType: result.locationType ?? '',
-        buildingType: result.buildingType ?? '',
+        raw: result.raw,
+        found: result.found,
+        latitude: result.latitude,
+        longitude: result.longitude,
+        address: result.address,
+        city: result.city,
+        state: result.state,
+        postalCode: result.postalCode,
+        country: result.country,
+        countryCode: result.countryCode,
+        continentCode: result.continentCode,
+        locationType: result.locationType,
+        buildingType: result.buildingType,
         timezone: {
-          timezoneId: tz.id ?? '',
-          name: tz.name ?? '',
-          abbr: tz.abbr ?? '',
-          offset: tz.offset ?? ''
+          timezoneId: tz.id,
+          name: tz.name,
+          abbr: tz.abbr,
+          offset: tz.offset
         }
       },
       message: result.found

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,9 +27,22 @@ export let exportLayer = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getLayerExportLink(ctx.input.mapId, ctx.input.layerId);
 
+    if (!result.export_link) {
+      throw createApiServiceError(
+        'Felt did not return a layer export link. Try the export again.'
+      );
+    }
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.export_link,
+      refreshReference: { mapId: ctx.input.mapId, layerId: ctx.input.layerId },
+      // Felt does not document a link lifetime. Regenerate at the next download.
+      refreshAt: new Date().toISOString()
+    });
+
     return {
       output: {
-        downloadUrl: result.url ?? result.download_url ?? result
+        downloadUrl: result.export_link
       },
       message: `Export link generated for layer \`${ctx.input.layerId}\`.`
     };

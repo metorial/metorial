@@ -1,4 +1,5 @@
 export * from './create-attribute';
+export { getAttributeTemplatesTool } from './get-attribute-templates';
 export * from './get-attribute-values';
 export * from './get-attributes';
 export * from './get-averages';

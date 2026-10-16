@@ -1,18 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bookmarkSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let bookmarkSchema = z.object({
-  href: z.string().describe('URL of the bookmark'),
-  description: z.string().describe('Title of the bookmark'),
-  extended: z.string().describe('Extended notes'),
-  hash: z.string().describe('MD5 hash of the URL'),
-  tag: z.string().describe('Space-separated tags'),
-  time: z.string().describe('ISO 8601 timestamp of when the bookmark was created'),
-  shared: z.string().describe('Whether the bookmark is public ("yes" or "no")'),
-  toread: z.string().describe('Whether the bookmark is marked as unread ("yes" or "no")')
-});
 
 export let listRecentBookmarks = SlateTool.create(spec, {
   name: 'List Recent Bookmarks',
@@ -25,7 +15,7 @@ export let listRecentBookmarks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tag: z.string().optional().describe('Filter by tag (up to 3 tags, space-separated)'),
+      tag: z.string().optional().describe('Filter by tag'),
       count: z
         .number()
         .optional()
@@ -34,9 +24,10 @@ export let listRecentBookmarks = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      date: z.string().describe('Timestamp of the response'),
-      user: z.string().describe('Username of the bookmark owner'),
-      posts: z.array(bookmarkSchema).describe('List of recent bookmarks')
+      date: z.string().optional().describe('Timestamp of the response'),
+      user: z.string().optional().describe('Username of the bookmark owner'),
+      posts: z.array(bookmarkSchema).describe('List of recent bookmarks'),
+      raw: z.unknown().describe('Original provider response')
     })
   )
   .handleInvocation(async ctx => {

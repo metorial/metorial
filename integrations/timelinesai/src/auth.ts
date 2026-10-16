@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let axios = createAxios({
-  baseURL: 'https://app.timelines.ai/integrations/api'
-});
+import { Client, requireArray } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,7 +14,7 @@ export let auth = SlateAuth.create()
     key: 'api_token',
 
     inputSchema: z.object({
-      token: z.string().describe('TimelinesAI API token from Settings > API Access')
+      token: z.string().describe('TimelinesAI API token from Integrations > Public API')
     }),
 
     getOutput: async ctx => {
@@ -29,13 +26,9 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await axios.get('/workspace/teammates', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let teammates = response.data?.data?.teammates || [];
+      let client = new Client({ token: ctx.output.token });
+      let response = await client.getWorkspaceTeammates();
+      let teammates = requireArray(response?.data?.teammates, 'teammates');
       let owner = teammates.find((t: any) => t.role === 'owner') || teammates[0];
 
       return {

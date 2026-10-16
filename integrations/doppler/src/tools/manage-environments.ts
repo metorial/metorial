@@ -1,9 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
+import { projectInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let environmentSchema = z.object({
+  raw: z.unknown().optional().describe('Original metadata returned by Doppler'),
   environmentId: z.string().optional().describe('Environment identifier (slug)'),
   name: z.string().optional().describe('Environment display name'),
   project: z.string().optional().describe('Project the environment belongs to'),
@@ -29,7 +31,7 @@ export let manageEnvironments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      project: z.string().describe('Project slug'),
+      project: projectInput,
       action: z
         .enum(['list', 'get', 'create', 'rename', 'delete'])
         .describe('Action to perform'),
@@ -54,6 +56,7 @@ export let manageEnvironments = SlateTool.create(spec, {
     let client = new DopplerClient({ token: ctx.auth.token });
 
     let mapEnv = (e: any) => ({
+      raw: e,
       environmentId: e.id || e.slug,
       name: e.name,
       project: e.project,
@@ -71,7 +74,8 @@ export let manageEnvironments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.environment) throw new Error('environment is required for "get" action');
+      if (!ctx.input.environment)
+        throw createApiServiceError('environment is required for "get" action');
 
       let env = await client.getEnvironment(ctx.input.project, ctx.input.environment);
 
@@ -82,8 +86,8 @@ export let manageEnvironments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for "create" action');
-      if (!ctx.input.slug) throw new Error('slug is required for "create" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "create" action');
+      if (!ctx.input.slug) throw createApiServiceError('slug is required for "create" action');
 
       let env = await client.createEnvironment(
         ctx.input.project,
@@ -99,7 +103,7 @@ export let manageEnvironments = SlateTool.create(spec, {
 
     if (ctx.input.action === 'rename') {
       if (!ctx.input.environment)
-        throw new Error('environment is required for "rename" action');
+        throw createApiServiceError('environment is required for "rename" action');
 
       let env = await client.renameEnvironment(
         ctx.input.project,
@@ -116,7 +120,7 @@ export let manageEnvironments = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.environment)
-        throw new Error('environment is required for "delete" action');
+        throw createApiServiceError('environment is required for "delete" action');
 
       await client.deleteEnvironment(ctx.input.project, ctx.input.environment);
 
@@ -126,6 +130,6 @@ export let manageEnvironments = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

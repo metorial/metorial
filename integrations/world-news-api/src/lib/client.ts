@@ -1,4 +1,12 @@
-import { createAxios } from 'slates';
+import { ServiceError } from '@lowerdeck/error';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  getResponseHeaderValue
+} from 'slates';
+import { z } from 'zod';
+import { assertPublicData, redactPublicData, validateWebsiteUrl } from './privacy';
 
 export interface SearchNewsParams {
   text?: string;
@@ -20,138 +28,211 @@ export interface SearchNewsParams {
   number?: number;
 }
 
-export interface NewsArticle {
-  id: number;
-  title: string;
-  text: string;
-  summary: string;
-  url: string;
-  image: string | null;
-  video: string | null;
-  publish_date: string;
-  authors: string[];
-  category: string | null;
-  language: string;
-  source_country: string;
-  sentiment: number | null;
-}
+let articleSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  text: z.string(),
+  summary: z.string(),
+  url: z.string(),
+  image: z.string().nullable(),
+  video: z.string().nullable(),
+  publish_date: z.string(),
+  authors: z.array(z.string()),
+  category: z.string().nullable(),
+  language: z.string(),
+  source_country: z.string(),
+  sentiment: z.number().nullable()
+});
 
-export interface SearchNewsResponse {
-  offset: number;
-  number: number;
-  available: number;
-  news: NewsArticle[];
-}
+let topArticleSchema = articleSchema.pick({ id: true, title: true, url: true }).extend({
+  text: z.string().nullable().optional(),
+  summary: z.string().nullable().optional(),
+  image: z.string().nullable().optional(),
+  publish_date: z.string().nullable().optional(),
+  authors: z.array(z.string()).optional(),
+  sentiment: z.number().nullable().optional()
+});
 
-export interface TopNewsCluster {
-  news: NewsArticle[];
-}
+let extractSchema = z.object({
+  title: z.string(),
+  text: z.string(),
+  url: z.string(),
+  image: z.string().nullable(),
+  images: z.array(
+    z.object({
+      url: z.string(),
+      width: z.number().nullable(),
+      height: z.number().nullable(),
+      caption: z.string().nullable().optional(),
+      title: z.string().nullable().optional()
+    })
+  ),
+  video: z.string().nullable(),
+  videos: z.array(
+    z.object({
+      url: z.string(),
+      summary: z.string().nullable(),
+      duration: z.number().nullable(),
+      thumbnail: z.string().nullable()
+    })
+  ),
+  publish_date: z.string(),
+  authors: z.array(z.string()),
+  language: z.string(),
+  source_country: z.string().optional(),
+  sentiment: z.number().nullable().optional()
+});
 
-export interface TopNewsResponse {
-  top_news: TopNewsCluster[];
-  language: string;
-  country: string;
-}
-
-export interface FrontPageResponse {
-  front_page: {
-    name: string;
-    date: string;
-    language: string;
-    country: string;
-    image: string;
-  };
-}
-
-export interface ExtractNewsResponse {
-  title: string;
-  text: string;
-  url: string;
-  image: string | null;
-  images: Array<{
-    url: string;
-    width: number | null;
-    height: number | null;
-    caption: string | null;
-  }>;
-  video: string | null;
-  videos: Array<{
-    url: string;
-    summary: string | null;
-    duration: number | null;
-    thumbnail: string | null;
-  }>;
-  publish_date: string;
-  authors: string[];
-  language: string;
-  source_country: string;
-  sentiment: number | null;
-}
-
-export interface NewsSource {
-  url: string;
-  name: string;
-  language: string;
-}
-
-export interface SearchSourcesResponse {
-  available: number;
-  sources: NewsSource[];
-}
-
-export interface GeoCoordinatesResponse {
-  latitude: number;
-  longitude: number;
-  city: string | null;
-}
-
-export interface ExtractLinksResponse {
-  news_links: string[];
-}
-
-export interface RetrieveNewsResponse {
-  news: NewsArticle[];
-}
+export let quotaSchema = z.object({
+  requestPoints: z.number().optional().describe('Points used by this API request'),
+  usedToday: z.number().optional().describe('Points used today; resets at midnight UTC'),
+  remainingToday: z.number().optional().describe('Points remaining today')
+});
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
+  private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide your World News API key.');
+    }
+    this.token = config.token;
     this.axios = createAxios({
       baseURL: 'https://api.worldnewsapi.com',
-      headers: {
-        'x-api-key': config.token
-      }
+      headers: { 'x-api-key': config.token }
     });
   }
 
-  async searchNews(params: SearchNewsParams): Promise<SearchNewsResponse> {
-    let queryParams: Record<string, string | number> = {};
+  private async get<T extends Record<string, unknown>>(
+    path: string,
+    params: Record<string, unknown>,
+    schema: z.ZodType<T>
+  ) {
+    let response: Awaited<ReturnType<typeof this.axios.get<unknown>>>;
+    try {
+      response = await this.axios.get<unknown>(path, { params });
+    } catch (error) {
+      if (error instanceof ServiceError) throw error;
+      throw buildApiServiceError(error, {
+        providerLabel: 'World News API',
+        reason: 'world_news_api_error',
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+        extractUpstreamCode: (input, response, helpers) => {
+          let body = helpers.isRecord(response?.data) ? response.data : undefined;
+          let nestedError = helpers.isRecord(body?.error) ? body.error : undefined;
+          let data =
+            helpers.isRecord(input) && helpers.isRecord(input.data) ? input.data : undefined;
+          let upstream = helpers.isRecord(data?.upstream) ? data.upstream : undefined;
+          let code = [body?.code, body?.error_code, nestedError?.code, upstream?.code].find(
+            value =>
+              (typeof value === 'string' && value.trim() !== '') ||
+              (typeof value === 'number' && Number.isFinite(value))
+          );
+          if (code === undefined) return undefined;
+          return String(redactPublicData(String(code), this.token));
+        },
+        // HTTP clients can retain request headers in the original error.
+        parent: {},
+        formatMessage: parts => {
+          let safe = redactPublicData(`${parts.statusLabel}${parts.message}`, this.token);
+          return `World News API request failed: ${safe}`;
+        }
+      });
+    }
 
-    if (params.text) queryParams.text = params.text;
-    if (params.textMatchIndexes) queryParams['text-match-indexes'] = params.textMatchIndexes;
-    if (params.sourceCountry) queryParams['source-country'] = params.sourceCountry;
-    if (params.language) queryParams.language = params.language;
-    if (params.minSentiment !== undefined) queryParams['min-sentiment'] = params.minSentiment;
-    if (params.maxSentiment !== undefined) queryParams['max-sentiment'] = params.maxSentiment;
-    if (params.earliestPublishDate)
-      queryParams['earliest-publish-date'] = params.earliestPublishDate;
-    if (params.latestPublishDate)
-      queryParams['latest-publish-date'] = params.latestPublishDate;
-    if (params.newsSources) queryParams['news-sources'] = params.newsSources;
-    if (params.authors) queryParams.authors = params.authors;
-    if (params.categories) queryParams.categories = params.categories;
-    if (params.entities) queryParams.entities = params.entities;
-    if (params.locationFilter) queryParams['location-filter'] = params.locationFilter;
-    if (params.sort) queryParams.sort = params.sort;
-    if (params.sortDirection) queryParams['sort-direction'] = params.sortDirection;
-    if (params.offset !== undefined) queryParams.offset = params.offset;
-    if (params.number !== undefined) queryParams.number = params.number;
+    let parsed = schema.safeParse(response.data);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'World News API returned an invalid response. Required article or response data is missing or has an unexpected type.',
+        { reason: 'invalid_provider_response' }
+      );
+    }
+    assertPublicData(parsed.data, this.token);
+    let quota: z.infer<typeof quotaSchema> = {};
+    for (let [key, header] of [
+      ['requestPoints', 'X-API-Quota-Request'],
+      ['usedToday', 'X-API-Quota-Used'],
+      ['remainingToday', 'X-API-Quota-Left']
+    ] as const) {
+      let value = getResponseHeaderValue(response.headers, header);
+      if (value !== undefined && value.trim() !== '' && Number.isFinite(Number(value))) {
+        quota[key] = Number(value);
+      }
+    }
+    return {
+      ...parsed.data,
+      raw: redactPublicData(response.data, this.token),
+      ...(Object.keys(quota).length ? { quota } : {})
+    };
+  }
 
-    let response = await this.axios.get<SearchNewsResponse>('/search-news', {
-      params: queryParams
-    });
-    return response.data;
+  async searchNews(params: SearchNewsParams) {
+    let filters = [
+      params.text,
+      params.sourceCountry,
+      params.language,
+      params.minSentiment,
+      params.maxSentiment,
+      params.earliestPublishDate,
+      params.latestPublishDate,
+      params.newsSources,
+      params.authors,
+      params.categories,
+      params.entities,
+      params.locationFilter
+    ];
+    if (!filters.some(value => value !== undefined && value !== '')) {
+      throw createApiServiceError(
+        'Provide at least one news search filter, such as text or language.'
+      );
+    }
+    for (let [name, value] of [
+      ['offset', params.offset],
+      ['maxResults', params.number]
+    ] as const) {
+      if (value !== undefined && !Number.isInteger(value)) {
+        throw createApiServiceError(`${name} must be a whole number.`);
+      }
+    }
+    if (
+      params.minSentiment !== undefined &&
+      params.maxSentiment !== undefined &&
+      params.minSentiment > params.maxSentiment
+    ) {
+      throw createApiServiceError('minSentiment must not exceed maxSentiment.');
+    }
+    let queryParams = Object.fromEntries(
+      Object.entries({
+        text: params.text,
+        'text-match-indexes': params.textMatchIndexes,
+        'source-country': params.sourceCountry,
+        language: params.language,
+        'min-sentiment': params.minSentiment,
+        'max-sentiment': params.maxSentiment,
+        'earliest-publish-date': params.earliestPublishDate,
+        'latest-publish-date': params.latestPublishDate,
+        'news-sources': params.newsSources,
+        authors: params.authors,
+        categories: params.categories,
+        entities: params.entities,
+        'location-filter': params.locationFilter,
+        sort: params.sort,
+        'sort-direction': params.sortDirection,
+        offset: params.offset,
+        number: params.number
+      }).filter(([, value]) => value !== undefined)
+    );
+    return this.get(
+      '/search-news',
+      queryParams,
+      z.object({
+        offset: z.number().int(),
+        number: z.number().int(),
+        available: z.number().int(),
+        news: z.array(articleSchema)
+      })
+    );
   }
 
   async getTopNews(params: {
@@ -160,89 +241,120 @@ export class Client {
     date?: string;
     headlinesOnly?: boolean;
     maxNewsPerCluster?: number;
-  }): Promise<TopNewsResponse> {
-    let queryParams: Record<string, string | number | boolean> = {
-      'source-country': params.sourceCountry,
-      language: params.language
-    };
-
-    if (params.date) queryParams.date = params.date;
-    if (params.headlinesOnly !== undefined)
-      queryParams['headlines-only'] = params.headlinesOnly;
-    if (params.maxNewsPerCluster !== undefined)
-      queryParams['max-news-per-cluster'] = params.maxNewsPerCluster;
-
-    let response = await this.axios.get<TopNewsResponse>('/top-news', {
-      params: queryParams
-    });
-    return response.data;
+  }) {
+    if (
+      params.maxNewsPerCluster !== undefined &&
+      !Number.isInteger(params.maxNewsPerCluster)
+    ) {
+      throw createApiServiceError('maxArticlesPerCluster must be a whole number.');
+    }
+    let result = await this.get(
+      '/top-news',
+      {
+        'source-country': params.sourceCountry,
+        language: params.language,
+        date: params.date,
+        'headlines-only': params.headlinesOnly
+      },
+      z.object({
+        top_news: z.array(z.object({ news: z.array(topArticleSchema) })),
+        language: z.string(),
+        country: z.string()
+      })
+    );
+    // The documented API has no per-cluster limit parameter.
+    if (params.maxNewsPerCluster !== undefined) {
+      result.top_news = result.top_news.map(cluster => ({
+        news: cluster.news.slice(0, params.maxNewsPerCluster)
+      }));
+    }
+    return result;
   }
 
-  async retrieveNews(ids: number[]): Promise<RetrieveNewsResponse> {
-    let response = await this.axios.get<RetrieveNewsResponse>('/retrieve-news', {
-      params: {
-        ids: ids.join(',')
+  async retrieveNews(ids: number[]) {
+    if (!ids.every(Number.isInteger)) {
+      throw createApiServiceError('Article IDs must be whole numbers.');
+    }
+    return this.get(
+      '/retrieve-news',
+      { ids: ids.join(',') },
+      z.object({ news: z.array(articleSchema) })
+    );
+  }
+
+  async extractNews(params: { url: string; analyze?: boolean }) {
+    validateWebsiteUrl(params.url, this.token);
+    return this.get('/extract-news', params, extractSchema);
+  }
+
+  async extractNewsLinks(params: { url: string; prefix?: string; subDomain?: boolean }) {
+    validateWebsiteUrl(params.url, this.token);
+    let result = await this.get(
+      '/extract-news-links',
+      { url: params.url },
+      z.object({
+        news_links: z.array(z.string())
+      })
+    );
+    // Apply the established optional filters locally rather than sending undocumented parameters.
+    result.news_links = result.news_links.filter(link => {
+      if (params.prefix !== undefined && !link.startsWith(params.prefix)) return false;
+      if (params.subDomain === false) {
+        try {
+          return new URL(link).hostname === new URL(params.url).hostname;
+        } catch {
+          throw createApiServiceError('World News API returned an invalid article link.');
+        }
       }
+      return true;
     });
-    return response.data;
+    return result;
   }
 
-  async extractNews(params: { url: string; analyze?: boolean }): Promise<ExtractNewsResponse> {
-    let queryParams: Record<string, string | boolean> = {
-      url: params.url
-    };
-    if (params.analyze !== undefined) queryParams.analyze = params.analyze;
-
-    let response = await this.axios.get<ExtractNewsResponse>('/extract-news', {
-      params: queryParams
-    });
-    return response.data;
+  async searchNewsSources(name: string) {
+    return this.get(
+      '/search-news-sources',
+      { name },
+      z.object({
+        available: z.number().int(),
+        sources: z.array(z.object({ url: z.string(), name: z.string(), language: z.string() }))
+      })
+    );
   }
 
-  async extractNewsLinks(params: {
-    url: string;
-    prefix?: string;
-    subDomain?: boolean;
-  }): Promise<ExtractLinksResponse> {
-    let queryParams: Record<string, string | boolean> = {
-      url: params.url
-    };
-    if (params.prefix) queryParams.prefix = params.prefix;
-    if (params.subDomain !== undefined) queryParams['sub-domain'] = params.subDomain;
-
-    let response = await this.axios.get<ExtractLinksResponse>('/extract-news-links', {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  async searchNewsSources(name: string): Promise<SearchSourcesResponse> {
-    let response = await this.axios.get<SearchSourcesResponse>('/search-news-sources', {
-      params: { name }
-    });
-    return response.data;
-  }
-
-  async getGeoCoordinates(location: string): Promise<GeoCoordinatesResponse> {
-    let response = await this.axios.get<GeoCoordinatesResponse>('/geo-coordinates', {
-      params: { location }
-    });
-    return response.data;
+  async getGeoCoordinates(location: string) {
+    return this.get(
+      '/geo-coordinates',
+      { location },
+      z.object({
+        latitude: z.number(),
+        longitude: z.number(),
+        city: z.string().nullable()
+      })
+    );
   }
 
   async retrieveFrontPage(params: {
     sourceCountry?: string;
     sourceName?: string;
     date?: string;
-  }): Promise<FrontPageResponse> {
-    let queryParams: Record<string, string> = {};
-    if (params.sourceCountry) queryParams['source-country'] = params.sourceCountry;
-    if (params.sourceName) queryParams['source-name'] = params.sourceName;
-    if (params.date) queryParams.date = params.date;
-
-    let response = await this.axios.get<FrontPageResponse>('/retrieve-front-page', {
-      params: queryParams
-    });
-    return response.data;
+  }) {
+    return this.get(
+      '/retrieve-front-page',
+      {
+        'source-country': params.sourceCountry,
+        'source-name': params.sourceName,
+        date: params.date
+      },
+      z.object({
+        front_page: z.object({
+          name: z.string(),
+          date: z.string(),
+          language: z.string(),
+          country: z.string(),
+          image: z.string()
+        })
+      })
+    );
   }
 }

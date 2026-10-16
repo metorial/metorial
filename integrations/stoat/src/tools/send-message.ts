@@ -35,7 +35,7 @@ let masqueradeSchema = z
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a message to a Revolt channel. Supports text content, embeds, file attachments (by ID), replies, and masquerade (overriding displayed username/avatar). Can be used for both server channels and direct messages.`,
+  description: `Send a message to a Stoat channel. Supports text content, embeds, file attachments (by ID), replies, and masquerade (overriding displayed username/avatar). Can be used for both server channels and direct messages.`,
   tags: {
     destructive: false,
     readOnly: false

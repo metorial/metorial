@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deletePass = SlateTool.create(spec, {
   name: 'Delete Pass',
   key: 'delete_pass',
-  description: `Permanently delete a pass. This action cannot be undone. The pass will be removed from all wallets on the next update cycle.`,
+  description: `Permanently delete a pass. This action cannot be undone.`,
   tags: {
     destructive: true
   }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageComments = SlateTool.create(spec, {
   key: 'manage_comments',
   description: `Export, resolve, or delete comments on a Felt map. Use this to retrieve all comments in JSON, CSV, or GeoJSON format, resolve a specific comment thread, or permanently delete a comment.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -39,6 +39,18 @@ export let manageComments = SlateTool.create(spec, {
     if (ctx.input.action === 'export') {
       let format = ctx.input.exportFormat ?? 'json';
       let comments = await client.exportComments(ctx.input.mapId, format);
+      await ctx.addAttachment({
+        type: 'url',
+        url: `https://felt.com/api/v2/maps/${encodeURIComponent(ctx.input.mapId)}/comments/export`,
+        headers: { Authorization: `Bearer ${ctx.auth.token}` },
+        query: { format },
+        mimeType:
+          format === 'csv'
+            ? 'text/csv'
+            : format === 'geojson'
+              ? 'application/geo+json'
+              : 'application/json'
+      });
       return {
         output: { action: 'exported', comments, commentId: null },
         message: `Exported comments from map \`${ctx.input.mapId}\` in **${format}** format.`
@@ -46,7 +58,7 @@ export let manageComments = SlateTool.create(spec, {
     }
 
     if (!ctx.input.commentId) {
-      throw new Error('commentId is required for resolve and delete actions');
+      throw createApiServiceError('commentId is required for resolve and delete actions');
     }
 
     if (ctx.input.action === 'resolve') {

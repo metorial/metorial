@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Memberstack
 
-Manage members, authentication, and membership plans for websites and web applications. Create, read, update, and delete members with custom fields, metadata, and JSON data. Assign or remove free plans from members. Verify JWT authentication tokens server-side. Track member and plan events via webhooks including member creation, updates, deletions, and plan connection changes. Integrates with Stripe for subscription payment processing.
+Manage Memberstack members, free plan connections, authentication tokens, and Data Tables. Create members with passwords or enabled passwordless authentication, inspect team memberships, update profile data, and query or modify data records. Connect with a secret key from Dev Tools → Keys & IDs in the Memberstack dashboard.
+
+See [the integration reference](docs/SPEC.md) for tools, pagination, and provider limitations.
 
 ## License
 

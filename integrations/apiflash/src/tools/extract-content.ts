@@ -7,7 +7,7 @@ export let extractContent = SlateTool.create(spec, {
   name: 'Extract Page Content',
   key: 'extract_page_content',
   description: `Extract HTML and/or text content from a webpage, along with a screenshot.
-Renders the page using a full Chrome browser and returns URLs to the extracted HTML, extracted text, and the screenshot.
+Renders the page using a full Chrome browser and returns downloadable HTML, text, and screenshot files with their original URLs.
 Useful for scraping content from JavaScript-rendered pages that require a real browser.`,
   instructions: [
     'The url must include the protocol (http:// or https://).',
@@ -15,7 +15,7 @@ Useful for scraping content from JavaScript-rendered pages that require a real b
   ],
   constraints: [
     'Rate limited to 20 requests/second with a 400-request burst capacity.',
-    'Each call counts against your API quota.'
+    'New successful captures count against your API quota; cached and failed captures do not.'
   ],
   tags: {
     destructive: false,
@@ -42,6 +42,14 @@ Useful for scraping content from JavaScript-rendered pages that require a real b
         .enum(['dom_loaded', 'page_loaded', 'network_idle'])
         .optional()
         .describe('Page load event to wait for. Defaults to network_idle'),
+      waitUntilTimeout: z
+        .number()
+        .min(1)
+        .max(30)
+        .optional()
+        .describe(
+          'Maximum seconds to wait for waitUntil (1-30). Captures loaded content when this expires. Defaults to 30'
+        ),
       delay: z
         .number()
         .min(0)
@@ -52,7 +60,7 @@ Useful for scraping content from JavaScript-rendered pages that require a real b
       headers: z
         .string()
         .optional()
-        .describe('Custom HTTP headers as semicolon-separated key:value pairs'),
+        .describe('Custom HTTP headers as semicolon-separated key=value pairs'),
       cookies: z
         .string()
         .optional()
@@ -67,7 +75,8 @@ Useful for scraping content from JavaScript-rendered pages that require a real b
     z.object({
       screenshotUrl: z.string().describe('URL of the captured screenshot'),
       extractedHtmlUrl: z.string().optional().describe('URL of the extracted HTML file'),
-      extractedTextUrl: z.string().optional().describe('URL of the extracted text file')
+      extractedTextUrl: z.string().optional().describe('URL of the extracted text file'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -79,6 +88,7 @@ Useful for scraping content from JavaScript-rendered pages that require a real b
       extractText: ctx.input.extractText,
       waitFor: ctx.input.waitFor,
       waitUntil: ctx.input.waitUntil,
+      waitUntilTimeout: ctx.input.waitUntilTimeout,
       delay: ctx.input.delay,
       js: ctx.input.js,
       headers: ctx.input.headers,
@@ -89,6 +99,22 @@ Useful for scraping content from JavaScript-rendered pages that require a real b
       fresh: ctx.input.fresh
     });
 
+    await ctx.addAttachment({ type: 'url', url: result.url, mimeType: 'image/jpeg' });
+    if (result.extractedHtml) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.extractedHtml,
+        mimeType: 'text/html'
+      });
+    }
+    if (result.extractedText) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.extractedText,
+        mimeType: 'text/plain'
+      });
+    }
+
     let parts: string[] = [];
     if (result.extractedHtml) parts.push(`[HTML](${result.extractedHtml})`);
     if (result.extractedText) parts.push(`[Text](${result.extractedText})`);
@@ -98,7 +124,8 @@ Useful for scraping content from JavaScript-rendered pages that require a real b
       output: {
         screenshotUrl: result.url,
         extractedHtmlUrl: result.extractedHtml,
-        extractedTextUrl: result.extractedText
+        extractedTextUrl: result.extractedText,
+        raw: result.raw
       },
       message: `Content extracted from **${ctx.input.url}**.${contentLinks}`
     };

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BartClient } from '../lib/client';
+import { bartRecord, bartRecords, bartStrings, bartText } from '../lib/response';
 import { spec } from '../spec';
 
 let stationSummarySchema = z.object({
@@ -36,6 +37,12 @@ let stationAccessSchema = z.object({
   hasBikeRacks: z.boolean().describe('Whether bike racks are available'),
   hasBikeStation: z.boolean().describe('Whether a bike station is available'),
   hasLockers: z.boolean().describe('Whether lockers are available'),
+  hasBikeShare: z.boolean().optional().describe('Whether bike sharing is available'),
+  elevatorDescription: z
+    .string()
+    .optional()
+    .describe('Elevator locations and accessible station routes'),
+  bikeShareDescription: z.string().optional().describe('Nearby bike sharing information'),
   entering: z.string().describe('Directions for entering the station'),
   exiting: z.string().describe('Directions for exiting the station'),
   parking: z.string().describe('Parking information'),
@@ -89,104 +96,82 @@ export let getStationInfo = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new BartClient({ token: ctx.auth.token });
-
+    let mapSummary = (s: Record<string, unknown>) => ({
+      stationName: bartText(s.name),
+      stationAbbr: bartText(s.abbr),
+      latitude: bartText(s.gtfs_latitude),
+      longitude: bartText(s.gtfs_longitude),
+      address: bartText(s.address),
+      city: bartText(s.city),
+      county: bartText(s.county),
+      state: bartText(s.state),
+      zipcode: bartText(s.zipcode)
+    });
     if (!ctx.input.stationAbbr) {
+      if (ctx.input.includeAccess) {
+        throw createApiServiceError(
+          'Provide stationAbbr to include station access information. Call get_station_info without includeAccess to find station abbreviations.'
+        );
+      }
       let result = await client.getStations();
-      let stationData = result?.stations?.station;
-      let stations = Array.isArray(stationData)
-        ? stationData
-        : stationData
-          ? [stationData]
-          : [];
-
-      let mappedStations = stations.map((s: any) => ({
-        stationName: s.name || '',
-        stationAbbr: s.abbr || '',
-        latitude: s.gtfs_latitude || '',
-        longitude: s.gtfs_longitude || '',
-        address: s.address || '',
-        city: s.city || '',
-        county: s.county || '',
-        state: s.state || '',
-        zipcode: s.zipcode || ''
-      }));
-
+      let stations = bartRecords(bartRecord(result.stations).station).map(mapSummary);
       return {
-        output: { stations: mappedStations },
-        message: `Retrieved **${mappedStations.length}** BART stations.`
+        output: { stations },
+        message: `Retrieved **${stations.length}** BART stations.`
       };
     }
-
-    let infoResult = await client.getStationInfo(ctx.input.stationAbbr);
-    let stn = infoResult?.stations?.station;
-
-    let extractArray = (data: any): string[] => {
-      if (!data) return [];
-      if (Array.isArray(data)) return data;
-      if (typeof data === 'object' && data.route) {
-        return Array.isArray(data.route) ? data.route : [data.route];
-      }
-      if (typeof data === 'object' && data.platform) {
-        return Array.isArray(data.platform) ? data.platform : [data.platform];
-      }
-      return [String(data)];
-    };
-
-    let extractCdata = (data: any): string => {
-      if (!data) return '';
-      if (typeof data === 'string') return data;
-      if (typeof data === 'object' && data['#cdata-section'] !== undefined)
-        return data['#cdata-section'];
-      return '';
-    };
-
+    let result = await client.getStationInfo(ctx.input.stationAbbr);
+    let stn = bartRecords(bartRecord(result.stations).station)[0];
+    if (!stn) {
+      throw createApiServiceError(
+        'BART did not return the requested station. Call get_station_info without stationAbbr to discover valid stations.'
+      );
+    }
     let station = {
-      stationName: stn?.name || '',
-      stationAbbr: stn?.abbr || '',
-      latitude: stn?.gtfs_latitude || '',
-      longitude: stn?.gtfs_longitude || '',
-      address: stn?.address || '',
-      city: stn?.city || '',
-      county: stn?.county || '',
-      state: stn?.state || '',
-      zipcode: stn?.zipcode || '',
-      northRoutes: extractArray(stn?.north_routes),
-      southRoutes: extractArray(stn?.south_routes),
-      northPlatforms: extractArray(stn?.north_platforms),
-      southPlatforms: extractArray(stn?.south_platforms),
-      platformInfo: extractCdata(stn?.platform_info) || '',
-      intro: extractCdata(stn?.intro) || '',
-      crossStreet: extractCdata(stn?.cross_street) || '',
-      food: extractCdata(stn?.food) || '',
-      shopping: extractCdata(stn?.shopping) || '',
-      attraction: extractCdata(stn?.attraction) || '',
-      link: extractCdata(stn?.link) || ''
+      ...mapSummary(stn),
+      northRoutes: bartStrings(bartRecord(stn.north_routes).route),
+      southRoutes: bartStrings(bartRecord(stn.south_routes).route),
+      northPlatforms: bartStrings(bartRecord(stn.north_platforms).platform),
+      southPlatforms: bartStrings(bartRecord(stn.south_platforms).platform),
+      platformInfo: bartText(stn.platform_info),
+      intro: bartText(stn.intro),
+      crossStreet: bartText(stn.cross_street),
+      food: bartText(stn.food),
+      shopping: bartText(stn.shopping),
+      attraction: bartText(stn.attraction),
+      link: bartText(stn.link)
     };
-
-    let output: any = { station };
-
+    let access: z.infer<typeof stationAccessSchema> | undefined;
     if (ctx.input.includeAccess) {
       let accessResult = await client.getStationAccess(ctx.input.stationAbbr);
-      let acc = accessResult?.stations?.station;
-
-      output.access = {
-        stationName: acc?.name || '',
-        stationAbbr: acc?.abbr || '',
-        hasParking: acc?.['@parking_flag'] === '1',
-        hasBikeRacks: acc?.['@bike_flag'] === '1',
-        hasBikeStation: acc?.['@bike_station_flag'] === '1',
-        hasLockers: acc?.['@locker_flag'] === '1',
-        entering: extractCdata(acc?.entering) || '',
-        exiting: extractCdata(acc?.exiting) || '',
-        parking: extractCdata(acc?.parking) || '',
-        lockers: extractCdata(acc?.lockers) || '',
-        transitInfo: extractCdata(acc?.transit_info) || '',
-        link: acc?.link || ''
+      let acc = bartRecords(bartRecord(accessResult.stations).station)[0];
+      if (!acc)
+        throw createApiServiceError(
+          'BART did not return access information for this station.'
+        );
+      access = {
+        stationName: bartText(acc.name),
+        stationAbbr: bartText(acc.abbr),
+        hasParking: bartText(acc['@parking_flag']) === '1',
+        hasBikeRacks: bartText(acc['@bike_flag']) === '1',
+        hasBikeStation: bartText(acc['@bike_station_flag']) === '1',
+        hasLockers: bartText(acc['@locker_flag']) === '1',
+        hasBikeShare:
+          acc['@bike_share_flag'] === undefined
+            ? undefined
+            : bartText(acc['@bike_share_flag']) === '1',
+        elevatorDescription: bartText(acc.elevator_description),
+        bikeShareDescription: bartText(acc.bike_share_description),
+        entering: bartText(acc.entering),
+        exiting: bartText(acc.exiting),
+        parking: bartText(acc.parking),
+        lockers: bartText(acc.lockers),
+        transitInfo: bartText(acc.transit_info),
+        link: bartText(acc.link)
       };
     }
-
     return {
-      output,
+      output: { station, ...(access ? { access } : {}) },
       message: `Retrieved details for **${station.stationName}** (${station.stationAbbr})${ctx.input.includeAccess ? ' including access information' : ''}.`
     };
   })

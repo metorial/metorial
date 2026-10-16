@@ -1,175 +1,41 @@
-# Slates Specification for D2L Brightspace
-
-## Overview
-
-D2L Brightspace is a Learning Management System (LMS) used across K–12, higher education, and corporate training to deliver coursework, manage assignments, track grades, and support digital learning. Brightspace is a Learning Management System (LMS) used across K–12, higher education, and corporate training to deliver coursework, manage assignments, track progress, and support digital learning. It's built by D2L (Desire2Learn), a long-time education technology company focused on personalized, data-driven learning experiences. The platform provides a comprehensive REST API (historically known as the "Valence" API) for programmatic access to its features.
-
-## Authentication
-
-The Brightspace API provides developers with two authentication approaches: OAuth 2.0 and their own proprietary ID Key Auth. However, the legacy ID-Key authentication workflow has been deprecated as of Brightspace 20.23.1 (January 2023), and D2L encourages clients to move to using OAuth 2.0.
-
-### OAuth 2.0 (Recommended)
-
-Brightspace supports the **Authorization Code Grant** flow for user-context API access and the **Client Credentials Grant** (with Private Key JWT) for server-to-server authentication.
-
-**Authorization Code Grant:**
-
-1. Register your application via the Brightspace Admin Tools under "Manage Extensibility" → "OAuth 2.0" → "Register an app", providing an application name.
-2. Provide a Redirect URI and specify scopes. Scopes take the form of a space-delimited string: `group:resource:permissions` (e.g., `content:toc:read enrollment:orgunit:read core:*:*`).
-3. Use the Authorization Code Grant workflow with these endpoints:
-   - **Authorization endpoint:** `https://auth.brightspace.com/oauth2/auth`
-   - **Token endpoint:** `https://auth.brightspace.com/core/connect/token`
-4. Send your retrieved access token as a Bearer token in the HTTP `Authorization` header of each API call.
-5. API calls are made against the institution's Brightspace instance host (e.g., `https://myschool.brightspace.com`), which must be provided as a custom input.
-
-**Client Credentials Grant (Server-to-Server):**
-
-Brightspace supports server-to-server API authentication using the OAuth 2.0 Client Credentials grant with Client Assertion (Private Key JWT). This allows trusted integrations to call APIs without user interaction.
-
-**Required inputs:**
-
-- **Brightspace Instance URL** (e.g., `https://myschool.brightspace.com`) — the host for all API calls
-- **Client ID** and **Client Secret** — obtained from the Manage Extensibility tool after app registration
-- **Scopes** — defined during app registration, following the `group:resource:permissions` pattern
-
-### Legacy ID Key Auth (Deprecated)
-
-Uses an Instance URL, Application Key, and Application ID, which are received when an application is registered in Brightspace using the "Manage Extensibility" tool. Not recommended for new development.
-
-## Features
-
-### User Management
-
-Create, read, update, and delete user accounts. Manage user roles, profiles, demographics, and account settings. Look up user information and manage user accommodations.
-
-### Organization Structure
-
-Manage organizational units including departments, semesters, and other org unit types. Configure the hierarchical structure of the learning environment.
-
-### Course Management
-
-Create and manage course offerings and course templates. Handle course content including modules and topics, manage course files, and configure course-level settings.
-
-### Enrollments
-
-The Brightspace API allows apps to read, create, or modify a variety of resources in the user's Brightspace environment. Enroll and unenroll users in courses and other org units, manage auditor roles, and query enrollment status across the organization.
-
-### Grades and Assessments
-
-The Brightspace API can let your app send and update scores in the user's gradebook. Manage grade items, grade categories, and individual student grades. Work with rubrics and assessments. Supports reading and writing grade data.
-
-### Assignments (Dropboxes)
-
-Create and manage assignment dropbox folders. Submit and retrieve student submissions. Manage feedback on submissions.
-
-### Quizzes and Surveys
-
-Create and manage quizzes and surveys within courses. Configure quiz settings, questions, and manage quiz attempts and results.
-
-### Discussions
-
-Manage discussion forums, topics, and threads within courses. Create, read, update, and delete discussion content.
-
-### Course Content
-
-Apps can generate resources that appear in Brightspace. Content integration lets your app communicate with Brightspace. For example, a teacher can assign a lesson from an external app, which then sends information to Brightspace to generate and post it. Manage modules, topics, and content structure.
-
-### Calendar and Events
-
-Create and manage calendar events associated with courses and org units.
-
-### News / Announcements
-
-Create and manage news items (announcements) within courses or organization units.
-
-### Awards
-
-Manage awards (badges, certificates) including creating award definitions, associating awards with org units, and issuing awards to users.
-
-### Groups and Sections
-
-Create and manage groups and sections within courses for collaborative work and organizational purposes.
-
-### Learning Outcomes and Competencies
-
-Define and manage learning outcomes and competency structures. Associate outcomes with courses and activities.
-
-### ePortfolio
-
-Manage ePortfolio objects including artifacts, reflections, collections, presentations, learning objectives, and sharing. Supports data export and import of portfolio content.
-
-### Release Conditions and Checklists
-
-Configure release conditions to control content availability. Manage course checklists for student progress tracking.
-
-### Data Hub and Data Export
-
-Access bulk data exports through the Data Hub framework. Download full or differential data sets for reporting and analytics purposes.
-
-### LTI Integration
-
-Manage LTI (Learning Tools Interoperability) tool configurations, including both LTI Advantage and legacy LTI assets, for embedding external tools within the LMS.
-
-### SIS Integration (IPSIS)
-
-Configure and manage Student Information System integration through the IPSIS framework.
-
-### Lockers
-
-Manage personal and group file storage lockers for users.
-
-### Notifications
-
-Manage notification preferences and settings for users.
-
-### Permissions and Configuration
-
-Manage role-based permissions and system configuration variables across the platform.
-
-## Events
-
-Brightspace supports real-time event streaming through **Brightspace Data Streams (BDS)**, a webhook-based system that delivers user activity events.
-
-BDS produces a stream of event objects describing user interactions and other events associated with a particular organization. BDS provides a relatively "raw" data stream so that organizations can analyze and mine the information. Events are posted with minimal latency, providing a close-to-real-time record.
-
-A webhook endpoint needs to be set up to receive automated HTTP POST requests containing Brightspace Data Streams' data payloads. Events are formatted as xAPI-compliant objects.
-
-### Award Events
-
-Events related to managing awards, associating awards with org units, and issuing awards to users.
-
-### Announcement Events
-
-Events for creating/updating/deleting announcements and viewing the announcement homepage.
-
-### Calendar Events
-
-Events for viewing the calendar homepage, viewing individual calendar events, and creating/updating/deleting calendar events.
-
-### Course Content Events
-
-Events for viewing content homepages, modules, and topics. Also covers content creation/modification/deletion, content service activities, and content completion tracking.
-
-### Discussion Events
-
-Events for viewing the discussions homepage, forums, topics, and threads. Also covers creation and management of discussion forums, threads, and topics.
-
-### Assignments and Grades Events
-
-Events for viewing assignments and grades homepages, managing assignments, managing grades, and managing activity exemptions.
-
-### Quiz Events
-
-Events for submitting, grading, and managing quiz attempts.
-
-### Organization Structure Events
-
-Events for viewing org unit homepages, daily course access, managing org units, viewing groups management pages, and enrolling users in org units.
-
-### External Tool Events
-
-Events for LTI tool launches from within Brightspace.
-
-### User Session Events
-
-Events for user login, logout, session timeout, and user impersonation (start and end).
+# D2L Brightspace capability reference
+
+## Connection
+
+OAuth uses the [documented authorization and token endpoints](https://docs.valence.desire2learn.com/basic/oauth2.html). The authorization code flow supports expiring access tokens and refresh tokens. An existing bearer token is also supported. Provide the HTTPS origin of the institution’s instance with the credentials. API version overrides are separate connection settings: LP 1.49, LE 1.82, BAS 1.4 by default.
+
+OAuth requests the declared scopes, including the documented `core:*:*` fallback for APIs without specific scopes. Group tools request the specific `groups:group:read` and `groups:enrollment:create`/`delete` scopes. The connected user’s Brightspace permissions still determine access. Limited bearer tokens can access only their granted operations.
+
+## Tools
+
+| Area | Supported operations | Official API reference |
+| --- | --- | --- |
+| Users and identity | `get_user` by ID, exact username, email, org-defined ID, or current user; `list_users`, `create_user`, `update_user`, `list_roles` | [Users](https://docs.valence.desire2learn.com/res/user.html) |
+| Organization structure | `list_org_units`, `get_org_unit`, `list_org_unit_types` | [Organization structure](https://docs.valence.desire2learn.com/res/orgunit.html) |
+| Courses | `get_course`, `create_course`, `update_course`, `delete_course` | [Courses](https://docs.valence.desire2learn.com/res/course.html) |
+| Enrollments | `enroll_user`, `unenroll_user`, `list_enrollments`, `get_classlist` | [Enrollments](https://docs.valence.desire2learn.com/res/enroll.html) |
+| Grades | `list_grade_items`, `get_grade_value`, `set_grade_value` for numeric grades, `get_final_grades` | [Grades](https://docs.valence.desire2learn.com/res/grade.html) |
+| Content | `list_content_modules`, `create_content_module`, `update_content_module`, `delete_content_module`, `get_content_topic` | [Content](https://docs.valence.desire2learn.com/res/content.html) |
+| Assignments | `list_assignments`, `get_assignment`, `create_assignment`, `update_assignment`, `delete_assignment`, `get_assignment_submissions` | [Dropboxes](https://docs.valence.desire2learn.com/res/dropbox.html) |
+| Quizzes | `list_quizzes`, `get_quiz`, optional questions and attempts | [Quizzes](https://docs.valence.desire2learn.com/res/quiz.html) |
+| Discussions | `list_discussion_forums`, `create_discussion_forum`, `create_discussion_topic`, `list_discussion_posts`, `create_discussion_post` | [Discussions](https://docs.valence.desire2learn.com/res/discuss.html) |
+| Announcements | `list_announcements`, `get_announcement`, `create_announcement`, `update_announcement`, `delete_announcement` | [News](https://docs.valence.desire2learn.com/res/news.html) |
+| Calendar | `list_calendar_events`, `get_calendar_event`, `create_calendar_event`, `update_calendar_event`, `delete_calendar_event` | [Calendar](https://docs.valence.desire2learn.com/res/calendar.html) |
+| Groups and sections | `list_groups_sections`, `manage_group_enrollment` | [Groups](https://docs.valence.desire2learn.com/res/groups.html) |
+| Awards | `list_awards`, `list_award_associations`, `issue_award`, `revoke_award` | [Awards](https://docs.valence.desire2learn.com/res/awards.html) |
+
+## Behavior and limits
+
+- `get_user` with no lookup fields is the read-only identity operation. `list_enrollments` with no IDs discovers the current user’s course IDs. Organization searches and enrollment listings expose bookmarks for continuation.
+- Username searches are exact; the API returns a single user object for username searches, arrays for email/org-defined-ID searches, and a paged envelope for unfiltered lists.
+- Complete-resource updates read the current resource before changing specified fields. Unspecified dates, visibility, descriptions, activation, and grade comments are preserved. User updates send null for the system-pronouns field to preserve it rather than copying the user’s displayed pronouns. These reads and writes are separate operations; concurrent edits can race.
+- Course creation sets `IsActive=true` for LP API 1.59 and later, where that field is required. Use `update_course` to change active status.
+- Paged quiz, award, grade-value, and calendar collections follow provider continuation URLs for the same instance and endpoint. Processing stops with an error at 100 pages or an unsafe/repeated URL. Discussion post paging remains caller-controlled.
+- Content-module structure entries can include topics. `contentType=0` identifies a module; `contentType=1` identifies a topic, with `topicId` for `get_content_topic`. The historical `moduleId` field remains available on all returned entries.
+- Nullable summary fields are omitted while preserving their existing scalar types. Detail readers expose the original resource as `raw`, including null values. Assignment enum names are converted to the numeric values expected in existing summaries.
+- Paper and observed assignments complete on evaluation; file, text, and file-or-text assignments complete on submission. Clearing the last due/start/end date disables assignment calendar display, as Brightspace requires a date for a calendar entry.
+- Filtering assignment submissions by a user uses the direct user route on LE 1.88 and later. On older versions, it reads the documented all-submissions route and filters user entities locally, which can require a larger response.
+- Assignment submission summaries identify individual submissions and count each submission’s files; group submitters are identified through `entityId` and `entityType`.
+- Award issuance requires an award already associated with the org unit, an enrolled recipient, and nonempty criteria/evidence. Existing optional input schemas remain compatible; invalid omissions are rejected with an actionable message.
+- Forum locking is a legacy API field ignored by LE 1.56 and later. Module and calendar updates retain existing locked/all-day state where appropriate.
+- No triggers, file uploads/downloads, quiz authoring, survey administration, Data Hub exports, LTI administration, or SIS operations are implemented.

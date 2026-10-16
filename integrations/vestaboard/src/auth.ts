@@ -17,6 +17,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
           'API token created in the Vestaboard mobile app Settings or Developer web app. Passed via X-Vestaboard-Token header.'
         )
@@ -32,16 +33,18 @@ export let auth = SlateAuth.create()
   })
   .addCustomAuth({
     type: 'auth.custom',
-    name: 'Subscription API Credentials',
+    name: 'Subscription API Credentials (Legacy)',
     key: 'subscription_api',
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
           'API key for the Subscription API, created from the Developer section of the web app.'
         ),
       apiSecret: z
         .string()
+        .min(1)
         .describe(
           'API secret for the Subscription API, created from the Developer section of the web app.'
         )
@@ -63,9 +66,11 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe('Local API key obtained from the one-time enablement process.'),
       baseUrl: z
         .string()
+        .min(1)
         .describe(
           'Base URL of your Vestaboard on the local network (e.g. http://vestaboard.local:7000 or an IP address with port).'
         )

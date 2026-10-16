@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BaseLinkerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -84,6 +84,9 @@ export let createOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.products.length) {
+      throw createApiServiceError('Provide at least one order product.');
+    }
     let client = new BaseLinkerClient({ token: ctx.auth.token });
 
     let result = await client.addOrder({

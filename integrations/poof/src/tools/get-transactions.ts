@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PoofClient } from '../lib/client';
 import { spec } from '../spec';
@@ -40,7 +40,11 @@ export let getTransactions = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.filter && ctx.input.search) {
+    if ((ctx.input.filter !== undefined) !== (ctx.input.search !== undefined)) {
+      throw createApiServiceError('Provide filter and search together to query transactions.');
+    }
+
+    if (ctx.input.filter !== undefined && ctx.input.search !== undefined) {
       result = await client.queryTransactions({
         filter: ctx.input.filter,
         search: ctx.input.search

@@ -43,7 +43,7 @@ export let sendMessage = SlateTool.create(spec, {
 
     return {
       output: { message: messageRecord },
-      message: `Sent ${ctx.input.type || 'email'} message to campaign supporters.`
+      message: 'Submitted the campaign message request.'
     };
   })
   .build();

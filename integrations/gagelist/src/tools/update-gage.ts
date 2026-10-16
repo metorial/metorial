@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -50,7 +50,27 @@ Provide the gage ID and any fields to update. Only the specified fields will be 
         .describe('Updated calibration instructions'),
       location: z.string().optional().describe('Updated physical location'),
       responsibleUser: z.string().optional().describe('Updated responsible person'),
-      tolerance: z.string().optional().describe('Updated tolerance specification')
+      tolerance: z.string().optional().describe('Updated tolerance specification'),
+      assetNumber: z.string().optional().describe('Updated asset number'),
+      purchasePrice: z.number().optional().describe('Updated purchase price'),
+      rangeOrSize: z.string().optional().describe('Updated measurement range or size'),
+      unitOfMeasure: z.string().optional().describe('Updated unit of measure'),
+      typesMeasurement: z.string().optional().describe('Updated measurement types'),
+      masterStandard: z.string().optional().describe('Updated master standard designation'),
+      interval: z
+        .string()
+        .optional()
+        .describe('Calibration interval from get_account_settings'),
+      years: z.number().optional().describe('Calibration interval years'),
+      months: z.number().optional().describe('Calibration interval months'),
+      days: z.number().optional().describe('Calibration interval days'),
+      calibrationEnvironment: z
+        .string()
+        .optional()
+        .describe('Updated calibration environment'),
+      calibrationTestMode: z.string().optional().describe('Updated calibration test mode'),
+      area: z.string().optional().describe('Updated area'),
+      otherInformation: z.string().optional().describe('Other information about the gage')
     })
   )
   .output(
@@ -82,6 +102,27 @@ Provide the gage ID and any fields to update. Only the specified fields will be 
       data.ResponsibleUser = ctx.input.responsibleUser;
     if (ctx.input.tolerance !== undefined) data.Tolerance = ctx.input.tolerance;
 
+    if (ctx.input.assetNumber !== undefined) data.AssetNo = ctx.input.assetNumber;
+    if (ctx.input.purchasePrice !== undefined) data.PurchasePrice = ctx.input.purchasePrice;
+    if (ctx.input.rangeOrSize !== undefined) data.RangeOrSize = ctx.input.rangeOrSize;
+    if (ctx.input.unitOfMeasure !== undefined) data.UnitOfMeasure = ctx.input.unitOfMeasure;
+    if (ctx.input.typesMeasurement !== undefined)
+      data.TypesMeasurement = ctx.input.typesMeasurement;
+    if (ctx.input.masterStandard !== undefined) data.MasterStandard = ctx.input.masterStandard;
+    if (ctx.input.interval !== undefined) data.Interval = ctx.input.interval;
+    if (ctx.input.years !== undefined) data.Years = ctx.input.years;
+    if (ctx.input.months !== undefined) data.Months = ctx.input.months;
+    if (ctx.input.days !== undefined) data.Days = ctx.input.days;
+    if (ctx.input.calibrationEnvironment !== undefined)
+      data.CalibrationEnvironment = ctx.input.calibrationEnvironment;
+    if (ctx.input.calibrationTestMode !== undefined)
+      data.CalibrationTestMode = ctx.input.calibrationTestMode;
+    if (ctx.input.area !== undefined) data.Area = ctx.input.area;
+    if (ctx.input.otherInformation !== undefined)
+      data.OtherInformation = ctx.input.otherInformation;
+    if (Object.keys(data).length === 1) {
+      throw createApiServiceError('Provide at least one gage field to update.');
+    }
     let result = await client.updateGage(data);
 
     return {

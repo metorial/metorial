@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -74,7 +74,7 @@ export let manageDevice = SlateTool.create(spec, {
     }
 
     if (!ctx.input.deviceIden) {
-      throw new Error('deviceIden is required for update and delete actions');
+      throw createApiServiceError('deviceIden is required for update and delete actions');
     }
 
     if (ctx.input.action === 'update') {

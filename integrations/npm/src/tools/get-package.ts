@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NpmRegistryClient } from '../lib/client';
+import {
+  array,
+  optionalStrings,
+  optionalText,
+  record,
+  stringRecord,
+  text
+} from '../lib/response';
 import { spec } from '../spec';
 
 let versionSchema = z
@@ -73,6 +81,10 @@ Optionally fetch a specific version or use abbreviated mode for smaller response
   )
   .output(
     z.object({
+      rawMetadata: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Unmodified package or version metadata, including all provider fields'),
       packageName: z.string().describe('Package name'),
       description: z.string().optional().describe('Package description'),
       latestVersion: z.string().optional().describe('Latest published version'),
@@ -82,7 +94,7 @@ Optionally fetch a specific version or use abbreviated mode for smaller response
       maintainers: z
         .array(
           z.object({
-            name: z.string(),
+            name: z.string().optional(),
             email: z.string().optional()
           })
         )
@@ -112,112 +124,111 @@ Optionally fetch a specific version or use abbreviated mode for smaller response
     let client = new NpmRegistryClient({ token: ctx.auth.token || undefined });
 
     if (ctx.input.version) {
-      let versionData = await client.getPackageVersion(
-        ctx.input.packageName,
-        ctx.input.version
+      let versionData = record(
+        await client.getPackageVersion(ctx.input.packageName, ctx.input.version),
+        'package version'
       );
+      let version = mapVersion(versionData);
       return {
         output: {
-          packageName: versionData.name,
-          description: versionData.description,
-          latestVersion: versionData.version,
-          license:
-            typeof versionData.license === 'string'
-              ? versionData.license
-              : versionData.license?.type,
-          homepage: versionData.homepage,
-          repository: versionData.repository,
-          maintainers: versionData.maintainers,
-          keywords: versionData.keywords,
-          requestedVersion: {
-            version: versionData.version,
-            name: versionData.name,
-            description: versionData.description,
-            main: versionData.main,
-            license:
-              typeof versionData.license === 'string'
-                ? versionData.license
-                : versionData.license?.type,
-            homepage: versionData.homepage,
-            repository: versionData.repository,
-            dependencies: versionData.dependencies,
-            devDependencies: versionData.devDependencies,
-            peerDependencies: versionData.peerDependencies,
-            engines: versionData.engines,
-            deprecated: versionData.deprecated,
-            dist: versionData.dist
-              ? {
-                  tarball: versionData.dist.tarball,
-                  shasum: versionData.dist.shasum,
-                  integrity: versionData.dist.integrity
-                }
-              : undefined
-          }
+          ...mapPackage(versionData),
+          latestVersion: version.version,
+          requestedVersion: version,
+          rawMetadata: versionData
         },
-        message: `Retrieved metadata for **${versionData.name}@${versionData.version}**.`
+        message: `Retrieved metadata for **${version.name}@${version.version}**.`
       };
     }
 
-    let metadata = await client.getPackageMetadata(ctx.input.packageName, {
-      abbreviated: ctx.input.abbreviated
-    });
-
-    let latestVersion = metadata['dist-tags']?.latest;
-    let versionKeys = metadata.versions ? Object.keys(metadata.versions) : [];
-
-    let versions = ctx.input.abbreviated
-      ? versionKeys.map((v: string) => {
-          let vd = metadata.versions[v];
-          return {
-            version: v,
-            name: metadata.name,
-            dependencies: vd?.dependencies,
-            devDependencies: vd?.devDependencies,
-            peerDependencies: vd?.peerDependencies,
-            engines: vd?.engines
-          };
-        })
-      : versionKeys.slice(-20).map((v: string) => {
-          let vd = metadata.versions[v];
-          return {
-            version: v,
-            name: vd?.name || metadata.name,
-            description: vd?.description,
-            main: vd?.main,
-            license: typeof vd?.license === 'string' ? vd.license : vd?.license?.type,
-            homepage: vd?.homepage,
-            repository: vd?.repository,
-            dependencies: vd?.dependencies,
-            devDependencies: vd?.devDependencies,
-            peerDependencies: vd?.peerDependencies,
-            engines: vd?.engines,
-            deprecated: vd?.deprecated,
-            dist: vd?.dist
-              ? {
-                  tarball: vd.dist.tarball,
-                  shasum: vd.dist.shasum,
-                  integrity: vd.dist.integrity
-                }
-              : undefined
-          };
-        });
-
+    let metadata = record(
+      await client.getPackageMetadata(ctx.input.packageName, {
+        abbreviated: ctx.input.abbreviated
+      }),
+      'package metadata'
+    );
+    let versionRecords = record(metadata.versions, 'package versions');
+    let versions = Object.values(versionRecords).map(value =>
+      mapVersion(record(value, 'package version'))
+    );
+    let distTags =
+      metadata['dist-tags'] == null
+        ? undefined
+        : stringRecord(metadata['dist-tags'], 'distribution tags');
     return {
       output: {
-        packageName: metadata.name,
-        description: metadata.description,
-        latestVersion,
-        license:
-          typeof metadata.license === 'string' ? metadata.license : metadata.license?.type,
-        homepage: metadata.homepage,
-        repository: metadata.repository,
-        maintainers: metadata.maintainers,
-        distTags: metadata['dist-tags'],
-        keywords: metadata.keywords,
+        ...mapPackage(metadata),
+        latestVersion: distTags?.latest,
+        distTags,
         versions,
-        time: metadata.time
+        time:
+          metadata.time == null ? undefined : stringRecord(metadata.time, 'publication dates'),
+        rawMetadata: metadata
       },
-      message: `Retrieved metadata for **${metadata.name}**${latestVersion ? ` (latest: ${latestVersion})` : ''}. Found ${versionKeys.length} version(s).`
+      message: `Retrieved metadata for **${text(metadata.name, 'package name')}** with ${versions.length} version(s).`
     };
   })
   .build();
+
+function mapPackage(value: Record<string, unknown>) {
+  return {
+    packageName: text(value.name, 'package name'),
+    description: optionalText(value.description, 'package description'),
+    license: mapLicense(value.license),
+    homepage: optionalText(value.homepage, 'package homepage'),
+    repository: value.repository,
+    maintainers:
+      value.maintainers == null
+        ? undefined
+        : array(value.maintainers, 'package maintainers').map(item => {
+            let maintainer = record(item, 'package maintainer');
+            return {
+              name: optionalText(maintainer.name, 'maintainer name'),
+              email: optionalText(maintainer.email, 'maintainer email')
+            };
+          }),
+    keywords: optionalStrings(value.keywords, 'package keywords')
+  };
+}
+
+function mapLicense(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  return typeof value === 'string'
+    ? value
+    : optionalText(record(value, 'package license').type, 'license type');
+}
+
+function mapVersion(value: Record<string, unknown>) {
+  let dist = value.dist == null ? undefined : record(value.dist, 'package distribution');
+  return {
+    ...value,
+    version: text(value.version, 'package version'),
+    name: text(value.name, 'version package name'),
+    description: optionalText(value.description, 'version description'),
+    main: optionalText(value.main, 'package entry point'),
+    license: mapLicense(value.license),
+    homepage: optionalText(value.homepage, 'version homepage'),
+    repository: value.repository,
+    dependencies:
+      value.dependencies == null
+        ? undefined
+        : stringRecord(value.dependencies, 'runtime dependencies'),
+    devDependencies:
+      value.devDependencies == null
+        ? undefined
+        : stringRecord(value.devDependencies, 'development dependencies'),
+    peerDependencies:
+      value.peerDependencies == null
+        ? undefined
+        : stringRecord(value.peerDependencies, 'peer dependencies'),
+    engines:
+      value.engines == null ? undefined : stringRecord(value.engines, 'engine requirements'),
+    deprecated: optionalText(value.deprecated, 'deprecation message'),
+    dist: dist
+      ? {
+          tarball: optionalText(dist.tarball, 'tarball URL'),
+          shasum: optionalText(dist.shasum, 'tarball SHA1'),
+          integrity: optionalText(dist.integrity, 'tarball integrity')
+        }
+      : undefined
+  };
+}

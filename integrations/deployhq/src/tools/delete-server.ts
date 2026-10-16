@@ -13,7 +13,9 @@ export let deleteServer = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       serverIdentifier: z.string().describe('The identifier (UUID) of the server to delete')
     })
   )
@@ -29,10 +31,13 @@ export let deleteServer = SlateTool.create(spec, {
       accountName: ctx.config.accountName
     });
 
-    await client.deleteServer(ctx.input.projectPermalink, ctx.input.serverIdentifier);
+    let result = await client.deleteServer(
+      ctx.input.projectPermalink,
+      ctx.input.serverIdentifier
+    );
 
     return {
-      output: { status: 'deleted' },
+      output: { status: result.status },
       message: `Deleted server \`${ctx.input.serverIdentifier}\` from project \`${ctx.input.projectPermalink}\`.`
     };
   })

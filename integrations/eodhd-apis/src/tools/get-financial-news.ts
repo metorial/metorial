@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let sentimentSchema = z.object({
@@ -25,7 +25,7 @@ export let getFinancialNews = SlateTool.create(spec, {
   key: 'get_financial_news',
   description: `Retrieve financial news articles with AI-generated sentiment analysis. Filter by specific ticker symbols, topic tags, and date ranges. Sentiment scores include polarity, negative, neutral, and positive values.`,
   instructions: [
-    'Provide either a ticker symbol (e.g., AAPL.US) or a topic tag to filter news',
+    'Provide a ticker symbol or topic tag to filter news, or omit both for the latest general feed',
     'Common tags: balance sheet, capital markets, earnings, ipo, mergers and acquisitions'
   ],
   tags: {
@@ -59,7 +59,7 @@ export let getFinancialNews = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let articlesArray = Array.isArray(articles) ? articles : [];
+    let articlesArray = eodhdArray(articles, 'get-financial-news');
 
     return {
       output: {

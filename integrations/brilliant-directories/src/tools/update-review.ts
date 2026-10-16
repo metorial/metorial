@@ -29,6 +29,10 @@ export let updateReview = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       review: z.any().describe('The updated review record.')
     })
   )
@@ -63,6 +67,7 @@ export let updateReview = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         review: result.message
       },
       message: `Updated review **${ctx.input.reviewId}**.`

@@ -14,7 +14,7 @@ export let getApp = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      appId: z.string().describe('Unique identifier of the app to retrieve')
+      appId: z.string().describe('App ID. Call list_apps to discover available apps.')
     })
   )
   .output(
@@ -29,13 +29,14 @@ export let getApp = SlateTool.create(spec, {
       responseFields: z
         .array(
           z.object({
-            name: z.string().describe('Name of the response field'),
+            name: z.string().optional().describe('Name of the response field when provided'),
             type: z.string().optional().describe('Type of the response field'),
             description: z.string().optional().describe('Description of the response field')
           })
         )
         .optional()
-        .describe('List of data fields returned by the app')
+        .describe('List of data fields returned by the app'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete app response')
     })
   )
   .handleInvocation(async ctx => {
@@ -43,8 +44,8 @@ export let getApp = SlateTool.create(spec, {
     let app = await client.getApp(ctx.input.appId);
 
     return {
-      output: app,
-      message: `Retrieved app **${app.appName}** (${app.appId}). Requires fields: ${app.dataFields?.join(', ') || 'none'}.`
+      output: { ...app, raw: app },
+      message: `Retrieved app **${app.appName}** (${app.appId}).`
     };
   })
   .build();

@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  optionalBoolean,
+  optionalString,
+  requireRecord,
+  requireString,
+  responseList
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageWebhook = SlateTool.create(spec, {
@@ -66,7 +73,8 @@ export let manageWebhook = SlateTool.create(spec, {
         .optional()
         .describe('List of webhooks (for list action)'),
       hookId: z.string().optional().describe('ID of the created/updated/deleted webhook'),
-      success: z.boolean().describe('Whether the operation succeeded')
+      success: z.boolean().describe('Whether the operation succeeded'),
+      raw: z.any().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -84,23 +92,23 @@ export let manageWebhook = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'list') {
-      if (!tableId) throw new Error('tableId is required for listing webhooks');
+      if (!tableId) throw createApiServiceError('tableId is required for listing webhooks');
       let result = await client.listWebhooks(tableId);
-      let list = result?.list ?? result ?? [];
-      let webhooks = (Array.isArray(list) ? list : []).map((h: any) => ({
-        hookId: h.id,
-        title: h.title,
-        event: h.event,
-        active: h.active
+      let list = responseList(result, 'webhooks');
+      let webhooks = list.map((h: any) => ({
+        hookId: requireString(h.id, 'webhook ID'),
+        title: optionalString(h.title),
+        event: optionalString(h.event),
+        active: optionalBoolean(h.active)
       }));
       return {
-        output: { webhooks, success: true },
+        output: { webhooks, success: true, raw: result },
         message: `Found **${webhooks.length}** webhook(s) for table \`${tableId}\`.`
       };
     }
 
     if (action === 'create') {
-      if (!tableId) throw new Error('tableId is required for creating a webhook');
+      if (!tableId) throw createApiServiceError('tableId is required for creating a webhook');
       let eventParts = event?.split('.') ?? ['after', 'insert'];
       let data: any = {
         title: title ?? 'Webhook',
@@ -117,15 +125,15 @@ export let manageWebhook = SlateTool.create(spec, {
           }
         }
       };
-      let result = await client.createWebhook(tableId, data);
+      let result = requireRecord(await client.createWebhook(tableId, data), 'created webhook');
       return {
-        output: { hookId: result.id, success: true },
+        output: { hookId: optionalString(result.id), success: true, raw: result },
         message: `Created webhook **${title ?? 'Webhook'}** (\`${result.id}\`) on table \`${tableId}\`.`
       };
     }
 
     if (action === 'update') {
-      if (!hookId) throw new Error('hookId is required for updating a webhook');
+      if (!hookId) throw createApiServiceError('hookId is required for updating a webhook');
       let data: any = {};
       if (title) data.title = title;
       if (event) {
@@ -144,22 +152,22 @@ export let manageWebhook = SlateTool.create(spec, {
           }
         };
       }
-      await client.updateWebhook(hookId, data);
+      let result = await client.updateWebhook(hookId, data);
       return {
-        output: { hookId, success: true },
+        output: { hookId, success: true, raw: result },
         message: `Updated webhook \`${hookId}\`.`
       };
     }
 
     if (action === 'delete') {
-      if (!hookId) throw new Error('hookId is required for deleting a webhook');
-      await client.deleteWebhook(hookId);
+      if (!hookId) throw createApiServiceError('hookId is required for deleting a webhook');
+      let result = await client.deleteWebhook(hookId);
       return {
-        output: { hookId, success: true },
+        output: { hookId, success: true, raw: result },
         message: `Deleted webhook \`${hookId}\`.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

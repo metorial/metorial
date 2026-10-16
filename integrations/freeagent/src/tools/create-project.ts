@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createProject = SlateTool.create(spec, {
@@ -15,6 +15,10 @@ export let createProject = SlateTool.create(spec, {
     z.object({
       contactId: z.string().describe('Contact ID to associate with the project'),
       name: z.string().describe('Project name'),
+      status: z
+        .enum(['Active', 'Completed', 'Cancelled', 'Hidden'])
+        .optional()
+        .describe('Project status'),
       budgetUnits: z
         .enum(['Hours', 'Days', 'Monetary'])
         .optional()
@@ -38,16 +42,23 @@ export let createProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    if (ctx.input.includesVat !== undefined) {
+      throw createApiServiceError(
+        'FreeAgent does not document includesVat for projects. Omit this field and set tax details on invoice items.'
+      );
+    }
+    if (ctx.input.billingPeriod && !['hour', 'day'].includes(ctx.input.billingPeriod)) {
+      throw createApiServiceError('FreeAgent project billingPeriod must be hour or day.');
+    }
+
+    let client = createClient(ctx);
 
     let projectData: Record<string, any> = {
       contact: ctx.input.contactId,
       name: ctx.input.name
     };
 
+    if (ctx.input.status) projectData.status = ctx.input.status;
     if (ctx.input.budgetUnits) projectData.budget_units = ctx.input.budgetUnits;
     if (ctx.input.budget) projectData.budget = ctx.input.budget;
     if (ctx.input.currency) projectData.currency = ctx.input.currency;
@@ -57,7 +68,6 @@ export let createProject = SlateTool.create(spec, {
     if (ctx.input.normalBillingRate)
       projectData.normal_billing_rate = ctx.input.normalBillingRate;
     if (ctx.input.hoursPerDay) projectData.hours_per_day = ctx.input.hoursPerDay;
-    if (ctx.input.includesVat !== undefined) projectData.includes_vat = ctx.input.includesVat;
 
     let project = await client.createProject(projectData);
 

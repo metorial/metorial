@@ -1,6 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NpmRegistryClient } from '../lib/client';
+import {
+  array,
+  number,
+  optionalNumber,
+  optionalStrings,
+  optionalText,
+  record,
+  text
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let searchPackages = SlateTool.create(spec, {
@@ -72,53 +81,77 @@ export let searchPackages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.size !== undefined &&
+      (!Number.isInteger(ctx.input.size) || ctx.input.size < 0 || ctx.input.size > 250)
+    )
+      throw createApiServiceError('size must be an integer between 0 and 250.');
+    if (
+      ctx.input.from !== undefined &&
+      (!Number.isInteger(ctx.input.from) || ctx.input.from < 0)
+    )
+      throw createApiServiceError('from must be a non-negative integer.');
+    for (let weight of [ctx.input.quality, ctx.input.popularity, ctx.input.maintenance]) {
+      if (weight !== undefined && (weight < 0 || weight > 1))
+        throw createApiServiceError('Search weights must be between 0 and 1.');
+    }
     let client = new NpmRegistryClient({ token: ctx.auth.token || undefined });
 
-    let result = await client.searchPackages({
-      text: ctx.input.query,
-      size: ctx.input.size,
-      from: ctx.input.from,
-      quality: ctx.input.quality,
-      popularity: ctx.input.popularity,
-      maintenance: ctx.input.maintenance
-    });
+    let result = record(
+      await client.searchPackages({
+        text: ctx.input.query,
+        size: ctx.input.size,
+        from: ctx.input.from,
+        quality: ctx.input.quality,
+        popularity: ctx.input.popularity,
+        maintenance: ctx.input.maintenance
+      }),
+      'package search'
+    );
 
-    let packages = (result.objects || []).map((obj: any) => {
-      let pkg = obj.package || {};
-      let score = obj.score || {};
-      let detail = score.detail || {};
-
+    let total = number(result.total, 'search total');
+    let packages = array(result.objects, 'search objects').map(value => {
+      let obj = record(value, 'search result');
+      let pkg = record(obj.package, 'search package');
+      let score = obj.score == null ? undefined : record(obj.score, 'package score');
+      let detail = score?.detail == null ? undefined : record(score.detail, 'score details');
+      let links = pkg.links == null ? undefined : record(pkg.links, 'package links');
+      let author = pkg.author == null ? undefined : record(pkg.author, 'package author');
+      let publisher =
+        pkg.publisher == null ? undefined : record(pkg.publisher, 'package publisher');
       return {
-        packageName: pkg.name,
-        scope: pkg.scope === 'unscoped' ? undefined : pkg.scope,
-        version: pkg.version,
-        description: pkg.description,
-        keywords: pkg.keywords,
-        author: pkg.author?.name || pkg.author?.username,
-        publisher: pkg.publisher?.username,
-        date: pkg.date,
-        links: pkg.links
+        packageName: text(pkg.name, 'search package name'),
+        scope: pkg.scope === 'unscoped' ? undefined : optionalText(pkg.scope, 'package scope'),
+        version: text(pkg.version, 'search package version'),
+        description: optionalText(pkg.description, 'package description'),
+        keywords: optionalStrings(pkg.keywords, 'package keywords'),
+        author: optionalText(author?.name ?? author?.username, 'package author'),
+        publisher: optionalText(publisher?.username, 'package publisher'),
+        date: optionalText(pkg.date, 'publication date'),
+        links: links
           ? {
-              npm: pkg.links.npm,
-              homepage: pkg.links.homepage,
-              repository: pkg.links.repository
+              npm: optionalText(links.npm, 'npm URL'),
+              homepage: optionalText(links.homepage, 'homepage URL'),
+              repository: optionalText(links.repository, 'repository URL')
             }
           : undefined,
-        score: {
-          final: score.final,
-          quality: detail.quality,
-          popularity: detail.popularity,
-          maintenance: detail.maintenance
-        }
+        score: score
+          ? {
+              final: optionalNumber(score.final, 'final score'),
+              quality: optionalNumber(detail?.quality, 'quality score'),
+              popularity: optionalNumber(detail?.popularity, 'popularity score'),
+              maintenance: optionalNumber(detail?.maintenance, 'maintenance score')
+            }
+          : undefined
       };
     });
 
     return {
       output: {
-        total: result.total || 0,
+        total: total,
         packages
       },
-      message: `Found **${result.total || 0}** package(s) matching "${ctx.input.query}". Showing ${packages.length} result(s).`
+      message: `Found **${total}** package(s) matching "${ctx.input.query}". Showing ${packages.length} result(s).`
     };
   })
   .build();

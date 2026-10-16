@@ -1,6 +1,6 @@
 {
   "name": "@metorial/bolt-iot",
-  "description": "Control and monitor IoT devices connected via Bolt WiFi modules. Set and read digital GPIO pin states to control LEDs, relays, and motors. Read analog sensor values (e.g., temperature, light) and write PWM output for variable device control. Manage UART serial communication to send and receive data with external microcontrollers like Arduino. List devices, check online/offline status, query firmware versions, and restart devices remotely. Supports data collection, visualization, and machine learning-based anomaly detection through the Bolt Cloud platform.",
+  "description": "Control Bolt WiFi modules through Bolt Cloud: discover devices, inspect status and versions, read GPIO and analog values, control digital/PWM outputs and servos, restart modules, and communicate over UART.",
   "categories": ["apis-and-http-requests", "iot-and-device-control"],
   "skills": [
     "control digital GPIO pins",
@@ -11,7 +11,8 @@
     "list connected devices",
     "restart device remotely",
     "query device firmware version",
-    "send serial data to microcontrollers"
+    "send serial data to microcontrollers",
+    "read cloud-reported status-change time"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/bolt-iot.png"
 }

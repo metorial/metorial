@@ -1,6 +1,6 @@
 {
   "name": "@metorial/ntfy",
-  "description": "Send push notifications to phones and desktops via HTTP-based pub-sub topics. Publish messages with titles, priorities, tags, emojis, markdown formatting, click actions, icons, and file attachments. Add interactive action buttons (view, HTTP, broadcast, copy) to notifications. Schedule delayed message delivery, update or delete previously sent notifications, and forward notifications to email or trigger phone calls. Manage access tokens and user accounts. Format incoming webhook payloads using message templates for services like GitHub, Grafana, and Alertmanager.",
+  "description": "Send and poll push notifications using ntfy topics on ntfy.sh or a self-hosted server. Publish messages with titles, priorities, tags, Markdown, file URLs, and action buttons. Schedule notifications with an explicit timezone, update or dismiss notification sequences, forward messages to email or supported phone calls, and inspect the connected account and usage limits.",
   "categories": [
     "apis-and-http-requests",
     "email-and-messaging",
@@ -15,6 +15,7 @@
     "forward notifications to email",
     "trigger phone calls",
     "add action buttons",
-    "manage access tokens"
+    "poll cached messages",
+    "inspect account usage and limits"
   ]
 }

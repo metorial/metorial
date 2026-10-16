@@ -1,5 +1,11 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { matterportError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -22,6 +28,8 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.tokenId || !ctx.input.tokenSecret)
+        throw createApiServiceError('Provide both the Matterport Token ID and Token Secret.');
       let basicToken = Buffer.from(`${ctx.input.tokenId}:${ctx.input.tokenSecret}`).toString(
         'base64'
       );
@@ -77,49 +85,89 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let axios = createAxios();
-
-      let response = await axios.post('https://api.matterport.com/api/oauth/token', {
-        grant_type: 'authorization_code',
-        code: ctx.code,
-        scope: ctx.scopes.join(' '),
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        redirect_uri: ctx.redirectUri
-      });
-
-      let expiresAt = new Date(Date.now() + response.data.expires_in * 1000).toISOString();
-
       return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          expiresAt,
-          authType: 'bearer' as const
-        }
+        output: await exchangeToken({
+          grant_type: 'authorization_code',
+          code: ctx.code,
+          scope: ctx.scopes.join(' '),
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          redirect_uri: ctx.redirectUri
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
-      let axios = createAxios();
-
-      let response = await axios.post('https://api.matterport.com/api/oauth/token', {
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        scope: ctx.scopes.join(' ')
-      });
-
-      let expiresAt = new Date(Date.now() + response.data.expires_in * 1000).toISOString();
-
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'Matterport did not provide a refresh token. Reconnect your account.'
+        );
+      }
       return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
-          authType: 'bearer' as const
-        }
+        output: await exchangeToken(
+          {
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          },
+          ctx.output.refreshToken
+        )
       };
     }
   });
+
+let exchangeToken = async (params: Record<string, string>, previousRefreshToken?: string) => {
+  try {
+    let response = await createAxios().post(
+      'https://api.matterport.com/api/oauth/token',
+      new URLSearchParams(params).toString(),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
+    let data = response.data;
+    let seconds = data?.expires_in;
+    if (
+      typeof seconds !== 'number' ||
+      !Number.isFinite(seconds) ||
+      seconds <= 0 ||
+      Date.now() + seconds * 1000 > 8.64e15
+    ) {
+      throw createApiServiceError(
+        'Matterport returned an invalid token expiry. Reconnect your account.'
+      );
+    }
+    if (
+      data.refresh_token != null &&
+      (typeof data.refresh_token !== 'string' || !data.refresh_token)
+    ) {
+      throw createApiServiceError(
+        'Matterport returned an invalid refresh token. Reconnect your account.'
+      );
+    }
+    let tokens = normalizeOAuthTokenResponse(data, {
+      providerLabel: 'Matterport',
+      required: true,
+      expiresInType: 'number',
+      previousRefreshToken
+    });
+    if (!tokens.refreshToken) {
+      throw createApiServiceError(
+        'Matterport did not provide a refresh token. Reconnect your account.'
+      );
+    }
+    return { ...tokens, authType: 'bearer' as const };
+  } catch (error) {
+    throw matterportError(
+      error,
+      [params.client_secret, params.code, params.refresh_token].filter(
+        (value): value is string => !!value
+      )
+    );
+  }
+};

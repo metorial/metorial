@@ -1,76 +1,70 @@
-Now let me check the webhook details from the order submission endpoint:# Slates Specification for Finerworks
+# FinerWorks Integration Specification
 
-## Overview
+FinerWorks provides print-on-demand production, custom framing and order fulfillment through one API. This integration uses the current `https://v2.api.finerworks.com/v3` endpoints.
 
-FinerWorks is a print-on-demand and order fulfillment service specializing in fine art and photo printing. It is a leading print-on-demand and order fulfillment service specializing in high-quality art and photo printing. Products include canvas prints, greeting cards, posters, picture frames, ceramic tiles, tote bags, notebooks, puzzles, pillows, drinkware, and acrylic plaques.
+## Authentication and account setup
 
-## Authentication
+Supply the `web_api_key` and `app_key` from the [account API settings linked from Getting Started](https://v2.api.finerworks.com/Documentation). Both credentials are sent in request headers. Connection verification calls `GET test_my_credentials` with the documented credentials body and identifies the actual connected account. `who_am_i` exposes the account ID, username, email and available setup flags without exposing the echoed API key.
 
-FinerWorks uses API key-based authentication with two required credentials:
+The existing `testMode` setting defaults to false. Enabling it marks submitted orders as test orders; account application-key settings can also enforce test mode. Production orders may be billed and manufactured. The optional `paymentToken` on `submit_orders` is a payment processor token, `invoice` for accounts explicitly enabled for invoice payment, or `xxxx` to force simulated testing. No payment method is invented or selected by the integration.
 
-1. **`web_api_key`** – Your web API key tied to your FinerWorks account.
-2. **`app_key`** – Your application key, which can be toggled between test and live modes.
+## Tools
 
-To get started you will need to retrieve your `web_api_key` and `app_key`. Both can be found when you login to your FinerWorks account.
+| Tool | Purpose and endpoint |
+| --- | --- |
+| `who_am_i` | Connected account identity, `GET test_my_credentials` |
+| `list_orders` | Search orders, discover IDs/GUIDs/emails and reconcile uncertain submissions, `POST list_orders` |
+| `get_order` | Receipt, recipient, items and totals by order GUID/email, `GET get_order` |
+| `submit_orders` | Submit or validate 1–5 orders, `POST submit_orders_v2` |
+| `get_order_status` | Production and shipment status by IDs or purchase order references, `POST fetch_order_status` |
+| `update_order` | Hold, cancel or release an order before production, `PUT update_order`; optionally add a reference note, `POST submit_note` |
+| `update_customer` | Update an order recipient, `PUT update_customer` |
+| `get_shipping_options` | Quote one order using `POST list_shipping_options_multiple` with an orders envelope |
+| `validate_address` | Validate and normalize a recipient, `POST validate_recipient_address` |
+| `get_prices` | Price 1–50 items using a products envelope, `POST get_prices` |
+| `get_product_details` | Retrieve 1–25 inventory SKU details using a products envelope, `POST get_product_details` |
+| `browse_catalog` | Product, media and style discovery, `POST list_product_types`, `list_media_types` or `list_style_types` |
+| `list_virtual_inventory` | Paginated SKU discovery by text, SKU, product code, product type or image GUID, `POST list_virtual_inventory` |
+| `list_images` | Paginated inventory image discovery, `POST list_images` |
+| `add_images` | Import up to five image URLs, `POST add_images` |
+| `update_images` | Update titles/descriptions, `PUT update_images` |
+| `delete_images` | Delete inventory images, `DELETE delete_images` |
+| `browse_framing` | Frame collections, mats and glazing, `POST list_collections`, `list_mats` or `list_glazing` |
+| `build_frame` | Validate/price a frame product code and optionally create a downloadable PNG/JPEG preview, `POST frame_builder` |
+| `list_order_status_definitions` | Production status IDs and labels, `GET list_order_status_definitions` |
 
-These should be included as request parameters in the header of any request. Alternatively you can include these as querystring parameters in the request URI.
+Existing tool keys and input/output field contracts are retained. New inputs and outputs are optional additions. The current image API accepts at most 50 results per page; the older schema's upper bound of 100 remains compatible, with a clear runtime validation failure for unsupported page sizes. Numeric identifier fields keep their existing schemas and validate integer requirements at invocation time.
 
-Headers should be set as:
+## Order workflow and retry behavior
 
-- `web_api_key: <your-web-api-key>`
-- `app_key: <your-app-key>`
+1. Discover SKUs using `list_virtual_inventory` or build product codes using the catalog and framing references.
+2. Validate recipient addresses and obtain shipping options. Prefer the returned numeric `shippingId` converted to a string for the order's `shippingCode`; legacy classification codes remain accepted as input.
+3. Optionally validate orders without submitting using `validateOnly`.
+4. Submit orders with unique purchase order references and the desired payment token. Image URL inputs are sent in the documented product image object; optional pixel dimensions can be supplied.
+5. Retain returned order IDs, confirmation IDs and available GUID/email values. A partial response returns confirmed orders and `success: false`. Check `list_orders` before retrying; resubmit only purchase order references that were not accepted.
 
-**Test Mode:** While building and testing your app, your app credentials should be marked as in test mode or your API calls should include `test_mode = true`. While in such a testing mode nothing will be processed or billed. All responses will be valid and simulate what you receive in a live environment.
+If transport fails after submission, acceptance may be uncertain. Inspect `list_orders` before retrying. If a status change succeeds but adding its note fails, the error identifies the completed status change and directs a retry of the note alone. Notes are for reference and do not send instructions to production or customer support.
 
-Credentials can be retrieved and managed (including switching between test and live modes) at `https://finerworks.com/MyAccount/MyWebApi.aspx`.
+## Images and previews
 
-## Features
+Image updates and deletions can remove virtual inventory products associated with the image. Image listings retain actual thumbnail, preview and high-resolution URLs and complete provider metadata. Frame previews are generated image files returned by FinerWorks as encoded bytes; the integration validates PNG/JPEG content and provides a downloadable file. Encoded file contents are excluded from structured preview output, while frame, mat, glazing, total price and other metadata remain available. No URL expiry is assumed.
 
-### Order Management
+## Errors and response data
 
-Submit, update, and track print-on-demand orders. Orders can be submitted (up to 5 at a time) including customer details (sender and recipient) as well as line item details and optional display fields for the packing slip. Each order includes recipient shipping information, line items referencing product SKUs or product codes, shipping method, and optional fields like gift messages and custom data. You can change the submission status of an order (e.g., hold, cancel) prior to it being placed in production. Once an order is in production, changes require contacting customer support. Notes can also be added to an order's log for reference purposes.
+HTTP failures and rejected provider statuses become structured service errors containing available provider messages and codes. Address validation can return `valid: false` as a normal negative validation result. Validation-only order submission may legitimately return no confirmations. Required IDs and prices are taken from provider data; missing required response data produces an explicit error, never a manufactured zero or empty identifier. Optional scalar mappings preserve genuine zero, false and empty-string values, with raw provider metadata retained where available.
 
-### Order Status Tracking
+## Scope
 
-Retrieve an order's current production status, including shipment details such as tracking numbers, shipment dates, and delivery dates. A list of all available production status definitions can also be retrieved for reference.
+The tools cover one fulfillment API; tool categories are unnecessary. No trigger is registered. An existing order callback URL can be passed during submission, but this integration does not receive or verify callbacks. Account editing, billing transactions, application-key administration, galleries, templates and pending-cart management are outside this tool set.
 
-### Product & Pricing Catalog
+## Official references
 
-Browse available product types, media types, and style types. Product codes are used when supplying images for printing and specify the desired printing surface, media type, mounting, and framing options. Retrieve pricing breakdowns based on product codes or virtual inventory SKUs. Get product details including pricing based on SKU and quantity.
-
-### Virtual Inventory (SKUs)
-
-The virtual inventory is the "glue" that binds your website's products with FinerWorks' fulfillment center. SKUs are entered in the `product_sku` field of various API calls. SKUs are beneficial when you have identical printed items to submit for ordering at different times. They are unique identifiers generated for each inventory item.
-
-### Image File Management
-
-Upload, list, update, and delete image files in your FinerWorks library. Images can be associated with virtual inventory items. Updating or deleting images that are assigned to the inventory library will also affect any virtual inventory products assigned to those images. File selection management is also available for grouping selected files.
-
-### Framing Options
-
-Browse frame collections, retrieve frame details, list available mats and glazing/glass options. A frame builder tool allows you to submit framing specifications to validate options, get pricing, and receive visual preview data (base64 image data) for the frame package.
-
-### Shipping
-
-Retrieve available shipping options with the required `shipping_code` to be used when submitting an order. Shipping options can be queried for single or multiple orders at once. Custom UPS or FedEx account numbers can be provided per order.
-
-### Address Validation
-
-Validate and test an address such as an order's recipient before submitting orders.
-
-### Customer Management
-
-Update an existing order's customer/shipping information after order submission.
-
-### User Account
-
-Retrieve and update user profile/account features via the API.
-
-## Events
-
-FinerWorks supports per-order webhook notifications for order status changes. When submitting an order, you can provide a `webhook_order_status_url` field with a callback URL. FinerWorks will send notifications to this URL when the order's status changes (e.g., when the order moves to production, ships, etc.).
-
-### Order Status Updates
-
-- **Description:** Receive notifications when an order's production status changes, including transitions through stages such as accepted, in production, and shipped.
-- **Configuration:** The `webhook_order_status_url` is set on a per-order basis at the time of order submission. Each order can have its own unique webhook URL.
+- [Current API reference](https://v2.api.finerworks.com/Help)
+- [Getting started, credentials, test mode and shipping IDs](https://v2.api.finerworks.com/Documentation)
+- [Getting started and API setup](https://api.finerworks.com/Documentation)
+- [Order submission](https://v2.api.finerworks.com/Help/Api/POST-v3-submit_orders_v2)
+- [Order search](https://v2.api.finerworks.com/Help/Api/POST-v3-list_orders)
+- [Order receipt](https://v2.api.finerworks.com/Help/Api/GET-v3-get_order_order_guid_order_email)
+- [Virtual inventory](https://v2.api.finerworks.com/Help/Api/POST-v3-list_virtual_inventory)
+- [Frame preview and pricing](https://v2.api.finerworks.com/Help/Api/POST-v3-frame_builder)
+- [Render options](https://v2.api.finerworks.com/Help/ResourceModel?modelName=frame_render_config)

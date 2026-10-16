@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,31 +44,40 @@ export let manageBundle = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      (ctx.input.action === 'create' || ctx.input.action === 'update') &&
+      ctx.input.passIds &&
+      ctx.input.passIds.length > 10
+    ) {
+      throw createApiServiceError('A bundle can contain at most 10 passes.');
+    }
+
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.passIds || ctx.input.passIds.length === 0) {
-          throw new Error('passIds is required for creating a bundle');
+          throw createApiServiceError('passIds is required for creating a bundle');
         }
         let result = await client.createBundle(ctx.input.passIds);
         return {
           output: {
-            bundleId: result.bundleId,
-            downloadUrl: result.urlToPass,
+            bundleId: result.data?.bundleId ?? result.bundleId,
+            downloadUrl: result.data?.urlToPass ?? result.urlToPass,
             passes: ctx.input.passIds
           },
-          message: `Created bundle \`${result.bundleId}\` with **${ctx.input.passIds.length}** pass(es).`
+          message: `Created bundle \`${result.data?.bundleId ?? result.bundleId}\` with **${ctx.input.passIds.length}** pass(es).`
         };
       }
       case 'update': {
-        if (!ctx.input.bundleId) throw new Error('bundleId is required for updating a bundle');
+        if (!ctx.input.bundleId)
+          throw createApiServiceError('bundleId is required for updating a bundle');
         if (!ctx.input.passIds || ctx.input.passIds.length === 0) {
-          throw new Error('passIds is required for updating a bundle');
+          throw createApiServiceError('passIds is required for updating a bundle');
         }
         let result = await client.updateBundle(ctx.input.bundleId, ctx.input.passIds);
         return {
           output: {
             bundleId: ctx.input.bundleId,
-            downloadUrl: result.urlToPass,
+            downloadUrl: result.data?.urlToPass ?? result.urlToPass,
             passes: ctx.input.passIds
           },
           message: `Updated bundle \`${ctx.input.bundleId}\` with **${ctx.input.passIds.length}** pass(es).`
@@ -76,7 +85,7 @@ export let manageBundle = SlateTool.create(spec, {
       }
       case 'get': {
         if (!ctx.input.bundleId)
-          throw new Error('bundleId is required for retrieving a bundle');
+          throw createApiServiceError('bundleId is required for retrieving a bundle');
         let result = await client.getBundle(ctx.input.bundleId);
         let passes = result.data?.passes || result.passes || [];
         return {
@@ -90,7 +99,7 @@ export let manageBundle = SlateTool.create(spec, {
       case 'void':
       case 'unvoid': {
         if (!ctx.input.bundleId)
-          throw new Error('bundleId is required for voiding/unvoiding a bundle');
+          throw createApiServiceError('bundleId is required for voiding/unvoiding a bundle');
         let voided = ctx.input.action === 'void';
         let result = await client.voidBundle(ctx.input.bundleId, voided);
         let passes = result.data?.passes || result.passes || [];
@@ -103,7 +112,8 @@ export let manageBundle = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.bundleId) throw new Error('bundleId is required for deleting a bundle');
+        if (!ctx.input.bundleId)
+          throw createApiServiceError('bundleId is required for deleting a bundle');
         await client.deleteBundle(ctx.input.bundleId);
         return {
           output: { bundleId: ctx.input.bundleId },

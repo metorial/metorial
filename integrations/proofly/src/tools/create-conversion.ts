@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createConversion = SlateTool.create(spec, {
   name: 'Create Conversion',
   key: 'create_conversion',
-  description: `Add an external lead, conversion, or sale to a Proofly notification. This allows data from third-party systems (e.g., CRM, payment provider) to be reflected in social proof widgets. Use **Get Campaign Notifications** first to obtain the notification ID.`,
+  description: `Submit an external conversion using the existing notification conversion endpoint. This compatibility endpoint is absent from the current public API reference. Use **Get Campaign Notifications** first to obtain the notification ID.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -34,20 +34,14 @@ export let createConversion = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let conversionData: Record<string, unknown> = {};
-    if (ctx.input.email) conversionData.email = ctx.input.email;
-    if (ctx.input.firstName) conversionData.firstName = ctx.input.firstName;
-    if (ctx.input.lastName) conversionData.lastName = ctx.input.lastName;
-    if (ctx.input.ip) conversionData.ip = ctx.input.ip;
-    if (ctx.input.city) conversionData.city = ctx.input.city;
-    if (ctx.input.country) conversionData.country = ctx.input.country;
-    if (ctx.input.pageUrl) conversionData.pageUrl = ctx.input.pageUrl;
+    let { notificationId, ...fields } = ctx.input;
+    let conversionData = pickDefined(fields);
 
-    let result = await client.createConversion(ctx.input.notificationId, conversionData);
+    let result = await client.createConversion(notificationId, conversionData);
 
     return {
       output: {
-        ok: result.ok ?? true
+        ok: result.ok
       },
       message: `Conversion added to notification \`${ctx.input.notificationId}\`${ctx.input.email ? ` for **${ctx.input.email}**` : ''}.`
     };

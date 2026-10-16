@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import { readBidsketchNumber, readBidsketchString } from '../lib/response';
 import { spec } from '../spec';
 
 let proposalSectionSchema = z.object({
@@ -28,20 +29,26 @@ export let listProposalSections = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      sections: z.array(proposalSectionSchema).describe('List of proposal sections')
+      sections: z
+        .array(
+          proposalSectionSchema.extend({
+            appUrl: proposalSectionSchema.shape.appUrl.optional()
+          })
+        )
+        .describe('List of proposal sections')
     })
   )
   .handleInvocation(async ctx => {
     let client = new BidsketchClient(ctx.auth.token);
     let data = await client.listProposalSections(ctx.input.proposalId, ctx.input.sectionType);
 
-    let sections = (Array.isArray(data) ? data : []).map((s: any) => ({
-      sectionId: s.id,
-      name: s.name,
-      sectionType: s.sectiontype,
+    let sections = data.map((s: any) => ({
+      sectionId: readBidsketchNumber(s.id, 'id'),
+      name: readBidsketchString(s.name, 'name'),
+      sectionType: readBidsketchString(s.sectiontype, 'sectiontype'),
       description: s.description ?? null,
-      url: s.url,
-      appUrl: s.app_url
+      url: readBidsketchString(s.url, 'url'),
+      ...(s.app_url === undefined ? {} : { appUrl: readBidsketchString(s.app_url, 'app_url') })
     }));
 
     return {
@@ -83,12 +90,12 @@ export let addProposalSection = SlateTool.create(spec, {
 
     return {
       output: {
-        sectionId: s.id,
-        name: s.name,
-        sectionType: s.sectiontype,
+        sectionId: readBidsketchNumber(s.id, 'id'),
+        name: readBidsketchString(s.name, 'name'),
+        sectionType: readBidsketchString(s.sectiontype, 'sectiontype'),
         description: s.description ?? null,
-        url: s.url,
-        appUrl: s.app_url
+        url: readBidsketchString(s.url, 'url'),
+        appUrl: readBidsketchString(s.app_url, 'app_url')
       },
       message: `Added ${s.sectiontype} section **${s.name}** to proposal ${ctx.input.proposalId}.`
     };
@@ -129,12 +136,12 @@ export let updateProposalSection = SlateTool.create(spec, {
 
     return {
       output: {
-        sectionId: s.id,
-        name: s.name,
-        sectionType: s.sectiontype,
+        sectionId: readBidsketchNumber(s.id, 'id'),
+        name: readBidsketchString(s.name, 'name'),
+        sectionType: readBidsketchString(s.sectiontype, 'sectiontype'),
         description: s.description ?? null,
-        url: s.url,
-        appUrl: s.app_url
+        url: readBidsketchString(s.url, 'url'),
+        appUrl: readBidsketchString(s.app_url, 'app_url')
       },
       message: `Updated section **${s.name}** in proposal ${ctx.input.proposalId}.`
     };

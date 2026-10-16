@@ -5,11 +5,14 @@ import {
   createGroup,
   createVideo,
   deleteVideos,
+  expireAccess,
+  expireAccessCode,
   getTopVideos,
   getVideoAnalytics,
   listGroups,
   listVideos,
   listWhitelistedDomains,
+  searchAccount,
   updatePlayerSettings,
   updateVideoSource
 } from './tools';
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     createGroup,
     updatePlayerSettings,
     listWhitelistedDomains,
-    addWhitelistedDomain
+    addWhitelistedDomain,
+    searchAccount,
+    expireAccess,
+    expireAccessCode
   ],
   triggers: []
 });

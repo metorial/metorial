@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PostalyticsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,11 +10,11 @@ export let manageTemplates = SlateTool.create(spec, {
   instructions: [
     'Use action "list" to see all available templates.',
     'Use action "get" to retrieve a specific template by ID.',
-    'Use action "create" to create a new HTML template. Size values: 1 = 4x6 postcard, 2 = 6x9 postcard, 3 = 6x11 postcard, 4 = letter.',
+    'Use action "create" to create a new HTML template. Current size values: 0 = letter, 1 = 4x6 postcard, 2 = 6x9 postcard, 3 = 6x11 postcard, 6 = 12x9 bifold, 7 = 6x18 bifold. Legacy numeric values are forwarded unchanged.',
     'Use action "delete" to remove a template.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -29,12 +29,34 @@ export let manageTemplates = SlateTool.create(spec, {
       html: z
         .string()
         .optional()
-        .describe('Template HTML content (required for create action)'),
+        .describe('Template HTML content, required for create unless isFullHtml is false'),
+      front: z
+        .string()
+        .optional()
+        .describe(
+          'Provider-accessible front image URL or letter front content when isFullHtml is false'
+        ),
+      back: z
+        .string()
+        .optional()
+        .describe(
+          'Provider-accessible back image URL or letter back content when isFullHtml is false'
+        ),
+      isFullHtml: z
+        .boolean()
+        .optional()
+        .describe('Whether the HTML defines the full template; Postalytics defaults to true.'),
+      isProofed: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to bypass the provider proofing safeguards. Only set true after verifying the template design.'
+        ),
       size: z
         .number()
         .optional()
         .describe(
-          'Template size: 1 = 4x6 postcard, 2 = 6x9 postcard, 3 = 6x11 postcard, 4 = letter (required for create)'
+          'Template size: 0 = letter, 1 = 4x6 postcard, 2 = 6x9 postcard, 3 = 6x11 postcard, 6 or 7 = bifold (required for create); numeric values are forwarded unchanged'
         )
     })
   )
@@ -71,7 +93,8 @@ export let manageTemplates = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.templateId) throw new Error('templateId is required for get action');
+      if (!ctx.input.templateId)
+        throw createApiServiceError('templateId is required for get action');
       let template = await client.getTemplate(ctx.input.templateId);
       return {
         output: { template },
@@ -80,13 +103,26 @@ export let manageTemplates = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.html) throw new Error('html is required for create action');
-      if (ctx.input.size === undefined) throw new Error('size is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
+      if (ctx.input.isFullHtml === false) {
+        if (!ctx.input.front && !ctx.input.back) {
+          throw createApiServiceError(
+            'Provide front or back image content when isFullHtml is false.'
+          );
+        }
+      } else if (!ctx.input.html) {
+        throw createApiServiceError('html is required for create action');
+      }
+      if (ctx.input.size === undefined)
+        throw createApiServiceError('size is required for create action');
       let result = await client.createTemplate({
         name: ctx.input.name,
         html: ctx.input.html,
-        size: ctx.input.size
+        front: ctx.input.front,
+        back: ctx.input.back,
+        size: ctx.input.size,
+        isFullHtml: ctx.input.isFullHtml,
+        isProofed: ctx.input.isProofed
       });
       return {
         output: { result },
@@ -95,7 +131,8 @@ export let manageTemplates = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.templateId) throw new Error('templateId is required for delete action');
+      if (!ctx.input.templateId)
+        throw createApiServiceError('templateId is required for delete action');
       let result = await client.deleteTemplate(ctx.input.templateId);
       return {
         output: { result },
@@ -103,6 +140,6 @@ export let manageTemplates = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

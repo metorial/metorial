@@ -38,8 +38,8 @@ export let listEvents = SlateTool.create(spec, {
           eventId: e.id,
           name: e.name,
           expoKey: e.expoKey,
-          date: e.date ?? '',
-          location: e.location ?? ''
+          date: e.date,
+          location: e.location
         }))
       },
       message: `Found **${events.length}** event(s).`

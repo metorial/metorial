@@ -1,98 +1,37 @@
-# Slates Specification for Zixflow
+# Zixflow Integration
 
-## Overview
+## Authentication and API
 
-Zixflow is an AI-powered CRM and multichannel messaging platform that enables businesses to manage contacts, send campaigns via WhatsApp, SMS, RCS, and Email, and automate workflows. It combines customer data management (collections, lists, records) with communication capabilities and activity/task tracking in a unified workspace.
+Use the Zixflow App API at `https://api.zixflow.com/api/v1` with `Authorization: Bearer <API key>`. Create an API key under Settings > Workspace Settings > Developer > API Key and grant permissions for the workflows being used. Keys may expire or have IP restrictions; the API key flow has no OAuth refresh exchange. Existing stored `token` values and configuration values remain parseable.
 
-## Authentication
+The connection profile identifies the workspace returned by the workspace-member API. A workspace member is not treated as the authenticated API-key owner. `list_workspace_members` returns the accessible members and workspace IDs. The current App documentation has no current-user or current-key identity endpoint.
 
-Zixflow uses **API Key authentication** via Bearer tokens.
+## CRM workflows
 
-**How to obtain an API key:**
+1. Call `list_collections` to discover People, Company, Deals, and custom collections.
+2. Call `list_attributes` with target `collection` and the selected collection ID to discover API key names, required fields, types, and configuration. Use `list_attribute_options` for select/multiselect option IDs, or set optionType to status to discover status IDs.
+3. Use `manage_collection_records` to create, get, query, patch, or delete records. Contacts are records in the People collection.
+4. Call `list_lists`, then inspect list attributes with `list_attributes` using target `list`.
+5. Use `manage_list_entries` to link a collection record to a list and create, get, query, patch, or delete list entries.
+6. Use `manage_activities` for activity/task creation, retrieval, queries, updates, and deletion. Activity update supports icon changes as well as scheduling, association, and status fields.
 
-1. Log in to the Zixflow dashboard.
-2. Navigate to **Settings > Workspace Settings > Developer > API Keys**.
-3. Click **Create an API** (or **+ Add New**).
-4. Configure the API key settings:
-   - **Permissions**: Define which API endpoints and actions the key can access.
-   - **Expiry** (optional): Set an expiration date for the key.
-   - **IP Restriction** (optional): Restrict usage to specific IP addresses.
-5. Copy the generated API key.
+Queries use `limit` and `offset` (defaults 10 and 0). Collection and entry queries accept the documented `filterObject` or the legacy `filter` array, which is combined with AND. Do not pass both. Sort uses provider objects such as `{ "direction": "asc", "attribute": "name" }`. Activity queries retain their array-filter form. No total count or next page is invented; advance the offset by the returned page length and stop on an empty or short page.
 
-**Usage:**
+## Messaging workflows
 
-Include the API key as a Bearer token in the `Authorization` header of each request:
+- `list_whatsapp_resources` discovers connected accounts, templates, and template variables. Template-variable lookup requires phoneId, templateName, and language; language comes from the selected template.
+- `send_whatsapp_message` sends templates or direct text/media/location payloads. Direct messages require an active recipient session as specified by WhatsApp. Media URLs are inputs to the provider.
+- `get_rcs_template_variables` discovers the variables for a configured RCS bot. `send_rcs_message` supports templates and direct text/media requests.
+- `send_sms` supports the existing transactional, promotional, and OTP routes, sender IDs, flash messages, and India DLT fields.
+- `send_email` sends HTML/plain text to 1–10 recipients using a verified sender. Existing attachment IDs refer to files already uploaded to Zixflow; this integration does not upload or download those files.
+- Messaging tools accept an optional `reportUrl` for delivery reports.
+- `send_otp` submits 1–5 ordered channel attempts with a combined timeout at most 300 seconds. A timeout of zero can trigger attempts immediately. Channel-level report URLs are supplied in channelData; the top-level webhookUrl reports channel switching.
+- `get_message_report` retrieves provider status for WhatsApp, SMS, or email using a message ID returned by Zixflow. Send responses expose message and campaign IDs only when the provider actually returns them.
 
-```
-Authorization: Bearer your_api_key
-```
+A provider acknowledgment is separate from recipient delivery. Responses include the complete actual response in `raw`, including nulls and provider-specific metadata. Optional scalar summaries are omitted when the provider returns a null/object or no value; required strings are validated instead of replaced with placeholders. Update/delete IDs are never copied from request context into provider result fields.
 
-The base URL for all API requests is `https://api.zixflow.com`.
+## Scope
 
-Note: Some legacy SMS endpoints also accept the API key as a query parameter (`apiKey`), but the Bearer token method is the standard approach for all other endpoints.
+This package exposes the Zixflow App API as one product. Zixflow AI messaging, Sendflow, and event ingestion require distinct authentication and are not exposed under the App API key. Custom attribute administration, option administration, email uploads, and inbound webhook triggers are outside this refresh.
 
-## Features
-
-### WhatsApp Messaging
-
-Send messages via WhatsApp using pre-approved templates or free-form direct messages. Supports template management (listing accounts, templates, and template variables), authentication templates (for OTP delivery), and rich media messages. Requires a connected WhatsApp Business Account (WABA) through Meta.
-
-### RCS Messaging
-
-Send Rich Communication Services (RCS) messages using templates or direct messages. Supports text, images, videos, documents, carousels, and interactive buttons. Requires an RCS bot ID.
-
-### SMS Messaging
-
-Send transactional or promotional SMS messages. Configurable options include sender ID, route (transactional/promotional), flash SMS, and DLT template/entity IDs (required for India). Supports a `reportUrl` parameter to receive delivery reports via HTTP POST.
-
-### Email Messaging
-
-Send emails with support for HTML content and attachments. Attachments can be uploaded separately and referenced when sending. Supports configuring sender name, reply-to address, and subject.
-
-### OTPflow
-
-A dedicated OTP delivery API that sends one-time passwords with intelligent multi-channel fallback (e.g., if SMS fails, it can automatically fall back to WhatsApp, RCS, or Email).
-
-### Campaign Reporting
-
-Retrieve delivery reports for sent messages across WhatsApp, SMS, and Email channels. Reports provide message status and delivery details.
-
-### Collections and Records
-
-Collections are customizable data containers (similar to database tables) in the CRM. You can retrieve collections, and perform full CRUD operations on collection records. Records support filtering and sorting with dynamic attributes. Useful for managing contacts, deals, or any custom business data.
-
-### Lists and List Entries
-
-Lists are another organizational structure for grouping data. You can retrieve lists and perform full CRUD operations on list entries. The structure of list entries is dynamic and varies depending on the list's configured attributes.
-
-### Attributes
-
-Manage custom attributes (fields) on collections and lists. Supports creating, reading, updating, and deleting custom attributes. Attributes have configurable options and status settings.
-
-### Activities / Tasks
-
-Manage activities and tasks associated with records. Supports creating, retrieving, updating, and deleting activities. Useful for tracking follow-ups, calls, meetings, and other tasks tied to CRM records.
-
-### Workspace Members
-
-Retrieve information about workspace members, including their names, emails, and roles. Read-only access to member data.
-
-## Events
-
-Zixflow supports webhooks that push real-time notifications to a user-specified endpoint via HTTP POST with a JSON body. Webhooks are configured in the Zixflow dashboard under **Settings > Developer > Webhook**. When creating a webhook, you specify a name, endpoint URL, the actions (events) to listen for, and the webhook type.
-
-### Incoming WhatsApp Messages
-
-Triggered when a new WhatsApp message is received on your connected account (`incoming.whatsapp.message`). Supports various message types: text, image, video, audio, document, location, contacts, button replies, interactive flow form responses, and product orders. Includes sender information (name, phone number) and Meta identifiers (phone ID, WABA ID, message ID).
-
-### Incoming RCS Messages
-
-Triggered when a new RCS message is received (`incoming.rcs.message`). Supports message types: text, quick reply buttons, image, video, audio, file, and location. Includes sender phone number and RCS bot ID.
-
-### SMS Delivery Reports
-
-When sending SMS, a `reportUrl` can be specified per message. Zixflow will POST delivery status reports to that URL when the message status changes. This is configured per-message rather than as a global webhook.
-
-### General Data Change Webhooks
-
-Zixflow supports workspace-level webhooks that notify your endpoint about changes to your data (e.g., CRM records, list entries). These are configured in the Developer settings by selecting specific actions to monitor. Exact event types are selected during webhook creation in the dashboard.
+Official reference: [API index](https://docs.zixflow.com/llms.txt), [authentication](https://docs.zixflow.com/api-reference/authentication), [CRM filtering](https://docs.zixflow.com/api-reference/filtering-and-sorting).

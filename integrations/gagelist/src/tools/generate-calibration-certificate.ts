@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { BASE_URL, Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateCalibrationCertificate = SlateTool.create(spec, {
   name: 'Generate Calibration Certificate',
   key: 'generate_calibration_certificate',
   description: `Generate a calibration certificate for a specific calibration record.
-Returns the certificate data (typically a PDF) for the given calibration record.`,
+Prepares a downloadable PDF certificate for the given calibration record.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -31,6 +31,13 @@ Returns the certificate data (typically a PDF) for the given calibration record.
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getCalibrationCertificate(ctx.input.calibrationId);
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: `${BASE_URL}/Calibration/GetCertificate/${ctx.input.calibrationId}`,
+      mimeType: 'application/pdf',
+      headers: { Authorization: `Bearer ${ctx.auth.token}` }
+    });
 
     return {
       output: {

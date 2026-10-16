@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, quotaSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let geoCoordinatesTool = SlateTool.create(spec, {
@@ -21,6 +21,7 @@ export let geoCoordinatesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      quota: quotaSchema.optional().describe('API point usage, when returned by the provider'),
       latitude: z.number().describe('Latitude of the location'),
       longitude: z.number().describe('Longitude of the location'),
       city: z.string().nullable().describe('Resolved city name')
@@ -33,11 +34,12 @@ export let geoCoordinatesTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...(result.quota ? { quota: result.quota } : {}),
         latitude: result.latitude,
         longitude: result.longitude,
         city: result.city
       },
-      message: `Coordinates for "${ctx.input.location}": **${result.latitude}, ${result.longitude}**${result.city ? ` (${result.city})` : ''}. Use as locationFilter: \`${result.latitude},${result.longitude},15\``
+      message: `Coordinates: **${result.latitude}, ${result.longitude}**${result.city ? ` (${result.city})` : ''}. Use as locationFilter: \`${result.latitude},${result.longitude},15\``
     };
   })
   .build();

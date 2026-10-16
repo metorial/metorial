@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Raisely
 
-Manage fundraising campaigns, donations, and supporter relationships for charities and nonprofits. Create and update fundraising profiles (individual and team pages), process one-time and recurring donations, manage subscriptions for recurring giving, sell event tickets and products, track supporter interactions and apply tags for segmentation, send messages and SMS to supporters, manage blog posts on fundraising pages, and configure webhooks for real-time event notifications. Supports importing offline donations, upserting user records with tagging, and accessing both public and private custom field data.
+Manage fundraising campaigns, donations, and supporter relationships for charities and nonprofits. Browse campaigns, fundraising profiles, donations, recurring subscriptions, supporters, and campaign products. Look up individual profiles, donations, and subscriptions, and confirm the connected account and its organization. Create and update profiles, import donations, manage recurring giving and profile posts, upsert supporters with tags and interaction notes, and submit campaign messages.
+
+Connect with a Raisely campaign private key. Use `list_campaigns` to discover campaign UUIDs and the corresponding list tools to discover record UUIDs. Request private custom fields only when needed and permitted by the connection.
 
 ## License
 

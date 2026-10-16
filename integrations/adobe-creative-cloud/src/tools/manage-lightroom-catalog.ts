@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LightroomClient } from '../lib/lightroom';
 import { spec } from '../spec';
@@ -79,7 +79,8 @@ export let manageLightroomCatalog = SlateTool.create(spec, {
         };
       }
       case 'listAssets': {
-        if (!ctx.input.catalogId) throw new Error('catalogId is required for listAssets');
+        if (!ctx.input.catalogId)
+          throw createApiServiceError('catalogId is required for listAssets');
         let result = await client.listAssets(ctx.input.catalogId, {
           limit: ctx.input.limit,
           capturedAfter: ctx.input.capturedAfter,
@@ -99,7 +100,8 @@ export let manageLightroomCatalog = SlateTool.create(spec, {
         };
       }
       case 'listAlbums': {
-        if (!ctx.input.catalogId) throw new Error('catalogId is required for listAlbums');
+        if (!ctx.input.catalogId)
+          throw createApiServiceError('catalogId is required for listAlbums');
         let result = await client.listAlbums(ctx.input.catalogId, { limit: ctx.input.limit });
         let resources = result.resources || [];
         let albums = resources.map((a: any) => ({
@@ -114,8 +116,10 @@ export let manageLightroomCatalog = SlateTool.create(spec, {
         };
       }
       case 'getAlbumAssets': {
-        if (!ctx.input.catalogId) throw new Error('catalogId is required for getAlbumAssets');
-        if (!ctx.input.albumId) throw new Error('albumId is required for getAlbumAssets');
+        if (!ctx.input.catalogId)
+          throw createApiServiceError('catalogId is required for getAlbumAssets');
+        if (!ctx.input.albumId)
+          throw createApiServiceError('albumId is required for getAlbumAssets');
         let result = await client.listAlbumAssets(ctx.input.catalogId, ctx.input.albumId, {
           limit: ctx.input.limit
         });

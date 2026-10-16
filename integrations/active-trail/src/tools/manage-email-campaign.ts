@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, readId, readList, redactProviderData } from '../lib/client';
 import { spec } from '../spec';
 
 let campaignOutputSchema = z.object({
@@ -46,19 +46,22 @@ export let listEmailCampaigns = SlateTool.create(spec, {
       page: ctx.input.page,
       limit: ctx.input.limit
     });
-    let campaigns = Array.isArray(result) ? result : [];
-    return {
-      output: {
-        campaigns: campaigns.map((c: any) => ({
-          campaignId: c.id,
-          name: c.details?.name,
-          subject: c.details?.subject,
-          sendType: c.send_type,
-          status: c.status
-        }))
+    let campaigns = readList(result);
+    return redactProviderData(
+      {
+        output: {
+          campaigns: campaigns.map((c: any) => ({
+            campaignId: readId(c),
+            name: c.name,
+            subject: c.subject,
+            sendType: c.send_type,
+            status: c.is_sent
+          }))
+        },
+        message: `Found **${campaigns.length}** email campaign(s).`
       },
-      message: `Found **${campaigns.length}** email campaign(s).`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -88,19 +91,24 @@ export let getEmailCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let campaign = await client.getCampaign(ctx.input.campaignId);
-    return {
-      output: {
-        campaignId: campaign.id,
-        name: campaign.details?.name,
-        subject: campaign.details?.subject,
-        sendType: campaign.send_type,
-        details: campaign.details,
-        design: campaign.design,
-        scheduling: campaign.scheduling,
-        segment: campaign.segment
+    let scheduling = await client.getCampaignScheduling(ctx.input.campaignId);
+    let segment = await client.getCampaignSegment(ctx.input.campaignId);
+    return redactProviderData(
+      {
+        output: {
+          campaignId: readId(campaign),
+          name: campaign.details?.name,
+          subject: campaign.details?.subject,
+          sendType: campaign.send_type,
+          details: campaign.details,
+          design: campaign.design,
+          scheduling,
+          segment
+        },
+        message: `Retrieved email campaign **${campaign.details?.name || ctx.input.campaignId}**.`
       },
-      message: `Retrieved email campaign **${campaign.details?.name || ctx.input.campaignId}**.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -171,14 +179,17 @@ export let createEmailCampaign = SlateTool.create(spec, {
     }
 
     let result = await client.createCampaign(data);
-    return {
-      output: {
-        campaignId: result.id,
-        name: result.details?.name,
-        sendType: result.send_type
+    return redactProviderData(
+      {
+        output: {
+          campaignId: readId(result),
+          name: result.details?.name,
+          sendType: result.send_type
+        },
+        message: `Email campaign **${ctx.input.name}** created with ID **${result.id}**.`
       },
-      message: `Email campaign **${ctx.input.name}** created with ID **${result.id}**.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -212,22 +223,29 @@ export let updateEmailCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let { campaignId } = ctx.input;
+    if (
+      Object.entries(ctx.input).every(
+        ([key, value]) => key === 'campaignId' || value === undefined
+      )
+    )
+      throw createApiServiceError('Provide at least one campaign field to update.');
 
     if (
-      ctx.input.name ||
-      ctx.input.subject ||
-      ctx.input.userProfileId ||
-      ctx.input.preheader
+      ctx.input.name !== undefined ||
+      ctx.input.subject !== undefined ||
+      ctx.input.userProfileId !== undefined ||
+      ctx.input.preheader !== undefined
     ) {
       let details: Record<string, any> = {};
-      if (ctx.input.name) details.name = ctx.input.name;
-      if (ctx.input.subject) details.subject = ctx.input.subject;
-      if (ctx.input.userProfileId) details.user_profile_id = ctx.input.userProfileId;
-      if (ctx.input.preheader) details.preheader = ctx.input.preheader;
+      if (ctx.input.name !== undefined) details.name = ctx.input.name;
+      if (ctx.input.subject !== undefined) details.subject = ctx.input.subject;
+      if (ctx.input.userProfileId !== undefined)
+        details.user_profile_id = ctx.input.userProfileId;
+      if (ctx.input.preheader !== undefined) details.preheader = ctx.input.preheader;
       await client.updateCampaignDetails(campaignId, details);
     }
 
-    if (ctx.input.htmlContent) {
+    if (ctx.input.htmlContent !== undefined) {
       await client.updateCampaignDesign(campaignId, { content: ctx.input.htmlContent });
     }
 
@@ -239,18 +257,21 @@ export let updateEmailCampaign = SlateTool.create(spec, {
       await client.updateCampaignSegment(campaignId, segment);
     }
 
-    if (ctx.input.isSent !== undefined || ctx.input.scheduledDateUtc) {
+    if (ctx.input.isSent !== undefined || ctx.input.scheduledDateUtc !== undefined) {
       let scheduling: Record<string, any> = {};
       if (ctx.input.isSent !== undefined) scheduling.is_sent = ctx.input.isSent;
-      if (ctx.input.scheduledDateUtc)
+      if (ctx.input.scheduledDateUtc !== undefined)
         scheduling.scheduled_date_utc = ctx.input.scheduledDateUtc;
       await client.updateCampaignScheduling(campaignId, scheduling);
     }
 
-    return {
-      output: { success: true, campaignId },
-      message: `Email campaign **${campaignId}** updated.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true, campaignId },
+        message: `Email campaign **${campaignId}** updated.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -273,9 +294,12 @@ export let deleteEmailCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.deleteCampaign(ctx.input.campaignId);
-    return {
-      output: { success: true },
-      message: `Email campaign **${ctx.input.campaignId}** deleted.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Email campaign **${ctx.input.campaignId}** deleted.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

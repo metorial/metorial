@@ -4,6 +4,10 @@ import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let datasetSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   datasetId: z.string().describe('Unique identifier of the dataset'),
   name: z.string().describe('Human-readable name of the dataset'),
   status: z
@@ -32,6 +36,7 @@ export let listDatasets = SlateTool.create(spec, {
     let datasets = await client.listDatasets();
 
     let mapped = datasets.map((d: any) => ({
+      raw: d,
       datasetId: d.id,
       name: d.name,
       status: d.status,
@@ -73,12 +78,13 @@ export let getDataset = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: d,
         datasetId: d.id,
         name: d.name,
         status: d.status,
         connectionId: d.connection_id,
         identityMapping: d.identity_sets,
-        outputColumns: d.output_columns,
+        outputColumns: d.output_columns ?? d.detected_columns,
         createdAt: d.created_at,
         updatedAt: d.updated_at
       },

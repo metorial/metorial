@@ -1,6 +1,7 @@
 export * from './animate-image';
 export * from './auto-hashtag';
 export * from './banned-instagram-hashtags';
+export * from './check-email';
 export * from './company-insights';
 export * from './email-insights';
 export * from './emoji-suggestions';

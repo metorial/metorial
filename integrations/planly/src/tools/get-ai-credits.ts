@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseData, teamIdSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getAiCredits = SlateTool.create(spec, {
   name: 'Get AI Credits',
   key: 'get_ai_credits',
-  description: `Check the number of available AI content generation credits for a team. Each AI generation consumes credits.`,
+  description: `Check the number of available AI content generation credits for a team. Each AI generation consumes credits. Call list_teams to discover the team ID.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,7 @@ export let getAiCredits = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team to check credits for')
+      teamId: teamIdSchema
     })
   )
   .output(
@@ -24,11 +25,9 @@ export let getAiCredits = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.getAiCredits(ctx.input.teamId);
-    let credits = result.data ?? result ?? 0;
-
-    return {
-      output: { credits: typeof credits === 'number' ? credits : 0 },
-      message: `${credits} AI credit(s) available.`
-    };
+    let credits = responseData(await client.getAiCredits(ctx.input.teamId));
+    if (typeof credits !== 'number' || !Number.isFinite(credits)) {
+      throw createApiServiceError('Planly returned missing or invalid AI credits.');
+    }
+    return { output: { credits }, message: `${credits} AI credit(s) available.` };
   });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireText } from '../lib/responses';
 import { spec } from '../spec';
 
 export let checkinAttendeeTool = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let checkinAttendeeTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       firstName: z.string().optional().describe('Attendee first name'),
       lastName: z.string().optional().describe('Attendee last name'),
       eventTitle: z.string().optional().describe('Event title'),
@@ -33,19 +35,18 @@ export let checkinAttendeeTool = SlateTool.create(spec, {
     let data = await client.checkinAttendee(ctx.input.barcode, ctx.input.checkin);
 
     let output = {
+      raw: data,
       firstName: data.first_name,
       lastName: data.last_name,
       eventTitle: data.eventtitle,
-      orderRef: data.orderef,
+      orderRef: data.orderref ?? data.orderef,
       email: data.email,
-      status: data.status
+      status: requireText(data.status, 'check-in status')
     };
-
-    let action = ctx.input.checkin ? 'checked in' : 'check-in reverted for';
 
     return {
       output,
-      message: `Successfully ${action} **${output.firstName} ${output.lastName}** for event "${output.eventTitle}".`
+      message: `Eventzilla returned check-in status **${output.status}** for barcode ${ctx.input.barcode}.`
     };
   })
   .build();

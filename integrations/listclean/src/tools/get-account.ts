@@ -15,9 +15,9 @@ export let getAccount = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      accountId: z.string().describe('Unique account identifier'),
-      email: z.string().describe('Account email address'),
-      name: z.string().describe('Account holder name'),
+      accountId: z.string().optional().describe('Account identifier, when returned'),
+      email: z.string().optional().describe('Account email address, when returned'),
+      name: z.string().optional().describe('Account holder name, when returned'),
       credits: z.number().describe('Remaining verification credits')
     })
   )
@@ -27,16 +27,19 @@ export let getAccount = SlateTool.create(spec, {
     });
 
     ctx.progress('Fetching account profile...');
-    let profile = await client.getAccountProfile();
+    let [profile, credits] = await Promise.all([
+      client.getAccountProfile(),
+      client.getCredits()
+    ]);
 
     return {
       output: {
-        accountId: profile.id ? String(profile.id) : '',
-        email: profile.email || '',
-        name: profile.name || '',
-        credits: profile.credits ?? 0
+        accountId: profile.id !== undefined ? String(profile.id) : undefined,
+        email: profile.email,
+        name: profile.name,
+        credits
       },
-      message: `Account: **${profile.name || profile.email}** — **${profile.credits ?? 0}** credits remaining.`
+      message: `Account profile retrieved. **${credits}** verification credits remaining.`
     };
   })
   .build();

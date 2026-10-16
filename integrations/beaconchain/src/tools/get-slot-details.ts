@@ -16,6 +16,20 @@ Optionally include sync committee duties, attestation duties, withdrawals, and d
   .input(
     z.object({
       slot: z.number().describe('Slot number to look up'),
+      pageSize: z.number().optional().describe('Results per included list (1-10)'),
+      syncCommitteeCursor: z
+        .string()
+        .optional()
+        .describe('Cursor from syncCommitteeDuties.paging.next_cursor'),
+      attestationCursor: z
+        .string()
+        .optional()
+        .describe('Cursor from attestationDuties.paging.next_cursor'),
+      withdrawalCursor: z
+        .string()
+        .optional()
+        .describe('Cursor from withdrawals.paging.next_cursor'),
+      depositCursor: z.string().optional().describe('Cursor from deposits.paging.next_cursor'),
       includeSyncCommitteeDuties: z
         .boolean()
         .optional()
@@ -55,19 +69,31 @@ Optionally include sync committee duties, attestation duties, withdrawals, and d
     let result: Record<string, any> = { slotOverview };
 
     if (ctx.input.includeSyncCommitteeDuties) {
-      result.syncCommitteeDuties = await client.getSlotSyncCommitteeDuties(ctx.input.slot);
+      result.syncCommitteeDuties = await client.getSlotSyncCommitteeDuties(ctx.input.slot, {
+        pageSize: ctx.input.pageSize,
+        cursor: ctx.input.syncCommitteeCursor
+      });
     }
 
     if (ctx.input.includeAttestationDuties) {
-      result.attestationDuties = await client.getSlotAttestationDuties(ctx.input.slot);
+      result.attestationDuties = await client.getSlotAttestationDuties(ctx.input.slot, {
+        pageSize: ctx.input.pageSize,
+        cursor: ctx.input.attestationCursor
+      });
     }
 
     if (ctx.input.includeWithdrawals) {
-      result.withdrawals = await client.getSlotWithdrawals(ctx.input.slot);
+      result.withdrawals = await client.getSlotWithdrawals(ctx.input.slot, {
+        pageSize: ctx.input.pageSize,
+        cursor: ctx.input.withdrawalCursor
+      });
     }
 
     if (ctx.input.includeDeposits) {
-      result.deposits = await client.getSlotDeposits(ctx.input.slot);
+      result.deposits = await client.getSlotDeposits(ctx.input.slot, {
+        pageSize: ctx.input.pageSize,
+        cursor: ctx.input.depositCursor
+      });
     }
 
     return {

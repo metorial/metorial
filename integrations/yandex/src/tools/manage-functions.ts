@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as functions from '../lib/functions';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listFunctions = SlateTool.create(spec, {
   name: 'List Functions',
   key: 'list_functions',
-  description: `List all serverless functions in a Yandex Cloud Functions folder. Returns function metadata including name, status, and invoke URL.`,
+  description: `List all serverless functions in a Yandex Cloud Functions folder. Returns function metadata including name and invoke URL. Call list_function_versions to inspect deployed versions.`,
   tags: { readOnly: true }
 })
   .input(
@@ -37,7 +37,8 @@ export let listFunctions = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await functions.listFunctions(
       ctx.auth,
@@ -69,7 +70,7 @@ export let listFunctions = SlateTool.create(spec, {
 export let getFunction = SlateTool.create(spec, {
   name: 'Get Function',
   key: 'get_function',
-  description: `Get detailed information about a specific Yandex Cloud Function, including its status, HTTP invoke URL, and version details.`,
+  description: `Get detailed information about a specific Yandex Cloud Function, including its HTTP invoke URL and metadata. Use list_function_versions for deployed version details.`,
   tags: { readOnly: true }
 })
   .input(
@@ -105,7 +106,7 @@ export let getFunction = SlateTool.create(spec, {
         logGroupId: result.logGroupId,
         labels: result.labels
       },
-      message: `Function **${result.name || result.id}** status: **${result.status}**.`
+      message: `Retrieved function **${result.name || result.id}**.`
     };
   })
   .build();
@@ -133,7 +134,8 @@ export let createFunction = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await functions.createFunction(ctx.auth, {
       folderId,
@@ -146,7 +148,7 @@ export let createFunction = SlateTool.create(spec, {
       output: {
         operationId: result.id,
         functionId: result.metadata?.functionId,
-        done: result.done || false
+        done: result.done
       },
       message: `Function creation initiated. Operation ID: **${result.id}**.`
     };
@@ -176,7 +178,7 @@ export let deleteFunction = SlateTool.create(spec, {
     return {
       output: {
         operationId: result.id,
-        done: result.done || false
+        done: result.done
       },
       message: `Function **${ctx.input.functionId}** deletion initiated.`
     };

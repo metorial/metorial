@@ -1,9 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let firewallRuleSchema = z.object({
+  ruleUuid: z.string().optional().describe('Existing rule UUID when updating a rule'),
+  endpointPrefixes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'IP addresses or CIDR ranges for ip_prefixes rules; use this for multiple prefixes'
+    ),
   protocol: z.enum(['TCP', 'UDP', 'ICMP']).describe('Protocol'),
   direction: z.enum(['inbound', 'outbound']).describe('Traffic direction'),
   portStart: z.number().optional().describe('Start port (1-65535)'),
@@ -12,14 +19,24 @@ let firewallRuleSchema = z.object({
   endpointSpec: z
     .string()
     .optional()
-    .describe('CIDR notation IP prefix (when endpointSpecType is "ip_prefixes")')
+    .describe(
+      'IP address, CIDR prefix, or JSON array of prefixes (when endpointSpecType is "ip_prefixes"). Prefer endpointPrefixes for multiple prefixes.'
+    )
 });
 
 let firewallSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider firewall response'),
   firewallUuid: z.string().describe('Firewall UUID'),
   name: z.string().optional().describe('Firewall name'),
   description: z.string().optional().describe('Firewall description'),
-  rules: z.array(firewallRuleSchema).optional().describe('Firewall rules'),
+  rules: z
+    .array(
+      firewallRuleSchema.extend({
+        raw: z.unknown().optional().describe('Complete provider rule response')
+      })
+    )
+    .optional()
+    .describe('Firewall rules'),
   assignedResources: z
     .array(
       z.object({
@@ -57,7 +74,12 @@ export let manageFirewalls = SlateTool.create(spec, {
         .describe('Firewall UUID (required for update, delete, assign, unassign)'),
       displayName: z.string().optional().describe('Firewall name (for create/update)'),
       description: z.string().optional().describe('Firewall description (for update)'),
-      billingAccountId: z.number().optional().describe('Billing account ID (for create)'),
+      billingAccountId: z
+        .number()
+        .optional()
+        .describe(
+          'Call list_billing_accounts to discover billing account IDs. Billing account ID (for create)'
+        ),
       rules: z
         .array(firewallRuleSchema)
         .optional()
@@ -80,31 +102,43 @@ export let manageFirewalls = SlateTool.create(spec, {
 
     let { action } = ctx.input;
 
-    let mapRule = (r: any) => ({
-      protocol: r.protocol,
-      direction: r.direction,
-      portStart: r.port_start,
-      portEnd: r.port_end,
-      endpointSpecType: r.endpoint_spec_type,
-      endpointSpec: r.endpoint_spec
-    });
+    let mapRule = (r: any) => {
+      if (typeof r.protocol !== 'string')
+        throw createApiServiceError('Pilvio returned a firewall rule without a protocol.');
+      return {
+        protocol: r.protocol.toUpperCase(),
+        direction: r.direction,
+        raw: r,
+        ruleUuid: r.uuid ?? undefined,
+        portStart: r.port_start ?? undefined,
+        portEnd: r.port_end ?? undefined,
+        endpointSpecType: r.endpoint_spec_type,
+        endpointSpec: Array.isArray(r.endpoint_spec)
+          ? r.endpoint_spec.length === 1
+            ? r.endpoint_spec[0]
+            : JSON.stringify(r.endpoint_spec)
+          : (r.endpoint_spec ?? undefined),
+        endpointPrefixes: Array.isArray(r.endpoint_spec) ? r.endpoint_spec : undefined
+      };
+    };
 
     let mapFirewall = (fw: any) => ({
+      raw: fw,
       firewallUuid: fw.uuid,
-      name: fw.name || fw.display_name,
-      description: fw.description,
+      name: fw.name ?? fw.display_name ?? undefined,
+      description: fw.description ?? undefined,
       rules: (fw.rules || []).map(mapRule),
       assignedResources: (fw.resources_assigned || []).map((r: any) => ({
         resourceType: r.resource_type,
         resourceUuid: r.resource_uuid
       })),
-      createdAt: fw.created_at
+      createdAt: fw.created_at ?? undefined
     });
 
     switch (action) {
       case 'list': {
         let firewalls = await client.listFirewalls();
-        let mapped = (Array.isArray(firewalls) ? firewalls : []).map(mapFirewall);
+        let mapped = firewalls.map(mapFirewall);
         return {
           output: { firewalls: mapped, success: true },
           message: `Found **${mapped.length}** firewall(s).`
@@ -113,7 +147,7 @@ export let manageFirewalls = SlateTool.create(spec, {
 
       case 'create': {
         if (!ctx.input.displayName)
-          throw new Error('displayName is required for create action');
+          throw createApiServiceError('displayName is required for create action');
         let fw = await client.createFirewall({
           displayName: ctx.input.displayName,
           billingAccountId: ctx.input.billingAccountId,
@@ -123,6 +157,8 @@ export let manageFirewalls = SlateTool.create(spec, {
             portStart: r.portStart,
             portEnd: r.portEnd,
             endpointSpecType: r.endpointSpecType,
+            endpointPrefixes: r.endpointPrefixes,
+            ruleUuid: r.ruleUuid,
             endpointSpec: r.endpointSpec
           }))
         });
@@ -134,7 +170,7 @@ export let manageFirewalls = SlateTool.create(spec, {
 
       case 'update': {
         if (!ctx.input.firewallUuid)
-          throw new Error('firewallUuid is required for update action');
+          throw createApiServiceError('firewallUuid is required for update action');
         let fw = await client.updateFirewall(ctx.input.firewallUuid, {
           name: ctx.input.displayName,
           description: ctx.input.description,
@@ -144,6 +180,8 @@ export let manageFirewalls = SlateTool.create(spec, {
             portStart: r.portStart,
             portEnd: r.portEnd,
             endpointSpecType: r.endpointSpecType,
+            endpointPrefixes: r.endpointPrefixes,
+            ruleUuid: r.ruleUuid,
             endpointSpec: r.endpointSpec
           }))
         });
@@ -155,7 +193,7 @@ export let manageFirewalls = SlateTool.create(spec, {
 
       case 'delete': {
         if (!ctx.input.firewallUuid)
-          throw new Error('firewallUuid is required for delete action');
+          throw createApiServiceError('firewallUuid is required for delete action');
         await client.deleteFirewall(ctx.input.firewallUuid);
         return {
           output: { success: true },
@@ -165,7 +203,9 @@ export let manageFirewalls = SlateTool.create(spec, {
 
       case 'assign': {
         if (!ctx.input.firewallUuid || !ctx.input.vmUuid)
-          throw new Error('firewallUuid and vmUuid are required for assign action');
+          throw createApiServiceError(
+            'firewallUuid and vmUuid are required for assign action'
+          );
         await client.assignFirewallToVm(ctx.input.firewallUuid, ctx.input.vmUuid);
         return {
           output: { success: true },
@@ -175,7 +215,9 @@ export let manageFirewalls = SlateTool.create(spec, {
 
       case 'unassign': {
         if (!ctx.input.firewallUuid || !ctx.input.vmUuid)
-          throw new Error('firewallUuid and vmUuid are required for unassign action');
+          throw createApiServiceError(
+            'firewallUuid and vmUuid are required for unassign action'
+          );
         await client.unassignFirewallFromVm(ctx.input.firewallUuid, ctx.input.vmUuid);
         return {
           output: { success: true },

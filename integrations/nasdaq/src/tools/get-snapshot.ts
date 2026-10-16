@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RealtimeClient } from '../lib/realtime-client';
+import { createRealtimeClient, realtimeRecords } from '../lib/realtime-client';
 import { spec } from '../spec';
 
 export let getSnapshot = SlateTool.create(spec, {
@@ -10,7 +10,7 @@ export let getSnapshot = SlateTool.create(spec, {
 Requires OAuth2 authentication with the Real-Time/Delayed REST API.`,
   instructions: [
     'Requires OAuth2 Client Credentials authentication (not API Key).',
-    'Set includeTrends to true to also fetch top 5 gainers and decliners.'
+    'Set includeTrends to true to also fetch market gainers, decliners, and activity rankings.'
   ],
   tags: {
     readOnly: true
@@ -29,7 +29,10 @@ Requires OAuth2 authentication with the Real-Time/Delayed REST API.`,
         .enum(['realtime', 'delayed'])
         .optional()
         .describe('Whether to get real-time or delayed data.'),
-      includeTrends: z.boolean().optional().describe('Also fetch top 5 gainers and decliners.')
+      includeTrends: z
+        .boolean()
+        .optional()
+        .describe('Also fetch market gainers, decliners, and activity rankings.')
     })
   )
   .output(
@@ -44,27 +47,7 @@ Requires OAuth2 authentication with the Real-Time/Delayed REST API.`,
     })
   )
   .handleInvocation(async ctx => {
-    if (
-      ctx.auth.authMethod !== 'oauth' ||
-      !ctx.auth.baseUrl ||
-      !ctx.auth.oauthToken ||
-      !ctx.auth.tokenEndpoint ||
-      !ctx.auth.clientId ||
-      !ctx.auth.clientSecret
-    ) {
-      throw new Error(
-        'This tool requires OAuth2 Client Credentials authentication. Please use the OAuth2 authentication method.'
-      );
-    }
-
-    let client = new RealtimeClient({
-      baseUrl: ctx.auth.baseUrl,
-      oauthToken: ctx.auth.oauthToken,
-      tokenEndpoint: ctx.auth.tokenEndpoint,
-      clientId: ctx.auth.clientId,
-      clientSecret: ctx.auth.clientSecret,
-      oauthTokenExpiresAt: ctx.auth.oauthTokenExpiresAt || ''
-    });
+    let client = createRealtimeClient(ctx.auth);
 
     let result = await client.getSnapshot({
       symbols: ctx.input.symbols,
@@ -72,7 +55,7 @@ Requires OAuth2 authentication with the Real-Time/Delayed REST API.`,
       offset: ctx.input.offset
     });
 
-    let snapshots = Array.isArray(result) ? result : [result];
+    let snapshots = realtimeRecords(result, 'snapshots');
 
     let trends: Record<string, any> | undefined;
     if (ctx.input.includeTrends) {

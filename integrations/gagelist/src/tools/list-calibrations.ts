@@ -35,11 +35,17 @@ Returns calibration records with their dates, equipment references, and key deta
             manufacturer: z.string().optional().describe('Manufacturer name'),
             controlNumber: z.string().optional().describe('Control number'),
             serialNumber: z.string().optional().describe('Serial number'),
+            lastCalibrationDate: z.string().optional().describe('Date of the calibration'),
+            calibrationDueDate: z.string().optional().describe('Next calibration due date'),
             createdDate: z.string().optional().describe('Record creation date'),
             updatedDate: z.string().optional().describe('Last update date')
           })
         )
         .describe('List of calibration records'),
+      totalAvailable: z
+        .number()
+        .optional()
+        .describe('Total matching records reported by GageList'),
       totalReturned: z.number().describe('Number of calibrations returned in this page')
     })
   )
@@ -51,7 +57,7 @@ Returns calibration records with their dates, equipment references, and key deta
       recordNumber: ctx.input.limit
     });
 
-    let calibrations = (result.data ?? []).map((c: any) => ({
+    let calibrations = result.data.map((c: any) => ({
       calibrationId: c.Id,
       recordNumber: c.RecordNumber,
       equipmentRefId: c.EquipmentRefId,
@@ -59,6 +65,8 @@ Returns calibration records with their dates, equipment references, and key deta
       manufacturer: c.Manufacturer,
       controlNumber: c.ControlNumber,
       serialNumber: c.SerialNumber,
+      lastCalibrationDate: c.LastCalibrationDate,
+      calibrationDueDate: c.CalibrationDueDate,
       createdDate: c.CreatedDate,
       updatedDate: c.UpdatedDate
     }));
@@ -66,6 +74,7 @@ Returns calibration records with their dates, equipment references, and key deta
     return {
       output: {
         calibrations,
+        totalAvailable: result.total,
         totalReturned: calibrations.length
       },
       message: `Retrieved **${calibrations.length}** calibration record(s) starting from offset ${ctx.input.offset}.`

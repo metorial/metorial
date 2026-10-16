@@ -1,12 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { getAttributes, getResource, requireText } from './lib/response';
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
@@ -19,29 +17,16 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
+      requireText(ctx.input.token, 'API token');
+      return { output: { token: ctx.input.token } };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://app.keyword.com'
-      });
-
-      let _response = await http.get('/api/v2/groups/active', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return {
-        profile: {
-          id: 'keyword-user',
-          name: 'Keyword.com Account'
-        }
-      };
+      let resource = getResource(
+        await new Client({ token: ctx.output.token }).getCurrentUser()
+      );
+      let attributes = getAttributes(resource);
+      requireText(resource.id, 'Account identifier returned by Keyword.com');
+      requireText(attributes.name, 'Account name returned by Keyword.com');
+      return { profile: { id: resource.id, name: attributes.name } };
     }
   });

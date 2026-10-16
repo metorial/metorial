@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let lookupIp = SlateTool.create(spec, {
   name: 'Lookup IP Address',
   key: 'lookup_ip',
-  description: `Look up detailed information for an IPv4 or IPv6 address, including geolocation, ASN, privacy detection, company, carrier, and network flags. Omit the IP to look up the caller's own address. The depth of data returned depends on your IPinfo plan tier.`,
+  description: `Look up detailed information for an IPv4 or IPv6 address, including geolocation, ASN, privacy detection, carrier, and network flags. Omit the IP to look up the invoking server's public IP address. Choose the legacy API for legacy company and abuse data when included in your plan.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -18,7 +18,13 @@ export let lookupIp = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          "IPv4 or IPv6 address to look up. Omit to look up the caller's own IP address."
+          "IPv4 or IPv6 address to look up. Omit to look up the invoking server's public IP address."
+        ),
+      api: z
+        .enum(['lookup', 'legacy'])
+        .optional()
+        .describe(
+          'API response format: lookup uses the current paid Core/Plus/Max API; legacy uses the maintained legacy API. Omit for lookup.'
         )
     })
   )
@@ -64,7 +70,11 @@ export let lookupIp = SlateTool.create(spec, {
           name: z.string().optional(),
           domain: z.string().optional(),
           route: z.string().optional(),
-          type: z.string().optional()
+          type: z.string().optional(),
+          lastChanged: z
+            .string()
+            .optional()
+            .describe('Date when the ASN information last changed')
         })
         .optional()
         .describe('ASN information (Core tier and above)'),
@@ -113,12 +123,17 @@ export let lookupIp = SlateTool.create(spec, {
         .optional()
         .describe('Whether the IP belongs to a hosting provider'),
       isMobile: z.boolean().optional().describe('Whether the IP is a mobile connection'),
-      isSatellite: z.boolean().optional().describe('Whether the IP is a satellite connection')
+      isSatellite: z.boolean().optional().describe('Whether the IP is a satellite connection'),
+      isPlace: z.boolean().optional().describe('Whether the IP maps to a known public place'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including plan-specific fields')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
-    let result = await client.getIpDetails(ctx.input.ip);
+    let result = await client.getIpDetails(ctx.input.ip, ctx.input.api);
 
     let geo = result.geo
       ? {
@@ -146,7 +161,8 @@ export let lookupIp = SlateTool.create(spec, {
           name: asData.name,
           domain: asData.domain,
           route: asData.route,
-          type: asData.type
+          type: asData.type,
+          lastChanged: asData.last_changed
         }
       : undefined;
 
@@ -173,14 +189,26 @@ export let lookupIp = SlateTool.create(spec, {
         geo,
         asn: asnOutput,
         company: result.company,
-        carrier: result.carrier,
-        privacy: result.privacy,
+        carrier: result.carrier ?? result.mobile,
+        privacy:
+          result.privacy ??
+          (result.anonymous
+            ? {
+                vpn: result.anonymous.is_vpn,
+                proxy: result.anonymous.is_proxy,
+                tor: result.anonymous.is_tor,
+                relay: result.anonymous.is_relay,
+                service: result.anonymous.name
+              }
+            : undefined),
         abuse: result.abuse,
         isAnonymous: result.is_anonymous,
         isAnycast: result.is_anycast,
         isHosting: result.is_hosting,
         isMobile: result.is_mobile,
-        isSatellite: result.is_satellite
+        isSatellite: result.is_satellite,
+        isPlace: result.is_place,
+        raw: result
       },
       message: `IP **${result.ip}** is located in **${locationStr}**${result.org ? ` (${result.org})` : ''}.`
     };

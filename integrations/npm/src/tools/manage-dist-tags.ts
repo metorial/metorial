@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NpmRegistryClient } from '../lib/client';
+import { stringRecord } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageDistTags = SlateTool.create(spec, {
@@ -24,6 +25,7 @@ Use "list" to see all current tags, "add" to create or update a tag pointing to 
         .describe(
           'Action to perform: "list" to view tags, "add" to set a tag, "remove" to delete a tag'
         ),
+      otp: z.string().optional().describe('One-time password when required by the account.'),
       tag: z
         .string()
         .optional()
@@ -46,7 +48,10 @@ Use "list" to see all current tags, "add" to create or update a tag pointing to 
     let client = new NpmRegistryClient({ token: ctx.auth.token || undefined });
 
     if (ctx.input.action === 'list') {
-      let tags = await client.getDistTags(ctx.input.packageName);
+      let tags = stringRecord(
+        await client.getDistTags(ctx.input.packageName),
+        'distribution tags'
+      );
       let tagEntries = Object.entries(tags);
       return {
         output: { distTags: tags },
@@ -55,11 +60,21 @@ Use "list" to see all current tags, "add" to create or update a tag pointing to 
     }
 
     if (ctx.input.action === 'add') {
-      if (!ctx.input.tag) throw new Error('Tag name is required for "add" action.');
-      if (!ctx.input.version) throw new Error('Version is required for "add" action.');
+      if (!ctx.input.tag)
+        throw createApiServiceError('Tag name is required for "add" action.');
+      if (!ctx.input.version)
+        throw createApiServiceError('Version is required for "add" action.');
 
-      await client.addDistTag(ctx.input.packageName, ctx.input.tag, ctx.input.version);
-      let tags = await client.getDistTags(ctx.input.packageName);
+      await client.addDistTag(
+        ctx.input.packageName,
+        ctx.input.tag,
+        ctx.input.version,
+        ctx.input.otp
+      );
+      let tags = stringRecord(
+        await client.getDistTags(ctx.input.packageName),
+        'distribution tags'
+      );
       return {
         output: { distTags: tags },
         message: `Set dist-tag \`${ctx.input.tag}\` → **${ctx.input.version}** on **${ctx.input.packageName}**.`
@@ -67,16 +82,20 @@ Use "list" to see all current tags, "add" to create or update a tag pointing to 
     }
 
     if (ctx.input.action === 'remove') {
-      if (!ctx.input.tag) throw new Error('Tag name is required for "remove" action.');
+      if (!ctx.input.tag)
+        throw createApiServiceError('Tag name is required for "remove" action.');
 
-      await client.removeDistTag(ctx.input.packageName, ctx.input.tag);
-      let tags = await client.getDistTags(ctx.input.packageName);
+      await client.removeDistTag(ctx.input.packageName, ctx.input.tag, ctx.input.otp);
+      let tags = stringRecord(
+        await client.getDistTags(ctx.input.packageName),
+        'distribution tags'
+      );
       return {
         output: { distTags: tags },
         message: `Removed dist-tag \`${ctx.input.tag}\` from **${ctx.input.packageName}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

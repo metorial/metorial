@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageAttendance = SlateTool.create(spec, {
@@ -36,7 +36,7 @@ export let manageAttendance = SlateTool.create(spec, {
     }
 
     return {
-      output: { success: result === true || result === 'true' },
+      output: { success: requireSuccess(result) },
       message: `${ctx.input.action === 'check_in' ? 'Checked in' : ctx.input.action === 'check_out' ? 'Checked out' : 'Removed attendance for'} person (ID: ${ctx.input.personId}) at event instance (ID: ${ctx.input.instanceId}).`
     };
   })

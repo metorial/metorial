@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { timeZoneSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let confidenceAreaPointSchema = z
@@ -41,9 +42,9 @@ export let geolocateIpTool = SlateTool.create(spec, {
   name: 'Geolocate IP',
   key: 'geolocate_ip',
   description: `Determine the geographic location of an IP address (IPv4 or IPv6) with high precision. Returns country, region, city, coordinates, timezone, ISP/ASN details, confidence level, confidence area polygon, and a full hazard report including VPN/proxy/Tor detection.
-If no IP is provided, the caller's own IP is geolocated.`,
+If no IP is provided, the execution server's public IP is geolocated.`,
   instructions: [
-    "Omit the IP address to geolocate the caller's own IP.",
+    "Omit the IP address to geolocate the execution server's public IP.",
     'Confidence levels are "low", "moderate", or "high".'
   ],
   tags: {
@@ -55,7 +56,9 @@ If no IP is provided, the caller's own IP is geolocated.`,
       ip: z
         .string()
         .optional()
-        .describe("IPv4 or IPv6 address to geolocate. If omitted, the caller's IP is used.")
+        .describe(
+          "IPv4 or IPv6 address to geolocate. If omitted, the execution server's public IP is used."
+        )
     })
   )
   .output(
@@ -68,6 +71,7 @@ If no IP is provided, the caller's own IP is geolocated.`,
           .describe('Whether the IP is present on the global routing table'),
         country: countrySchema.optional().describe('Country-level location details'),
         location: locationSchema.optional().describe('Detailed geographic location'),
+        timeZone: timeZoneSchema.optional().describe('Provider time zone information'),
         confidence: z
           .string()
           .optional()
@@ -131,7 +135,7 @@ If no IP is provided, the caller's own IP is geolocated.`,
 
     let result = await client.ipGeolocation({ ip: ctx.input.ip });
 
-    let ipAddr = result.ip || ctx.input.ip || 'caller IP';
+    let ipAddr = result.ip || ctx.input.ip || 'execution server IP';
     let city = result.location?.city || result.city || '';
     let countryName = result.country?.name || '';
     let confidence = result.confidence || 'unknown';

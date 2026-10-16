@@ -25,6 +25,12 @@ export let getCopeData = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation URL returned by this tool. Supply it alone to retrieve the next page.'
+        ),
       filter: z
         .string()
         .optional()
@@ -39,13 +45,22 @@ export let getCopeData = SlateTool.create(spec, {
   .output(
     z.object({
       copeRecords: z.array(copeRecordSchema).describe('List of COPE records'),
-      count: z.number().describe('Number of COPE records returned')
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Provider continuation URL for the next page, when supplied'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total matching count, when supplied'),
+      count: z.number().describe('Number of COPE records returned in this page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let cope = await client.getCope({
+      nextLink: ctx.input.nextLink,
       filter: ctx.input.filter,
       select: ctx.input.select,
       expand: ctx.input.expand,
@@ -54,12 +69,14 @@ export let getCopeData = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let results = Array.isArray(cope) ? cope : [cope];
+    let results = cope.records;
 
     return {
       output: {
         copeRecords: results,
-        count: results.length
+        count: results.length,
+        nextLink: cope.nextLink,
+        totalCount: cope.totalCount
       },
       message: `Retrieved **${results.length}** COPE record(s).`
     };

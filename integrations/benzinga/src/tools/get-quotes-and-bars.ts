@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, numericValue, recordsFrom } from '../lib/client';
 import { spec } from '../spec';
 
 let quoteSchema = z.object({
@@ -53,6 +53,7 @@ export let getQuotesTool = SlateTool.create(spec, {
   .output(
     z.object({
       quotes: z.array(quoteSchema).describe('Delayed quote data for requested securities'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of quotes returned')
     })
   )
@@ -61,27 +62,34 @@ export let getQuotesTool = SlateTool.create(spec, {
 
     let data = await client.getDelayedQuotes({ symbols: ctx.input.symbols });
 
-    let quotesArray = data?.quotes || (Array.isArray(data) ? data : []);
+    let quotesArray = Array.isArray(data?.quotes)
+      ? data.quotes
+      : Array.isArray(data)
+        ? data
+        : Object.values(data ?? {});
     let quotes = quotesArray.map((q: any) => ({
       symbol: q.security?.symbol || q.symbol,
       name: q.security?.name || q.name,
-      open: q.quote?.open ?? q.open,
-      high: q.quote?.high ?? q.high,
-      low: q.quote?.low ?? q.low,
-      close: q.quote?.close ?? q.close,
-      last: q.quote?.last ?? q.last,
-      previousClose: q.quote?.previousClose ?? q.previousClose,
-      change: q.quote?.change ?? q.change,
-      changePercent: q.quote?.changePercent ?? q.changePercent,
-      volume: q.quote?.volume ?? q.volume,
-      fiftyTwoWeekHigh: q.quote?.fiftyTwoWeekHigh ?? q.fiftyTwoWeekHigh,
-      fiftyTwoWeekLow: q.quote?.fiftyTwoWeekLow ?? q.fiftyTwoWeekLow,
-      date: q.quote?.date ?? q.date,
+      open: numericValue(q.quote?.open ?? q.open),
+      high: numericValue(q.quote?.high ?? q.high),
+      low: numericValue(q.quote?.low ?? q.low),
+      close: numericValue(q.quote?.close ?? q.close),
+      last: numericValue(q.quote?.last ?? q.last ?? q.lastTradePrice),
+      previousClose: numericValue(
+        q.quote?.previousClose ?? q.previousClose ?? q.previousClosePrice
+      ),
+      change: numericValue(q.quote?.change ?? q.change),
+      changePercent: numericValue(q.quote?.changePercent ?? q.changePercent),
+      volume: numericValue(q.quote?.volume ?? q.volume),
+      fiftyTwoWeekHigh: numericValue(q.quote?.fiftyTwoWeekHigh ?? q.fiftyTwoWeekHigh),
+      fiftyTwoWeekLow: numericValue(q.quote?.fiftyTwoWeekLow ?? q.fiftyTwoWeekLow),
+      date: q.quote?.date ?? q.date ?? q.closeDate,
       currency: q.quote?.currency ?? q.currency
     }));
 
     return {
       output: {
+        raw: data,
         quotes,
         count: quotes.length
       },
@@ -105,8 +113,14 @@ export let getHistoricalBarsTool = SlateTool.create(spec, {
       from: z
         .string()
         .optional()
-        .describe('Start date (YYYY-MM-DD or relative like "YTD", "1MONTH", "1D")'),
+        .describe(
+          'Required by Benzinga at invocation: start date YYYY-MM-DD or a relative value such as YTD, 1MONTH, or 1DAY'
+        ),
       to: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      session: z
+        .enum(['ANY', 'REGULAR', 'PRE_MARKET', 'AFTER_MARKET'])
+        .optional()
+        .describe('Trading sessions to include'),
       interval: z
         .enum(['5M', '15M', '30M', '1H', '1D', '1W', '1MONTH'])
         .optional()
@@ -117,6 +131,7 @@ export let getHistoricalBarsTool = SlateTool.create(spec, {
   .output(
     z.object({
       bars: z.array(barResponseSchema).describe('Historical bar data per symbol'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of symbols with bar data')
     })
   )
@@ -127,18 +142,19 @@ export let getHistoricalBarsTool = SlateTool.create(spec, {
       symbols: ctx.input.symbols,
       from: ctx.input.from,
       to: ctx.input.to,
+      session: ctx.input.session,
       interval: ctx.input.interval
     });
 
-    let bars = (Array.isArray(data) ? data : []).map((item: any) => ({
+    let bars = recordsFrom(data).map((item: any) => ({
       symbol: item.symbol,
       candles: (item.candles || []).map((c: any) => ({
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume,
-        time: c.time,
+        open: numericValue(c.open),
+        high: numericValue(c.high),
+        low: numericValue(c.low),
+        close: numericValue(c.close),
+        volume: numericValue(c.volume),
+        time: numericValue(c.time),
         dateTime: c.dateTime
       }))
     }));
@@ -147,6 +163,7 @@ export let getHistoricalBarsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         bars,
         count: bars.length
       },

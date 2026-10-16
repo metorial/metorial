@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DotSimpleClient } from '../lib/client';
+import { DotSimpleClient, getCollection } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listReports = SlateTool.create(spec, {
   name: 'List Reports',
   key: 'list_reports',
-  description: `List account-level performance reports with aggregated metrics across connected social media accounts. Reports are sorted chronologically and contain engagement data.`,
+  description: `List reports available through the workspace reports API with pagination.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +15,7 @@ export let listReports = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       page: z.number().optional().default(1).describe('Page number for pagination')
     })
   )
@@ -30,11 +32,11 @@ export let listReports = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listReports(ctx.input.page);
-    let reports = result?.data ?? (Array.isArray(result) ? result : []);
+    let reports = getCollection(result);
 
     return {
       output: {

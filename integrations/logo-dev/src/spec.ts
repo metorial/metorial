@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'logodev',
   name: 'Logo.dev',
   description:
-    'Retrieve company logos, brand colors, social links, and enrichment data from tens of millions of companies. Look up logos by domain, stock ticker, crypto symbol, ISIN, or company name, and search for domains by brand name.',
+    'Look up company brand profiles, colors, and social links; search for company domains; create logo display URLs; and download logo or brandmark files by domain, ticker, crypto symbol, ISIN, or name.',
   metadata: {},
   config,
   auth

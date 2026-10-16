@@ -1,314 +1,335 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
-let BASE_URL = 'https://api.fidel.uk/v1';
+type RecordData = Record<string, any>;
+export type PageOptions = {
+  start?: number;
+  cursor?: string;
+  limit?: number;
+  order?: 'asc' | 'desc';
+  [key: string]: unknown;
+};
+
+let pathId = (value: string) => encodeURIComponent(value);
+let isAccountWebhook = (event: string) =>
+  ['brand.consent', 'offer-location.linked', 'offer-location.unlinked'].includes(event);
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        'fidel-key': config.token,
-        'Content-Type': 'application/json'
-      }
+    if (!config.token.trim())
+      throw createApiServiceError('A Fidel API secret key is required.');
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.fidel.uk/v1',
+      timeout: 30_000,
+      authHeader: { name: 'Fidel-Key', value: config.token },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Fidel API',
+          reason: 'fidel_api_error',
+          detailKeys: ['message', 'code', 'type', 'name', 'details'],
+          nestedKeys: ['error', 'errors'],
+          extractResponse: (value, helpers) => helpers.getResponseWithBody(value)
+        })
     });
   }
 
-  // ── Programs ──────────────────────────────────────────────
-
-  async createProgram(data: { name: string; metadata?: Record<string, any> }) {
-    let res = await this.axios.post('/programs', data);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async getProgram(programId: string) {
-    let res = await this.axios.get(`/programs/${programId}`);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async listPrograms(params?: { start?: number; limit?: number }) {
-    let res = await this.axios.get('/programs', { params });
-    return res.data;
-  }
-
-  async updateProgram(
-    programId: string,
-    data: { name?: string; metadata?: Record<string, any> }
-  ) {
-    let res = await this.axios.patch(`/programs/${programId}`, data);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  // ── Brands ────────────────────────────────────────────────
-
-  async createBrand(data: { name: string; logoURL?: string; metadata?: Record<string, any> }) {
-    let res = await this.axios.post('/brands', data);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async getBrand(brandId: string) {
-    let res = await this.axios.get(`/brands/${brandId}`);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async listBrands(params?: { start?: number; limit?: number }) {
-    let res = await this.axios.get('/brands', { params });
-    return res.data;
-  }
-
-  async updateBrand(
-    brandId: string,
-    data: { name?: string; logoURL?: string; metadata?: Record<string, any> }
-  ) {
-    let res = await this.axios.patch(`/brands/${brandId}`, data);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async deleteBrand(brandId: string) {
-    let res = await this.axios.delete(`/brands/${brandId}`);
-    return res.data;
-  }
-
-  // ── Locations ─────────────────────────────────────────────
-
-  async createLocation(
-    brandId: string,
-    programId: string,
-    data: {
-      address: string;
-      city: string;
-      countryCode: string;
-      postcode: string;
-      metadata?: Record<string, any>;
-      geolocation?: { latitude: number; longitude: number };
-    }
-  ) {
-    let res = await this.axios.post(`/programs/${programId}/locations`, {
-      ...data,
-      brandId
-    });
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async getLocation(locationId: string, programId: string) {
-    let res = await this.axios.get(`/programs/${programId}/locations/${locationId}`);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async listLocations(programId: string, params?: { start?: number; limit?: number }) {
-    let res = await this.axios.get(`/programs/${programId}/locations`, { params });
-    return res.data;
-  }
-
-  async updateLocation(
-    locationId: string,
-    programId: string,
-    data: {
-      address?: string;
-      city?: string;
-      countryCode?: string;
-      postcode?: string;
-      metadata?: Record<string, any>;
-      geolocation?: { latitude: number; longitude: number };
-    }
-  ) {
-    let res = await this.axios.patch(`/programs/${programId}/locations/${locationId}`, data);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async deleteLocation(locationId: string, programId: string) {
-    let res = await this.axios.delete(`/programs/${programId}/locations/${locationId}`);
-    return res.data;
-  }
-
-  // ── Cards ─────────────────────────────────────────────────
-
-  async enrollCard(
-    programId: string,
-    data: {
-      number: string;
-      expMonth: number;
-      expYear: number;
-      countryCode: string;
-      termsOfUse?: boolean;
-      metadata?: Record<string, any>;
-    }
-  ) {
-    let res = await this.axios.post(`/programs/${programId}/cards`, data);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async getCard(cardId: string, programId: string) {
-    let res = await this.axios.get(`/programs/${programId}/cards/${cardId}`);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async listCards(programId: string, params?: { start?: number; limit?: number }) {
-    let res = await this.axios.get(`/programs/${programId}/cards`, { params });
-    return res.data;
-  }
-
-  async deleteCard(cardId: string, programId: string) {
-    let res = await this.axios.delete(`/programs/${programId}/cards/${cardId}`);
-    return res.data;
-  }
-
-  // ── Transactions ──────────────────────────────────────────
-
-  async getTransaction(transactionId: string, programId: string) {
-    let res = await this.axios.get(`/programs/${programId}/transactions/${transactionId}`);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  async listTransactionsByProgram(
-    programId: string,
-    params?: {
-      start?: number;
-      limit?: number;
-      from?: string;
-      to?: string;
-    }
-  ) {
-    let res = await this.axios.get(`/programs/${programId}/transactions`, { params });
-    return res.data;
-  }
-
-  async listTransactionsByCard(
-    cardId: string,
-    programId: string,
-    params?: {
-      start?: number;
-      limit?: number;
-      from?: string;
-      to?: string;
-    }
-  ) {
-    let res = await this.axios.get(`/programs/${programId}/cards/${cardId}/transactions`, {
+  private async request(
+    method: 'get' | 'post' | 'patch' | 'put' | 'delete',
+    url: string,
+    data?: RecordData,
+    params?: Record<string, unknown>
+  ): Promise<RecordData> {
+    let response = await this.axios.request({
+      method,
+      url,
+      data: data && pickDefined(data),
       params
     });
-    return res.data;
+    if (response.status === 204) return {};
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Fidel API returned an unexpected response.');
+    }
+    return response.data;
   }
 
-  async createTestTransaction(
-    programId: string,
-    data: {
-      amount: number;
-      cardId: string;
-      locationId: string;
-      currency: string;
+  private async item(
+    method: 'get' | 'post' | 'patch' | 'put',
+    url: string,
+    data?: RecordData
+  ): Promise<RecordData> {
+    let response = await this.request(method, url, data);
+    let item = response.items?.[0];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw createApiServiceError('Fidel API returned no resource for this request.');
     }
-  ) {
-    let res = await this.axios.post(`/transactions/test`, {
-      ...data,
-      programId
+    return item;
+  }
+
+  // Legacy numeric offsets are traversed using Fidel's documented continuation keys.
+  async list(url: string, options: PageOptions = {}): Promise<RecordData> {
+    let { start = 0, cursor, limit, ...filters } = options;
+    if (!Number.isSafeInteger(start) || start < 0) {
+      throw createApiServiceError('start must be a non-negative integer offset.');
+    }
+    if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) {
+      throw createApiServiceError('limit must be a positive integer.');
+    }
+    if (cursor !== undefined && start > 0) {
+      throw createApiServiceError('Use cursor or a numeric start offset, rather than both.');
+    }
+    if (cursor !== undefined) {
+      let value: unknown;
+      try {
+        value = JSON.parse(cursor);
+      } catch {
+        throw createApiServiceError(
+          'cursor must be the JSON-serialized last object from the previous response.'
+        );
+      }
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw createApiServiceError(
+          'cursor must be the JSON-serialized last object from the previous response.'
+        );
+      }
+    }
+    let continuation = cursor;
+    while (start > 0) {
+      let page = await this.request(
+        'get',
+        url,
+        undefined,
+        pickDefined({ ...filters, limit: Math.min(start, 100), start: continuation })
+      );
+      if (!Array.isArray(page.items))
+        throw createApiServiceError('Fidel API returned an invalid result list.');
+      start -= page.items.length;
+      if (page.items.length === 0 || page.last == null)
+        return { ...page, items: [], count: undefined, last: undefined, rawResponse: page };
+      let next = JSON.stringify(page.last);
+      if (next === continuation)
+        throw createApiServiceError('Fidel API returned a repeated pagination cursor.');
+      continuation = next;
+    }
+    let result = await this.request(
+      'get',
+      url,
+      undefined,
+      pickDefined({ ...filters, limit, start: continuation })
+    );
+    if (!Array.isArray(result.items))
+      throw createApiServiceError('Fidel API returned an invalid result list.');
+    return result;
+  }
+
+  listMissingTransactionRequests(programId: string, options: Omit<PageOptions, 'start'>) {
+    let { cursor, ...filters } = options;
+    return this.request(
+      'get',
+      `/programs/${pathId(programId)}/missing-transaction-requests`,
+      undefined,
+      pickDefined({ ...filters, start: cursor })
+    );
+  }
+
+  createMissingTransactionRequest(cardId: string, data: RecordData) {
+    return this.request('post', `/cards/${pathId(cardId)}/missing-transaction-requests`, data);
+  }
+  getMissingTransactionRequest(requestId: string) {
+    return this.request('get', `/missing-transaction-requests/${pathId(requestId)}`);
+  }
+
+  createProgram(data: RecordData) {
+    return this.item('post', '/programs', data);
+  }
+  getProgram(programId: string) {
+    return this.item('get', `/programs/${pathId(programId)}`);
+  }
+  listPrograms(params?: PageOptions) {
+    return this.list('/programs', params);
+  }
+  updateProgram(programId: string, data: RecordData) {
+    return this.item('patch', `/programs/${pathId(programId)}`, data);
+  }
+
+  createBrand(data: RecordData) {
+    return this.item('post', '/brands', data);
+  }
+  getBrand(brandId: string) {
+    return this.item('get', `/brands/${pathId(brandId)}`);
+  }
+  listBrands(params?: PageOptions) {
+    return this.list('/brands', params);
+  }
+  updateBrand(brandId: string, data: RecordData) {
+    return this.item('patch', `/brands/${pathId(brandId)}`, data);
+  }
+  deleteBrand(brandId: string) {
+    return this.request('delete', `/brands/${pathId(brandId)}`);
+  }
+
+  createLocation(brandId: string, programId: string, data: RecordData) {
+    return this.item('post', `/programs/${pathId(programId)}/locations`, { ...data, brandId });
+  }
+  getLocation(locationId: string, _programId?: string) {
+    return this.item('get', `/locations/${pathId(locationId)}`);
+  }
+  listLocations(programId: string, params?: PageOptions) {
+    let { brandId, ...filters } = params ?? {};
+    return this.list(
+      brandId
+        ? `/brands/${pathId(String(brandId))}/programs/${pathId(programId)}/locations`
+        : `/programs/${pathId(programId)}/locations`,
+      filters
+    );
+  }
+  updateLocation(locationId: string, data: RecordData) {
+    return this.item('patch', `/locations/${pathId(locationId)}`, data);
+  }
+  deleteLocation(locationId: string, _programId?: string) {
+    return this.request('delete', `/locations/${pathId(locationId)}`);
+  }
+
+  enrollCard(programId: string, data: RecordData) {
+    return this.item('post', `/programs/${pathId(programId)}/cards`, data);
+  }
+  getCard(cardId: string, _programId?: string) {
+    return this.item('get', `/cards/${pathId(cardId)}`);
+  }
+  listCards(programId: string, params?: PageOptions) {
+    return this.list(`/programs/${pathId(programId)}/cards`, params);
+  }
+  deleteCard(cardId: string, _programId?: string) {
+    return this.request('delete', `/cards/${pathId(cardId)}`);
+  }
+  updateCardMetadata(cardId: string, metadata: RecordData) {
+    return this.item('put', `/cards/${pathId(cardId)}/metadata`, metadata);
+  }
+
+  getTransaction(transactionId: string, _programId?: string) {
+    return this.item('get', `/transactions/${pathId(transactionId)}`);
+  }
+  listTransactionsByProgram(programId: string, params?: PageOptions) {
+    return this.list(`/programs/${pathId(programId)}/transactions`, params);
+  }
+  listTransactionsByCard(cardId: string, _programId: string, params?: PageOptions) {
+    return this.list(`/cards/${pathId(cardId)}/transactions`, params);
+  }
+  createTestTransaction(_programId: string, data: RecordData) {
+    return this.item('post', '/transactions/test', {
+      amount: data.amount,
+      cardId: data.cardId,
+      locationId: data.locationId
     });
-    return res.data?.items?.[0] ?? res.data;
   }
 
-  // ── Webhooks ──────────────────────────────────────────────
-
-  async createWebhook(
-    programId: string,
-    data: {
-      event: string;
-      url: string;
+  createWebhook(programId: string, data: RecordData) {
+    return this.item(
+      'post',
+      isAccountWebhook(data.event) ? '/hooks' : `/programs/${pathId(programId)}/hooks`,
+      data
+    );
+  }
+  getWebhook(webhookId: string, _programId?: string) {
+    return this.item('get', `/hooks/${pathId(webhookId)}`);
+  }
+  async listWebhooks(programId: string, params: PageOptions = {}): Promise<RecordData> {
+    let { start = 0, limit = 100, event } = params;
+    if (
+      !Number.isSafeInteger(start) ||
+      start < 0 ||
+      !Number.isSafeInteger(limit) ||
+      limit < 1
+    ) {
+      throw createApiServiceError(
+        'Use a non-negative integer start and a positive integer limit.'
+      );
     }
-  ) {
-    let res = await this.axios.post(`/programs/${programId}/hooks`, data);
-    return res.data?.items?.[0] ?? res.data;
+    // This endpoint documents a limit and event filter, rather than cursor pagination.
+    let response = await this.request(
+      'get',
+      `/programs/${pathId(programId)}/hooks`,
+      undefined,
+      pickDefined({ limit: start + limit, event })
+    );
+    if (!Array.isArray(response.items))
+      throw createApiServiceError('Fidel API returned an invalid result list.');
+    return {
+      ...response,
+      items: response.items.slice(start, start + limit),
+      rawResponse: response
+    };
   }
-
-  async getWebhook(webhookId: string, programId: string) {
-    let res = await this.axios.get(`/programs/${programId}/hooks/${webhookId}`);
-    return res.data?.items?.[0] ?? res.data;
+  deleteWebhook(webhookId: string, _programId?: string) {
+    return this.request('delete', `/hooks/${pathId(webhookId)}`);
   }
-
-  async listWebhooks(programId: string, params?: { start?: number; limit?: number }) {
-    let res = await this.axios.get(`/programs/${programId}/hooks`, { params });
-    return res.data;
-  }
-
-  async deleteWebhook(webhookId: string, programId: string) {
-    let res = await this.axios.delete(`/programs/${programId}/hooks/${webhookId}`);
-    return res.data;
-  }
-
-  async updateWebhook(
-    webhookId: string,
-    programId: string,
-    data: {
-      event?: string;
-      url?: string;
-    }
-  ) {
-    let res = await this.axios.patch(`/programs/${programId}/hooks/${webhookId}`, data);
-    return res.data?.items?.[0] ?? res.data;
-  }
-
-  // ── Offers ────────────────────────────────────────────────
-
-  async createOffer(
-    programId: string,
-    data: {
-      brandId: string;
-      countryCode: string;
-      name: string;
-      type: { name: 'amount' | 'discount'; value: number };
-      startDate?: string;
-      endDate?: string;
-      maxReward?: number;
-      metadata?: Record<string, any>;
-    }
-  ) {
-    let res = await this.axios.post(`/offers`, {
+  async updateWebhook(webhookId: string, programId: string, data: RecordData) {
+    let current =
+      data.event === undefined || data.url === undefined
+        ? await this.getWebhook(webhookId)
+        : undefined;
+    let event = data.event ?? current?.event;
+    return this.item('patch', `/hooks/${pathId(webhookId)}`, {
       ...data,
-      programId
+      event,
+      url: data.url ?? current?.url,
+      programId: isAccountWebhook(event) ? undefined : programId
     });
-    return res.data?.items?.[0] ?? res.data;
   }
 
-  async getOffer(offerId: string) {
-    let res = await this.axios.get(`/offers/${offerId}`);
-    return res.data?.items?.[0] ?? res.data;
+  createOffer(_programId: string, data: RecordData) {
+    return this.item('post', '/offers', data);
   }
-
-  async listOffers(programId: string, params?: { start?: number; limit?: number }) {
-    let res = await this.axios.get(`/programs/${programId}/offers`, { params });
-    return res.data;
+  getOffer(offerId: string) {
+    return this.item('get', `/offers/${pathId(offerId)}`);
   }
-
-  async updateOffer(
-    offerId: string,
-    data: {
-      name?: string;
-      startDate?: string;
-      endDate?: string;
-      maxReward?: number;
-      metadata?: Record<string, any>;
+  listOffers(programId: string, params?: PageOptions) {
+    return this.list('/offers', { ...params, programId });
+  }
+  async updateOffer(offerId: string, data: RecordData) {
+    let { maxReward, ...body } = data;
+    if (maxReward !== undefined) {
+      let current = await this.getOffer(offerId);
+      body.type = { ...current.type, ...body.type, maxRewardAmount: maxReward };
     }
-  ) {
-    let res = await this.axios.patch(`/offers/${offerId}`, data);
-    return res.data?.items?.[0] ?? res.data;
+    return this.item('patch', `/offers/${pathId(offerId)}`, body);
   }
-
-  async linkOfferToLocation(offerId: string, locationId: string) {
-    let res = await this.axios.post(`/offers/${offerId}/locations/${locationId}`, {});
-    return res.data?.items?.[0] ?? res.data;
+  deleteOffer(offerId: string) {
+    return this.request('delete', `/offers/${pathId(offerId)}`);
   }
-
-  async unlinkOfferFromLocation(offerId: string, locationId: string) {
-    let res = await this.axios.delete(`/offers/${offerId}/locations/${locationId}`);
-    return res.data;
+  linkOfferToLocation(offerId: string, locationId: string) {
+    return this.request(
+      'post',
+      `/offers/${pathId(offerId)}/locations/${pathId(locationId)}`,
+      {}
+    );
   }
-
-  async activateOfferOnCard(offerId: string, cardId: string) {
-    let res = await this.axios.post(`/offers/${offerId}/cards/${cardId}`, {});
-    return res.data?.items?.[0] ?? res.data;
+  unlinkOfferFromLocation(offerId: string, locationId: string) {
+    return this.request(
+      'delete',
+      `/offers/${pathId(offerId)}/locations/${pathId(locationId)}`
+    );
   }
-
-  async deactivateOfferOnCard(offerId: string, cardId: string) {
-    let res = await this.axios.delete(`/offers/${offerId}/cards/${cardId}`);
-    return res.data;
+  activateOfferOnCard(offerId: string, cardId: string) {
+    return this.request('post', `/offers/${pathId(offerId)}/cards/${pathId(cardId)}`, {});
+  }
+  deactivateOfferOnCard(offerId: string, cardId: string) {
+    return this.request('delete', `/offers/${pathId(offerId)}/cards/${pathId(cardId)}`);
+  }
+  checkOfferCard(offerId: string, cardId: string) {
+    return this.request('get', `/offers/${pathId(offerId)}/cards/${pathId(cardId)}`);
+  }
+  linkAllOfferLocations(offerId: string, programId: string) {
+    return this.request(
+      'post',
+      `/offers/${pathId(offerId)}/programs/${pathId(programId)}/locations`,
+      {}
+    );
   }
 }

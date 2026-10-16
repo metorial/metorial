@@ -1,3 +1,4 @@
+export { createTask } from './create-task';
 export { getBalance } from './get-balance';
 export { getTaskResult } from './get-task-result';
 export { reportSolution } from './report-solution';

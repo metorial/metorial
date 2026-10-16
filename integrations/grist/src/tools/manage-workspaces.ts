@@ -134,3 +134,71 @@ export let deleteWorkspace = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let getWorkspace = SlateTool.create(spec, {
+  name: 'Get Workspace',
+  key: 'get_workspace',
+  description: 'Retrieve workspace details. Call list_workspaces to discover workspace IDs.',
+  tags: { readOnly: true }
+})
+  .input(z.object({ workspaceId: z.number().describe('Workspace ID from list_workspaces') }))
+  .output(
+    z.object({
+      workspace: z.record(z.string(), z.any()).describe('Provider workspace details')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let workspace = await new GristClient(ctx.auth).getWorkspace(ctx.input.workspaceId);
+    return { output: { workspace }, message: 'Retrieved the workspace.' };
+  })
+  .build();
+
+export let updateWorkspace = SlateTool.create(spec, {
+  name: 'Update Workspace',
+  key: 'update_workspace',
+  description: 'Rename a workspace. Call list_workspaces to discover workspace IDs.',
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      workspaceId: z.number().describe('Workspace ID from list_workspaces'),
+      name: z.string().describe('New workspace name')
+    })
+  )
+  .output(
+    z.object({
+      workspace: z
+        .record(z.string(), z.any())
+        .describe('Provider workspace details after the update')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new GristClient(ctx.auth);
+    await client.updateWorkspace(ctx.input.workspaceId, ctx.input.name);
+    let workspace = await client.getWorkspace(ctx.input.workspaceId);
+    return { output: { workspace }, message: 'Updated the workspace.' };
+  })
+  .build();
+
+export let restoreWorkspace = SlateTool.create(spec, {
+  name: 'Restore Workspace',
+  key: 'restore_workspace',
+  description:
+    'Restore a workspace that was moved to trash. Permanently deleted workspaces cannot be restored.',
+  tags: { destructive: false }
+})
+  .input(z.object({ workspaceId: z.number().describe('ID of the workspace in trash') }))
+  .output(
+    z.object({
+      workspace: z
+        .record(z.string(), z.any())
+        .describe('Provider workspace details after restoration')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new GristClient(ctx.auth);
+    await client.restoreWorkspace(ctx.input.workspaceId);
+    let workspace = await client.getWorkspace(ctx.input.workspaceId);
+    return { output: { workspace }, message: 'Restored the workspace.' };
+  })
+  .build();

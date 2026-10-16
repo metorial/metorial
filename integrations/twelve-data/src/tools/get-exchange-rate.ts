@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { decimalString, optionalNumber, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getExchangeRate = SlateTool.create(spec, {
@@ -22,9 +23,13 @@ Use this to check the current rate between any currency pair.`,
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       symbol: z.string().describe('Currency pair'),
       rate: z.string().describe('Current exchange rate'),
-      timestamp: z.number().optional().describe('Unix timestamp')
+      timestamp: z.number().optional().describe('Unix timestamp in seconds')
     })
   )
   .handleInvocation(async ctx => {
@@ -38,9 +43,10 @@ Use this to check the current rate between any currency pair.`,
 
     return {
       output: {
-        symbol: result.symbol || ctx.input.symbol,
-        rate: result.rate,
-        timestamp: result.timestamp
+        raw: result,
+        symbol: requiredString(result.symbol, 'symbol'),
+        rate: decimalString(result.rate, 'rate'),
+        timestamp: optionalNumber(result.timestamp)
       },
       message: `Exchange rate for **${ctx.input.symbol}**: ${result.rate}`
     };

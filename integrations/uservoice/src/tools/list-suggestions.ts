@@ -5,18 +5,19 @@ import { spec } from '../spec';
 
 let suggestionSchema = z.object({
   suggestionId: z.number().describe('Unique ID of the suggestion'),
-  title: z.string().describe('Title of the suggestion'),
+  title: z.string().optional().describe('Title of the suggestion'),
   body: z.string().nullable().describe('Body/description of the suggestion'),
   state: z.string().describe('Current state (e.g., published, approved, closed)'),
-  votesCount: z.number().describe('Number of votes'),
-  commentsCount: z.number().describe('Number of comments'),
-  supportersCount: z.number().describe('Number of supporters'),
-  createdAt: z.string().describe('When the suggestion was created'),
-  updatedAt: z.string().describe('When the suggestion was last updated'),
+  votesCount: z.number().optional().describe('Number of votes'),
+  commentsCount: z.number().optional().describe('Number of comments'),
+  supportersCount: z.number().optional().describe('Number of supporters'),
+  createdAt: z.string().optional().describe('When the suggestion was created'),
+  updatedAt: z.string().optional().describe('When the suggestion was last updated'),
   links: z
     .record(z.string(), z.any())
     .optional()
-    .describe('Associated resource links (forum, category, status, labels, etc.)')
+    .describe('Associated resource links (forum, category, status, labels, etc.)'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listSuggestions = SlateTool.create(spec, {
@@ -27,6 +28,7 @@ export let listSuggestions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      query: z.string().optional().describe('Search suggestion titles and descriptions'),
       forumId: z.number().optional().describe('Filter by forum ID'),
       sort: z
         .string()
@@ -48,49 +50,52 @@ export let listSuggestions = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      suggestions: z.array(suggestionSchema),
-      totalRecords: z.number().describe('Total number of matching suggestions'),
-      totalPages: z.number().describe('Total number of pages'),
-      currentPage: z.number().describe('Current page number')
+      suggestions: z.array(suggestionSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of matching suggestions'),
+      totalPages: z.number().optional().describe('Total number of pages'),
+      currentPage: z.number().optional().describe('Current page number')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let params: Record<string, unknown> = {};
-    if (ctx.input.forumId) params.forum = ctx.input.forumId;
+    if (ctx.input.query !== undefined) params.q = ctx.input.query;
+    if (ctx.input.forumId !== undefined) params.forum = ctx.input.forumId;
     if (ctx.input.sort) params.sort = ctx.input.sort;
-    if (ctx.input.page) params.page = ctx.input.page;
-    if (ctx.input.perPage) params.perPage = ctx.input.perPage;
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.perPage = ctx.input.perPage;
     if (ctx.input.updatedAfter) params.updatedAfter = ctx.input.updatedAfter;
     if (ctx.input.state) params.state = ctx.input.state;
 
     let result = await client.listSuggestions(params);
 
-    let suggestions = result.suggestions.map((s: any) => ({
+    let suggestions = result.suggestions?.map((s: any) => ({
       suggestionId: s.id,
-      title: s.title,
-      body: s.body || null,
+      title: s.title ?? undefined,
+      body: s.body ?? null,
       state: s.state,
-      votesCount: s.votes_count || 0,
-      commentsCount: s.comments_count || 0,
-      supportersCount: s.supporters_count || 0,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at,
-      links: s.links
+      votesCount: s.votes_count,
+      commentsCount: s.comments_count,
+      supportersCount: s.supporters_count,
+      createdAt: s.created_at ?? undefined,
+      updatedAt: s.updated_at ?? undefined,
+      links: s.links,
+      raw: s
     }));
 
     return {
       output: {
         suggestions,
-        totalRecords: result.pagination?.totalRecords || 0,
-        totalPages: result.pagination?.totalPages || 0,
-        currentPage: result.pagination?.page || ctx.input.page || 1
+        totalRecords: result.pagination?.totalRecords,
+        totalPages: result.pagination?.totalPages,
+        currentPage: result.pagination?.page
       },
-      message: `Found **${suggestions.length}** suggestions (page ${result.pagination?.page || 1} of ${result.pagination?.totalPages || 1}).`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

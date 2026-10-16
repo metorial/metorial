@@ -1,64 +1,80 @@
-# Slates Specification for Bolt Iot
+# Bolt IoT API specification
 
-## Overview
+## Authentication and device selection
 
-Bolt IoT is an integrated IoT platform that offers a WiFi chip to connect actuators and sensors to the Internet. Users can configure the system over the Bolt Cloud to receive, store, and visualize data over graphs, and connect actuators such as motors and light bulbs to control them remotely. The platform also supports deploying machine learning algorithms to detect anomalies and predict sensor values.
+Generate and enable an API key in [Bolt Cloud](https://cloud.boltiot.com/).
+Requests use HTTPS with the key in `/remote/{api_key}/{command}` and a
+`deviceName` query parameter for device commands. There is no OAuth token
+refresh flow. The connection keeps its existing required default Device ID;
+device tools also accept an optional `deviceName` override. Omission uses the
+saved default, while an explicitly supplied value is forwarded unchanged.
+`list_devices` retains its account-level request without a Device ID.
 
-## Authentication
+## Capabilities
 
-Bolt IoT uses **API key** authentication.
+- `list_devices`: preserves the existing `getDevices` request and device-list
+  decoding, including the legacy success fallback for responses without a
+  success field. The complete original response is also returned as `raw`.
+- `get_device_status`: calls `isAlive` and, only for an alive device, attempts
+  `version`. Firmware and hardware lookup is best effort; failure of that
+  additional query does not discard an obtained status. Both original response
+  envelopes are available in `raw` when received. Hardware names from both
+  the API reference (`Bolt Version`) and official SDK (`Bolt Hardware Version`)
+  are recognized.
+- `get_device_online_status`: calls the official SDK's `isOnline` command and
+  exposes the provider status and status-change time without converting the
+  timestamp or substituting missing values. An actual offline/false status is
+  data, not a command failure.
+- `get_device_version`: queries `version` directly without a prior status call
+  and preserves the original JSON-encoded version string.
+- `restart_device`: issues the existing `restart` command.
+- `digital_read` / `digital_write`: retain the existing single-pin versus
+  multi-pin routing and comma-separated `pins` / `states` parameters.
+- `analog_read` / `analog_write`: retain the existing analog input and PWM
+  parameters, including the default `A0` read pin and original numeric ranges.
+- `servo_control`: retains `servoWrite` with `pin` and `value`. The provider's
+  servo article documents Bolt Cloud Pro and firmware 1.4.1 or later.
+- `uart_communicate`: retains `serialBegin`, `serialWrite`, `serialRead`, and
+  `serialWR`. Omitted `till` remains omitted; an explicit zero remains zero.
+  Nonempty serial strings are forwarded unchanged. The legacy `baudRate`
+  index is forwarded unchanged, including zero. An optional `baudRateBps`
+  supplies an actual baud value for initialization and takes precedence when
+  both fields are present. Only that new field has positive-integer validation.
 
-- To generate an API key, go to the Bolt Cloud control panel (cloud.boltiot.com) and click on "Generate New API Key." You can also enable and disable the API key from the same panel.
-- If the API key status is disabled, all API requests will be aborted by the server.
-- The API key is included directly in the request URL path. The general syntax is: `https://cloud.boltiot.com/remote/{your_api_key}/{command}?param1=...&deviceName=BOLTXXXXXX`
-- In addition to the API key, each request requires a **Device Name** (device ID) in the format `BOLTXXXXXXX`, which identifies the specific hardware device to interact with.
-- There is no OAuth flow; the API key is the sole authentication mechanism.
+All existing tool schemas and required output fields are retained. Device
+responses are not reduced to numeric sensor values; original string values
+and complete provider response metadata are available. Explicit provider
+failure indicators and HTTP errors produce service errors. No file transfer,
+OAuth scopes, pagination, or account identity operation is documented by the
+reviewed primary API sources. This is one Bolt Cloud API product, so separate
+tool categories are unnecessary.
 
-## Features
+## Documentation evidence and limits
 
-### Device Management
+Reviewed 2026-10-15:
 
-- List all devices associated with your account via the `getDevices` endpoint.
-- Check if a specific Bolt IoT device is online or offline (alive/dead status).
-- Query the firmware and hardware version of a device.
-- Restart a device remotely.
+- [Bolt Cloud API reference](https://cloud.boltiot.com/apiDoc): API-key path,
+  device query parameter, GET requests, GPIO, analog, serial, version, restart,
+  and alive/dead envelopes. This legacy reference has hardware and baud-rate
+  differences from the SDK and current product specifications.
+- [Official Inventrom SDK](https://github.com/Inventrom/bolt-api-python/blob/master/boltiot/bolt.py):
+  `isOnline`, status-change time, alternate hardware-version key, and literal
+  baud-rate arguments.
+- [Official SDK URL templates](https://github.com/Inventrom/bolt-api-python/blob/master/boltiot/urls.py)
+  and [request construction](https://github.com/Inventrom/bolt-api-python/blob/master/boltiot/requesting.py):
+  `isOnline` path and unchanged baud argument substitution into `baud=`.
+- [Servo motor control](https://www.boltiot.com/projects/posts/servo-motor-control-with-bolt-iot):
+  servo endpoint, angle range, plan and firmware requirements.
+- [Current hardware specifications](https://www.boltiot.com/techspecs): five
+  digital pins with 3.3 V logic and one 10-bit ADC. GPIO voltage and analog
+  input limits must follow the connected board's hardware documentation.
+- [Official serial project](https://www.boltiot.com/projects/posts/iot-enabled-serial-lcd-display):
+  `serialWR` and literal `baud=9600` examples.
 
-### Digital GPIO Control
-
-- Set a digital pin high (5V) or low (0V) on a specified Bolt device.
-- Read the current digital state of any GPIO pin (pins 0–7 and A0–A3).
-- Useful for controlling LEDs, relays, motors, and other on/off actuators.
-
-### Analog I/O
-
-- Read the analog value from a specified pin on a Bolt device (e.g., for sensors like temperature or light). The analog pin A0 returns values from 0 to 1023.
-- Write an analog (PWM) value (0–255) to output pins 1–5, enabling variable control of devices like motors or dimmable LEDs.
-
-### UART / Serial Communication
-
-- Perform actions like reading sensor values, controlling actuators, checking device status, and managing UART communication.
-- Initialize the UART interface at a specified baud rate (supported rates: 9600, 115200, etc., selected by index 0–3).
-- Send string data over the serial TX line to connected microcontrollers (e.g., Arduino).
-- Read data received over the serial RX line.
-- Send serial commands and immediately capture device responses in one seamless step, enabling complex automation workflows.
-- This enables interfacing the Bolt WiFi module with external microcontrollers like Arduino for more complex projects.
-
-### Data Collection and Visualization
-
-- Remotely configure, monitor, and control devices via the Bolt Cloud.
-- Configure the system over the Bolt Cloud to receive, store, and visualize data over graphs.
-- The Cloud can poll devices for data at configurable intervals (e.g., every 5 minutes on the free plan, every 30 seconds on Pro).
-
-### Machine Learning
-
-- Deploy machine learning algorithms with a few clicks to detect anomalies as well as predict sensor values.
-- This feature is configured through the Bolt Cloud dashboard, not directly via the REST API.
-
-### Alerts
-
-- Utilize Bolt's alert system providing information sent directly to your phone or email. You can configure the contact details and set the threshold.
-- Alerts are configured through the Bolt Cloud dashboard.
-
-## Events
-
-The provider does not support webhooks or event subscription mechanisms through its API. The Bolt Cloud platform does support periodic data polling from devices at configured intervals, but there is no webhook or purpose-built push event system available for external consumers to subscribe to device events programmatically.
+The accessible official reference does not document `getDevices`,
+`digitalMultiRead`, or `digitalMultiWrite`. These pre-existing operations and
+request shapes remain intact; their current provider behavior was not verified.
+The legacy Cloud reference uses baud index 2 for 9600, while the official SDK
+and project send 9600 directly. Both forms are available without changing the
+meaning of the original input. No provider or device calls were made during
+this static refresh.

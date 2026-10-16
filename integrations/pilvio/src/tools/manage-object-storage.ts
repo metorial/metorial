@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let bucketSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   name: z.string().describe('Bucket name'),
   sizeBytes: z.number().optional().describe('Total size in bytes'),
   numObjects: z.number().optional().describe('Number of objects in the bucket'),
@@ -39,7 +40,9 @@ export let manageObjectStorage = SlateTool.create(spec, {
       billingAccountId: z
         .number()
         .optional()
-        .describe('Billing account ID (for create/modify)')
+        .describe(
+          'Call list_billing_accounts to discover billing account IDs. Billing account ID (for create/modify)'
+        )
     })
   )
   .output(
@@ -62,13 +65,14 @@ export let manageObjectStorage = SlateTool.create(spec, {
       name: b.name,
       sizeBytes: b.size_bytes,
       numObjects: b.num_objects,
-      createdAt: b.created_at
+      createdAt: b.created_at ?? undefined,
+      raw: b
     });
 
     switch (action) {
       case 'list': {
         let buckets = await client.listBuckets(ctx.input.billingAccountId);
-        let mapped = (Array.isArray(buckets) ? buckets : []).map(mapBucket);
+        let mapped = buckets.map(mapBucket);
         return {
           output: { buckets: mapped, success: true },
           message: `Found **${mapped.length}** bucket(s).`
@@ -76,16 +80,18 @@ export let manageObjectStorage = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.bucketName) throw new Error('bucketName is required for get action');
+        if (!ctx.input.bucketName)
+          throw createApiServiceError('bucketName is required for get action');
         let bucket = await client.getBucket(ctx.input.bucketName);
         return {
           output: { bucket: mapBucket(bucket), success: true },
-          message: `Bucket **${bucket.name}**: ${bucket.num_objects || 0} objects, ${bucket.size_bytes || 0} bytes.`
+          message: `Bucket **${bucket.name}**: ${bucket.num_objects ?? 'unknown'} objects, ${bucket.size_bytes ?? 'unknown'} bytes.`
         };
       }
 
       case 'create': {
-        if (!ctx.input.bucketName) throw new Error('bucketName is required for create action');
+        if (!ctx.input.bucketName)
+          throw createApiServiceError('bucketName is required for create action');
         let bucket = await client.createBucket({
           name: ctx.input.bucketName,
           billingAccountId: ctx.input.billingAccountId
@@ -98,7 +104,9 @@ export let manageObjectStorage = SlateTool.create(spec, {
 
       case 'modify': {
         if (!ctx.input.bucketName || ctx.input.billingAccountId === undefined) {
-          throw new Error('bucketName and billingAccountId are required for modify action');
+          throw createApiServiceError(
+            'bucketName and billingAccountId are required for modify action'
+          );
         }
         let bucket = await client.modifyBucket(
           ctx.input.bucketName,
@@ -111,7 +119,8 @@ export let manageObjectStorage = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.bucketName) throw new Error('bucketName is required for delete action');
+        if (!ctx.input.bucketName)
+          throw createApiServiceError('bucketName is required for delete action');
         await client.deleteBucket(ctx.input.bucketName);
         return {
           output: { success: true },

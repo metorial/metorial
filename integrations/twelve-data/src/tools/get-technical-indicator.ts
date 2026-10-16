@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { record, records, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getTechnicalIndicator = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let getTechnicalIndicator = SlateTool.create(spec, {
   description: `Calculate and retrieve technical indicator values for any financial instrument. Supports 100+ indicators including SMA, EMA, RSI, MACD, Bollinger Bands, Stochastic, ADX, ATR, and many more.
 Each indicator can be configured with specific parameters such as time period, series type, and moving average type.`,
   instructions: [
-    'The indicator name must match the Twelve Data endpoint name (lowercase), e.g., "sma", "ema", "rsi", "macd", "bbands", "stoch", "adx", "atr".',
+    'Call list_technical_indicators to discover supported endpoint keys. The indicator name must match the Twelve Data endpoint name (lowercase), e.g., "sma", "ema", "rsi", "macd", "bbands", "stoch", "adx", "atr".',
     'Common indicators: sma, ema, wma, rsi, macd, bbands, stoch, adx, atr, cci, obv, vwap, willr, aroon, ichimoku.',
     'The timePeriod parameter is used by most indicators (default varies by indicator, typically 14).'
   ],
@@ -50,7 +51,12 @@ Each indicator can be configured with specific parameters such as time period, s
         .number()
         .optional()
         .describe('Number of data points to return (default: 30)'),
-      timezone: z.string().optional().describe('Timezone for timestamps'),
+      timezone: z
+        .string()
+        .optional()
+        .describe(
+          'IANA timezone, UTC, or Exchange for intraday output; daily and longer intervals use exchange local time'
+        ),
       startDate: z
         .string()
         .optional()
@@ -75,9 +81,17 @@ Each indicator can be configured with specific parameters such as time period, s
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       symbol: z.string().describe('Ticker symbol'),
       interval: z.string().describe('Time interval'),
-      indicator: z.string().describe('Indicator name'),
+      indicator: z
+        .string()
+        .describe(
+          'Requested indicator endpoint key; provider indicator metadata is retained in raw'
+        ),
       values: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of indicator values with timestamps')
@@ -107,13 +121,14 @@ Each indicator can be configured with specific parameters such as time period, s
       sd: ctx.input.sd
     });
 
-    let meta = result.meta || {};
-    let values = result.values || [];
+    let meta = record(result.meta, 'meta');
+    let values = records(result.values, 'values');
 
     return {
       output: {
-        symbol: meta.symbol || ctx.input.symbol,
-        interval: meta.interval || ctx.input.interval,
+        raw: result,
+        symbol: requiredString(meta.symbol, 'meta.symbol'),
+        interval: requiredString(meta.interval, 'meta.interval'),
         indicator: ctx.input.indicator,
         values
       },

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleList, kaggleSummary } from '../lib/responses';
 import { spec } from '../spec';
 
 let datasetSchema = z
@@ -91,9 +92,12 @@ export let searchDatasets = SlateTool.create(spec, {
       tagIds: ctx.input.tagIds,
       page: ctx.input.page
     });
+    datasets = kaggleList(datasets, ['datasets'], 'datasets').map(item =>
+      kaggleSummary(item, 'datasets item', ['ref', 'title'])
+    );
     return {
-      output: { datasets: datasets ?? [] },
-      message: `Found ${(datasets ?? []).length} dataset(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
+      output: { datasets },
+      message: `Found ${datasets.length} dataset(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

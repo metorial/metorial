@@ -18,16 +18,17 @@ export let getTickerDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       symbol: z.string(),
       name: z.string(),
-      country: z.string().nullable(),
-      hasIntraday: z.boolean(),
-      hasEod: z.boolean(),
+      country: z.string().nullable().optional(),
+      hasIntraday: z.boolean().optional(),
+      hasEod: z.boolean().optional(),
       exchange: z.object({
         name: z.string(),
         acronym: z.string(),
         mic: z.string(),
-        country: z.string(),
+        country: z.string().optional(),
         countryCode: z.string(),
         city: z.string(),
         website: z.string()
@@ -42,6 +43,7 @@ export let getTickerDetails = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result.raw,
         symbol: t.symbol,
         name: t.name,
         country: t.country,

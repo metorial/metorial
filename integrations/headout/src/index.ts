@@ -1,6 +1,8 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelBooking,
+  captureBooking,
   createBooking,
   getBooking,
   getInventory,
@@ -8,6 +10,7 @@ import {
   listCategories,
   listCities,
   listCollections,
+  rescheduleBooking,
   searchProducts
 } from './tools';
 
@@ -21,7 +24,10 @@ export let provider = Slate.create({
     getBooking,
     listCities,
     listCategories,
-    listCollections
+    listCollections,
+    captureBooking,
+    cancelBooking,
+    rescheduleBooking
   ],
   triggers: []
 });

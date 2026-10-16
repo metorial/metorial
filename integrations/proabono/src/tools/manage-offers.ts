@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,6 +57,20 @@ Can retrieve offers for a specific customer (with personalized links), or list u
         .optional()
         .describe('Customer reference for personalized offers'),
       referenceSegment: z.string().optional().describe('Segment reference filter'),
+      subscriptionId: z
+        .number()
+        .optional()
+        .describe(
+          'Subscription ID for upgrade offers when a customer has multiple subscriptions. Discover IDs with manage_subscriptions list.'
+        ),
+      prefixReferenceOffer: z
+        .string()
+        .optional()
+        .describe('List offers whose reference starts with this prefix.'),
+      referencePricingTable: z
+        .string()
+        .optional()
+        .describe('List offers in this pricing table.'),
       language: z.string().optional().describe('Override language (ISO 639-1)'),
       isVisible: z.boolean().optional().describe('Filter by visibility'),
       upgradeMode: z
@@ -86,9 +100,11 @@ Can retrieve offers for a specific customer (with personalized links), or list u
     let { action } = ctx.input;
 
     if (action === 'get') {
-      if (!ctx.input.referenceOffer) throw new Error('referenceOffer is required for get');
+      if (!ctx.input.referenceOffer)
+        throw createApiServiceError('referenceOffer is required for get');
       let result = await client.getOffer({
         ReferenceOffer: ctx.input.referenceOffer,
+        ReferenceSegment: ctx.input.referenceSegment ?? ctx.config.defaultSegment,
         ReferenceCustomer: ctx.input.referenceCustomer,
         Language: ctx.input.language,
         Html: ctx.input.includeHtml
@@ -96,12 +112,24 @@ Can retrieve offers for a specific customer (with personalized links), or list u
       let offer = mapOffer(result);
       return {
         output: { offer },
-        message: `Retrieved offer **${offer.referenceOffer}** — ${offer.titleLocalized || 'untitled'} (${offer.amountRecurrence != null ? `${offer.amountRecurrence} cents` : 'free'} / ${offer.unitRecurrence || 'n/a'})`
+        message: `Retrieved offer **${offer.referenceOffer}** — ${offer.titleLocalized || 'untitled'} (${offer.amountRecurrence != null ? `${offer.amountRecurrence} cents` : 'amount not returned'} / ${offer.unitRecurrence || 'n/a'})`
       };
     }
 
     if (action === 'list') {
+      if (
+        ctx.input.upgradeMode &&
+        !ctx.input.referenceCustomer &&
+        ctx.input.subscriptionId === undefined
+      ) {
+        throw createApiServiceError(
+          'Provide referenceCustomer or subscriptionId for upgrade offers.'
+        );
+      }
       let result = await client.listOffers({
+        IdSubscription: ctx.input.subscriptionId,
+        PrefixReferenceOffer: ctx.input.prefixReferenceOffer,
+        ReferencePricingTable: ctx.input.referencePricingTable,
         ReferenceCustomer: ctx.input.referenceCustomer,
         ReferenceSegment: ctx.input.referenceSegment || ctx.config.defaultSegment,
         IsVisible: ctx.input.isVisible,
@@ -120,11 +148,11 @@ Can retrieve offers for a specific customer (with personalized links), or list u
           totalItems: result?.TotalItems,
           page: result?.Page
         },
-        message: `Found **${offers.length}** offers (total: ${result?.TotalItems || 0})`
+        message: `Found **${offers.length}** offers on this page`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
 

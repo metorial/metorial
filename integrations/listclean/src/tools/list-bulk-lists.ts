@@ -40,14 +40,14 @@ export let listBulkLists = SlateTool.create(spec, {
     let rawLists = await client.getBulkLists();
 
     let lists = rawLists.map(l => ({
-      listId: String(l.listId || ''),
-      fileName: l.fileName || '',
-      status: l.status || '',
-      totalEmails: l.totalEmails ?? 0,
-      cleanCount: l.cleanCount ?? 0,
-      dirtyCount: l.dirtyCount ?? 0,
-      unknownCount: l.unknownCount ?? 0,
-      createdAt: l.createdAt || ''
+      listId: l.listId,
+      fileName: l.fileName,
+      status: l.status,
+      totalEmails: l.totalEmails,
+      cleanCount: l.cleanCount,
+      dirtyCount: l.dirtyCount,
+      unknownCount: l.unknownCount,
+      createdAt: l.createdAt
     }));
 
     return {

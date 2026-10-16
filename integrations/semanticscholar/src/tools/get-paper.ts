@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -36,6 +36,7 @@ let paperDetailSchema = z
         url: z.string().nullable().optional(),
         status: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
       .describe('Open access PDF details'),
@@ -44,6 +45,7 @@ let paperDetailSchema = z
         model: z.string().nullable().optional(),
         text: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
       .describe('TLDR summary'),
@@ -68,6 +70,7 @@ let paperDetailSchema = z
         volume: z.string().nullable().optional(),
         pages: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
       .describe('Journal information'),
@@ -86,6 +89,7 @@ let paperDetailSchema = z
       .object({
         bibtex: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
       .describe('Citation styles'),
@@ -94,9 +98,10 @@ let paperDetailSchema = z
         model: z.string().nullable().optional(),
         vector: z.array(z.number()).nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
-      .describe('SPECTER2 embedding vector')
+      .describe('SPECTER embedding vector; request embedding.specter_v2 for version 2')
   })
   .passthrough();
 
@@ -133,7 +138,7 @@ Use the **fields** parameter to control which metadata is returned.`,
         .string()
         .optional()
         .describe(
-          'Comma-separated list of fields to return (e.g. "title,abstract,authors,year,citationCount,tldr,openAccessPdf,embedding,citationStyles"). Defaults to "paperId,title".'
+          'Comma-separated list of fields to return (e.g. "title,abstract,authors,year,citationCount,tldr,openAccessPdf,embedding.specter_v2,citationStyles"). Defaults to "paperId,title".'
         )
     })
   )
@@ -147,9 +152,13 @@ Use the **fields** parameter to control which metadata is returned.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.paperId !== undefined && ctx.input.paperIds !== undefined) {
+      throw createApiServiceError('Provide either paperId or paperIds, not both.');
+    }
+
     if (ctx.input.paperIds && ctx.input.paperIds.length > 0) {
       let result = await client.getPapersBatch(ctx.input.paperIds, ctx.input.fields);
-      let papers = Array.isArray(result) ? result : [];
+      let papers = result;
 
       return {
         output: { papers },
@@ -166,9 +175,6 @@ Use the **fields** parameter to control which metadata is returned.`,
       };
     }
 
-    return {
-      output: { papers: [] },
-      message: 'No paper ID provided. Please specify either `paperId` or `paperIds`.'
-    };
+    throw createApiServiceError('Provide either paperId or a non-empty paperIds array.');
   })
   .build();

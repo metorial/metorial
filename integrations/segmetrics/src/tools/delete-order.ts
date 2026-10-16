@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let deleteOrder = SlateTool.create(spec, {
@@ -15,6 +16,7 @@ export let deleteOrder = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...importScopeFields,
       orderId: z.string().describe('The unique identifier of the order/invoice to delete.')
     })
   )
@@ -25,11 +27,7 @@ export let deleteOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
 
     let response = await client.deleteInvoice(ctx.input.orderId);
 

@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DiscoveryClient } from '../lib/client';
 import { mapEvent, mapPagination } from '../lib/mappers';
+import { parseTicketmasterOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let imageSchema = z.object({
@@ -19,8 +20,8 @@ let classificationSchema = z.object({
   genreId: z.string(),
   subGenreName: z.string(),
   subGenreId: z.string(),
-  typeName: z.string(),
-  subTypeName: z.string()
+  typeName: z.string().optional(),
+  subTypeName: z.string().optional()
 });
 
 let priceRangeSchema = z.object({
@@ -34,7 +35,7 @@ let venueSchema = z
   .object({
     venueId: z.string(),
     name: z.string(),
-    url: z.string(),
+    url: z.string().optional(),
     city: z.string(),
     stateCode: z.string(),
     stateName: z.string(),
@@ -51,7 +52,7 @@ let venueSchema = z
 let attractionSummarySchema = z.object({
   attractionId: z.string(),
   name: z.string(),
-  url: z.string(),
+  url: z.string().optional(),
   classifications: z.array(
     z.object({
       segmentName: z.string(),
@@ -66,25 +67,26 @@ let eventSchema = z.object({
   type: z.string(),
   url: z.string().describe('Direct URL to purchase tickets'),
   locale: z.string(),
-  description: z.string(),
-  pleaseNote: z.string(),
+  description: z.string().optional(),
+  pleaseNote: z.string().optional(),
   startDate: z.string(),
   startLocalDate: z.string(),
-  startLocalTime: z.string(),
+  startLocalTime: z.string().optional(),
   startDateTBD: z.boolean(),
   startDateTBA: z.boolean(),
   startTimeTBA: z.boolean(),
-  endDate: z.string(),
+  endDate: z.string().optional(),
   timezone: z.string(),
   statusCode: z
     .string()
+
     .describe('Event status: onsale, offsale, canceled, postponed, rescheduled'),
-  spanMultipleDays: z.boolean(),
+  spanMultipleDays: z.boolean().optional(),
   priceRanges: z.array(priceRangeSchema),
-  seatmap: z.string().describe('URL to static seatmap image'),
-  ticketLimit: z.string(),
-  ageRestrictions: z.boolean(),
-  accessibility: z.string(),
+  seatmap: z.string().describe('URL to static seatmap image').optional(),
+  ticketLimit: z.string().optional(),
+  ageRestrictions: z.boolean().optional(),
+  accessibility: z.string().optional(),
   images: z.array(imageSchema),
   sales: z.object({
     publicStartDateTime: z.string(),
@@ -102,8 +104,8 @@ let eventSchema = z.object({
   promoter: z
     .object({
       promoterId: z.string(),
-      name: z.string(),
-      description: z.string()
+      name: z.string().optional(),
+      description: z.string().optional()
     })
     .nullable(),
   venue: venueSchema,
@@ -117,6 +119,11 @@ let paginationSchema = z.object({
   pageSize: z.number()
 });
 
+let outputSchema = z.object({
+  events: z.array(eventSchema),
+  pagination: paginationSchema
+});
+
 export let searchEventsTool = SlateTool.create(spec, {
   name: 'Search Events',
   key: 'search_events',
@@ -125,10 +132,10 @@ export let searchEventsTool = SlateTool.create(spec, {
     'Date/time filters use ISO 8601 format with timezone: YYYY-MM-DDTHH:mm:ssZ (e.g., 2025-01-01T00:00:00Z)',
     'Use countryCode (e.g., US, CA, GB) to filter by country. Use stateCode for US/CA states.',
     'Use latlong with radius for proximity search (e.g., latlong "34.0522,-118.2437" with radius "50" and unit "miles")',
-    'Sort options: name,asc | name,desc | date,asc | date,desc | relevance,asc | relevance,desc | distance,asc | distance,desc | onSaleStartDate,asc'
+    'Sort options: name,asc | name,desc | date,asc | date,desc | relevance,asc | relevance,desc | distance,asc | onSaleStartDate,asc'
   ],
   constraints: [
-    'Maximum page size is 200 events per request.',
+    'Maximum page size is 200 events per request. size × page must be below 1000; narrow the search to retrieve additional results.',
     'Rate limited to 5 requests per second with the default API key tier.'
   ],
   tags: {
@@ -137,6 +144,42 @@ export let searchEventsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      classificationId: z
+        .string()
+        .optional()
+        .describe(
+          'Classification ID from browse_classifications or get_classification_details'
+        ),
+      promoterId: z.string().optional().describe('Promoter ID from event details'),
+      marketId: z.string().optional().describe('Ticketmaster market ID'),
+      typeId: z.string().optional().describe('Classification type ID'),
+      subTypeId: z.string().optional().describe('Classification sub-type ID'),
+      geoPoint: z
+        .string()
+        .optional()
+        .describe(
+          'Geohash for location search; preferred over the deprecated latlong parameter'
+        ),
+      onsaleStartDateTime: z
+        .string()
+        .optional()
+        .describe('Filter events with public sales starting after this UTC date/time'),
+      onsaleEndDateTime: z
+        .string()
+        .optional()
+        .describe('Filter events with public sales ending before this UTC date/time'),
+      includeTBA: z
+        .string()
+        .optional()
+        .describe('Include events with dates to be announced: yes, no, or only'),
+      includeTBD: z
+        .string()
+        .optional()
+        .describe('Include events with dates to be determined: yes, no, or only'),
+      includeFamily: z
+        .string()
+        .optional()
+        .describe('Include family-friendly classifications: yes, no, or only'),
       keyword: z
         .string()
         .optional()
@@ -185,12 +228,7 @@ export let searchEventsTool = SlateTool.create(spec, {
       page: z.number().optional().describe('Page number (0-indexed)')
     })
   )
-  .output(
-    z.object({
-      events: z.array(eventSchema),
-      pagination: paginationSchema
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DiscoveryClient({
       token: ctx.auth.token,
@@ -199,6 +237,17 @@ export let searchEventsTool = SlateTool.create(spec, {
     });
 
     let response = await client.searchEvents({
+      classificationId: ctx.input.classificationId,
+      promoterId: ctx.input.promoterId,
+      marketId: ctx.input.marketId,
+      typeId: ctx.input.typeId,
+      subTypeId: ctx.input.subTypeId,
+      geoPoint: ctx.input.geoPoint,
+      onsaleStartDateTime: ctx.input.onsaleStartDateTime,
+      onsaleEndDateTime: ctx.input.onsaleEndDateTime,
+      includeTBA: ctx.input.includeTBA,
+      includeTBD: ctx.input.includeTBD,
+      includeFamily: ctx.input.includeFamily,
       keyword: ctx.input.keyword,
       attractionId: ctx.input.attractionId,
       venueId: ctx.input.venueId,
@@ -228,8 +277,8 @@ export let searchEventsTool = SlateTool.create(spec, {
     let pagination = mapPagination(response?.page);
 
     return {
-      output: { events, pagination },
-      message: `Found **${pagination.totalElements}** events (showing page ${pagination.currentPage + 1} of ${pagination.totalPages}).`
+      output: parseTicketmasterOutput(outputSchema, { events, pagination }, 'search-events'),
+      message: `Returned **${events.length}** events.`
     };
   })
   .build();

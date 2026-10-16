@@ -1,10 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, requireValue, translationsBody } from '../lib/response';
 import { spec } from '../spec';
 
 let translationSchema = z.object({
   locale: z.string().describe('Locale code (e.g. "en")'),
+  authorId: z
+    .string()
+    .optional()
+    .describe(
+      'Author teammate ID; required for create. Call list_teams to discover teammates.'
+    ),
   title: z.string().optional().describe('Article title'),
   description: z.string().optional().describe('Article description/excerpt'),
   htmlText: z.string().optional().describe('Article body as HTML'),
@@ -27,6 +34,7 @@ export let manageArticle = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       articleId: z.string().optional(),
       defaultLocale: z.string().optional(),
       translations: z.array(z.any()).optional(),
@@ -38,23 +46,26 @@ export let manageArticle = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'create': {
+        if (!ctx.input.translations?.length)
+          throw createApiServiceError('Provide article translations.');
+        for (let translation of ctx.input.translations) {
+          requireValue(translation.authorId, 'Translation authorId');
+          requireValue(translation.title, 'Translation title');
+          requireValue(translation.htmlText, 'Translation htmlText');
+          requireValue(translation.status, 'Translation status');
+        }
         let body: Record<string, any> = {};
         if (ctx.input.parentId) body.parent_id = ctx.input.parentId;
         if (ctx.input.defaultLocale) body.default_locale = ctx.input.defaultLocale;
         if (ctx.input.translations) {
-          body.translations = ctx.input.translations.map(t => ({
-            locale: t.locale,
-            title: t.title,
-            description: t.description,
-            html_text: t.htmlText,
-            status: t.status
-          }));
+          body.translations = translationsBody(ctx.input.translations);
         }
         let data = await client.createArticle(body);
         let article = data.article || data;
         return {
           output: {
-            articleId: String(article.id),
+            rawResponse: client.responses,
+            articleId: requiredId(article.id),
             defaultLocale: article.default_locale,
             translations: article.translations
           },
@@ -63,24 +74,20 @@ export let manageArticle = SlateTool.create(spec, {
       }
 
       case 'update': {
-        if (!ctx.input.articleId) throw new Error('articleId is required for update');
+        if (!ctx.input.articleId)
+          throw createApiServiceError('articleId is required for update');
         let body: Record<string, any> = {};
         if (ctx.input.parentId) body.parent_id = ctx.input.parentId;
         if (ctx.input.defaultLocale) body.default_locale = ctx.input.defaultLocale;
         if (ctx.input.translations) {
-          body.translations = ctx.input.translations.map(t => ({
-            locale: t.locale,
-            title: t.title,
-            description: t.description,
-            html_text: t.htmlText,
-            status: t.status
-          }));
+          body.translations = translationsBody(ctx.input.translations);
         }
         let data = await client.updateArticle(ctx.input.articleId, body);
         let article = data.article || data;
         return {
           output: {
-            articleId: String(article.id),
+            rawResponse: client.responses,
+            articleId: requiredId(article.id),
             defaultLocale: article.default_locale,
             translations: article.translations
           },
@@ -89,10 +96,11 @@ export let manageArticle = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.articleId) throw new Error('articleId is required for delete');
+        if (!ctx.input.articleId)
+          throw createApiServiceError('articleId is required for delete');
         await client.deleteArticle(ctx.input.articleId);
         return {
-          output: { deleted: true },
+          output: { rawResponse: client.responses, deleted: true },
           message: `Deleted article **${ctx.input.articleId}**.`
         };
       }

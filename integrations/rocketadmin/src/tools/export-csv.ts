@@ -1,19 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let exportCsv = SlateTool.create(spec, {
   name: 'Export Table CSV',
   key: 'export_csv',
-  description: `Export all data from a database table as CSV format. Returns the CSV content as a string.`,
+  description: `Export all data from a database table as CSV format. Provides a downloadable CSV file.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       tableName: z.string().describe('Name of the table to export'),
       masterPassword: z
         .string()
@@ -27,13 +31,18 @@ export let exportCsv = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      masterPassword: ctx.input.masterPassword
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
     let csvContent = await client.exportCsv(ctx.input.connectionId, ctx.input.tableName);
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(csvContent, {
+        headers: { 'content-type': 'text/csv; charset=utf-8' }
+      }),
+      filename: `${ctx.input.tableName.replace(/[^a-zA-Z0-9_.-]/g, '_') || 'table'}.csv`,
+      mimeType: 'text/csv'
+    });
 
     return {
       output: { csvContent },

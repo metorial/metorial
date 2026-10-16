@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTask } from '../lib/response';
 import { spec } from '../spec';
 
 export let getTask = SlateTool.create(spec, {
@@ -18,6 +19,12 @@ export let getTask = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       taskId: z.string().describe('Unique task identifier'),
       taskName: z.string().describe('Name of the task'),
       projectId: z.string().optional().describe('ID of the parent project'),
@@ -50,27 +57,10 @@ export let getTask = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let task = await client.getTask(ctx.input.taskId);
 
+    let output = mapTask(task);
     return {
-      output: {
-        taskId: task.taskId ?? '',
-        taskName: task.taskName ?? '',
-        projectId: task.projectId || undefined,
-        groupId: task.groupId || undefined,
-        group: task.group || undefined,
-        description: task.description || undefined,
-        status: task.status,
-        priority: task.priority,
-        dueDate: task.dueDate || undefined,
-        estimateTime: task.estimateTime,
-        milestoneId: task.milestoneId != null ? String(task.milestoneId) : undefined,
-        subscribers: Array.isArray(task.subscribers) ? task.subscribers : undefined,
-        taskUsers: Array.isArray(task.taskUsers)
-          ? task.taskUsers.map((u: any) => ({
-              taskUserId: u.taskUserId ?? ''
-            }))
-          : undefined
-      },
-      message: `Retrieved task **${task.taskName}** (ID: ${task.taskId}).`
+      output,
+      message: `Retrieved task **${output.taskName}** (ID: ${output.taskId}).`
     };
   })
   .build();

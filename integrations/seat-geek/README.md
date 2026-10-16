@@ -1,6 +1,8 @@
-# Seat Geek
+# SeatGeek
 
-Search and discover live events (sports, concerts, theater) across the United States and Canada. Look up detailed event information including dates, venues, performers, ticket price statistics, and popularity scores. Filter events by performer, venue, location, date range, taxonomy, and ticket pricing. Search for performers with details like images, genres, and external links. Look up venues by city, state, or geolocation. Retrieve event and performer recommendations based on similarity seeds. Browse hierarchical event category taxonomies. Note: does not support purchasing or booking tickets — users must be directed to SeatGeek URLs for transactions.
+Search live sports, concerts, and theater events; discover performers and venues; retrieve event, performer, and venue details; and find similar events or performers. Filter by location, date, taxonomy, genre, ticket prices, or available listings. Browse taxonomies and music genres to discover filter values. Returned SeatGeek URLs lead to ticket purchases.
+
+Connect with a client ID from the [SeatGeek developer portal](https://developer.seatgeek.com/). A client secret and affiliate tracking IDs are optional. See the [API specification](./docs/SPEC.md) for coverage and limitations.
 
 ## License
 

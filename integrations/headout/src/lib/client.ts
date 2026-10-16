@@ -1,4 +1,26 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Headout',
+    reason: 'headout_api_error',
+    nestedKeys: ['error', 'errors'],
+    detailKeys: ['message', 'detail', 'detailedMessage', 'code'],
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    extractUpstreamCode: (_input, response) => {
+      let body = response?.data;
+      return isApiErrorRecord(body) &&
+        isApiErrorRecord(body.error) &&
+        typeof body.error.code === 'string'
+        ? body.error.code
+        : undefined;
+    }
+  });
 
 export interface ClientConfig {
   token: string;
@@ -11,17 +33,27 @@ export class Client {
   private axios;
 
   constructor(private clientConfig: ClientConfig) {
+    if (!clientConfig.token.trim()) {
+      throw createApiServiceError(
+        'A Headout API key is required. Reconnect with your partner API key.'
+      );
+    }
     let baseURL =
       clientConfig.environment === 'sandbox'
-        ? 'https://sandbox.api.test-headout.com'
+        ? 'https://sandbox.api.dev-headout.com'
         : 'https://www.headout.com';
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        'Headout-Auth': clientConfig.token,
-        'Content-Type': 'application/json'
+      timeout: 30_000,
+      authHeader: { name: 'Headout-Auth', value: clientConfig.token },
+      errorAdapter: apiError
+    });
+    this.axios.interceptors.response.use(response => {
+      if (isApiErrorRecord(response.data) && response.data.error) {
+        throw apiError({ response });
       }
+      return response;
     });
   }
 
@@ -53,9 +85,12 @@ export class Client {
       queryParams.language = params?.language ?? this.clientConfig.languageCode;
     }
 
-    let response = await this.axios.get(`/api/public/v1/product/get/${productId}`, {
-      params: queryParams
-    });
+    let response = await this.axios.get(
+      `/api/public/v1/product/get/${encodeURIComponent(productId)}`,
+      {
+        params: queryParams
+      }
+    );
     return response.data;
   }
 
@@ -205,6 +240,8 @@ export class Client {
   // ── Bookings ─────────────────────────────────────────────────────
 
   async createBooking(body: {
+    productId?: string;
+    partnerReferenceId?: string;
     variantId: string;
     inventoryId: string;
     customersDetails: {
@@ -238,20 +275,44 @@ export class Client {
       partnerReferenceId?: string;
     }
   ) {
-    let response = await this.axios.put(`/api/public/v1/booking/${bookingId}`, {
-      status: 'PENDING',
-      ...body
-    });
+    let response = await this.axios.put(
+      `/api/public/v1/booking/${encodeURIComponent(bookingId)}`,
+      {
+        status: 'PENDING',
+        ...body
+      }
+    );
     return response.data;
   }
 
   async getBooking(bookingId: string) {
-    let response = await this.axios.get(`/api/public/v1/booking/${bookingId}`);
+    let response = await this.axios.get(
+      `/api/public/v1/booking/${encodeURIComponent(bookingId)}`
+    );
     return response.data;
   }
 
   async listBookings(params?: { offset?: number; limit?: number }) {
     let response = await this.axios.get('/api/public/v1/booking', { params });
+    return response.data;
+  }
+
+  async cancelBooking(bookingId: string, body: { reason: string; comment?: string }) {
+    let response = await this.axios.post(
+      `/api/public/v2/bookings/${encodeURIComponent(bookingId)}/cancel/`,
+      body
+    );
+    return response.data;
+  }
+
+  async rescheduleBooking(
+    bookingId: string,
+    body: { startDateTime: string; endDateTime: string; comment?: string }
+  ) {
+    let response = await this.axios.post(
+      `/api/public/v2/bookings/${encodeURIComponent(bookingId)}/reschedule/`,
+      body
+    );
     return response.data;
   }
 }

@@ -1,4 +1,5 @@
 export * from './create-user';
+export * from './discovery';
 export * from './get-user';
 export * from './list-users';
 export * from './manage-assignments';
@@ -13,4 +14,5 @@ export * from './manage-groups';
 export * from './manage-news';
 export * from './manage-org-units';
 export * from './manage-quizzes';
+export * from './update-assignment';
 export * from './update-user';

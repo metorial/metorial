@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let getJob = SlateTool.create(spec, {
@@ -36,6 +37,7 @@ export let getJob = SlateTool.create(spec, {
       type: z.string().optional().describe('Job type'),
       createdAt: z.string().optional().describe('Created date'),
       updatedAt: z.string().optional().describe('Updated date'),
+      raw: z.any().optional().describe('Complete provider response, retaining null values'),
       links: z.any().optional().describe('HAL links for related resources')
     })
   )
@@ -45,24 +47,25 @@ export let getJob = SlateTool.create(spec, {
 
     return {
       output: {
-        jobId: (data.id ?? ctx.input.jobId).toString(),
-        title: data.title,
-        orderId: data.order_id,
-        description: data.description,
-        notes: data.notes,
-        isActive: data.is_active,
-        isHot: data.is_hot,
-        city: data.city,
-        state: data.state,
-        postalCode: data.postal_code,
-        countryCode: data.country_code,
-        salary: data.salary,
-        duration: data.duration,
-        startDate: data.start_date,
-        openings: data.openings,
-        type: data.type,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        jobId: requiredId(data?.id, 'record'),
+        title: data.title ?? undefined,
+        orderId: data.external_id ?? undefined,
+        description: data.description ?? undefined,
+        notes: data.notes ?? undefined,
+        isActive: data.is_active ?? undefined,
+        isHot: data.is_hot ?? undefined,
+        city: data.location?.city ?? undefined,
+        state: data.location?.state ?? undefined,
+        postalCode: data.location?.postal_code ?? undefined,
+        countryCode: data.country_code ?? undefined,
+        salary: data.salary ?? undefined,
+        duration: data.duration ?? undefined,
+        startDate: data.start_date ?? undefined,
+        openings: data.openings ?? undefined,
+        type: data.type ?? undefined,
+        createdAt: data.date_created ?? undefined,
+        updatedAt: data.date_modified ?? undefined,
+        raw: data,
         links: data._links
       },
       message: `Retrieved job **${data.title ?? ctx.input.jobId}** (ID: ${ctx.input.jobId}).`

@@ -4,6 +4,8 @@ import {
   getEventMarketsTool,
   getEventOddsTool,
   getEventsTool,
+  getHistoricalEventMarketsTool,
+  getHistoricalEventOddsTool,
   getHistoricalEventsTool,
   getHistoricalOddsTool,
   getOddsTool,
@@ -22,7 +24,9 @@ export let provider = Slate.create({
     getEventMarketsTool,
     getParticipantsTool,
     getHistoricalOddsTool,
-    getHistoricalEventsTool
+    getHistoricalEventsTool,
+    getHistoricalEventOddsTool,
+    getHistoricalEventMarketsTool
   ],
   triggers: []
 });

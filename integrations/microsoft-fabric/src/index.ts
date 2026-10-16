@@ -1,7 +1,16 @@
-import { Slate } from '@slates/provider';
+import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
+  coreCancelItemJob,
   coreCreateItem,
+  coreDeleteItem,
+  coreGetItem,
+  coreGetItemJob,
+  coreGetOperationState,
+  coreListItems,
+  coreListWorkspaces,
+  coreUpdateItem,
   datafactoryCreateDataflow,
   datafactoryCreatePipeline,
   datafactoryExecuteQuery,
@@ -33,6 +42,7 @@ import {
 
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
     docsWorkloads,
     docsWorkloadApiSpec,
@@ -55,6 +65,14 @@ export let provider = Slate.create({
     onelakeListTables,
     onelakeGetTable,
     coreCreateItem,
+    coreListWorkspaces,
+    coreListItems,
+    coreGetItem,
+    coreUpdateItem,
+    coreDeleteItem,
+    coreGetOperationState,
+    coreGetItemJob,
+    coreCancelItemJob,
     datafactoryListPipelines,
     datafactoryCreatePipeline,
     datafactoryGetPipeline,

@@ -11,7 +11,8 @@ export let enrichCompany = SlateTool.create(spec, {
 
 Uses the streaming endpoint to wait for results if the company data is not yet cached (up to ~200 seconds). Returns \`null\` for the company if no match is found.`,
   instructions: [
-    'Provide the full root domain (e.g. "stripe.com" not "www.stripe.com" or "https://stripe.com").'
+    'Provide the full root domain (e.g. "stripe.com" not "www.stripe.com" or "https://stripe.com").',
+    'For asynchronous result delivery, set stream to false and provide webhookUrl. webhookId can correlate the resulting POST with your request.'
   ],
   constraints: [
     'Rate limited to 600 requests per minute (standard) or 5 requests per minute (streaming).',
@@ -30,7 +31,15 @@ Uses the streaming endpoint to wait for results if the company data is not yet c
         .default(true)
         .describe(
           'Use streaming endpoint to wait for results if data is not yet cached. Defaults to true.'
-        )
+        ),
+      webhookUrl: z
+        .string()
+        .optional()
+        .describe('HTTP or HTTPS URL to receive a POST when company enrichment completes'),
+      webhookId: z
+        .string()
+        .optional()
+        .describe('Optional correlation identifier included in the webhook POST')
     })
   )
   .output(
@@ -41,7 +50,11 @@ Uses the streaming endpoint to wait for results if the company data is not yet c
         .describe('Whether the lookup is still processing (only when stream is false)'),
       company: companySchema
         .nullable()
-        .describe('The enriched company profile, or null if not found')
+        .describe('The enriched company profile, or null if not found'),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Original response returned by BigPicture.io')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,7 +62,9 @@ Uses the streaming endpoint to wait for results if the company data is not yet c
 
     let result = await client.findCompanyByDomain({
       domain: ctx.input.domain,
-      stream: ctx.input.stream
+      stream: ctx.input.stream,
+      webhookUrl: ctx.input.webhookUrl,
+      webhookId: ctx.input.webhookId
     });
 
     let found = result.status === 200 && result.company !== null;
@@ -65,7 +80,8 @@ Uses the streaming endpoint to wait for results if the company data is not yet c
       output: {
         found,
         pending,
-        company: result.company ?? null
+        company: result.company ?? null,
+        rawResponse: result.rawResponse
       },
       message: pending
         ? `Company data for **${ctx.input.domain}** is being processed (202 Accepted). The data is not yet available — retry later or enable streaming.`

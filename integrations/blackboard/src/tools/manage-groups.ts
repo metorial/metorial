@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let groupOutputSchema = z.object({
@@ -49,7 +49,7 @@ export let createGroup = SlateTool.create(spec, {
   )
   .output(groupOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let group = await client.createCourseGroup(ctx.input.courseId, {
       name: ctx.input.name,
@@ -57,9 +57,17 @@ export let createGroup = SlateTool.create(spec, {
       externalId: ctx.input.externalId,
       availability: ctx.input.available ? { available: ctx.input.available } : undefined,
       enrollment:
-        ctx.input.enrollmentType || ctx.input.memberLimit
+        ctx.input.enrollmentType || ctx.input.memberLimit !== undefined
           ? {
-              type: ctx.input.enrollmentType,
+              type:
+                ctx.input.enrollmentType === 'SignupSheet'
+                  ? 'SelfEnrollment'
+                  : (ctx.input.enrollmentType ??
+                    (ctx.input.memberLimit !== undefined ? 'SelfEnrollment' : undefined)),
+              signupSheet:
+                ctx.input.enrollmentType === 'SignupSheet'
+                  ? { name: ctx.input.name }
+                  : undefined,
               limit: ctx.input.memberLimit
             }
           : undefined
@@ -92,7 +100,7 @@ export let listGroups = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let result = await client.listCourseGroups(ctx.input.courseId, {
       offset: ctx.input.offset,
       limit: ctx.input.limit
@@ -123,7 +131,7 @@ export let updateGroup = SlateTool.create(spec, {
   )
   .output(groupOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let group = await client.updateCourseGroup(ctx.input.courseId, ctx.input.groupId, {
       name: ctx.input.name,
@@ -156,7 +164,7 @@ export let deleteGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     await client.deleteCourseGroup(ctx.input.courseId, ctx.input.groupId);
     return {
       output: { deleted: true },
@@ -197,7 +205,7 @@ export let manageGroupMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     if (ctx.input.action === 'list') {
       let result = await client.listGroupMembers(ctx.input.courseId, ctx.input.groupId, {
@@ -206,7 +214,7 @@ export let manageGroupMembers = SlateTool.create(spec, {
       });
       let members = (result.results || []).map(m => ({
         userId: m.userId,
-        courseId: m.courseId
+        courseId: ctx.input.courseId
       }));
       return {
         output: { success: true, members, hasMore: !!result.paging?.nextPage },
@@ -215,7 +223,7 @@ export let manageGroupMembers = SlateTool.create(spec, {
     }
 
     if (!ctx.input.userId) {
-      throw new Error('userId is required for add/remove actions.');
+      throw createApiServiceError('userId is required for add/remove actions.');
     }
 
     if (ctx.input.action === 'add') {

@@ -33,7 +33,9 @@ export let listScheduledDeployments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project')
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.')
     })
   )
   .output(
@@ -52,7 +54,7 @@ export let listScheduledDeployments = SlateTool.create(spec, {
 
     let scheduled = await client.listScheduledDeployments(ctx.input.projectPermalink);
 
-    let mapped = (Array.isArray(scheduled) ? scheduled : []).map((s: any) => ({
+    let mapped = scheduled.map((s: any) => ({
       scheduledDeploymentIdentifier: s.identifier,
       frequency: s.frequency,
       scheduleHour: s.at?.hour,

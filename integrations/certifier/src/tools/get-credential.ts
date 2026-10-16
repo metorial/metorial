@@ -22,6 +22,10 @@ export let getCredential = SlateTool.create(spec, {
       publicId: z.string().describe('Public UUID of the credential'),
       groupId: z.string().describe('ID of the group'),
       status: z.string().describe('Current status (draft, scheduled, issued, expired)'),
+      recipientId: z
+        .string()
+        .optional()
+        .describe('Linked recipient ID, when the credential has a recipient record'),
       recipientName: z.string().describe('Name of the recipient'),
       recipientEmail: z.string().optional().describe('Email of the recipient'),
       issueDate: z.string().describe('Issuance date'),
@@ -43,6 +47,7 @@ export let getCredential = SlateTool.create(spec, {
         publicId: credential.publicId,
         groupId: credential.groupId,
         status: credential.status,
+        recipientId: credential.recipient.id,
         recipientName: credential.recipient.name,
         recipientEmail: credential.recipient.email,
         issueDate: credential.issueDate,

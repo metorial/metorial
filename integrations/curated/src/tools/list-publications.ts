@@ -14,6 +14,10 @@ export let listPublications = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional metadata'),
       publications: z.array(
         z.object({
           publicationId: z.number().describe('Unique identifier of the publication'),
@@ -34,7 +38,10 @@ export let listPublications = SlateTool.create(spec, {
     }));
 
     return {
-      output: { publications: mapped },
+      output: {
+        raw: publications,
+        publications: mapped
+      },
       message: `Found **${mapped.length}** publication(s): ${mapped.map(p => `${p.name} (ID: ${p.publicationId})`).join(', ')}`
     };
   })

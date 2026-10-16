@@ -1,6 +1,6 @@
 # Goody
 
-Send corporate gifts and physical products programmatically without needing recipient addresses. Browse a curated product catalog, create gift orders for one or many recipients, generate shareable gift links, and track orders through their full lifecycle (created, opened, accepted, shipped, delivered). Manage order batches, schedule future deliveries, calculate pricing, handle payments, and receive real-time webhook notifications on gift and order events. Supports address-free gifting where recipients choose their own options and enter their address, as well as direct shipping to known addresses.
+Send address-free corporate gifts, browse products and curated collections, estimate costs, schedule gift batches, and track recipients and order activity. Discover workspaces and payment methods, prevent duplicate batches with client references, and update or cancel eligible orders.
 
 ## License
 

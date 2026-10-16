@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTask, rawSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let getTask = SlateTool.create(spec, {
@@ -13,7 +14,11 @@ export let getTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      robotId: z.string().describe('ID of the robot the task belongs to'),
+      robotId: z
+        .string()
+        .describe(
+          'ID of the robot the task belongs to. Call list_robots to discover robot IDs.'
+        ),
       taskId: z.string().describe('ID of the task to retrieve')
     })
   )
@@ -21,7 +26,7 @@ export let getTask = SlateTool.create(spec, {
     z.object({
       taskId: z.string().describe('ID of the task'),
       status: z.string().describe('Task status (e.g., "running", "successful", "failed")'),
-      robotId: z.string().describe('ID of the robot'),
+      robotId: z.string().describe('ID of the robot. Call list_robots to discover robot IDs.'),
       capturedTexts: z
         .record(z.string(), z.any())
         .optional()
@@ -40,32 +45,34 @@ export let getTask = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Human-readable error message if the task failed'),
-      videoUrl: z.string().optional().describe('URL to debug video of the robot execution')
+      videoUrl: z.string().optional().describe('URL to debug video of the robot execution'),
+      capturedLists: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Extracted tables and lists'),
+      inputParameters: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Input parameters used for the task'),
+      robotBulkRunId: z.string().optional().describe('Bulk run that created the task'),
+      runByTaskMonitorId: z.string().optional().describe('Monitor that created the task'),
+      retriedOriginalTaskId: z
+        .string()
+        .optional()
+        .describe('Original failed task in this retry chain'),
+      retriedByTaskId: z.string().optional().describe('Task that retried this task'),
+      capturedDataTemporaryUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Temporary URL for data exceeding 100 KB; use Download Task Data for a downloadable result'
+        ),
+      raw: rawSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let task = await client.getTask(ctx.input.robotId, ctx.input.taskId);
-
-    return {
-      output: {
-        taskId: task.id,
-        status: task.status,
-        robotId: task.robotId ?? ctx.input.robotId,
-        capturedTexts: task.capturedTexts,
-        capturedScreenshots: task.capturedScreenshots,
-        createdAt: task.createdAt,
-        startedAt: task.startedAt,
-        finishedAt: task.finishedAt,
-        userFriendlyError: task.userFriendlyError,
-        videoUrl: task.videoUrl
-      },
-      message:
-        task.status === 'successful'
-          ? `Task \`${task.id}\` completed **successfully** with ${Object.keys(task.capturedTexts ?? {}).length} captured field(s).`
-          : task.status === 'failed'
-            ? `Task \`${task.id}\` **failed**: ${task.userFriendlyError ?? 'Unknown error'}.`
-            : `Task \`${task.id}\` is currently **${task.status}**.`
-    };
+    let task = await new Client(ctx.auth).getTask(ctx.input.robotId, ctx.input.taskId);
+    let output = mapTask(task);
+    return { output, message: `Task \`${output.taskId}\` is **${output.status}**.` };
   })
   .build();

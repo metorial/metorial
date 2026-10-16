@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getReceivedEmail = SlateTool.create(spec, {
   name: 'Get Received Email',
   key: 'get_received_email',
-  description: `Fetch the full content of a specific received email, including subject, plain text and HTML body, sender information, headers, and attachment URLs. Use "Browse Received Emails" first to obtain the email ID.`,
+  description: `Fetch the content of a specific received email, including subject, plain text and HTML body, sender information, and downloadable files. Use "Browse Received Emails" first to obtain the email ID.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -45,6 +45,10 @@ export let getReceivedEmail = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let email = await client.getReceivedEmail(ctx.input.receivedEmailId);
+
+    for (let attachment of email.attachments) {
+      await ctx.addAttachment({ type: 'url', url: attachment.url });
+    }
 
     return {
       output: email,

@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let generateBarcode = SlateTool.create(spec, {
   name: 'Generate Barcode',
   key: 'generate_barcode',
-  description: `Generate a barcode image URL for a given value. Supports QR codes and PDF417 barcodes with configurable size, format, and error correction level. Returns a URL that renders the barcode image.`,
+  description: ` DEPRECATED — use \`generate_barcode_file\` instead. Generate a barcode image URL for a given value. Supports QR codes and PDF417 barcodes with configurable size, format, and error correction level. Returns a URL that renders the barcode image.`,
+  instructions: [
+    'Use generate_barcode_file to receive a downloadable barcode image. This legacy tool returns a credential-bearing URL.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

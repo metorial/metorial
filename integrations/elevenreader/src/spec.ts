@@ -4,9 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'elevenreader',
-  name: 'Elevenreader',
+  name: 'ElevenLabs Audio',
   description:
-    'ElevenLabs text-to-speech, speech-to-text, voice management, sound effects, music generation, dubbing, and conversational AI platform.',
+    'Generate and download ElevenLabs speech and sound effects, transcribe audio, design and manage voices, isolate vocals, and manage automatic dubbing. This connection uses the ElevenLabs API; it does not access the ElevenReader library.',
   metadata: {},
   config,
   auth

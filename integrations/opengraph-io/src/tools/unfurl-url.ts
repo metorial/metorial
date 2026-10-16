@@ -50,7 +50,9 @@ Use this to generate link previews, validate social sharing metadata, or gather 
       maxCacheAge: z
         .number()
         .optional()
-        .describe('Maximum cache age in seconds. Defaults to 432000 (5 days).'),
+        .describe(
+          'Maximum cache age in milliseconds for the v1.1 endpoint. Defaults to 432000000 (5 days).'
+        ),
       acceptLang: z
         .string()
         .optional()
@@ -59,11 +61,27 @@ Use this to generate link previews, validate social sharing metadata, or gather 
         .boolean()
         .optional()
         .describe('Automatically select optimal proxy level (eligible plans only).'),
-      proxyCountry: z.string().optional().describe('Country code for proxy routing.')
+      proxyCountry: z.string().optional().describe('Country code for proxy routing.'),
+      retry: z
+        .boolean()
+        .optional()
+        .describe(
+          'Retry failed requests with proxy escalation; requires a plan with superior proxy access.'
+        ),
+      maxRetries: z
+        .number()
+        .int()
+        .min(1)
+        .max(4)
+        .optional()
+        .describe('Maximum retry attempts when retry is enabled (1-4).'),
+      retryEscalate: z.boolean().optional().describe('Escalate the proxy tier for each retry')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
+      twitterCard: z.unknown().optional().describe('Twitter Card metadata when provided'),
       hybridGraph: z
         .object({
           title: z.string().optional().describe('Page title'),
@@ -124,19 +142,35 @@ Use this to generate link previews, validate social sharing metadata, or gather 
       maxCacheAge: ctx.input.maxCacheAge,
       acceptLang: ctx.input.acceptLang,
       autoProxy: ctx.input.autoProxy,
-      proxyCountry: ctx.input.proxyCountry
+      proxyCountry: ctx.input.proxyCountry,
+      retry: ctx.input.retry,
+      maxRetries: ctx.input.maxRetries,
+      retryEscalate: ctx.input.retryEscalate
     });
 
     let hybrid = result.hybridGraph ?? {};
-    let title = hybrid.title ?? result.openGraph?.title ?? 'Unknown';
+    let title = hybrid.title ?? result.openGraph?.title ?? 'the page';
 
     return {
       output: {
-        hybridGraph: result.hybridGraph,
-        openGraph: result.openGraph,
+        raw: result,
+        twitterCard: result.twitterCard,
+        hybridGraph: result.hybridGraph
+          ? {
+              ...result.hybridGraph,
+              siteName: result.hybridGraph.siteName ?? result.hybridGraph.site_name
+            }
+          : undefined,
+        openGraph: result.openGraph
+          ? {
+              ...result.openGraph,
+              siteName: result.openGraph.siteName ?? result.openGraph.site_name
+            }
+          : undefined,
         htmlInferred: result.htmlInferred,
         requestInfo: result.requestInfo
       },
       message: `Extracted metadata for **${title}** from \`${ctx.input.url}\`. ${hybrid.description ? `Description: "${hybrid.description.substring(0, 120)}${hybrid.description.length > 120 ? '...' : ''}"` : 'No description found.'}`
     };
-  });
+  })
+  .build();

@@ -1,81 +1,117 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import { requireDate, requireInteger, requireText } from './response';
+
+type KeywordInput = {
+  keyword: string;
+  url: string;
+  region?: string;
+  language?: string;
+  tags?: string[];
+  device?: 'desktop' | 'mobile';
+  ignoreLocalPack?: boolean;
+  urlTrackingMethod?: string;
+  ignoreSubDomains?: boolean;
+};
 
 export class Client {
   private http;
 
-  constructor(private config: { token: string }) {
-    this.http = createAxios({
-      baseURL: 'https://app.keyword.com'
+  constructor(config: { token: string }) {
+    requireText(config.token, 'API token');
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://app.keyword.com',
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Keyword.com',
+          reason: 'keyword_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          detailKeys: ['title', 'message', 'detail', 'code'],
+          extractUpstreamCode: (_error, response, helpers) => {
+            if (!helpers.isRecord(response?.data)) return undefined;
+            let errors = response.data.errors;
+            let first = Array.isArray(errors) ? errors[0] : errors;
+            return helpers.isRecord(first) && typeof first.code === 'string'
+              ? first.code
+              : undefined;
+          }
+        })
     });
   }
 
-  private get headers() {
-    return {
-      Authorization: `Bearer ${this.config.token}`,
-      'Content-Type': 'application/json'
-    };
+  private projectPath(projectName: string) {
+    requireText(projectName, 'Project name');
+    return `/api/v2/groups/${encodeURIComponent(projectName)}`;
   }
 
-  // ── Projects ──────────────────────────────────────────────
+  private keywordPath(projectName: string, keywordId: string) {
+    requireText(keywordId, 'Keyword ID');
+    return `${this.projectPath(projectName)}/keywords/${encodeURIComponent(keywordId)}`;
+  }
+
+  private domainPath(domainId: string) {
+    requireText(domainId, 'AI Visibility domain ID');
+    return `/api/v2/ai-visibility/domains/${encodeURIComponent(domainId)}`;
+  }
+
+  private aiFilters(params: { topics?: string[]; searchTerms?: string[] }) {
+    let query = new URLSearchParams();
+    for (let topic of params.topics ?? []) query.append('topics[]', topic);
+    for (let term of params.searchTerms ?? []) query.append('search_terms[]', term);
+    return query;
+  }
+
+  async getCurrentUser(includeSubscriptions = false) {
+    return (
+      await this.http.get('/api/v2/users/self', {
+        params: includeSubscriptions ? { include: 'subscriptions' } : undefined
+      })
+    ).data;
+  }
 
   async listProjects() {
-    let response = await this.http.get('/api/v2/groups/active', {
-      headers: this.headers
-    });
-    return response.data;
+    return (await this.http.get('/api/v2/groups/active')).data;
   }
 
   async getProject(projectName: string) {
-    let response = await this.http.get(`/api/v2/groups/${encodeURIComponent(projectName)}`, {
-      headers: this.headers
-    });
-    return response.data;
+    return (await this.http.get(this.projectPath(projectName))).data;
   }
 
   async createProject(params: { name: string; currencyCode?: string }) {
-    let body: Record<string, any> = {
-      category: params.name
-    };
-    if (params.currencyCode) body.currency_code = params.currencyCode;
-
-    let response = await this.http.post('/api/v2/groups', body, {
-      headers: this.headers
-    });
-    return response.data;
+    requireText(params.name, 'Project name');
+    return (
+      await this.http.post('/api/v2/groups', {
+        data: {
+          type: 'group',
+          attributes: pickDefined({
+            category: params.name,
+            currency_code: params.currencyCode
+          })
+        }
+      })
+    ).data;
   }
 
   async archiveProject(projectName: string) {
-    let response = await this.http.put(
-      `/api/v2/groups/${encodeURIComponent(projectName)}`,
-      { status: 2 },
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    return (
+      await this.http.put(this.projectPath(projectName), {
+        data: { type: 'group', attributes: { status: 2 } }
+      })
+    ).data;
   }
 
   async restoreProject(projectName: string) {
-    let response = await this.http.get(
-      `/api/v2/groups/${encodeURIComponent(projectName)}/undo/archive`,
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    return (await this.http.get(`${this.projectPath(projectName)}/undo/archive`)).data;
   }
 
   async deleteProject(projectName: string) {
-    let response = await this.http.delete(
-      `/api/v2/groups/${encodeURIComponent(projectName)}`,
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    return (await this.http.delete(this.projectPath(projectName))).data;
   }
-
-  // ── Keywords ──────────────────────────────────────────────
 
   async listKeywords(params: {
     projectName: string;
@@ -83,96 +119,85 @@ export class Client {
     perPage?: number;
     date?: string;
   }) {
-    let query: Record<string, any> = {};
-    if (params.page) query.page = params.page;
-    if (params.perPage) query.per_page = params.perPage;
-    if (params.date) query.date = params.date;
-
-    let response = await this.http.get(
-      `/api/v2/groups/${encodeURIComponent(params.projectName)}/keywords/`,
-      {
-        headers: this.headers,
-        params: query
-      }
-    );
-    return response.data;
+    requireInteger(params.page, 'page', 1);
+    requireInteger(params.perPage, 'perPage', 1);
+    requireDate(params.date, 'date');
+    return (
+      await this.http.get(`${this.projectPath(params.projectName)}/keywords`, {
+        params: pickDefined({ page: params.page, per_page: params.perPage, date: params.date })
+      })
+    ).data;
   }
 
   async getKeyword(params: { projectName: string; keywordId: string; date?: string }) {
-    let url = `/api/v2/groups/${encodeURIComponent(params.projectName)}/keywords/${params.keywordId}`;
-    let query: Record<string, any> = {};
-    if (params.date) query.date = params.date;
-
-    let response = await this.http.get(url, {
-      headers: this.headers,
-      params: query
-    });
-    return response.data;
+    requireDate(params.date, 'date');
+    return (
+      await this.http.get(this.keywordPath(params.projectName, params.keywordId), {
+        params: pickDefined({ date: params.date })
+      })
+    ).data;
   }
 
-  async addKeywords(params: {
-    projectName: string;
-    keywords: Array<{
-      keyword: string;
-      url: string;
-      region?: string;
-      language?: string;
-      tags?: string[];
-      device?: 'desktop' | 'mobile';
-      ignoreLocalPack?: boolean;
-      urlTrackingMethod?: string;
-      ignoreSubDomains?: boolean;
-    }>;
-  }) {
-    let body = params.keywords.map(kw => ({
-      type: 'keyword',
-      category: params.projectName,
-      kw: kw.keyword,
-      url: kw.url,
-      region: kw.region || 'google.com',
-      language: kw.language || 'en',
-      tags: kw.tags || [],
-      se_type: kw.device === 'mobile' ? 'sem' : 'se',
-      ignore_local: kw.ignoreLocalPack ? 1 : 0,
-      url_tracking_method: kw.urlTrackingMethod || 'exact',
-      ignore_sub_domains: kw.ignoreSubDomains ? 1 : 0
-    }));
-
-    let response = await this.http.post(
-      `/api/v2/groups/${encodeURIComponent(params.projectName)}/keywords`,
-      body,
-      { headers: this.headers }
-    );
-    return response.data;
+  async addKeywords(params: { projectName: string; keywords: KeywordInput[] }) {
+    let data = params.keywords.map(kw => {
+      requireText(kw.keyword, 'Keyword text', 150);
+      requireText(kw.url, 'Tracked URL');
+      requireText(kw.region, 'Keyword region');
+      requireText(kw.language, 'Keyword language');
+      let trackingMethod = kw.urlTrackingMethod === 'domain' ? 'broad' : kw.urlTrackingMethod;
+      if (trackingMethod !== undefined && !['broad', 'exact'].includes(trackingMethod)) {
+        throw createApiServiceError(
+          'urlTrackingMethod must be broad, exact, or the legacy domain alias.'
+        );
+      }
+      return {
+        type: 'keyword',
+        attributes: pickDefined({
+          category: params.projectName,
+          kw: kw.keyword,
+          url: kw.url,
+          region: kw.region,
+          language: kw.language,
+          tags: kw.tags,
+          type: kw.device === undefined ? undefined : kw.device === 'mobile' ? 'sem' : 'se',
+          ignore_local: kw.ignoreLocalPack,
+          url_tracking_method: trackingMethod,
+          ignore_sub_domains: kw.ignoreSubDomains,
+          source: 1
+        })
+      };
+    });
+    return (await this.http.post(`${this.projectPath(params.projectName)}/keywords`, { data }))
+      .data;
   }
 
   async deleteKeyword(params: { projectName: string; keywordId: string }) {
-    let response = await this.http.delete(
-      `/api/v2/groups/${encodeURIComponent(params.projectName)}/keywords/${params.keywordId}`,
-      { headers: this.headers }
-    );
-    return response.data;
+    return (await this.http.delete(this.keywordPath(params.projectName, params.keywordId)))
+      .data;
   }
 
-  // ── Ranking Data ──────────────────────────────────────────
+  async updateKeyword(params: {
+    projectName: string;
+    keywordId: string;
+    attributes: Record<string, unknown>;
+  }) {
+    return (
+      await this.http.patch(this.keywordPath(params.projectName, params.keywordId), {
+        data: { type: 'keyword', attributes: params.attributes }
+      })
+    ).data;
+  }
 
   async getRankingHistory(params: { keywordIds: string[]; limit?: number }) {
-    let query: Record<string, any> = {
-      action: 'chart'
-    };
-    if (params.limit) query.limit = params.limit;
-
-    let response = await this.http.post(
-      '/api/v2/keywords/chart',
-      {
-        keyword_ids: params.keywordIds
-      },
-      {
-        headers: this.headers,
-        params: query
-      }
-    );
-    return response.data;
+    requireInteger(params.limit, 'historyDays', 1, 180);
+    for (let id of params.keywordIds) requireText(id, 'Keyword ID');
+    return (
+      await this.http.post(
+        '/api/v2/keywords/chart',
+        { kwid: params.keywordIds },
+        { params: pickDefined({ action: 'bulkChart', limit: params.limit }) }
+      )
+    ).data;
   }
 
   async getKeywordMetrics(params: {
@@ -180,75 +205,73 @@ export class Client {
     tagId?: string;
     timeframe?: string;
   }) {
-    let query: Record<string, any> = {};
-    if (params.tagId) query.tagId = params.tagId;
-    if (params.timeframe) query.timeframe = params.timeframe;
-
-    let response = await this.http.get(
-      `/api/v2/groups/${encodeURIComponent(params.projectName)}/metrics`,
-      {
-        headers: this.headers,
-        params: query
-      }
-    );
-    return response.data;
+    return (
+      await this.http.get(`${this.projectPath(params.projectName)}/metrics`, {
+        params: pickDefined({ tagId: params.tagId, timeframe: params.timeframe })
+      })
+    ).data;
   }
 
-  // ── Regions ───────────────────────────────────────────────
+  async getKeywordCompetitors(params: {
+    projectName: string;
+    keywordId: string;
+    startDate: string;
+    endDate: string;
+  }) {
+    requireText(params.projectName, 'Project name');
+    requireText(params.keywordId, 'Keyword ID');
+    requireDate(params.startDate, 'startDate');
+    requireDate(params.endDate, 'endDate');
+    if (params.endDate < params.startDate) {
+      throw createApiServiceError('endDate must be on or after startDate.');
+    }
+    return (
+      await this.http.get(
+        `/api/v2/metrics/${encodeURIComponent(params.projectName)}/competitors/${encodeURIComponent(params.keywordId)}/history`,
+        { params: { dateRange: `${params.startDate}.${params.endDate}` } }
+      )
+    ).data;
+  }
+
+  async getShareOfVoice(projectName: string) {
+    requireText(projectName, 'Project name');
+    return (
+      await this.http.get(
+        `/api/v2/metrics/${encodeURIComponent(projectName)}/mindshare/latest`
+      )
+    ).data;
+  }
 
   async listRegions(projectName: string) {
-    let response = await this.http.get(
-      `/api/v2/groups/${encodeURIComponent(projectName)}/regions`,
-      { headers: this.headers }
-    );
-    return response.data;
+    return (await this.http.get(`${this.projectPath(projectName)}/regions`)).data;
   }
-
-  // ── Refresh ───────────────────────────────────────────────
 
   async refreshKeywords(params: { projectIds: string[]; includeSubGroups?: boolean }) {
-    let response = await this.http.post(
-      '/api/v2/keywords/refresh',
-      {
-        project_ids: params.projectIds,
-        include_sub_groups: params.includeSubGroups ?? true
-      },
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    for (let id of params.projectIds) requireText(id, 'Project ID');
+    return (
+      await this.http.post('/api/v2/keywords/refresh', {
+        data: pickDefined({
+          project_ids: params.projectIds,
+          include_sub_groups: params.includeSubGroups
+        })
+      })
+    ).data;
   }
 
-  // ── AI Visibility - Domains ───────────────────────────────
-
-  async listAiDomains() {
-    let response = await this.http.get('/api/v2/ai-visibility/domains', {
-      headers: this.headers
-    });
-    return response.data;
+  async listAiDomains(page?: number) {
+    requireInteger(page, 'page', 1);
+    return (
+      await this.http.get('/api/v2/ai-visibility/domains', { params: pickDefined({ page }) })
+    ).data;
   }
 
   async getAiDomain(domainId: string) {
-    let response = await this.http.get(`/api/v2/ai-visibility/domains/${domainId}`, {
-      headers: this.headers
-    });
-    return response.data;
+    return (await this.http.get(this.domainPath(domainId))).data;
   }
-
-  // ── AI Visibility - Search Terms ──────────────────────────
 
   async listAiSearchTerms(domainId: string) {
-    let response = await this.http.get(
-      `/api/v2/ai-visibility/domains/${domainId}/search-terms`,
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    return (await this.http.get(`${this.domainPath(domainId)}/search-terms`)).data;
   }
-
-  // ── AI Visibility - Metrics ───────────────────────────────
 
   async getAiMetrics(params: {
     domainId: string;
@@ -259,98 +282,39 @@ export class Client {
     periodOffset?: number;
     aggregation?: string;
   }) {
-    let query: Record<string, any> = {};
-    if (params.topics) {
-      params.topics.forEach(t => {
-        query['topics[]'] = query['topics[]'] || [];
-        query['topics[]'].push(t);
-      });
-    }
-    if (params.searchTerms) {
-      params.searchTerms.forEach(s => {
-        query['search_terms[]'] = query['search_terms[]'] || [];
-        query['search_terms[]'].push(s);
-      });
-    }
-    if (params.engines) {
-      params.engines.forEach(e => {
-        query['engine[]'] = query['engine[]'] || [];
-        query['engine[]'].push(e);
-      });
-    }
-    if (params.timeframe) query.timeframe = params.timeframe;
-    if (params.periodOffset !== undefined) query.period_offset = params.periodOffset;
-    if (params.aggregation) query.aggregation = params.aggregation;
-
-    let response = await this.http.get(
-      `/api/v2/ai-visibility/domains/${params.domainId}/metrics`,
-      {
-        headers: this.headers,
-        params: query
-      }
-    );
-    return response.data;
+    requireInteger(params.periodOffset, 'periodOffset', -365, 0);
+    let query = this.aiFilters(params);
+    for (let engine of params.engines ?? []) query.append('engines[]', engine);
+    if (params.timeframe !== undefined) query.set('timeframe', params.timeframe);
+    if (params.periodOffset !== undefined)
+      query.set('period_offset', String(params.periodOffset));
+    if (params.aggregation !== undefined) query.set('aggregation', params.aggregation);
+    return (
+      await this.http.get(`${this.domainPath(params.domainId)}/metrics`, { params: query })
+    ).data;
   }
-
-  // ── AI Visibility - Sentiment ─────────────────────────────
 
   async getAiSentiment(params: {
     domainId: string;
     topics?: string[];
     searchTerms?: string[];
   }) {
-    let query: Record<string, any> = {};
-    if (params.topics) {
-      params.topics.forEach(t => {
-        query['topics[]'] = query['topics[]'] || [];
-        query['topics[]'].push(t);
-      });
-    }
-    if (params.searchTerms) {
-      params.searchTerms.forEach(s => {
-        query['search_terms[]'] = query['search_terms[]'] || [];
-        query['search_terms[]'].push(s);
-      });
-    }
-
-    let response = await this.http.get(
-      `/api/v2/ai-visibility/domains/${params.domainId}/metrics/sentiment`,
-      {
-        headers: this.headers,
-        params: query
-      }
-    );
-    return response.data;
+    return (
+      await this.http.get(`${this.domainPath(params.domainId)}/metrics/sentiment`, {
+        params: this.aiFilters(params)
+      })
+    ).data;
   }
-
-  // ── AI Visibility - Citations ─────────────────────────────
 
   async getAiCitations(params: {
     domainId: string;
     topics?: string[];
     searchTerms?: string[];
   }) {
-    let query: Record<string, any> = {};
-    if (params.topics) {
-      params.topics.forEach(t => {
-        query['topics[]'] = query['topics[]'] || [];
-        query['topics[]'].push(t);
-      });
-    }
-    if (params.searchTerms) {
-      params.searchTerms.forEach(s => {
-        query['search_terms[]'] = query['search_terms[]'] || [];
-        query['search_terms[]'].push(s);
-      });
-    }
-
-    let response = await this.http.get(
-      `/api/v2/ai-visibility/domains/${params.domainId}/metrics/citations`,
-      {
-        headers: this.headers,
-        params: query
-      }
-    );
-    return response.data;
+    return (
+      await this.http.get(`${this.domainPath(params.domainId)}/metrics/citations`, {
+        params: this.aiFilters(params)
+      })
+    ).data;
   }
 }

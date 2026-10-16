@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HNClient } from '../lib/client';
+import { toIsoTimestamp } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getItem = SlateTool.create(spec, {
@@ -37,6 +38,8 @@ Returns the full item data including author, score, text content, URL, and child
       commentCount: z.number().optional().describe('Total number of comments on the item'),
       childIds: z.array(z.number()).optional().describe('IDs of direct child comments'),
       parentId: z.number().optional().describe('ID of the parent item (for comments)'),
+      pollId: z.number().optional().describe('ID of the poll containing this option'),
+      optionIds: z.array(z.number()).optional().describe('Poll option IDs in display order'),
       deleted: z.boolean().optional().describe('Whether the item has been deleted'),
       dead: z.boolean().optional().describe('Whether the item is dead/flagged')
     })
@@ -46,15 +49,10 @@ Returns the full item data including author, score, text content, URL, and child
     let item = await client.getItem(ctx.input.itemId);
 
     if (!item) {
-      return {
-        output: {
-          itemId: ctx.input.itemId
-        },
-        message: `Item **${ctx.input.itemId}** was not found.`
-      };
+      throw createApiServiceError(`Hacker News item ${ctx.input.itemId} was not found.`);
     }
 
-    let createdAt = item.time ? new Date(item.time * 1000).toISOString() : undefined;
+    let createdAt = toIsoTimestamp(item.time);
 
     let output = {
       itemId: item.id,
@@ -68,6 +66,8 @@ Returns the full item data including author, score, text content, URL, and child
       commentCount: item.descendants,
       childIds: item.kids,
       parentId: item.parent,
+      pollId: item.poll,
+      optionIds: item.parts,
       deleted: item.deleted,
       dead: item.dead
     };

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scriptureContent } from '../lib/content';
 import { spec } from '../spec';
 
 export let getPassage = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let getPassage = SlateTool.create(spec, {
   description: `Retrieve a range of scripture content by combining two verse IDs with a dash, or by specifying a single chapter/verse reference. Useful for fetching a specific portion of text spanning multiple verses.`,
   instructions: [
     'Passage IDs can be a single verse (e.g., "GEN.1.1"), a chapter (e.g., "GEN.1"), or a range (e.g., "GEN.1.1-GEN.1.5" for Genesis 1:1-5).',
-    'Ranges must be within the same book.'
+    'Ranges may span chapters and books. Responses are limited to 200 verses; split larger ranges into smaller passages.'
   ],
   tags: {
     readOnly: true
@@ -21,6 +22,16 @@ export let getPassage = SlateTool.create(spec, {
       passageId: z
         .string()
         .describe('Passage ID or range (e.g., "GEN.1.1-GEN.1.5", "MAT.5.1-MAT.5.12")'),
+      useOrgId: z
+        .boolean()
+        .optional()
+        .describe(
+          'Match the supplied verse or passage IDs against original versification IDs'
+        ),
+      parallels: z
+        .string()
+        .optional()
+        .describe('Comma-separated Bible IDs to return parallel scripture from'),
       contentType: z
         .enum(['html', 'json', 'text'])
         .optional()
@@ -41,7 +52,12 @@ export let getPassage = SlateTool.create(spec, {
       content: z.string().describe('Passage scripture content'),
       verseCount: z.number().describe('Number of verses in the passage'),
       copyright: z.string().describe('Copyright information'),
-      fumsId: z.string().describe('FUMS tracking token')
+      fumsToken: z.string().optional().describe('Current FUMS token for scripture engagement'),
+      meta: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original scripture response metadata'),
+      fumsId: z.string().optional().describe('Legacy FUMS tracking token, when supplied')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,6 +65,8 @@ export let getPassage = SlateTool.create(spec, {
 
     let result = await client.getPassage(ctx.input.bibleId, ctx.input.passageId, {
       contentType: ctx.input.contentType,
+      parallels: ctx.input.parallels,
+      useOrgId: ctx.input.useOrgId,
       includeNotes: ctx.input.includeNotes,
       includeTitles: ctx.input.includeTitles,
       includeChapterNumbers: ctx.input.includeChapterNumbers,
@@ -59,14 +77,16 @@ export let getPassage = SlateTool.create(spec, {
     let p = result.data;
     return {
       output: {
-        passageId: p.passageId,
+        passageId: p.id,
         bibleId: p.bibleId,
-        orgId: p.orgId || '',
-        reference: p.reference || '',
-        content: p.content || '',
+        orgId: p.orgId,
+        reference: p.reference,
+        content: scriptureContent(p.content),
         verseCount: p.verseCount,
-        copyright: p.copyright || '',
-        fumsId: result.meta?.fumsId || ''
+        copyright: p.copyright,
+        fumsToken: result.meta?.fumsToken,
+        meta: result.meta,
+        fumsId: result.meta?.fumsId
       },
       message: `Retrieved passage **${p.reference}** (${p.verseCount} verse(s)).`
     };

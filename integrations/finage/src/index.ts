@@ -13,16 +13,20 @@ import {
   getMarketStatus,
   getSectorPerformance,
   getStockAggregates,
+  getStockDetails,
   getStockPrice,
   getStockSignals,
   getStockSnapshot,
   getTechnicalIndicator,
+  listSymbols,
   searchMarket
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     getStockPrice,
+    getStockDetails,
+    listSymbols,
     getStockAggregates,
     getStockSnapshot,
     getForexPrice,

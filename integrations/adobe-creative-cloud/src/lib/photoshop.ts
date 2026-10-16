@@ -1,4 +1,4 @@
-import { type AdobeAuthConfig, createAdobeAxios } from './client';
+import { type AdobeAuthConfig, createAdobeAxios, getAdobeJobUrl } from './client';
 
 let PHOTOSHOP_BASE_URL = 'https://image.adobe.io';
 
@@ -12,6 +12,7 @@ export interface PhotoshopJobStatus {
   status: string;
   outputs?: any[];
   links?: any;
+  _links?: { self?: { href?: string } };
 }
 
 export class PhotoshopClient {
@@ -57,8 +58,8 @@ export class PhotoshopClient {
       input,
       output,
       options: {
-        width: options?.width || 100,
-        height: options?.height || 100
+        width: options?.width ?? 100,
+        height: options?.height ?? 100
       }
     });
     return response.data as PhotoshopJobStatus;
@@ -122,7 +123,9 @@ export class PhotoshopClient {
         layers: [
           {
             ...(smartObjectLayer.name ? { name: smartObjectLayer.name } : {}),
-            ...(smartObjectLayer.layerId ? { id: smartObjectLayer.layerId } : {}),
+            ...(smartObjectLayer.layerId !== undefined
+              ? { id: smartObjectLayer.layerId }
+              : {}),
             input: smartObjectLayer.replacement,
             edit: {}
           }
@@ -162,7 +165,7 @@ export class PhotoshopClient {
       options: {
         layers: layers.map(layer => ({
           ...(layer.name ? { name: layer.name } : {}),
-          ...(layer.layerId ? { id: layer.layerId } : {}),
+          ...(layer.layerId !== undefined ? { id: layer.layerId } : {}),
           text: layer.text
         }))
       },
@@ -172,7 +175,9 @@ export class PhotoshopClient {
   }
 
   async getJobStatus(statusUrl: string) {
-    let response = await this.http.get(statusUrl);
+    let response = await this.http.get(getAdobeJobUrl(statusUrl).toString(), {
+      maxRedirects: 0
+    });
     return response.data as PhotoshopJobStatus;
   }
 }

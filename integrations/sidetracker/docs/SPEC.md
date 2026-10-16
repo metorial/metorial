@@ -1,74 +1,38 @@
-Let me fetch the API documentation to get more details.Let me try to access the Postman collection and the product features page for more detail on the API.Let me check the Zapier integration page for more details on triggers and actions.Now I have enough information to write the specification. Let me compile everything.
+# Sidetracker Integration
 
-# Slates Specification for Sidetracker
-
-## Overview
-
-Sidetracker is a cookie-free marketing analytics platform that tracks website traffic, sales funnels, customer journeys, and marketing expenses. It tracks expenses, sales funnels, and customer journeys, helping optimize marketing spend and visualize campaign performance from start to finish. Specifically designed for SaaS founders, it tracks customer journeys from initial engagement on a landing domain through to sign-up and ongoing engagement.
+Sidetracker is a cookie-free marketing analytics product at [sidetracker.io](https://sidetracker.io/). It tracks visitor sessions, conversion lists, revenue attribution, and sales progress across domains.
 
 ## Authentication
 
-Sidetracker uses API key authentication.
+Connect with an API key from the API section in account settings. Requests use the supplied value in the `Authorization` header and the base URL `https://app.sidetracker.io/api/`.
 
-To obtain your API key, log into the application, navigate to the settings, and locate the API section, then copy your API key.
+The [quick start](https://sidetracker.io/api-quick-start/) shows `Authorization: {API_KEY}`. The current [API reference](https://app.sidetracker.io/api/schema/redoc) instead describes a `Token` prefix. Existing connection values are passed unchanged; include the prefix in the supplied value if required by your account.
 
-To authenticate requests, add the API key as a Bearer token in the header of each request.
+## Available workflows
 
-- **Header format**: `Authorization: {API_KEY}`
-- **Base URL**: `https://app.sidetracker.io/api/`
+- Inspect the connected account with `get_current_user`.
+- Discover conversion lists with `get_lists`, retrieve one with `get_list`, create a preset-based list with `create_list`, and delete a list with `delete_list`.
+- Retrieve paginated list rows with `get_list_rows`, inspect one with `get_list_row`, and add, update, or delete rows with `manage_list_row`.
+- Retrieve sessions by domain with `get_sessions`. Use `get_session` to inspect a session, optionally including notes or a selected page of visits.
+- Search converted sessions with `get_conversions`, including revenue status, tags, referrer labels, date range, incremental update timestamps, and attribution options. The provider ignores malformed filters, so a typo can broaden the results.
+- Enrich sessions with `update_session_metadata`, `add_session_note`, `add_revenue`, and `update_sales_status`.
+- Fire a configured call-to-action using `execute_trigger`.
 
-Note: The API key is passed directly as the `Authorization` header value (not with a `Bearer ` prefix).
+List creation uses the provider's `tracking` or `checks` preset. Column names are case-sensitive and must belong to the selected preset. List, row, and session reads preserve the provider data supported by their existing tool contracts. New list-detail, row-detail, and conversion reads expose the unmodified provider response because the public reference does not specify response fields. Account lookup exposes only supported flat identity fields actually returned by the provider: id, name, username, email, first_name, and last_name. These fields are optional; the public reference does not guarantee their presence. Unknown and nested account data are omitted.
 
-## Features
+## Pagination and scope
 
-### Lists Management
+List, list-row, session, and session-visit requests support the documented `page` and `page_size` parameters. Existing pagination fields remain optional numbers. Omitted fields keep the provider's defaults. No workspace or domain ID is required when connecting; domain-specific session reads accept the domain ID per call.
 
-Lists are a core data structure in Sidetracker where all conversions are organized, allowing you to see the number of conversions per list at a glance. The API allows you to retrieve lists and their associated row data. Lists contain rows representing individual conversion records or tracked entries.
+## Reference limitations
 
-- Each list has a unique List ID.
-- Rows within lists can be created and updated, and you can retrieve row data through the API.
+The public [OpenAPI schema](https://app.sidetracker.io/api/schema) omits response body definitions for most reads and mutations. It does not provide a domain-discovery endpoint. The `get_lists` public contract requires string identifiers, names, descriptions, and presets; malformed or incomplete entries or pagination envelopes produce a clear error rather than invented values. Existing generic mutation results and legacy Zapier request bodies are retained.
 
-### Session Tracking and Metadata
+The reference includes webhook receiver and subscription routes, but callback contracts are outside these tools. No webhook registration or incoming-event workflow is configured by this integration.
 
-Using session IDs, you can store information back to the metadata field of a user session, such as marking `{"signup": true}` or recording any other custom value. This enables cross-domain tracking and enrichment of visitor data.
+## Official sources
 
-- Sessions are identified by a unique session ID.
-- You can attach custom metadata to sessions via the API.
-
-### Revenue Attribution
-
-The API allows adding revenue data to tracked sessions. This links financial outcomes to specific visitor sessions and marketing sources.
-
-- Requires a Session ID and an amount value.
-
-### Sales Status Management
-
-You can update the sales status of a customer session through the API, enabling pipeline tracking tied to the original traffic source.
-
-- Requires a Session ID and a sales status value.
-
-### Event Tracking via API
-
-The REST API can help track call-to-action events. You can leverage the REST API to activate Triggers programmatically, allowing deep integration with your system based on custom logic or external events.
-
-### Cross-Domain Tracking
-
-By embedding parameters like `?clickEvent=keep|{session_id}` into links, Sidetracker transfers the session ID of the visitor to other domains. The API complements this by allowing you to enrich session data on the receiving domain.
-
-## Events
-
-Sidetracker supports webhooks for receiving real-time updates.
-
-### Webhook Configuration
-
-Webhooks allow you to receive real-time updates for specific events. Setup requires providing a Webhook URL and a secret token in the application settings. When an event occurs, the system sends a POST request to your Webhook URL with relevant data.
-
-### List Row Created
-
-Triggers instantly when a new row is added to a specific list. Requires specifying the target List ID.
-
-### List Row Updated
-
-Triggers instantly when an existing row in a specific list is updated. Requires specifying the target List ID.
-
-Note: The specific event types beyond list row changes are not well-documented in publicly available API references. The webhook system is configured globally through the application settings rather than through API-based subscription management.
+- [API quick start](https://sidetracker.io/api-quick-start/)
+- [API reference](https://app.sidetracker.io/api/schema/redoc)
+- [OpenAPI schema](https://app.sidetracker.io/api/schema)
+- [Official Postman collection](https://sidetracker.io/wp-content/uploads/2024/02/SideTracker-V1.postman_collection.json_.zip)

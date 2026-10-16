@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { gifSchema, paginationSchema } from '../lib/types';
+import {
+  gifSchema,
+  paginationSchema,
+  requestContextFields,
+  responseMetadataFields
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let searchChannels = SlateTool.create(spec, {
@@ -14,6 +19,7 @@ export let searchChannels = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: requestContextFields.customerId,
       query: z.string().describe('Search query for channel names'),
       limit: z
         .number()
@@ -26,9 +32,14 @@ export let searchChannels = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       channels: z
         .array(
           z.object({
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Complete provider channel metadata'),
             channelId: z.number().describe('Unique channel ID'),
             url: z.string().describe('Channel URL on GIPHY'),
             displayName: z.string().describe('Channel display name'),
@@ -46,7 +57,7 @@ export let searchChannels = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
 
     let result = await client.searchChannels({
       query: ctx.input.query,
@@ -55,10 +66,7 @@ export let searchChannels = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        channels: result.channels,
-        pagination: result.pagination
-      },
+      output: { raw: result.raw, channels: result.channels, pagination: result.pagination },
       message: `Found ${result.channels.length} channels for "${ctx.input.query}".`
     };
   })

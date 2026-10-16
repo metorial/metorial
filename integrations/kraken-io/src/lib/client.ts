@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 import type {
   KrakenAuth,
   KrakenCallbackResponse,
@@ -34,6 +39,34 @@ export class Client {
     this.sandbox = config.sandbox ?? false;
   }
 
+  private async request<T>(path: string, body: unknown, allowCallback = false): Promise<T> {
+    try {
+      let response = await apiAxios.post(path, body);
+      let data: unknown = response.data;
+      if (!isApiErrorRecord(data)) {
+        throw createApiServiceError('Kraken.io returned an invalid response.');
+      }
+      if (data.success === false) {
+        throw createApiServiceError(
+          typeof data.message === 'string' ? data.message : 'Kraken.io rejected the request.'
+        );
+      }
+      if (
+        data.success !== true &&
+        !(allowCallback && typeof data.id === 'string' && data.id)
+      ) {
+        throw createApiServiceError('Kraken.io did not confirm the request.');
+      }
+      return data as T;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Kraken.io',
+        reason: 'krakenio_api_error',
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+      });
+    }
+  }
+
   async optimizeFromUrl(options: {
     url: string;
     lossy?: boolean;
@@ -63,8 +96,7 @@ export class Client {
       ...(options.s3Store && { s3_store: options.s3Store })
     };
 
-    let response = await apiAxios.post('/v1/url', body);
-    return response.data as KrakenOptimizeResponse | KrakenCallbackResponse;
+    return this.request('/v1/url', body, Boolean(options.callbackUrl));
   }
 
   async generateImageSets(options: {
@@ -96,14 +128,22 @@ export class Client {
       ...(options.s3Store && { s3_store: options.s3Store })
     };
 
-    let response = await apiAxios.post('/v1/url', body);
-    return response.data as KrakenImageSetResponse | KrakenCallbackResponse;
+    return this.request('/v1/url', body, Boolean(options.callbackUrl));
   }
 
   async getUserStatus(): Promise<KrakenUserStatusResponse> {
-    let response = await apiAxios.post('/user_status', {
+    let status = await this.request<KrakenUserStatusResponse>('/user_status', {
       auth: this.auth
     });
-    return response.data as KrakenUserStatusResponse;
+    if (
+      typeof status.active !== 'boolean' ||
+      typeof status.plan_name !== 'string' ||
+      [status.quota_total, status.quota_used, status.quota_remaining].some(
+        value => typeof value !== 'number' || !Number.isFinite(value)
+      )
+    ) {
+      throw createApiServiceError('Kraken.io returned an incomplete account status response.');
+    }
+    return status;
   }
 }

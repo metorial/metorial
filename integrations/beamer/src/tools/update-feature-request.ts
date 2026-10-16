@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type UpdateFeatureRequestParams } from '../lib/client';
+import { translationParams } from '../lib/translations';
 import { spec } from '../spec';
 import { featureRequestOutputSchema } from './create-feature-request';
 
@@ -25,7 +26,15 @@ export let updateFeatureRequestTool = SlateTool.create(spec, {
       translations: z
         .array(translationUpdateSchema)
         .optional()
-        .describe('Updated translations'),
+        .describe(
+          'Updated translations; if any language code is provided, supply one for every translation'
+        ),
+      date: z.string().optional().describe('Creation date (ISO-8601)'),
+      votesCount: z.number().optional().describe('Vote count, a nonnegative whole number'),
+      internalUserEmail: z
+        .string()
+        .optional()
+        .describe('Email of the team member creating the request'),
       category: z.string().optional().describe('Category name'),
       status: z
         .string()
@@ -33,22 +42,32 @@ export let updateFeatureRequestTool = SlateTool.create(spec, {
         .describe('Status (e.g., "under_review", "planned", "in_progress", "complete")'),
       visible: z.boolean().optional().describe('Public visibility'),
       notes: z.string().optional().describe('Internal team notes'),
-      filters: z.string().optional().describe('Segmentation filter')
+      filters: z.string().optional().describe('Segmentation filter'),
+      userId: z.string().optional().describe('Requester user ID'),
+      userEmail: z.string().optional().describe('Requester email'),
+      userFirstname: z.string().optional().describe('Requester first name'),
+      userLastname: z.string().optional().describe('Requester last name')
     })
   )
   .output(featureRequestOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updateData: Record<string, unknown> = {};
+    let updateData: UpdateFeatureRequestParams = {};
 
-    if (ctx.input.translations) {
-      updateData.title = ctx.input.translations.map(t => t.title);
-      updateData.content = ctx.input.translations.map(t => t.content);
-      let languages = ctx.input.translations.map(t => t.language).filter(Boolean);
-      if (languages.length > 0) updateData.language = languages;
+    if (ctx.input.translations !== undefined) {
+      Object.assign(updateData, translationParams(ctx.input.translations));
     }
 
+    if (ctx.input.date !== undefined) updateData.date = ctx.input.date;
+    if (ctx.input.votesCount !== undefined) updateData.votesCount = ctx.input.votesCount;
+    if (ctx.input.internalUserEmail !== undefined)
+      updateData.internalUserEmail = ctx.input.internalUserEmail;
+    if (ctx.input.userId !== undefined) updateData.userId = ctx.input.userId;
+    if (ctx.input.userEmail !== undefined) updateData.userEmail = ctx.input.userEmail;
+    if (ctx.input.userFirstname !== undefined)
+      updateData.userFirstname = ctx.input.userFirstname;
+    if (ctx.input.userLastname !== undefined) updateData.userLastname = ctx.input.userLastname;
     if (ctx.input.category !== undefined) updateData.category = ctx.input.category;
     if (ctx.input.status !== undefined) updateData.status = ctx.input.status;
     if (ctx.input.visible !== undefined) updateData.visible = ctx.input.visible;

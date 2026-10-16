@@ -3,6 +3,10 @@ import { spec } from './spec';
 import {
   createDonation,
   getCampaign,
+  getCurrentUser,
+  getDonation,
+  getProfile,
+  getSubscription,
   listCampaigns,
   listDonations,
   listProducts,
@@ -20,6 +24,10 @@ export let provider = Slate.create({
   tools: [
     listCampaigns,
     getCampaign,
+    getCurrentUser,
+    getDonation,
+    getProfile,
+    getSubscription,
     listProfiles,
     manageProfile,
     listDonations,

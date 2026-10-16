@@ -18,7 +18,7 @@ export let getWaiversForEvent = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      waivers: z.any().describe('Array of waiver records for the specified event')
+      waivers: z.any().describe('Complete provider response for the event waivers')
     })
   )
   .handleInvocation(async ctx => {
@@ -28,11 +28,10 @@ export let getWaiversForEvent = SlateTool.create(spec, {
     });
 
     let waivers = await client.getWaiversForEvent(ctx.input.waiverEventId);
-    let results = Array.isArray(waivers) ? waivers : [waivers];
 
     return {
-      output: { waivers: results },
-      message: `Found **${results.length}** waiver(s) for event **${ctx.input.waiverEventId}**.`
+      output: { waivers },
+      message: 'Retrieved the event waiver response.'
     };
   })
   .build();

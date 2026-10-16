@@ -1,62 +1,32 @@
-# Slates Specification for Twocaptcha
+# 2Captcha API Reference
 
-## Overview
+The integration uses the [Captcha Solver API v2](https://2captcha.com/api-docs), with JSON POST requests to `https://api.2captcha.com`. Authentication is the account API key in the `clientKey` body property. No OAuth, scopes, additional configuration, or refresh tokens are required. This API documents no profile/current-user identity endpoint; `get_balance` is an account operation rather than an identity lookup. The separate residential Proxy API is outside this integration's scope.
 
-2Captcha is a human-powered image and CAPTCHA recognition service whose main purpose is solving CAPTCHAs in a quick and accurate way by human employees, but the service is not limited only to CAPTCHA solving. You can convert to text any image that a human can recognize. Most captcha tasks are solved automatically by AI models for speed, and if AI confidence is low, the task is passed to verified human workers.
+| Tool | API method | Behavior |
+| --- | --- | --- |
+| `solve_captcha` | `createTask` | Guided task creation for reCAPTCHA V2/V3, Arkose Labs, GeeTest V3/V4, Turnstile, and the existing hCaptcha branch |
+| `solve_image_captcha` | `createTask` | ImageToTextTask or TextCaptchaTask |
+| `create_task` | `createTask` | Complete documented task object, with optional callback, worker language, and software ID |
+| `get_task_result` | `getTaskResult` | One result request; actual status, solution, cost, timestamps, attempts, and raw response |
+| `report_solution` | `reportCorrect` or `reportIncorrect` | Feedback after verifying the solution on the target site |
+| `get_balance` | `getBalance` | Actual account balance in USD |
 
-## Authentication
+Each creation tool sends a single request and returns the provider task ID. It never waits, polls automatically, or retries a paid submission. A transport timeout does not establish whether submission failed; inspect the registered callback or account before resubmitting. A successful creation response without a valid task ID is reported as an error rather than inventing an identifier.
 
-2Captcha uses API key authentication.
+[getTaskResult](https://2captcha.com/api-docs/get-task-result) returns `processing` or `ready`. Wait at least five seconds between checks. Solution objects remain complete because each task type has its own fields. For Cloudflare challenge pages, retain the returned `solution.userAgent` along with the token. The legacy `workerIp` output contains the provider's `ip`, which the API defines as the submission IP. `solveTime` is the difference between actual `endTime` and `createTime`; missing facts are omitted rather than fabricated. All tools include the full provider response as `raw`.
 
-- To use the API you need to obtain your API key from the Dashboard. The key is used to authenticate all your requests to the API endpoints.
-- Each user is given a unique authentication token called an API key. It's a 32-character string that looks like: `1abc234de56fab7c89012d34e56fa7b8`.
-- The API key can be found at `https://2captcha.com/setting` after registering an account.
-- **API v2 (JSON-based):** Pass the key as the `clientKey` field in the JSON request body to `https://api.2captcha.com/createTask`.
-- **API v1 (legacy):** Pass the key as the `key` parameter in requests to `https://2captcha.com/in.php` and `https://2captcha.com/res.php`.
+[createTask](https://2captcha.com/api-docs/create-task) accepts worker languages `en` and `ru`; the old `rn` input is retained as an alias for `ru`. Worker language applies to image and text tasks. Optional empty strings and omitted fields retain their previous request omission behavior.
 
-No OAuth or scopes are involved. The single API key grants full access to all captcha solving and account management features.
+[reCAPTCHA V2 Enterprise](https://2captcha.com/api-docs/recaptcha-v2-enterprise) uses `RecaptchaV2EnterpriseTaskProxyless` or `RecaptchaV2EnterpriseTask`; set `isEnterprise: true` on the guided tool. `enterprisePayload` carries render parameters. Standard V2 remains unchanged.
 
-## Features
+[reCAPTCHA V3](https://2captcha.com/api-docs/recaptcha-v3) uses `RecaptchaV3TaskProxyless`, with documented `minScore` values 0.3, 0.7, or 0.9. [Proxies are explicitly unsupported](https://2captcha.com/api-docs/proxy) for both standard and Enterprise V3. A supplied proxy is rejected before submission.
 
-### Captcha Solving
+[GeeTest](https://2captcha.com/api-docs/geetest) V3 uses `gt` and a fresh `challenge`. V4 uses `version: 4` and `initParameters.captcha_id`. The optional `geetestRiskType` maps to the documented `riskType` field. Existing legacy fields are retained.
 
-The core feature of 2Captcha. You submit a captcha task and receive a solution (typically a token or text answer). The workflow involves sending your captcha to the server, getting a task ID, polling until the task is completed, and getting the result. Supported captcha types include:
+[Image recognition](https://2captcha.com/api-docs/normal-captcha) supports numeric modes 0 through 4, including mode 4 for both numbers and letters. [Text questions](https://2captcha.com/api-docs/text) use `TextCaptchaTask.comment`.
 
-- **Interactive/Token-based captchas:** reCAPTCHA V2, reCAPTCHA V3, reCAPTCHA V2/V3 Enterprise, Arkose Labs (FunCaptcha), GeeTest (v3 and v4), Cloudflare Turnstile, Capy Puzzle, KeyCAPTCHA, Lemin, Amazon WAF, CyberSiARA, MTCaptcha, Cutcaptcha, Friendly Captcha, DataDome, atbCAPTCHA, Tencent, Prosopo Procaptcha, CaptchaFox, VK Captcha, Temu Captcha, and Altcha Captcha.
-- **Simple/Image-based captchas:** Normal image captcha (distorted text), text captcha, rotate captcha, coordinate/click captcha, grid captcha, canvas (draw around), bounding box, and audio captcha.
+The hCaptcha branch is retained without altered request fields. Its former official documentation URL was inaccessible during this refresh and the current API index does not list it, so current availability is unverified. This absence is not treated as evidence of retirement.
 
-Key parameters vary by captcha type but commonly include the site key, page URL, and optionally a proxy configuration for IP-matching requirements. For reCAPTCHA V3, a minimum score and page action can be specified. Image captchas accept base64-encoded images or file uploads.
+[Callbacks](https://2captcha.com/api-docs/callback) are forwarded to the provider; this integration does not register or receive webhook events. Consult the provider's current callback format and registration requirements.
 
-### Proxy Support
-
-You can provide your own proxy details (address, port, credentials, type) when submitting captcha tasks. This is important for cases where the captcha solution must originate from a specific IP, such as Google services.
-
-### Image-to-Text Recognition
-
-Beyond CAPTCHA solving, you can convert to text any image that a human can recognize. Options include case sensitivity, language hints, and numeric-only constraints.
-
-### Solution Reporting
-
-You can report captcha solutions as correct or incorrect. This helps improve quality and may result in refunds for incorrectly solved captchas.
-
-### Account Balance
-
-You can check your current account balance via the API.
-
-### Residential Proxy Service
-
-2Captcha also provides residential and rotating proxy services with a separate API. Through this API you can:
-
-- Retrieve account status and traffic usage.
-- Check proxy balance.
-- Browse available proxy locations by country, region, city, and ASN (autonomous system/ISP).
-
-## Events
-
-2Captcha provides a callback (webhook) option that allows you to get the solution for your captcha automatically when it's ready, without polling the API.
-
-### Captcha Solution Ready
-
-- When a captcha is solved, 2Captcha sends an HTTP POST request with URL-encoded form data to your registered callback URL. The request contains two parameters: `id` (captcha ID) and `code` (the answer).
-- The callback URL must first be registered in the pingback settings of your 2Captcha account. You register a domain or IP, not a full URL.
-- The callback URL can also be specified per-request when creating a task.
+Documentation review and offline verification do not establish live acceptance or solving performance. No provider calls or paid solves were performed during this refresh.

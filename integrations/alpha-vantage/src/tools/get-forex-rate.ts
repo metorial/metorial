@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRecord, responseSeries, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 export let getForexRate = SlateTool.create(spec, {
   name: 'Get Forex Rate',
   key: 'get_forex_rate',
   description: `Retrieve foreign exchange rate data for a currency pair. Supports real-time exchange rates as well as historical time series at intraday, daily, weekly, and monthly resolutions. Use standard ISO 4217 currency codes (e.g. USD, EUR, GBP, JPY).`,
+  constraints: ['Intraday FX data requires a premium API key.'],
   tags: {
     readOnly: true
   }
@@ -57,22 +59,23 @@ export let getForexRate = SlateTool.create(spec, {
 
     if (resolution === 'realtime') {
       let data = await client.currencyExchangeRate({ fromCurrency, toCurrency });
-      let rateInfo = data['Realtime Currency Exchange Rate'] || {};
+      let rateInfo = responseRecord(data['Realtime Currency Exchange Rate'], 'exchange rate');
 
       return {
         output: {
           fromCurrency,
           toCurrency,
-          exchangeRate: rateInfo['5. Exchange Rate'] || '',
-          lastRefreshed: rateInfo['6. Last Refreshed'] || ''
+          exchangeRate: responseText(rateInfo['5. Exchange Rate'], ' Exchange Rate'),
+          lastRefreshed: responseText(rateInfo['6. Last Refreshed'], ' Last Refreshed')
         },
-        message: `**${fromCurrency}/${toCurrency}** exchange rate: ${rateInfo['5. Exchange Rate'] || 'N/A'}.`
+        message: `**${fromCurrency}/${toCurrency}** exchange rate: ${responseText(rateInfo['5. Exchange Rate'], 'exchange rate')}.`
       };
     }
 
     let data: any;
     if (resolution === 'intraday') {
-      if (!interval) throw new Error('Interval is required for intraday resolution.');
+      if (!interval)
+        throw createApiServiceError('Interval is required for intraday resolution.');
       data = await client.fxIntraday({
         fromSymbol: fromCurrency,
         toSymbol: toCurrency,
@@ -91,18 +94,20 @@ export let getForexRate = SlateTool.create(spec, {
       data = await client.fxMonthly({ fromSymbol: fromCurrency, toSymbol: toCurrency });
     }
 
-    let metaData = data['Meta Data'] || {};
-    let lastRefreshed = metaData['5. Last Refreshed'] || metaData['4. Last Refreshed'] || '';
+    let metaData = responseRecord(data['Meta Data'], 'metadata');
+    let lastRefreshed = responseText(
+      metaData['5. Last Refreshed'] ?? metaData['4. Last Refreshed'],
+      ' Last Refreshed'
+    );
 
-    let timeSeriesKey = Object.keys(data).find(k => k !== 'Meta Data') || '';
-    let timeSeries = data[timeSeriesKey] || {};
+    let timeSeries = responseSeries(data);
 
     let rates = Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
       date,
-      open: values['1. open'] || '',
-      high: values['2. high'] || '',
-      low: values['3. low'] || '',
-      close: values['4. close'] || ''
+      open: responseText(values['1. open'], ' open'),
+      high: responseText(values['2. high'], ' high'),
+      low: responseText(values['3. low'], ' low'),
+      close: responseText(values['4. close'], ' close')
     }));
 
     return {

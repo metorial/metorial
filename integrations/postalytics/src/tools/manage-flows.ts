@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PostalyticsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,9 +6,10 @@ import { spec } from '../spec';
 export let manageFlows = SlateTool.create(spec, {
   name: 'Manage Flows',
   key: 'manage_flows',
-  description: `List campaign flows and enroll or unenroll contacts from multi-step direct mail sequences. Flows automate multi-touch mail drops with timing and branching logic.`,
+  description: `List or retrieve campaign flows and enroll or unenroll contacts from multi-step direct mail sequences. Flows automate multi-touch mail drops with timing and branching logic.`,
   instructions: [
     'Use action "list" to see all available flows.',
+    'Use action "get" with the flow endpoint from the list result to inspect one flow.',
     'Use action "enroll" to add a contact to a flow using the flow endpoint identifier.',
     'Use action "unenroll" to remove a contact from a flow using the flow endpoint and data ID.'
   ],
@@ -19,11 +20,13 @@ export let manageFlows = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      action: z.enum(['list', 'enroll', 'unenroll']).describe('The action to perform'),
+      action: z.enum(['list', 'get', 'enroll', 'unenroll']).describe('The action to perform'),
       flowEndpoint: z
         .string()
         .optional()
-        .describe('Flow endpoint identifier (required for enroll, unenroll)'),
+        .describe(
+          'Flow endpoint identifier (required for get, enroll, unenroll; discover with list)'
+        ),
       dataId: z
         .string()
         .optional()
@@ -79,10 +82,18 @@ export let manageFlows = SlateTool.create(spec, {
       };
     }
 
+    if (action === 'get') {
+      if (!ctx.input.flowEndpoint)
+        throw createApiServiceError('flowEndpoint is required for get action');
+      let result = await client.getFlow(ctx.input.flowEndpoint);
+      return { output: { result }, message: 'Retrieved the flow.' };
+    }
+
     if (action === 'enroll') {
       if (!ctx.input.flowEndpoint)
-        throw new Error('flowEndpoint is required for enroll action');
-      if (!ctx.input.recipient) throw new Error('recipient is required for enroll action');
+        throw createApiServiceError('flowEndpoint is required for enroll action');
+      if (!ctx.input.recipient)
+        throw createApiServiceError('recipient is required for enroll action');
       let result = await client.enrollContactInFlow(
         ctx.input.flowEndpoint,
         ctx.input.recipient
@@ -95,8 +106,9 @@ export let manageFlows = SlateTool.create(spec, {
 
     if (action === 'unenroll') {
       if (!ctx.input.flowEndpoint)
-        throw new Error('flowEndpoint is required for unenroll action');
-      if (!ctx.input.dataId) throw new Error('dataId is required for unenroll action');
+        throw createApiServiceError('flowEndpoint is required for unenroll action');
+      if (!ctx.input.dataId)
+        throw createApiServiceError('dataId is required for unenroll action');
       let result = await client.unenrollContactFromFlow(
         ctx.input.flowEndpoint,
         ctx.input.dataId
@@ -107,6 +119,6 @@ export let manageFlows = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

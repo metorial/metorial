@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { asText, paginationSchema, readCollection, readPagination } from '../lib/responses';
 import { spec } from '../spec';
 
 let attendeeSchema = z.object({
@@ -49,6 +50,10 @@ export let listAttendeesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema
+        .optional()
+        .describe('Pagination details returned by Eventzilla'),
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       attendees: z.array(attendeeSchema).describe('List of attendees')
     })
   )
@@ -60,11 +65,7 @@ export let listAttendeesTool = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let rawAttendees = Array.isArray(data?.attendees)
-      ? data.attendees
-      : Array.isArray(data)
-        ? data
-        : [];
+    let rawAttendees = readCollection(data, 'attendees');
 
     let attendees = rawAttendees.map((a: any) => ({
       attendeeId: a.id,
@@ -74,9 +75,9 @@ export let listAttendeesTool = SlateTool.create(spec, {
       ticketType: a.ticket_type,
       barCode: a.bar_code,
       isAttended: a.is_attended,
-      transactionRef: a.transaction_ref,
+      transactionRef: a.transaction_ref ?? a.refno,
       transactionDate: a.transaction_date,
-      transactionAmount: a.transaction_amount,
+      transactionAmount: asText(a.transaction_amount),
       transactionStatus: a.transaction_status,
       eventDate: a.event_date,
       eventId: a.event_id,
@@ -91,7 +92,7 @@ export let listAttendeesTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { attendees },
+      output: { attendees, pagination: readPagination(data), raw: data },
       message: `Found **${attendees.length}** attendee(s) for event ${ctx.input.eventId}.`
     };
   })

@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 let API_BASE = 'https://core-api.uk.plain.com/graphql/v1';
 
@@ -162,7 +162,6 @@ let FRAGMENT_CUSTOMER_EVENT = `
 fragment CustomerEventParts on CustomerEvent {
   id
   title
-  externalId
   createdAt { ...DateTimeParts }
 }`;
 
@@ -170,7 +169,6 @@ let FRAGMENT_THREAD_EVENT = `
 fragment ThreadEventParts on ThreadEvent {
   id
   title
-  externalId
   createdAt { ...DateTimeParts }
 }`;
 
@@ -208,16 +206,63 @@ export class Client {
   }
 
   private async graphql<T = any>(query: string, variables?: Record<string, any>): Promise<T> {
-    let fullQuery = `${query}\n${COMMON_FRAGMENTS}`;
-    let res = await this.http.post('', {
-      query: fullQuery,
-      variables
-    });
-    let body = res.data as any;
-    if (body.errors && body.errors.length > 0) {
-      throw new Error(`GraphQL error: ${body.errors.map((e: any) => e.message).join(', ')}`);
+    if (
+      variables?.first !== undefined &&
+      (!Number.isInteger(variables.first) || variables.first < 1 || variables.first > 100)
+    ) {
+      throw createApiServiceError('first must be a whole number between 1 and 100');
     }
-    return body.data as T;
+    let fragments = new Map(
+      [
+        ...COMMON_FRAGMENTS.matchAll(
+          /fragment\s+(\w+)\s+on\s+[\s\S]*?(?=\bfragment\s+\w+\s+on\s+|$)/g
+        )
+      ].map(match => [match[1]!, match[0].trim()] as const)
+    );
+    let included = new Set<string>();
+    let fullQuery = query;
+    let documents = [query];
+    for (let document of documents) {
+      for (let match of document.matchAll(/\.\.\.\s*(?!on\b)(\w+)/g)) {
+        let name = match[1]!;
+        if (included.has(name)) continue;
+        let fragment = fragments.get(name);
+        if (!fragment) throw createApiServiceError(`Unknown Plain query fragment: ${name}`);
+        included.add(name);
+        fullQuery += `\n${fragment}`;
+        documents.push(fragment);
+      }
+    }
+    try {
+      let res = await this.http.post('', { query: fullQuery, variables });
+      let body = res.data;
+      if (body?.errors?.length) {
+        throw createApiServiceError(
+          `Plain GraphQL request failed: ${body.errors.map((error: any) => error.message).join(', ')}`,
+          { upstreamCode: body.errors[0]?.extensions?.code }
+        );
+      }
+      if (!body?.data || typeof body.data !== 'object') {
+        throw createApiServiceError('Plain returned no GraphQL response data');
+      }
+      for (let payload of Object.values(body.data) as any[]) {
+        if (payload === null)
+          throw createApiServiceError('The requested Plain resource was not found');
+        if (payload?.error) {
+          throw createApiServiceError(`Plain operation failed: ${payload.error.message}`, {
+            upstreamCode: payload.error.code,
+            reason: payload.error.type
+          });
+        }
+      }
+      return body.data as T;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Plain',
+        operation: 'GraphQL request',
+        reason: 'plain_api_error'
+      });
+    }
   }
 
   // ─── Customers ───
@@ -267,9 +312,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.upsertCustomer.error) {
-      throw new Error(`Upsert customer failed: ${data.upsertCustomer.error.message}`);
-    }
     return data.upsertCustomer;
   }
 
@@ -280,9 +322,6 @@ export class Client {
       }`,
       { input: { customerId } }
     );
-    if (data.deleteCustomer.error) {
-      throw new Error(`Delete customer failed: ${data.deleteCustomer.error.message}`);
-    }
     return data.deleteCustomer;
   }
 
@@ -308,11 +347,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.updateCustomerCompany.error) {
-      throw new Error(
-        `Update customer company failed: ${data.updateCustomerCompany.error.message}`
-      );
-    }
     return data.updateCustomerCompany;
   }
 
@@ -346,9 +380,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.upsertTenant.error) {
-      throw new Error(`Upsert tenant failed: ${data.upsertTenant.error.message}`);
-    }
     return data.upsertTenant;
   }
 
@@ -359,11 +390,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.addCustomerToTenants.error) {
-      throw new Error(
-        `Add customer to tenants failed: ${data.addCustomerToTenants.error.message}`
-      );
-    }
     return data.addCustomerToTenants;
   }
 
@@ -374,11 +400,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.removeCustomerFromTenants.error) {
-      throw new Error(
-        `Remove customer from tenants failed: ${data.removeCustomerFromTenants.error.message}`
-      );
-    }
     return data.removeCustomerFromTenants;
   }
 
@@ -412,9 +433,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.createThread.error) {
-      throw new Error(`Create thread failed: ${data.createThread.error.message}`);
-    }
     return data.createThread;
   }
 
@@ -425,9 +443,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.replyToThread.error) {
-      throw new Error(`Reply to thread failed: ${data.replyToThread.error.message}`);
-    }
     return data.replyToThread;
   }
 
@@ -438,9 +453,6 @@ export class Client {
       }`,
       { input: { threadId, userId } }
     );
-    if (data.assignThread.error) {
-      throw new Error(`Assign thread failed: ${data.assignThread.error.message}`);
-    }
     return data.assignThread;
   }
 
@@ -451,9 +463,6 @@ export class Client {
       }`,
       { input: { threadId } }
     );
-    if (data.unassignThread.error) {
-      throw new Error(`Unassign thread failed: ${data.unassignThread.error.message}`);
-    }
     return data.unassignThread;
   }
 
@@ -464,9 +473,6 @@ export class Client {
       }`,
       { input: { threadId } }
     );
-    if (data.markThreadAsDone.error) {
-      throw new Error(`Mark thread as done failed: ${data.markThreadAsDone.error.message}`);
-    }
     return data.markThreadAsDone;
   }
 
@@ -477,22 +483,16 @@ export class Client {
       }`,
       { input: { threadId } }
     );
-    if (data.markThreadAsTodo.error) {
-      throw new Error(`Mark thread as todo failed: ${data.markThreadAsTodo.error.message}`);
-    }
     return data.markThreadAsTodo;
   }
 
-  async snoozeThread(threadId: string, durationMs: number) {
+  async snoozeThread(threadId: string, durationSeconds: number) {
     let data = await this.graphql<{ snoozeThread: any }>(
       `mutation snoozeThread($input: SnoozeThreadInput!) {
         snoozeThread(input: $input) { thread { ...ThreadParts } error { ...MutationErrorParts } }
       }`,
-      { input: { threadId, durationMs } }
+      { input: { threadId, durationSeconds } }
     );
-    if (data.snoozeThread.error) {
-      throw new Error(`Snooze thread failed: ${data.snoozeThread.error.message}`);
-    }
     return data.snoozeThread;
   }
 
@@ -503,11 +503,6 @@ export class Client {
       }`,
       { input: { threadId, priority } }
     );
-    if (data.changeThreadPriority.error) {
-      throw new Error(
-        `Change thread priority failed: ${data.changeThreadPriority.error.message}`
-      );
-    }
     return data.changeThreadPriority;
   }
 
@@ -533,9 +528,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.addLabels.error) {
-      throw new Error(`Add labels failed: ${data.addLabels.error.message}`);
-    }
     return data.addLabels;
   }
 
@@ -546,9 +538,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.removeLabels.error) {
-      throw new Error(`Remove labels failed: ${data.removeLabels.error.message}`);
-    }
     return data.removeLabels;
   }
 
@@ -561,11 +550,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.createCustomerEvent.error) {
-      throw new Error(
-        `Create customer event failed: ${data.createCustomerEvent.error.message}`
-      );
-    }
     return data.createCustomerEvent;
   }
 
@@ -576,9 +560,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.createThreadEvent.error) {
-      throw new Error(`Create thread event failed: ${data.createThreadEvent.error.message}`);
-    }
     return data.createThreadEvent;
   }
 
@@ -594,9 +575,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.sendNewEmail.error) {
-      throw new Error(`Send new email failed: ${data.sendNewEmail.error.message}`);
-    }
     return data.sendNewEmail;
   }
 
@@ -610,9 +588,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.replyToEmail.error) {
-      throw new Error(`Reply to email failed: ${data.replyToEmail.error.message}`);
-    }
     return data.replyToEmail;
   }
 
@@ -626,9 +601,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.sendChat.error) {
-      throw new Error(`Send chat failed: ${data.sendChat.error.message}`);
-    }
     return data.sendChat;
   }
 
@@ -642,9 +614,6 @@ export class Client {
       }`,
       { input }
     );
-    if (data.createNote.error) {
-      throw new Error(`Create note failed: ${data.createNote.error.message}`);
-    }
     return data.createNote;
   }
 
@@ -667,17 +636,12 @@ export class Client {
     let data = await this.graphql<{ addCustomerToCustomerGroups: any }>(
       `mutation addCustomerToCustomerGroups($input: AddCustomerToCustomerGroupsInput!) {
         addCustomerToCustomerGroups(input: $input) {
-          customerGroupMemberships { customerGroupId }
+          customerGroupMemberships { customerId customerGroup { id } }
           error { ...MutationErrorParts }
         }
       }`,
       { input }
     );
-    if (data.addCustomerToCustomerGroups.error) {
-      throw new Error(
-        `Add customer to groups failed: ${data.addCustomerToCustomerGroups.error.message}`
-      );
-    }
     return data.addCustomerToCustomerGroups;
   }
 
@@ -688,12 +652,63 @@ export class Client {
       }`,
       { input }
     );
-    if (data.removeCustomerFromCustomerGroups.error) {
-      throw new Error(
-        `Remove customer from groups failed: ${data.removeCustomerFromCustomerGroups.error.message}`
-      );
-    }
     return data.removeCustomerFromCustomerGroups;
+  }
+
+  async getUsers(first?: number, after?: string, isAssignableToThread?: boolean) {
+    let data = await this.graphql<{ users: any }>(
+      `query users($first: Int, $after: String, $filters: UsersFilter) {
+        users(first: $first, after: $after, filters: $filters) {
+          edges { node { ...UserParts } }
+          pageInfo { ...PageInfoParts }
+        }
+      }`,
+      {
+        first,
+        after,
+        filters: isAssignableToThread === undefined ? undefined : { isAssignableToThread }
+      }
+    );
+    return data.users;
+  }
+
+  async getCurrentIdentity() {
+    return this.graphql<{ myMachineUser: any; myWorkspace: any }>(
+      `query currentIdentity {
+        myMachineUser { id fullName publicName description }
+        myWorkspace { id name publicName }
+      }`
+    );
+  }
+
+  async getThreadTimeline(threadId: string, first?: number, after?: string) {
+    let data = await this.graphql<{ thread: any }>(
+      `query threadTimeline($threadId: ID!, $first: Int, $after: String) {
+        thread(threadId: $threadId) {
+          id
+          timelineEntries(first: $first, after: $after) {
+            edges { node {
+              id customerId threadId timestamp { ...DateTimeParts }
+              entry {
+                __typename
+                ... on EmailEntry { emailId subject textContent fullTextContent markdownContent fullMarkdownContent from { email name } to { email name } }
+                ... on NoteEntry { noteId text markdown }
+                ... on ChatEntry { chatId chatText: text }
+                ... on SlackMessageEntry { slackWebMessageLink text }
+                ... on SlackReplyEntry { slackWebMessageLink text }
+                ... on MSTeamsMessageEntry { msTeamsMessageId msTeamsMessageLink text markdownContent }
+                ... on DiscordMessageEntry { discordMessageId discordMessageLink markdownContent }
+                ... on CustomerEventEntry { timelineEventId title externalId }
+                ... on ThreadEventEntry { timelineEventId title externalId }
+              }
+            } }
+            pageInfo { ...PageInfoParts }
+          }
+        }
+      }`,
+      { threadId, first, after }
+    );
+    return data.thread.timelineEntries;
   }
 
   // ─── Workspace ───

@@ -53,12 +53,12 @@ export let uploadBulkList = SlateTool.create(spec, {
 
     return {
       output: {
-        listId: String(result.listId || ''),
-        fileName: result.fileName || ctx.input.fileName,
-        status: result.status || 'processing',
-        totalEmails: result.totalEmails ?? 0
+        listId: result.listId,
+        fileName: result.fileName,
+        status: result.status,
+        totalEmails: result.totalEmails
       },
-      message: `Bulk list **${ctx.input.fileName}** uploaded successfully. List ID: **${result.listId}**, Status: **${result.status}**, Total emails: **${result.totalEmails ?? 0}**.`
+      message: `Bulk list **${ctx.input.fileName}** uploaded successfully. List ID: **${result.listId}**, Status: **${result.status}**, Total emails: **${result.totalEmails}**.`
     };
   })
   .build();

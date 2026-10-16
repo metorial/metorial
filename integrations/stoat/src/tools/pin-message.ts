@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let pinMessage = SlateTool.create(spec, {
   name: 'Pin / Unpin Message',
   key: 'pin_message',
-  description: `Pin or unpin a message in a Revolt channel. Pinned messages are highlighted and easily accessible for all channel members.`,
+  description: `Pin or unpin a message in a Stoat channel. Pinned messages are highlighted and easily accessible for all channel members.`,
   tags: {
     destructive: false,
     readOnly: false

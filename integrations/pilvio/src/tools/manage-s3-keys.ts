@@ -1,11 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let s3KeySchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   accessKey: z.string().describe('S3 access key'),
-  secretKey: z.string().optional().describe('S3 secret key (only shown on creation)')
+  secretKey: z.string().optional().describe('S3 secret key returned by Pilvio')
 });
 
 export let manageS3Keys = SlateTool.create(spec, {
@@ -38,13 +39,14 @@ export let manageS3Keys = SlateTool.create(spec, {
 
     let mapKey = (k: any) => ({
       accessKey: k.accessKey || k.access_key,
-      secretKey: k.secretKey || k.secret_key
+      secretKey: k.secretKey ?? k.secret_key ?? undefined,
+      raw: k
     });
 
     switch (action) {
       case 'list': {
         let keys = await client.listS3Keys();
-        let mapped = (Array.isArray(keys) ? keys : []).map(mapKey);
+        let mapped = keys.map(mapKey);
         return {
           output: { keys: mapped, success: true },
           message: `Found **${mapped.length}** S3 credential(s).`
@@ -53,7 +55,7 @@ export let manageS3Keys = SlateTool.create(spec, {
 
       case 'generate': {
         let keys = await client.generateS3Key();
-        let mapped = (Array.isArray(keys) ? keys : []).map(mapKey);
+        let mapped = keys.map(mapKey);
         return {
           output: { keys: mapped, success: true },
           message: `Generated new S3 credentials. **${mapped.length}** total key(s).`
@@ -61,7 +63,8 @@ export let manageS3Keys = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.accessKey) throw new Error('accessKey is required for delete action');
+        if (!ctx.input.accessKey)
+          throw createApiServiceError('accessKey is required for delete action');
         await client.deleteS3Key(ctx.input.accessKey);
         return {
           output: { success: true },

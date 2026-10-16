@@ -1,69 +1,41 @@
-Now let me check the full documentation navigation to understand all available endpoints:Now I have enough information to write the specification.
+# Adyntel integration reference
 
-# Slates Specification for Adyntel
+Audited against the official API documentation on 2026-10-15. All API operations use JSON POST requests to `https://api.adyntel.com`.
 
-## Overview
+## Connection
 
-Adyntel is an ad intelligence API that retrieves publicly available advertising data from Google, Meta (Facebook & Instagram), LinkedIn, and TikTok ad libraries. It provides information on who's running paid ads, on which platforms, and what creatives they're using. It also offers keyword intelligence with estimation of budgets and CPC.
+The `api_key_email` authentication method accepts `apiKey` and account `email` and retains the existing `{ token, email }` auth output. Each request sends `api_key` and `email` in its JSON body. The endpoint request examples establish the body format despite the authorization overview's reference to a query string. API keys do not require OAuth refresh. There are no connection settings or required opaque IDs. The researched documentation does not expose a suitable current-account identity endpoint.
 
-## Authentication
+Source: [authorization](https://docs.adyntel.com/authorization).
 
-Adyntel uses API key-based authentication combined with the account email address. You can copy the API key from your Dashboard at any time. To authorize your calls you need to include the `api_key` as a query string alongside the other variables of your API call.
+## Tools
 
-Each API request requires two credentials passed in the request body (as JSON):
+| Tool key | Endpoint | Behavior |
+| --- | --- | --- |
+| `lookup_meta_ads` | `/facebook` | One company domain or Facebook page URL; continuation token; media, country, activity, language, special-category filters and video UGC classification. |
+| `search_meta_ads` | `/facebook_ad_search` | Keyword and optional country; grouped provider results become a flat summary list. |
+| `lookup_google_ads` | `/google` | Company domain; media, country, continuation token, optional text extraction. Repeat the country filter on every page. |
+| `lookup_linkedin_ads` | `/linkedin` | Company domain or numeric page ID; continuation token; date preset or custom dates; optional EU impression data. |
+| `lookup_google_shopping_ads` | `/google_shopping`, `/google_shopping_status` | Submit and check up to ten times at three-second intervals. Return the request ID even if results are still unavailable. |
+| `submit_google_shopping_search` | `/google_shopping` | Submit once and return the real request ID immediately. |
+| `get_google_shopping_status` | `/google_shopping_status` | Read an existing search by request ID without another charged submission. |
+| `search_tiktok_ads` | `/tiktok_search` | Keyword and optional supported European country code or `ALL`; returns string ad IDs. |
+| `get_tiktok_ad` | `/tiktok_ad_details` | Retrieve an ad using its exact string ID, preserving creative type and advertiser details. |
+| `get_tiktok_ad_details` | `/tiktok_ad_details` | Deprecated numeric-ID tool. Existing input/output schemas and handler remain intact; use `get_tiktok_ad` for new workflows. |
+| `analyze_keywords` | `/domain-keywords` | Domain-level organic and paid position, traffic, budget, and CPC metrics. |
 
-- **`api_key`** (string): Your Adyntel API key, obtained from the dashboard at `platform.adyntel.com`.
-- **`email`** (string): The email address used to register your Adyntel account.
+Official endpoint references: [Meta](https://docs.adyntel.com/ad-libraries/meta), [Meta keyword search](https://docs.adyntel.com/ad-libraries/meta-ad-search), [Google](https://docs.adyntel.com/ad-libraries/google), [LinkedIn](https://docs.adyntel.com/ad-libraries/linkedin), [Shopping submission](https://docs.adyntel.com/ad-libraries/google-shopping), [Shopping status](https://docs.adyntel.com/ad-libraries/google-shopping-status), [TikTok search](https://docs.adyntel.com/ad-libraries/tiktok-search), [TikTok details](https://docs.adyntel.com/ad-libraries/tiktok-ad-details), [keyword metrics](https://docs.adyntel.com/ad-libraries/paid-vs-organic-keywords).
 
-Example request body: `{ "api_key": "hd-nndgi7gy6b3kdsgd-a", "email": "[email protected]", "company_domain": "tesla.com" }`
+## Validation and responses
 
-All requests use `Content-Type: application/json` headers and are sent as POST requests to `api.adyntel.com`.
+Domains are normalized by removing an HTTP(S) prefix and leading `www.`; paths and empty domains are rejected. Meta and LinkedIn requests require exactly one company target. A Meta political-category filter requires US, and UGC classification requires video media. LinkedIn custom dates must form a valid `YYYY-MM-DD` range ending before today, spanning no more than 364 days. Impression data cannot be combined with date filters.
 
-Alternatively, for MCP integrations, credentials can be passed via HTTP headers: `X-Adyntel-Email` and `X-Adyntel-Api-Key`.
+Existing public keys, types, enums, and requiredness remain compatible. New filters and `rawResponse` fields are additive. Summaries map documented provider field names to the existing output names, retain nullable continuation tokens, and omit values that cannot satisfy their existing optional schemas. Complete original objects and nulls remain in `rawResponse`. Missing count, state, or timestamp data is never replaced with invented values. The deprecated numeric TikTok tool retains its original response mapping for compatibility.
 
-There are no OAuth flows, scopes, or token refresh mechanisms. Sign up at platform.adyntel.com. You'll get 50 free credits and an API key. No credit card is required.
+A 204 response is treated as no provider data. HTTP and provider error responses become structured service failures. Ordinary creative URLs remain research metadata, not downloaded files.
 
-## Features
+## Costs and boundaries
 
-### Meta (Facebook & Instagram) Ad Lookup
+Successful requests generally cost one credit; Google text extraction and LinkedIn impression data cost two. Shopping status requests are free. Unavailable Shopping results are reported as unavailable, without inventing a completion state.
 
-Retrieve all Facebook and Instagram ads for a given company. It takes a Facebook page URL or a company domain as input. Returns ad creatives, copy, CTA text, page information, and media assets. Supports a continuation token for retrieving additional results.
-
-### Meta Ad Search
-
-Search the Meta Ad Library using a keyword as input, with an optional country code filter to limit results geographically. Country codes use ISO 3166-1 alpha-2 format (e.g., US, GB, DE).
-
-### LinkedIn Ad Lookup
-
-Fetch LinkedIn ad creatives, impressions, and volume data. Track any company's paid LinkedIn strategy. Accepts a company domain or LinkedIn Page ID as input.
-
-### Google Ads Lookup
-
-Find all Google ads for a given company. It takes a company domain as input. Results can be filtered by media type with possible values: text, image, video. Returns ad creatives, advertiser information, format, start dates, and links to the Google Ads Transparency Center.
-
-### Google Shopping Ads
-
-Find all Google Shopping ads for a given company. This is different from the Google endpoint as it returns strictly shopping ads rather than search, image, or video ads. Results are retrieved asynchronously — a separate status endpoint returns the results using an ID received from the initial request. The status endpoint does not consume credits.
-
-### TikTok Ad Search
-
-Search for ads on TikTok using a keyword as the starting point. TikTok searches accept ISO 3166-1 alpha-2 country codes to filter by geographic region. Returns ad metadata including estimated audience, date ranges, and media.
-
-### TikTok Ad Details
-
-View all the details of a specific TikTok ad. This endpoint needs an "id" that you get in the response from the TikTok search endpoint. Returns detailed data including video URLs, image URLs, estimated audience size, and impression data.
-
-### Paid vs. Organic Keyword Analysis
-
-Get an overview of paid and organic keywords for a domain, with estimation of budgets and CPC included. Returns keyword position distribution, traffic estimates, estimated ad budget, and trends (new, up, down, lost keywords).
-
-### General Considerations
-
-- Adyntel doesn't provide exact spend figures since platforms don't disclose that publicly. Ad volume and budget estimates serve as proxies.
-- Adyntel scrapes official platform transparency centers which reflect currently running or recently active campaigns. Data is as current as what Google, Meta, and TikTok publish in their public ad libraries.
-- Each API call that successfully returns data uses 1 credit. Failed or empty lookups don't consume credits.
-- All domain inputs must be in bare `company.com` format (no `https://` or `www.` prefix).
-
-## Events
-
-The provider does not support events. Adyntel is a stateless data retrieval API and does not offer webhooks, event subscriptions, or purpose-built polling mechanisms.
+The API documents outbound result webhooks and unattended all-page jobs, but no authenticated subscription lifecycle or webhook signature contract. This integration uses direct responses and explicit pagination. No triggers are registered. Callback fan-out, unbounded all-page jobs, and multi-country webhook batches are outside this practical synchronous surface.

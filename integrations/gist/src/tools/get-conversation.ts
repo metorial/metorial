@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, responseList } from '../lib/response';
 import { spec } from '../spec';
 
 export let getConversation = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ export let getConversation = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       conversationId: z.string(),
       subject: z.string().optional(),
       contactId: z.string().optional(),
@@ -52,30 +54,31 @@ export let getConversation = SlateTool.create(spec, {
     let messages: any[] | undefined;
     if (ctx.input.includeMessages !== false) {
       let msgData = await client.listMessages(ctx.input.conversationId);
-      messages = (msgData.messages || []).map((m: any) => ({
-        messageId: String(m.id),
+      messages = responseList(msgData.messages).map((m: any) => ({
+        messageId: requiredId(m.id),
         body: m.body,
-        authorId: m.author_id ? String(m.author_id) : undefined,
+        authorId: m.author_id !== undefined ? String(m.author_id) : undefined,
         authorType: m.author_type,
-        createdAt: m.created_at ? String(m.created_at) : undefined
+        createdAt: m.created_at !== undefined ? String(m.created_at) : undefined
       }));
     }
 
     return {
       output: {
-        conversationId: String(conv.id),
+        rawResponse: client.responses,
+        conversationId: requiredId(conv.id),
         subject: conv.subject,
-        contactId: conv.contact_id ? String(conv.contact_id) : undefined,
-        assigneeId: conv.assignee_id ? String(conv.assignee_id) : undefined,
-        teamId: conv.team_id ? String(conv.team_id) : undefined,
+        contactId: conv.contact_id !== undefined ? String(conv.contact_id) : undefined,
+        assigneeId: conv.assignee_id !== undefined ? String(conv.assignee_id) : undefined,
+        teamId: conv.team_id !== undefined ? String(conv.team_id) : undefined,
         priority: conv.priority,
         status: conv.status,
-        createdAt: conv.created_at ? String(conv.created_at) : undefined,
-        updatedAt: conv.updated_at ? String(conv.updated_at) : undefined,
+        createdAt: conv.created_at !== undefined ? String(conv.created_at) : undefined,
+        updatedAt: conv.updated_at !== undefined ? String(conv.updated_at) : undefined,
         tags: conv.tags,
         messages
       },
-      message: `Retrieved conversation **${conv.subject || conv.id}** with ${messages?.length ?? 0} messages.`
+      message: `Retrieved conversation **${conv.subject || conv.id}** ${messages ? `with ${messages.length} messages from the first page` : ''}.`
     };
   })
   .build();

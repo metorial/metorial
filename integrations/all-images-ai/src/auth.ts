@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,6 +22,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      new Client(ctx.input.apiKey);
       return {
         output: {
           token: ctx.input.apiKey
@@ -29,18 +31,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.all-images.ai/v1'
-      });
-
-      let response = await client.get('/api-keys/check', {
-        headers: { 'api-key': ctx.output.token }
-      });
+      let profile = await new Client(ctx.output.token).checkApiKey();
 
       return {
         profile: {
-          email: response.data.email,
-          name: response.data.name
+          email: profile.email,
+          name: profile.name
         }
       };
     }

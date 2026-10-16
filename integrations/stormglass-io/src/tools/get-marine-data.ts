@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getResponseRows } from '../lib/client';
 import { spec } from '../spec';
 
 let sourceValueSchema = z
@@ -16,9 +16,10 @@ Ideal for ocean and coastal applications such as surfing, fishing, shipping, and
   instructions: [
     'Provide latitude and longitude for the target marine location.',
     'Specify marine-specific parameters such as "waveHeight", "swellHeight", "waterTemperature", "waveDirection", "wavePeriod", "currentSpeed", "currentDirection", etc.',
-    'Use source "sg" for automatic best-source selection.'
+    'Use source "sg" for automatic best-source selection.',
+    'Wave heights and sea level are in meters, wave periods in seconds, current speed in meters per second, water temperature in degrees Celsius, and directions in degrees from north.'
   ],
-  constraints: ['Forecast data is available up to 10 days ahead.'],
+  constraints: ['Forecast horizon and parameter availability depend on the data source.'],
   tags: {
     readOnly: true
   }
@@ -30,13 +31,20 @@ Ideal for ocean and coastal applications such as surfing, fishing, shipping, and
       parameters: z
         .array(z.string())
         .describe(
-          'Marine parameters to retrieve (e.g., "waveHeight", "wavePeriod", "waveDirection", "swellHeight", "swellDirection", "swellPeriod", "secondarySwellHeight", "secondarySwellDirection", "secondarySwellPeriod", "windWaveHeight", "windWaveDirection", "windWavePeriod", "waterTemperature", "currentSpeed", "currentDirection", "seaLevel", "iceCover", "seaFloorDepth")'
+          'Marine parameters to retrieve (e.g., "waveHeight", "wavePeriod", "waveDirection", "swellHeight", "swellDirection", "swellPeriod", "secondarySwellHeight", "secondarySwellDirection", "secondarySwellPeriod", "windWaveHeight", "windWaveDirection", "windWavePeriod", "waterTemperature", "currentSpeed", "currentDirection", "seaLevel", "iceCover")'
         ),
       start: z
         .string()
         .optional()
-        .describe('Start time in ISO 8601 or UNIX timestamp format.'),
-      end: z.string().optional().describe('End time in ISO 8601 or UNIX timestamp format.'),
+        .describe(
+          'Start time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets.'
+        ),
+      end: z
+        .string()
+        .optional()
+        .describe(
+          'End time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets.'
+        ),
       sources: z
         .array(z.string())
         .optional()
@@ -58,7 +66,11 @@ Ideal for ocean and coastal applications such as surfing, fishing, shipping, and
         .describe('Hourly marine data points'),
       meta: z
         .record(z.string(), z.any())
-        .describe('Request metadata including coordinates, quota, and request count')
+        .describe('Request metadata including coordinates, quota, and request count'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete original provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -73,14 +85,15 @@ Ideal for ocean and coastal applications such as surfing, fishing, shipping, and
       source: ctx.input.sources
     });
 
-    let hourCount = result.hours?.length ?? 0;
+    let hours = getResponseRows(result, 'hours', 'data');
 
     return {
       output: {
-        hours: result.hours ?? [],
-        meta: result.meta ?? {}
+        hours,
+        meta: result.meta,
+        raw: result
       },
-      message: `Retrieved **${hourCount}** hourly marine data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
+      message: `Retrieved **${hours.length}** hourly marine data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
     };
   })
   .build();

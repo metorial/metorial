@@ -1,7 +1,13 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export interface ScriptureMeta {
+  fumsId?: string;
+  fumsToken?: string;
+  [key: string]: unknown;
+}
 
 export interface BibleSummary {
-  bibleId: string;
+  id: string;
   name: string;
   nameLocal: string;
   abbreviation: string;
@@ -22,28 +28,28 @@ export interface BibleSummary {
   }>;
   type: string;
   updatedAt: string;
-  audioBibles: Array<{
-    audioBibleId: string;
+  copyright?: string;
+  info?: string;
+  audioBibles?: Array<{
+    id: string;
     name: string;
     nameLocal: string;
   }>;
 }
 
-export interface Bible extends BibleSummary {
-  copyright: string;
-  info: string;
-}
+export type Bible = BibleSummary;
 
 export interface Book {
-  bookId: string;
+  id: string;
   bibleId: string;
   abbreviation: string;
   name: string;
   nameLong: string;
+  chapters?: Chapter[];
 }
 
 export interface Chapter {
-  chapterId: string;
+  id: string;
   bibleId: string;
   bookId: string;
   number: string;
@@ -51,15 +57,15 @@ export interface Chapter {
 }
 
 export interface ChapterContent extends Chapter {
-  content: string;
+  content: string | Record<string, unknown>[];
   verseCount: number;
   copyright: string;
-  next: { chapterId: string; bookId: string; number: string } | null;
-  previous: { chapterId: string; bookId: string; number: string } | null;
+  next: { id: string; bookId: string; number: string } | null;
+  previous: { id: string; bookId: string; number: string } | null;
 }
 
 export interface Verse {
-  verseId: string;
+  id: string;
   orgId: string;
   bibleId: string;
   bookId: string;
@@ -68,32 +74,36 @@ export interface Verse {
 }
 
 export interface VerseContent extends Verse {
-  content: string;
+  content: string | Record<string, unknown>[];
   copyright: string;
-  next: { verseId: string; bookId: string } | null;
-  previous: { verseId: string; bookId: string } | null;
+  next: { id: string; bookId: string } | null;
+  previous: { id: string; bookId: string } | null;
 }
 
 export interface PassageContent {
-  passageId: string;
+  id: string;
   bibleId: string;
   orgId: string;
-  content: string;
+  content: string | Record<string, unknown>[];
   reference: string;
   verseCount: number;
   copyright: string;
 }
 
 export interface Section {
-  sectionId: string;
+  id: string;
   bibleId: string;
   bookId: string;
-  chapterId: string;
+  chapterId?: string;
   title: string;
+  firstVerseId: string;
+  lastVerseId: string;
+  firstVerseOrgId: string;
+  lastVerseOrgId: string;
 }
 
 export interface SectionContent extends Section {
-  content: string;
+  content: string | Record<string, unknown>[];
   copyright: string;
 }
 
@@ -104,7 +114,7 @@ export interface SearchResult {
   total: number;
   verseCount: number;
   verses: Array<{
-    verseId: string;
+    id: string;
     orgId: string;
     bibleId: string;
     bookId: string;
@@ -112,18 +122,21 @@ export interface SearchResult {
     reference: string;
     text: string;
   }>;
-  passages: Array<{
-    passageId: string;
+  passages?: Array<{
+    id: string;
     bibleId: string;
     orgId: string;
-    content: string;
+    content: string | Record<string, unknown>[];
     reference: string;
     verseCount: number;
+    copyright: string;
   }>;
 }
 
 export interface AudioBibleSummary {
-  audioBibleId: string;
+  copyright?: string;
+  info?: string;
+  id: string;
   name: string;
   nameLocal: string;
   description: string;
@@ -145,20 +158,22 @@ export interface AudioBibleSummary {
 }
 
 export interface AudioBible extends AudioBibleSummary {
-  copyright: string;
-  info: string;
+  copyright?: string;
+  info?: string;
 }
 
 export interface AudioChapter {
-  chapterId: string;
+  id: string;
   bibleId: string;
   bookId: string;
   number: string;
   reference: string;
   resourceUrl: string;
-  copyright: string;
-  next: { chapterId: string; bookId: string; number: string } | null;
-  previous: { chapterId: string; bookId: string; number: string } | null;
+  expiresAt: number;
+  timecodes?: Array<{ start: string; end: string; verseId: string }>;
+  copyright?: string;
+  next: { id: string; bookId: string; number: string } | null;
+  previous: { id: string; bookId: string; number: string } | null;
 }
 
 export interface ListBiblesParams {
@@ -177,6 +192,7 @@ export interface ContentParams {
   includeVerseNumbers?: boolean;
   includeVerseSpans?: boolean;
   parallels?: string;
+  useOrgId?: boolean;
 }
 
 export interface SearchParams {
@@ -189,14 +205,18 @@ export interface SearchParams {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
-      baseURL: 'https://api.scripture.api.bible/v1',
-      headers: {
-        'api-key': config.token
-      }
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://rest.api.bible/v1',
+      authHeader: { name: 'api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'API.Bible',
+          reason: 'api_bible_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+        })
     });
   }
 
@@ -216,7 +236,7 @@ export class Client {
   }
 
   async getBible(bibleId: string): Promise<{ data: Bible }> {
-    let response = await this.http.get(`/bibles/${bibleId}`);
+    let response = await this.http.get(`/bibles/${encodeURIComponent(bibleId)}`);
     return response.data;
   }
 
@@ -227,7 +247,7 @@ export class Client {
     includeChapters?: boolean,
     includeChaptersAndSections?: boolean
   ): Promise<{ data: Book[] }> {
-    let response = await this.http.get(`/bibles/${bibleId}/books`, {
+    let response = await this.http.get(`/bibles/${encodeURIComponent(bibleId)}/books`, {
       params: {
         'include-chapters': includeChapters,
         'include-chapters-and-sections': includeChaptersAndSections
@@ -241,18 +261,23 @@ export class Client {
     bookId: string,
     includeChapters?: boolean
   ): Promise<{ data: Book }> {
-    let response = await this.http.get(`/bibles/${bibleId}/books/${bookId}`, {
-      params: {
-        'include-chapters': includeChapters
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/books/${encodeURIComponent(bookId)}`,
+      {
+        params: {
+          'include-chapters': includeChapters
+        }
       }
-    });
+    );
     return response.data;
   }
 
   // --- Chapters ---
 
   async getChapters(bibleId: string, bookId: string): Promise<{ data: Chapter[] }> {
-    let response = await this.http.get(`/bibles/${bibleId}/books/${bookId}/chapters`);
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/books/${encodeURIComponent(bookId)}/chapters`
+    );
     return response.data;
   }
 
@@ -260,25 +285,30 @@ export class Client {
     bibleId: string,
     chapterId: string,
     params?: ContentParams
-  ): Promise<{ data: ChapterContent; meta: { fumsId: string } }> {
-    let response = await this.http.get(`/bibles/${bibleId}/chapters/${chapterId}`, {
-      params: {
-        'content-type': params?.contentType,
-        'include-notes': params?.includeNotes,
-        'include-titles': params?.includeTitles,
-        'include-chapter-numbers': params?.includeChapterNumbers,
-        'include-verse-numbers': params?.includeVerseNumbers,
-        'include-verse-spans': params?.includeVerseSpans,
-        parallels: params?.parallels
+  ): Promise<{ data: ChapterContent; meta: ScriptureMeta }> {
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/chapters/${encodeURIComponent(chapterId)}`,
+      {
+        params: {
+          'content-type': params?.contentType,
+          'include-notes': params?.includeNotes,
+          'include-titles': params?.includeTitles,
+          'include-chapter-numbers': params?.includeChapterNumbers,
+          'include-verse-numbers': params?.includeVerseNumbers,
+          'include-verse-spans': params?.includeVerseSpans,
+          parallels: params?.parallels
+        }
       }
-    });
+    );
     return response.data;
   }
 
   // --- Verses ---
 
   async getVerses(bibleId: string, chapterId: string): Promise<{ data: Verse[] }> {
-    let response = await this.http.get(`/bibles/${bibleId}/chapters/${chapterId}/verses`);
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/chapters/${encodeURIComponent(chapterId)}/verses`
+    );
     return response.data;
   }
 
@@ -286,18 +316,22 @@ export class Client {
     bibleId: string,
     verseId: string,
     params?: ContentParams
-  ): Promise<{ data: VerseContent; meta: { fumsId: string } }> {
-    let response = await this.http.get(`/bibles/${bibleId}/verses/${verseId}`, {
-      params: {
-        'content-type': params?.contentType,
-        'include-notes': params?.includeNotes,
-        'include-titles': params?.includeTitles,
-        'include-chapter-numbers': params?.includeChapterNumbers,
-        'include-verse-numbers': params?.includeVerseNumbers,
-        'include-verse-spans': params?.includeVerseSpans,
-        parallels: params?.parallels
+  ): Promise<{ data: VerseContent; meta: ScriptureMeta }> {
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/verses/${encodeURIComponent(verseId)}`,
+      {
+        params: {
+          'content-type': params?.contentType,
+          'include-notes': params?.includeNotes,
+          'include-titles': params?.includeTitles,
+          'include-chapter-numbers': params?.includeChapterNumbers,
+          'include-verse-numbers': params?.includeVerseNumbers,
+          'include-verse-spans': params?.includeVerseSpans,
+          parallels: params?.parallels,
+          'use-org-id': params?.useOrgId
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -307,30 +341,38 @@ export class Client {
     bibleId: string,
     passageId: string,
     params?: ContentParams
-  ): Promise<{ data: PassageContent; meta: { fumsId: string } }> {
-    let response = await this.http.get(`/bibles/${bibleId}/passages/${passageId}`, {
-      params: {
-        'content-type': params?.contentType,
-        'include-notes': params?.includeNotes,
-        'include-titles': params?.includeTitles,
-        'include-chapter-numbers': params?.includeChapterNumbers,
-        'include-verse-numbers': params?.includeVerseNumbers,
-        'include-verse-spans': params?.includeVerseSpans,
-        parallels: params?.parallels
+  ): Promise<{ data: PassageContent; meta: ScriptureMeta }> {
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/passages/${encodeURIComponent(passageId)}`,
+      {
+        params: {
+          'content-type': params?.contentType,
+          'include-notes': params?.includeNotes,
+          'include-titles': params?.includeTitles,
+          'include-chapter-numbers': params?.includeChapterNumbers,
+          'include-verse-numbers': params?.includeVerseNumbers,
+          'include-verse-spans': params?.includeVerseSpans,
+          parallels: params?.parallels,
+          'use-org-id': params?.useOrgId
+        }
       }
-    });
+    );
     return response.data;
   }
 
   // --- Sections ---
 
   async getSections(bibleId: string, bookId: string): Promise<{ data: Section[] }> {
-    let response = await this.http.get(`/bibles/${bibleId}/books/${bookId}/sections`);
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/books/${encodeURIComponent(bookId)}/sections`
+    );
     return response.data;
   }
 
   async getChapterSections(bibleId: string, chapterId: string): Promise<{ data: Section[] }> {
-    let response = await this.http.get(`/bibles/${bibleId}/chapters/${chapterId}/sections`);
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/chapters/${encodeURIComponent(chapterId)}/sections`
+    );
     return response.data;
   }
 
@@ -338,25 +380,31 @@ export class Client {
     bibleId: string,
     sectionId: string,
     params?: ContentParams
-  ): Promise<{ data: SectionContent; meta: { fumsId: string } }> {
-    let response = await this.http.get(`/bibles/${bibleId}/sections/${sectionId}`, {
-      params: {
-        'content-type': params?.contentType,
-        'include-notes': params?.includeNotes,
-        'include-titles': params?.includeTitles,
-        'include-chapter-numbers': params?.includeChapterNumbers,
-        'include-verse-numbers': params?.includeVerseNumbers,
-        'include-verse-spans': params?.includeVerseSpans,
-        parallels: params?.parallels
+  ): Promise<{ data: SectionContent; meta: ScriptureMeta }> {
+    let response = await this.http.get(
+      `/bibles/${encodeURIComponent(bibleId)}/sections/${encodeURIComponent(sectionId)}`,
+      {
+        params: {
+          'content-type': params?.contentType,
+          'include-notes': params?.includeNotes,
+          'include-titles': params?.includeTitles,
+          'include-chapter-numbers': params?.includeChapterNumbers,
+          'include-verse-numbers': params?.includeVerseNumbers,
+          'include-verse-spans': params?.includeVerseSpans,
+          parallels: params?.parallels
+        }
       }
-    });
+    );
     return response.data;
   }
 
   // --- Search ---
 
-  async search(bibleId: string, params: SearchParams): Promise<{ data: SearchResult }> {
-    let response = await this.http.get(`/bibles/${bibleId}/search`, {
+  async search(
+    bibleId: string,
+    params: SearchParams
+  ): Promise<{ data: SearchResult; meta?: ScriptureMeta }> {
+    let response = await this.http.get(`/bibles/${encodeURIComponent(bibleId)}/search`, {
       params: {
         query: params.query,
         limit: params.limit,
@@ -373,11 +421,19 @@ export class Client {
 
   async listAudioBibles(params?: {
     language?: string;
+    abbreviation?: string;
+    name?: string;
+    ids?: string;
+    bibleId?: string;
     includeFullDetails?: boolean;
   }): Promise<{ data: AudioBibleSummary[] }> {
     let response = await this.http.get('/audio-bibles', {
       params: {
         language: params?.language,
+        abbreviation: params?.abbreviation,
+        name: params?.name,
+        ids: params?.ids,
+        bibleId: params?.bibleId,
         'include-full-details': params?.includeFullDetails
       }
     });
@@ -385,7 +441,7 @@ export class Client {
   }
 
   async getAudioBible(audioBibleId: string): Promise<{ data: AudioBible }> {
-    let response = await this.http.get(`/audio-bibles/${audioBibleId}`);
+    let response = await this.http.get(`/audio-bibles/${encodeURIComponent(audioBibleId)}`);
     return response.data;
   }
 
@@ -393,11 +449,14 @@ export class Client {
     audioBibleId: string,
     includeChapters?: boolean
   ): Promise<{ data: Book[] }> {
-    let response = await this.http.get(`/audio-bibles/${audioBibleId}/books`, {
-      params: {
-        'include-chapters': includeChapters
+    let response = await this.http.get(
+      `/audio-bibles/${encodeURIComponent(audioBibleId)}/books`,
+      {
+        params: {
+          'include-chapters': includeChapters
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -406,7 +465,7 @@ export class Client {
     bookId: string
   ): Promise<{ data: Chapter[] }> {
     let response = await this.http.get(
-      `/audio-bibles/${audioBibleId}/books/${bookId}/chapters`
+      `/audio-bibles/${encodeURIComponent(audioBibleId)}/books/${encodeURIComponent(bookId)}/chapters`
     );
     return response.data;
   }
@@ -414,8 +473,10 @@ export class Client {
   async getAudioChapter(
     audioBibleId: string,
     chapterId: string
-  ): Promise<{ data: AudioChapter; meta: { fumsId: string } }> {
-    let response = await this.http.get(`/audio-bibles/${audioBibleId}/chapters/${chapterId}`);
+  ): Promise<{ data: AudioChapter; meta: ScriptureMeta }> {
+    let response = await this.http.get(
+      `/audio-bibles/${encodeURIComponent(audioBibleId)}/chapters/${encodeURIComponent(chapterId)}`
+    );
     return response.data;
   }
 }

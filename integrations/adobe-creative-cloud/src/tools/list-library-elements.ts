@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { libraryTimestamp } from '../lib/client';
 import { LibrariesClient } from '../lib/libraries';
 import { spec } from '../spec';
 
@@ -55,8 +56,8 @@ export let listLibraryElements = SlateTool.create(spec, {
       elementId: el.id || el.element_id,
       name: el.name,
       type: el.type || el.element_type,
-      createdAt: el.created_date || el.created,
-      modifiedAt: el.modified_date || el.modified,
+      createdAt: libraryTimestamp(el.created_date ?? el.created),
+      modifiedAt: libraryTimestamp(el.modified_date ?? el.modified),
       thumbnailUrl: el.thumbnail?.href || el.thumbnail_url
     }));
 
@@ -64,7 +65,7 @@ export let listLibraryElements = SlateTool.create(spec, {
       output: {
         elements,
         totalCount: result.total_count,
-        nextCursor: result._links?.next?.href
+        nextCursor: result._page?.next ?? result._links?.next?.href
       },
       message: `Found **${elements.length}** elements in library \`${ctx.input.libraryId}\`.`
     };

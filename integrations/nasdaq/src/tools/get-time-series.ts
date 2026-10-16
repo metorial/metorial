@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TablesClient } from '../lib/client';
+import { mapRows, TablesClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTimeSeries = SlateTool.create(spec, {
@@ -55,12 +55,19 @@ Provide the database and dataset codes (e.g., database \`WIKI\`, dataset \`AAPL\
       rowCount: z.number().describe('Number of data points returned.'),
       startDate: z.string().describe('Start date of the returned data.'),
       endDate: z.string().describe('End date of the returned data.'),
-      frequency: z.string().describe('Frequency of the data.'),
-      order: z.string().describe('Sort order of the data.')
+      frequency: z
+        .string()
+        .optional()
+        .describe('Frequency of the data, when supplied by the provider.'),
+      order: z.string().describe('Sort order of the data.'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original time-series response metadata and values.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TablesClient({ apiKey: ctx.auth.token });
+    let client = new TablesClient({ apiKey: ctx.auth.token, authMethod: ctx.auth.authMethod });
 
     let response = await client.getTimeSeriesData({
       databaseCode: ctx.input.databaseCode,
@@ -75,13 +82,7 @@ Provide the database and dataset codes (e.g., database \`WIKI\`, dataset \`AAPL\
     });
 
     let columnNames = response.dataset_data.column_names;
-    let rows = response.dataset_data.data.map(row => {
-      let obj: Record<string, any> = {};
-      columnNames.forEach((col, i) => {
-        obj[col] = row[i];
-      });
-      return obj;
-    });
+    let rows = mapRows(columnNames, response.dataset_data.data);
 
     return {
       output: {
@@ -90,8 +91,11 @@ Provide the database and dataset codes (e.g., database \`WIKI\`, dataset \`AAPL\
         rowCount: rows.length,
         startDate: response.dataset_data.start_date,
         endDate: response.dataset_data.end_date,
-        frequency: response.dataset_data.frequency,
-        order: response.dataset_data.order
+        ...(response.dataset_data.frequency != null
+          ? { frequency: response.dataset_data.frequency }
+          : {}),
+        order: response.dataset_data.order,
+        raw: response
       },
       message: `Retrieved **${rows.length}** data points from **${ctx.input.databaseCode}/${ctx.input.datasetCode}** (${response.dataset_data.start_date} to ${response.dataset_data.end_date}).`
     };

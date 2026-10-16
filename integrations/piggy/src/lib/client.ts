@@ -1,10 +1,28 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { validateInteger, validatePagination, validateResponse } from './response';
+
+export let piggyApiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Piggy',
+    reason: 'piggy_api_error',
+    extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+    extractUpstreamCode: (_error, response, helpers) =>
+      helpers.isRecord(response?.data) &&
+      ['string', 'number'].includes(typeof response.data.code)
+        ? String(response.data.code)
+        : undefined
+  });
 
 export class Client {
   private api;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    if (!config.token.trim())
+      throw createApiServiceError('Enter your Piggy API token.', {
+        reason: 'piggy_missing_auth'
+      });
+    this.api = createAuthenticatedAxios({
+      errorAdapter: piggyApiError,
       baseURL: 'https://api.piggy.eu',
       headers: {
         Authorization: `Bearer ${config.token}`,
@@ -25,9 +43,10 @@ export class Client {
     createdAtLt?: string;
     createdAtLte?: string;
   }) {
+    validatePagination(params?.limit, params?.page, 100, 1);
     let query: Record<string, any> = {};
-    if (params?.limit) query.limit = params.limit;
-    if (params?.page) query.page = params.page;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.page !== undefined) query.page = params.page;
     if (params?.sort) query.sort = params.sort;
     if (params?.createdAtGt) query['created_at[gt]'] = params.createdAtGt;
     if (params?.createdAtGte) query['created_at[gte]'] = params.createdAtGte;
@@ -35,83 +54,97 @@ export class Client {
     if (params?.createdAtLte) query['created_at[lte]'] = params.createdAtLte;
 
     let response = await this.api.get('/api/v3/oauth/clients/contacts', { params: query });
-    return response.data;
+    return validateResponse(response.data, 'list');
   }
 
   async getContact(contactUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/contacts/${contactUuid}`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/contacts/${encodeURIComponent(contactUuid)}`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async findContactByEmail(email: string) {
-    let response = await this.api.get('/api/v3/oauth/contacts/find-one-by', {
+    let response = await this.api.get('/api/v3/oauth/clients/contacts/find-one-by', {
       params: { email }
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async findOrCreateContact(email: string) {
-    let response = await this.api.get('/api/v3/oauth/contacts/find-or-create', {
+    let response = await this.api.get('/api/v3/oauth/clients/contacts/find-or-create', {
       params: { email }
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async createContact(data: { email: string; referralCode?: string }) {
     let body: Record<string, any> = { email: data.email };
     if (data.referralCode) body.referral_code = data.referralCode;
-    let response = await this.api.post('/api/v3/oauth/contacts', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/contacts', body);
+    return validateResponse(response.data, 'object');
   }
 
   async createAnonymousContact(contactIdentifierValue?: string) {
     let body: Record<string, any> = {};
     if (contactIdentifierValue) body.contact_identifier_value = contactIdentifierValue;
-    let response = await this.api.post('/api/v3/oauth/contacts/anonymous', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/contacts/anonymous', body);
+    return validateResponse(response.data, 'object');
   }
 
   async updateContact(contactUuid: string, attributes: Record<string, any>) {
-    let response = await this.api.put(`/api/v3/oauth/contacts/${contactUuid}`, { attributes });
-    return response.data;
+    let response = await this.api.put(
+      `/api/v3/oauth/clients/contacts/${encodeURIComponent(contactUuid)}`,
+      { attributes }
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async deleteContact(contactUuid: string, type: 'DEFAULT' | 'GDPR' = 'DEFAULT') {
-    let response = await this.api.post(`/api/v3/oauth/contacts/${contactUuid}/delete`, {
-      type
-    });
-    return response.data;
+    let response = await this.api.post(
+      `/api/v3/oauth/clients/contacts/${encodeURIComponent(contactUuid)}/delete`,
+      {
+        type
+      }
+    );
+    return validateResponse(response.data, 'ack');
   }
 
   async getContactCreditBalance(contactUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/contacts/${contactUuid}/credit-balance`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/contacts/${encodeURIComponent(contactUuid)}/credit-balance`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async getContactPrepaidBalance(contactUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/contacts/${contactUuid}/prepaid-balance`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/contacts/${encodeURIComponent(contactUuid)}/prepaid-balance`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async getContactTier(contactUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/contacts/${contactUuid}/tier`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/contacts/${encodeURIComponent(contactUuid)}/tier`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async getContactIdentifiers(contactUuid: string) {
     let response = await this.api.get(
-      `/api/v3/oauth/contacts/${contactUuid}/contact-identifiers`
+      `/api/v3/oauth/clients/contacts/${encodeURIComponent(contactUuid)}/contact-identifiers`
     );
-    return response.data;
+    return validateResponse(response.data, 'list');
   }
 
   // ─── Contact Identifiers ────────────────────────────────────
 
   async findContactIdentifier(value: string) {
-    let response = await this.api.get('/api/v3/oauth/contact-identifiers/find', {
+    let response = await this.api.get('/api/v3/oauth/clients/contact-identifiers/find', {
       params: { contact_identifier_value: value }
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async createContactIdentifier(data: {
@@ -125,30 +158,30 @@ export class Client {
     if (data.contactUuid) body.contact_uuid = data.contactUuid;
     if (data.contactIdentifierName) body.contact_identifier_name = data.contactIdentifierName;
 
-    let response = await this.api.post('/api/v3/oauth/contact-identifiers', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/contact-identifiers', body);
+    return validateResponse(response.data, 'object');
   }
 
   async linkContactIdentifier(contactIdentifierValue: string, contactUuid: string) {
-    let response = await this.api.put('/api/v3/oauth/contact-identifiers/link', {
+    let response = await this.api.put('/api/v3/oauth/clients/contact-identifiers/link', {
       contact_identifier_value: contactIdentifierValue,
       contact_uuid: contactUuid
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async unlinkContactIdentifier(contactIdentifierValue: string) {
-    let response = await this.api.put('/api/v3/oauth/contact-identifiers/unlink', {
+    let response = await this.api.put('/api/v3/oauth/clients/contact-identifiers/unlink', {
       contact_identifier_value: contactIdentifierValue
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Loyalty ─────────────────────────────────────────────────
 
   async getLoyaltyProgram() {
-    let response = await this.api.get('/api/v3/oauth/loyalty-program');
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/loyalty-program');
+    return validateResponse(response.data, 'object');
   }
 
   async listLoyaltyTransactions(params?: {
@@ -163,9 +196,10 @@ export class Client {
     createdAtLt?: string;
     createdAtLte?: string;
   }) {
+    validatePagination(params?.limit, params?.page, 100, 1);
     let query: Record<string, any> = {};
-    if (params?.limit) query.limit = params.limit;
-    if (params?.page) query.page = params.page;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.page !== undefined) query.page = params.page;
     if (params?.type) query.type = params.type;
     if (params?.shopUuid) query.shop_uuid = params.shopUuid;
     if (params?.contactUuid) query.contact_uuid = params.contactUuid;
@@ -178,7 +212,7 @@ export class Client {
     let response = await this.api.get('/api/v3/oauth/clients/loyalty-transactions', {
       params: query
     });
-    return response.data;
+    return validateResponse(response.data, 'list');
   }
 
   async createCreditReception(data: {
@@ -189,6 +223,10 @@ export class Client {
     unitName?: string;
     contactIdentifierValue?: string;
   }) {
+    if (data.credits === undefined && data.unitValue === undefined)
+      throw createApiServiceError('Provide credits or unitValue.', {
+        reason: 'piggy_invalid_input'
+      });
     let body: Record<string, any> = {
       shop_uuid: data.shopUuid,
       contact_uuid: data.contactUuid
@@ -199,15 +237,15 @@ export class Client {
     if (data.contactIdentifierValue)
       body.contact_identifier_value = data.contactIdentifierValue;
 
-    let response = await this.api.post('/api/v3/oauth/credit-receptions', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/credit-receptions', body);
+    return validateResponse(response.data, 'object');
   }
 
   async reverseCreditReception(creditReceptionUuid: string) {
     let response = await this.api.post(
-      `/api/v3/oauth/credit-receptions/${creditReceptionUuid}/reverse`
+      `/api/v3/oauth/clients/credit-receptions/${encodeURIComponent(creditReceptionUuid)}/reverse`
     );
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async calculateCredits(params: {
@@ -223,10 +261,10 @@ export class Client {
     if (params.contactUuid) query.contact_uuid = params.contactUuid;
     if (params.unitName) query.unit_name = params.unitName;
 
-    let response = await this.api.get('/api/v3/oauth/credit-receptions/calculate', {
+    let response = await this.api.get('/api/v3/oauth/clients/credit-receptions/calculate', {
       params: query
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Rewards ─────────────────────────────────────────────────
@@ -236,13 +274,15 @@ export class Client {
     if (params?.shopUuid) query.shop_uuid = params.shopUuid;
     if (params?.contactUuid) query.contact_uuid = params.contactUuid;
 
-    let response = await this.api.get('/api/v3/oauth/rewards', { params: query });
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/rewards', { params: query });
+    return validateResponse(response.data, 'list');
   }
 
   async getReward(rewardUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/rewards/${rewardUuid}`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/rewards/${encodeURIComponent(rewardUuid)}`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async updateReward(
@@ -258,8 +298,11 @@ export class Client {
     if (data.description !== undefined) body.description = data.description;
     if (data.requiredCredits !== undefined) body.required_credits = data.requiredCredits;
 
-    let response = await this.api.put(`/api/v3/oauth/rewards/${rewardUuid}`, body);
-    return response.data;
+    let response = await this.api.put(
+      `/api/v3/oauth/clients/rewards/${encodeURIComponent(rewardUuid)}`,
+      body
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async createRewardReception(data: {
@@ -276,27 +319,29 @@ export class Client {
     if (data.contactIdentifierValue)
       body.contact_identifier_value = data.contactIdentifierValue;
 
-    let response = await this.api.post('/api/v3/oauth/reward-receptions', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/reward-receptions', body);
+    return validateResponse(response.data, 'object');
   }
 
   async reverseRewardReception(rewardReceptionUuid: string) {
     let response = await this.api.post(
-      `/api/v3/oauth/reward-receptions/${rewardReceptionUuid}/reverse`
+      `/api/v3/oauth/clients/reward-receptions/${encodeURIComponent(rewardReceptionUuid)}/reverse`
     );
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Promotions ──────────────────────────────────────────────
 
   async listPromotions() {
-    let response = await this.api.get('/api/v3/oauth/promotions');
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/promotions');
+    return validateResponse(response.data, 'list');
   }
 
   async getPromotion(promotionUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/promotions/${promotionUuid}`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/promotions/${encodeURIComponent(promotionUuid)}`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Vouchers ────────────────────────────────────────────────
@@ -308,22 +353,23 @@ export class Client {
     limit?: number;
     page?: number;
   }) {
+    validatePagination(params?.limit, params?.page, 500, 0);
     let query: Record<string, any> = {};
     if (params?.promotionUuid) query.promotion_uuid = params.promotionUuid;
     if (params?.contactUuid) query.contact_uuid = params.contactUuid;
     if (params?.status) query.status = params.status;
-    if (params?.limit) query.limit = params.limit;
-    if (params?.page) query.page = params.page;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.page !== undefined) query.page = params.page;
 
-    let response = await this.api.get('/api/v3/oauth/vouchers', { params: query });
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/vouchers', { params: query });
+    return validateResponse(response.data, 'list');
   }
 
   async findVoucher(code: string) {
-    let response = await this.api.get('/api/v3/oauth/vouchers/find', {
+    let response = await this.api.get('/api/v3/oauth/clients/vouchers/find', {
       params: { code }
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async createVoucher(data: {
@@ -335,6 +381,7 @@ export class Client {
     totalRedemptionsAllowed?: number;
     customAttributes?: Array<{ name: string; value: string }>;
   }) {
+    validateInteger(data.totalRedemptionsAllowed, 'totalRedemptionsAllowed');
     let body: Record<string, any> = {
       promotion_uuid: data.promotionUuid
     };
@@ -346,8 +393,8 @@ export class Client {
       body.total_redemptions_allowed = data.totalRedemptionsAllowed;
     if (data.customAttributes) body.custom_attributes = data.customAttributes;
 
-    let response = await this.api.post('/api/v3/oauth/vouchers', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/vouchers', body);
+    return validateResponse(response.data, 'object');
   }
 
   async updateVoucher(
@@ -358,13 +405,20 @@ export class Client {
       customAttributes?: Array<{ name: string; value: string }>;
     }
   ) {
+    if (data.status !== 'ACTIVE' && data.status !== 'DEACTIVATED')
+      throw createApiServiceError('Voucher updates require status ACTIVE or DEACTIVATED.', {
+        reason: 'piggy_invalid_input'
+      });
     let body: Record<string, any> = {};
     if (data.status) body.status = data.status;
     if (data.expirationDate) body.expiration_date = data.expirationDate;
     if (data.customAttributes) body.custom_attributes = data.customAttributes;
 
-    let response = await this.api.put(`/api/v3/oauth/vouchers/${voucherUuid}`, body);
-    return response.data;
+    let response = await this.api.put(
+      `/api/v3/oauth/clients/vouchers/${encodeURIComponent(voucherUuid)}`,
+      body
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async redeemVoucher(data: {
@@ -380,8 +434,8 @@ export class Client {
     if (data.contactUuid) body.contact_uuid = data.contactUuid;
     if (data.releaseKey) body.release_key = data.releaseKey;
 
-    let response = await this.api.post('/api/v3/oauth/vouchers/redeem', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/vouchers/redeem', body);
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Gift Cards ──────────────────────────────────────────────
@@ -391,38 +445,41 @@ export class Client {
     page?: number;
     limit?: number;
   }) {
+    validatePagination(params?.limit, params?.page, 100, 1);
     let query: Record<string, any> = {};
     if (params?.giftcardProgramUuid) query.giftcard_program_uuid = params.giftcardProgramUuid;
-    if (params?.page) query.page = params.page;
-    if (params?.limit) query.limit = params.limit;
+    if (params?.page !== undefined) query.page = params.page;
+    if (params?.limit !== undefined) query.limit = params.limit;
 
-    let response = await this.api.get('/api/v3/oauth/giftcards', { params: query });
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/giftcards', { params: query });
+    return validateResponse(response.data, 'list');
   }
 
   async getGiftcard(giftcardUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/giftcards/${giftcardUuid}`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/giftcards/${encodeURIComponent(giftcardUuid)}`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   async findGiftcardByHash(hash: string) {
-    let response = await this.api.get('/api/v3/oauth/giftcards/find-one-by', {
+    let response = await this.api.get('/api/v3/oauth/clients/giftcards/find-one-by', {
       params: { hash }
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async createGiftcard(data: { giftcardProgramUuid: string; type?: number }) {
-    let response = await this.api.post('/api/v3/oauth/giftcards', {
+    let response = await this.api.post('/api/v3/oauth/clients/giftcards', {
       giftcard_program_uuid: data.giftcardProgramUuid,
       type: data.type ?? 1 // 1 = digital
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async listGiftcardPrograms() {
-    let response = await this.api.get('/api/v3/oauth/giftcard-programs');
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/giftcard-programs');
+    return validateResponse(response.data, 'list');
   }
 
   async listGiftcardTransactions(params?: {
@@ -437,12 +494,13 @@ export class Client {
     createdAtLt?: string;
     createdAtLte?: string;
   }) {
+    validatePagination(params?.perPage, params?.page, 100, 1);
     let query: Record<string, any> = {};
     if (params?.giftcardHash) query.giftcard_hash = params.giftcardHash;
     if (params?.giftcardProgramUuid) query.giftcard_program_uuid = params.giftcardProgramUuid;
     if (params?.shopUuid) query.shop_uuid = params.shopUuid;
-    if (params?.page) query.page = params.page;
-    if (params?.perPage) query.perPage = params.perPage;
+    if (params?.page !== undefined) query.page = params.page;
+    if (params?.perPage !== undefined) query.perPage = params.perPage;
     if (params?.sort) query.sort = params.sort;
     if (params?.createdAtGt) query['created_at[gt]'] = params.createdAtGt;
     if (params?.createdAtGte) query['created_at[gte]'] = params.createdAtGte;
@@ -452,7 +510,7 @@ export class Client {
     let response = await this.api.get('/api/v3/oauth/clients/giftcard-transactions', {
       params: query
     });
-    return response.data;
+    return validateResponse(response.data, 'list');
   }
 
   async createGiftcardTransaction(data: {
@@ -461,6 +519,7 @@ export class Client {
     shopUuid: string;
     customAttributes?: Array<{ name: string; value: string }>;
   }) {
+    validateInteger(data.amountInCents, 'amountInCents');
     let body: Record<string, any> = {
       giftcard_uuid: data.giftcardUuid,
       amount_in_cents: data.amountInCents,
@@ -468,15 +527,15 @@ export class Client {
     };
     if (data.customAttributes) body.custom_attributes = data.customAttributes;
 
-    let response = await this.api.post('/api/v3/oauth/giftcard-transactions', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/giftcard-transactions', body);
+    return validateResponse(response.data, 'object');
   }
 
   async reverseGiftcardTransaction(giftcardTransactionUuid: string) {
     let response = await this.api.post(
-      `/api/v3/oauth/giftcard-transactions/${giftcardTransactionUuid}/reverse`
+      `/api/v3/oauth/clients/giftcard-transactions/${encodeURIComponent(giftcardTransactionUuid)}/reverse`
     );
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Prepaid ─────────────────────────────────────────────────
@@ -487,6 +546,7 @@ export class Client {
     amountInCents: number;
     shopUuid: string;
   }) {
+    validateInteger(data.amountInCents, 'amountInCents');
     let body: Record<string, any> = {
       amount_in_cents: data.amountInCents,
       shop_uuid: data.shopUuid
@@ -495,8 +555,8 @@ export class Client {
     if (data.contactIdentifierValue)
       body.contact_identifier_value = data.contactIdentifierValue;
 
-    let response = await this.api.post('/api/v3/oauth/prepaid-transactions', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/prepaid-transactions', body);
+    return validateResponse(response.data, 'object');
   }
 
   async listPrepaidTransactions(params?: {
@@ -505,33 +565,38 @@ export class Client {
     limit?: number;
     page?: number;
   }) {
+    validatePagination(params?.limit, params?.page, 30, 1);
     let query: Record<string, any> = {};
     if (params?.contactUuid) query.contact_uuid = params.contactUuid;
     if (params?.shopUuid) query.shop_uuid = params.shopUuid;
-    if (params?.limit) query.limit = params.limit;
-    if (params?.page) query.page = params.page;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.page !== undefined) query.page = params.page;
 
-    let response = await this.api.get('/api/v3/oauth/prepaid-transactions', { params: query });
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/prepaid-transactions', {
+      params: query
+    });
+    return validateResponse(response.data, 'list');
   }
 
   async reversePrepaidTransaction(prepaidTransactionUuid: string) {
     let response = await this.api.post(
-      `/api/v3/oauth/prepaid-transactions/${prepaidTransactionUuid}/reverse`
+      `/api/v3/oauth/clients/prepaid-transactions/${encodeURIComponent(prepaidTransactionUuid)}/reverse`
     );
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Shops ───────────────────────────────────────────────────
 
   async listShops() {
-    let response = await this.api.get('/api/v3/oauth/shops');
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/shops');
+    return validateResponse(response.data, 'list');
   }
 
   async getShop(shopUuid: string) {
-    let response = await this.api.get(`/api/v3/oauth/shops/${shopUuid}`);
-    return response.data;
+    let response = await this.api.get(
+      `/api/v3/oauth/clients/shops/${encodeURIComponent(shopUuid)}`
+    );
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Orders ──────────────────────────────────────────────────
@@ -541,14 +606,14 @@ export class Client {
       '/api/v3/oauth/clients/orders/create-and-process',
       data
     );
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async findOrder(externalIdentifier: string) {
     let response = await this.api.get('/api/v3/oauth/clients/orders/find', {
       params: { external_identifier: externalIdentifier }
     });
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async updateOrder(orderUuid: string, data: { status?: string; paymentStatus?: string }) {
@@ -556,8 +621,11 @@ export class Client {
     if (data.status) body.status = data.status;
     if (data.paymentStatus) body.payment_status = data.paymentStatus;
 
-    let response = await this.api.put(`/api/v3/oauth/clients/orders/${orderUuid}`, body);
-    return response.data;
+    let response = await this.api.put(
+      `/api/v3/oauth/clients/orders/${encodeURIComponent(orderUuid)}`,
+      body
+    );
+    return validateResponse(response.data, 'object');
   }
 
   // ─── Forms ───────────────────────────────────────────────────
@@ -567,15 +635,15 @@ export class Client {
     if (params?.status) query.status = params.status;
     if (params?.type) query.type = params.type;
 
-    let response = await this.api.get('/api/v3/oauth/forms', { params: query });
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/forms', { params: query });
+    return validateResponse(response.data, 'list');
   }
 
   // ─── Tiers ───────────────────────────────────────────────────
 
   async listTiers() {
-    let response = await this.api.get('/api/v3/oauth/tiers');
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/tiers');
+    return validateResponse(response.data, 'list');
   }
 
   // ─── Contact Attributes ──────────────────────────────────────
@@ -584,8 +652,10 @@ export class Client {
     let query: Record<string, any> = {};
     if (entity) query.entity = entity;
 
-    let response = await this.api.get('/api/v3/oauth/contact-attributes', { params: query });
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/contact-attributes', {
+      params: query
+    });
+    return validateResponse(response.data, 'list');
   }
 
   // ─── Webhook Subscriptions ───────────────────────────────────
@@ -595,10 +665,10 @@ export class Client {
     if (params?.eventType) query.event_type = params.eventType;
     if (params?.status) query.status = params.status;
 
-    let response = await this.api.get('/api/v3/oauth/webhook-subscriptions', {
+    let response = await this.api.get('/api/v3/oauth/clients/webhook-subscriptions', {
       params: query
     });
-    return response.data;
+    return validateResponse(response.data, 'list');
   }
 
   async createWebhookSubscription(data: {
@@ -616,15 +686,15 @@ export class Client {
     if (data.secret) body.secret = data.secret;
     if (data.attributes) body.attributes = data.attributes;
 
-    let response = await this.api.post('/api/v3/oauth/webhook-subscriptions', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/webhook-subscriptions', body);
+    return validateResponse(response.data, 'object');
   }
 
   async getWebhookSubscription(webhookSubscriptionUuid: string) {
     let response = await this.api.get(
-      `/api/v3/oauth/webhook-subscriptions/${webhookSubscriptionUuid}`
+      `/api/v3/oauth/clients/webhook-subscriptions/${encodeURIComponent(webhookSubscriptionUuid)}`
     );
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async updateWebhookSubscription(
@@ -643,24 +713,24 @@ export class Client {
     if (data.attributes) body.attributes = data.attributes;
 
     let response = await this.api.put(
-      `/api/v3/oauth/webhook-subscriptions/${webhookSubscriptionUuid}`,
+      `/api/v3/oauth/clients/webhook-subscriptions/${encodeURIComponent(webhookSubscriptionUuid)}`,
       body
     );
-    return response.data;
+    return validateResponse(response.data, 'object');
   }
 
   async deleteWebhookSubscription(webhookSubscriptionUuid: string) {
     let response = await this.api.delete(
-      `/api/v3/oauth/webhook-subscriptions/${webhookSubscriptionUuid}`
+      `/api/v3/oauth/clients/webhook-subscriptions/${encodeURIComponent(webhookSubscriptionUuid)}`
     );
-    return response.data;
+    return validateResponse(response.data, 'ack');
   }
 
   // ─── Automations ─────────────────────────────────────────────
 
   async listAutomations() {
-    let response = await this.api.get('/api/v3/oauth/automations');
-    return response.data;
+    let response = await this.api.get('/api/v3/oauth/clients/automations');
+    return validateResponse(response.data, 'list');
   }
 
   async triggerAutomationRun(data: {
@@ -674,7 +744,7 @@ export class Client {
     };
     if (data.runData) body.data = data.runData;
 
-    let response = await this.api.post('/api/v3/oauth/automations/runs', body);
-    return response.data;
+    let response = await this.api.post('/api/v3/oauth/clients/automations/runs', body);
+    return validateResponse(response.data, 'ack');
   }
 }

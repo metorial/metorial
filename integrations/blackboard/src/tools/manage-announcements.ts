@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let announcementOutputSchema = z.object({
@@ -20,7 +20,7 @@ let mapAnnouncement = (a: any) => ({
   body: a.body,
   showAtLogin: a.showAtLogin,
   showInCourses: a.showInCourses,
-  creator: a.creator,
+  creator: a.creatorUserId ?? a.creator,
   created: a.created,
   modified: a.modified
 });
@@ -36,19 +36,27 @@ export let createAnnouncement = SlateTool.create(spec, {
       courseId: z.string().describe('Course identifier'),
       title: z.string().describe('Announcement title'),
       body: z.string().describe('Announcement body (HTML supported)'),
-      showAtLogin: z.boolean().optional().describe('Show at login'),
-      showInCourses: z.boolean().optional().describe('Show in courses'),
+      showAtLogin: z
+        .boolean()
+        .optional()
+        .describe('System-only setting; true is not supported for course announcements'),
+      showInCourses: z
+        .boolean()
+        .optional()
+        .describe('System-only setting; true is not supported for course announcements'),
       durationType: z
         .enum(['Permanent', 'DateRange', 'Term'])
         .optional()
-        .describe('Availability duration type'),
+        .describe(
+          'Permanent, DateRange (mapped to the provider date restriction), or the associated course Term'
+        ),
       startDate: z.string().optional().describe('Start date (ISO 8601)'),
       endDate: z.string().optional().describe('End date (ISO 8601)')
     })
   )
   .output(announcementOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let announcement = await client.createCourseAnnouncement(ctx.input.courseId, {
       title: ctx.input.title,
@@ -97,7 +105,7 @@ export let listAnnouncements = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = ctx.input.courseId
       ? await client.listCourseAnnouncements(ctx.input.courseId, {
@@ -129,13 +137,19 @@ export let updateAnnouncement = SlateTool.create(spec, {
       announcementId: z.string().describe('Announcement ID'),
       title: z.string().optional().describe('New title'),
       body: z.string().optional().describe('New body (HTML)'),
-      showAtLogin: z.boolean().optional().describe('Show at login'),
-      showInCourses: z.boolean().optional().describe('Show in courses')
+      showAtLogin: z
+        .boolean()
+        .optional()
+        .describe('System-only setting; true is not supported for course announcements'),
+      showInCourses: z
+        .boolean()
+        .optional()
+        .describe('System-only setting; true is not supported for course announcements')
     })
   )
   .output(announcementOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let announcement = await client.updateCourseAnnouncement(
       ctx.input.courseId,
@@ -173,7 +187,7 @@ export let deleteAnnouncement = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     await client.deleteCourseAnnouncement(ctx.input.courseId, ctx.input.announcementId);
     return {
       output: { deleted: true },

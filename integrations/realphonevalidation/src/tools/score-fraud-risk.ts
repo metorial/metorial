@@ -13,7 +13,7 @@ export let scoreFraudRisk = SlateTool.create(spec, {
   key: 'score_fraud_risk',
   description: `Provides a fraud risk score and detailed data points for a phone number, enabling identification of possible fraud before it occurs. Returns risk level, numeric score, recommendation, phone type, carrier, and geographic location data. Customize your risk tolerance based on the returned score.`,
   constraints: [
-    'Phone number must be a valid US or Canadian number.',
+    'Phone number must be exactly 10 numeric digits (US only).',
     'API rate limit of 10 requests per second.'
   ],
   tags: {
@@ -27,7 +27,11 @@ export let scoreFraudRisk = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      riskLevel: z.string().describe('Risk assessment: low, medium, or high'),
+      riskLevel: z
+        .string()
+        .describe(
+          'Provider risk level, including low, medium-low, medium, medium-high, or high'
+        ),
       riskScore: z.string().describe('Numeric fraud risk score (0-1000)'),
       recommendation: z.string().describe('Recommended action: allow, flag, or block'),
       phoneType: z.string().describe('Phone type description: Mobile, Landline, VOIP, etc.'),
@@ -44,7 +48,11 @@ export let scoreFraudRisk = SlateTool.create(spec, {
       errorText: z
         .string()
         .optional()
-        .describe('Error message if the check encountered an issue')
+        .describe('Error message if the check encountered an issue'),
+      providerResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including numbering and location details')
     })
   )
   .handleInvocation(async ctx => {
@@ -68,7 +76,8 @@ export let scoreFraudRisk = SlateTool.create(spec, {
         locationLatitude: result.location_latitude || undefined,
         locationLongitude: result.location_longitude || undefined,
         locationTimeZone: result.location_time_zone || undefined,
-        errorText: errorText || undefined
+        errorText: errorText || undefined,
+        providerResponse: result
       },
       message: `Phone **${ctx.input.phone}**: Risk **${result.risk_level}** (score: ${result.score}), recommendation: **${result.recommendation}**. Type: ${result.phn_desc}, carrier: ${result.carrier}${result.location_city ? `, location: ${result.location_city}, ${result.location_state}` : ''}.`
     };

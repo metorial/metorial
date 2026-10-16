@@ -1,67 +1,40 @@
-Now let me check the actual Memberspot API Swagger documentation to get more details on the endpoints:Now I have enough information to compile the specification. Let me also check the Make.com integration page for more details on available actions/triggers:
+# Memberspot integration specification
 
-# Slates Specification for Memberspot
-
-## Overview
-
-Memberspot is a German e-learning platform (memberspot.de) for creating, managing, and delivering online courses, membership areas, and training programs. It provides course authoring tools, member management, community features, branding customization, and GDPR-compliant hosting on German servers. The API is available on the Enterprise plan and above, or as a paid add-on.
+Manage members, offer access, learning progress, custom properties, and exam results through the Memberspot REST API.
 
 ## Authentication
 
-Memberspot uses API keys for authentication. Authentication is done via an API Key passed in the `X-API-KEY` header, with requests made to the base URL `https://api.memberspot.de/v1`.
+Create an API key in Memberspot **Settings > API keys** (`/settings/apikeys`). Requests send it in the `X-API-KEY` header. API operations use `https://api.memberspot.de/v1`; the connected-school identity endpoint is `GET https://api.memberspot.de/api-auth`.
 
-To obtain an API key:
+API keys do not use OAuth or token refresh. Endpoint availability can depend on your account entitlement; check with Memberspot if a request is denied.
 
-1. Navigate to your Memberspot account and sign in. Go to **Settings** > **Integrations** > **API Keys**.
-2. Click **Create** and enter a name for the key.
-3. Copy the generated secret value and store it securely — it is only shown once.
+## Discovery and member workflows
 
-The API is available to all customers on the Enterprise plan and above, as well as all those who have booked the API add-on.
+- `get_school` returns the school associated with the API key, preserving the provider response without inventing identity fields.
+- `list_users` returns one page of users, optionally filtered by offer, course, and active state. A course filter populates that course's progress. Pass `nextPage` as `lastLoadedId` to continue; `pageLength` is between 1 and 100.
+- `find_user` finds a member by email. A missing member returns a clear error because the tool's user output is an object.
+- `grant_access` creates a member if needed and grants an offer. Discover offer IDs with `list_offers`; provide the order ID used to track access.
+- `manage_access` activates or deactivates access by offer or order. `delete_access` removes the matching assignment by omitting the API's `active` property. Offer scope affects all matching offers; order scope affects all accesses with the same order ID for that member.
+- `set_offer_expiration` sets an ISO 8601 expiry date for a user's offer, or removes it when the date is omitted or null. Find user UIDs with `find_user` or `list_users`.
+- `delete_users` permanently deletes members using between 1 and 10 email addresses. Unknown users are ignored. The provider's raw response is retained; a scalar acknowledgement is also exposed under `result.status`.
 
-**Example request header:**
+## Courses, exams, and custom properties
 
-```
-X-API-KEY: your-api-key-here
-Accept: application/json
-```
+- `list_courses` discovers course IDs, names, types, and available descriptions.
+- `get_course_progress` returns the provider's full progress response for a specific course or one page across courses. For list calls, use `pageLength` and `lastLoadedCourseId`; pass the response's `nextPage` cursor to continue. Provider progress metrics and optional timestamps remain unchanged.
+- `enable_chapter_access` unlocks a chapter for a member. Discover course IDs with `list_courses`; obtain chapter IDs from course settings because the reviewed REST definition contains no chapter-list endpoint.
+- `list_exams` discovers exam IDs and metadata. `get_exam_results` returns one page of submissions, including complete run records. Pass `nextPage` as `lastLoadedId` to continue; `pageLength` is between 1 and 100.
+- `manage_custom_properties` lists property definitions when called without email or properties. To update a user, supply both email and at least one property. The public `propertyId` input maps to the API's `id` field. Definitions retain select options and other provider metadata.
+- `get_login_token` generates a token valid for one hour. It exposes the provider's direct `loginUrl` when present. Treat tokens and login URLs as credentials.
 
-## Features
+## API behavior and limits
 
-### User Management
+HTTP failures and invalid input combinations produce structured service errors. Requests have a 30-second timeout. The official definition documents a limit of four requests per second on user, progress, custom-property update, and exam-result endpoints; callers should pace requests and handle rate-limit errors.
 
-Manage members on your Memberspot platform. You can list all users, look up a user by email address, delete users, and set custom properties on user profiles. Searching for a user by email is Enterprise-only. Custom properties allow attaching arbitrary metadata to users for personalization or segmentation purposes.
+Existing output field types remain intact. Paginated list tools expose optional cursors and preserve the complete response under `raw`; progress already returns the complete response. No tool downloads or generates files.
 
-### Access & Enrollment Management
+Memberspot advertises webhooks, but the reviewed public REST definition supplies no webhook registration or callback-verification contract. This package currently provides tools without triggers.
 
-Grant access to a course — when the member does not exist, the member will be created automatically. You can also revoke a member's access to a course (member progress in the courses will not be deleted), or delete the access of a member (member progress in the courses will be deleted). Access can be managed both at the offer level (activate/deactivate) and at the order level (activate/deactivate). You can also delete access for a specific order ID.
+## Official reference
 
-- Granting access requires: `firstname`, `lastname`, `email`, `offerId`, and `orderId`.
-- Access state can be toggled between active and inactive for both offers and orders.
-
-### Offer (Course) Retrieval
-
-Retrieve a list of all available offers (courses/products) configured in your Memberspot account. This is useful for dynamically populating course selections in integrations and automations.
-
-### Course Progress Tracking
-
-List course progress for users and get course progress for a specific course. This enables monitoring learner advancement and triggering actions based on completion status.
-
-### Chapter Access Management
-
-Enable access to specific chapters within a course, allowing fine-grained control over what content a user can access beyond full course-level grants.
-
-### Exam Results
-
-Retrieve exam results for users, enabling tracking of assessment outcomes and automating follow-up actions based on exam performance.
-
-### Login Token Generation
-
-Generate single sign-on login tokens for users, allowing you to create direct login links that can be delivered via email or other channels without requiring users to enter credentials manually.
-
-### Custom Properties Management
-
-List and set custom user properties. These are user-defined fields that can store additional information about members for personalization, reporting, or integration purposes.
-
-## Events
-
-The provider does not support events. Memberspot's API is a REST-only API with no native webhook or event subscription mechanism. To react to changes, external tools (such as Zapier, Make, or Pipedream) can be used to trigger workflows based on events from other connected systems (e.g., payment providers), which then call the Memberspot API.
+Reviewed 2026-10-15: [Memberspot API documentation](https://api.memberspot.de/api), using its [published OpenAPI definition](https://api.memberspot.de/api/swagger-ui-init.js). The definition covers the implemented routes, request DTOs, response DTOs, authentication, and pagination.

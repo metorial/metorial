@@ -28,7 +28,7 @@ export let getSynonymsAntonyms = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Language code override (e.g., "en", "fr", "es"). Uses the configured default if not specified.'
+          'Language code override, such as "en" for English. Uses the configured default when omitted; availability depends on the provider.'
         )
     })
   )
@@ -57,8 +57,8 @@ export let getSynonymsAntonyms = SlateTool.create(spec, {
           groupMap.set(meaning.partOfSpeech, existing);
         }
 
-        for (let syn of meaning.synonyms) existing.synonyms.add(syn);
-        for (let ant of meaning.antonyms) existing.antonyms.add(ant);
+        for (let syn of meaning.synonyms ?? []) existing.synonyms.add(syn);
+        for (let ant of meaning.antonyms ?? []) existing.antonyms.add(ant);
 
         for (let def of meaning.definitions) {
           for (let syn of def.synonyms) existing.synonyms.add(syn);

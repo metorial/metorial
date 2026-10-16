@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseResponse, providerDataSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let hostedDomains = SlateTool.create(spec, {
@@ -30,20 +31,35 @@ Results are paginated - specify a page number to navigate through large result s
       currentPage: z.number().describe('Current page number'),
       perPage: z.number().describe('Number of domains per page'),
       totalPages: z.number().describe('Total number of pages available'),
-      domains: z.array(z.string()).describe('List of domain names hosted on the IP address')
+      domains: z.array(z.string()).describe('List of domain names hosted on the IP address'),
+      providerData: providerDataSchema
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.getHostedDomains(ctx.input.ipAddress, ctx.input.page);
+    let result = parseResponse(
+      z
+        .object({
+          ip: z.string().min(1),
+          total_domains: z.number(),
+          page: z.number(),
+          per_page: z.number(),
+          total_pages: z.number(),
+          domains: z.array(z.string())
+        })
+        .passthrough(),
+      await client.getHostedDomains(ctx.input.ipAddress, ctx.input.page),
+      'hosted domain'
+    );
 
     let output = {
-      ip: result.ip || ctx.input.ipAddress,
-      totalDomains: result.total || 0,
-      currentPage: result.page || 1,
-      perPage: result.per_page || 0,
-      totalPages: result.total_pages || 0,
-      domains: result.domains || []
+      ip: result.ip,
+      totalDomains: result.total_domains,
+      currentPage: result.page,
+      perPage: result.per_page,
+      totalPages: result.total_pages,
+      domains: result.domains,
+      providerData: result
     };
 
     let paginationStr =

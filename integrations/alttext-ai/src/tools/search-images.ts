@@ -1,12 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { imageSummarySchema, mapImage } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchImages = SlateTool.create(spec, {
   name: 'Search Images',
   key: 'search_images',
-  description: `Search for images in your AltText.ai library by keyword. Matches against alt text and image metadata. Use this to find specific images or check if alt text contains certain terms.`,
+  description:
+    'Search the image library by exact asset ID, URL substring, or alt text. HTTP and HTTPS queries search source URLs; other queries first try an exact asset ID, then fall back to alt-text search.',
   tags: {
     destructive: false,
     readOnly: true
@@ -14,28 +16,23 @@ export let searchImages = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      query: z.string().describe('Search query to match against alt text and metadata'),
+      query: z
+        .string()
+        .describe(
+          'Exact asset ID, HTTP or HTTPS URL substring, or alt-text search expression'
+        ),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       perPage: z.number().optional().describe('Number of results per page')
     })
   )
   .output(
     z.object({
-      images: z
-        .array(
-          z.object({
-            imageAssetId: z.string().describe('Unique identifier for the image'),
-            imageUrl: z.string().describe('URL of the image'),
-            altText: z.string().describe('Generated alt text'),
-            lang: z.string().describe('Language of the alt text'),
-            status: z.string().describe('Processing status'),
-            createdAt: z.string().describe('When the image was processed')
-          })
-        )
-        .describe('Matching images'),
+      images: z.array(imageSummarySchema).describe('Image results'),
       page: z.number().describe('Current page number'),
       perPage: z.number().describe('Number of results per page'),
-      total: z.number().describe('Total number of matching images')
+      total: z.number().describe('Total number of matching images'),
+      totalPages: z.number().optional().describe('Total result pages'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,21 +44,16 @@ export let searchImages = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let images = result.images.map(img => ({
-      imageAssetId: img.asset_id,
-      imageUrl: img.url,
-      altText: img.alt_text,
-      lang: img.lang,
-      status: img.status,
-      createdAt: img.created_at
-    }));
+    let images = result.images.map(mapImage);
 
     return {
       output: {
         images,
         page: result.page,
         perPage: result.per_page,
-        total: result.total
+        total: result.total,
+        totalPages: result.total_pages,
+        raw: result.raw
       },
       message: `Found **${result.total}** images matching "${ctx.input.query}" (showing ${images.length} on page ${result.page}).`
     };

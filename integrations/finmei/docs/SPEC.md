@@ -1,57 +1,55 @@
-Now let me check the Finmei features page and see if there's more detail about webhooks.Now I have a good understanding of Finmei. Let me also check if there's webhook support mentioned anywhere specific.Based on the review finding that mentions webhooks support, and the Postman API documentation, I now have enough information to write the specification.
+# Finmei integration
 
-# Slates Specification for Finmei
+## Official sources
 
-## Overview
+The Finmei homepage links to the provider-maintained [Public API reference](https://documenter.getpostman.com/view/835227/2s9YXh5NRs). Its published [Postman collection](https://documenter.gw.postman.com/api/collections/835227/2s9YXh5NRs?versionTag=latest) was reviewed on 2026-10-15. [Product features](https://finmei.com/features) and [pricing](https://finmei.com/pricing) describe API access and webhook availability; they do not specify webhook events, registration, signatures, or callback contracts.
 
-Finmei is an invoicing and expense management platform for freelancers and small businesses. It simplifies billing, invoice management, and expense tracking. It supports over 180 currencies and offers customizable invoice templates with branding options.
+## Connection
 
-## Authentication
+Requests use `https://app.finmei.com/api` and Bearer authentication. Generate an API token under Settings → Integrations. Each token accesses one business. There is no OAuth flow, connection configuration, or user-entered business ID. Auth validation and `get_profile` read the business-scoped `data` envelope from `GET /profile`; business ID/title identify both company and individual businesses.
 
-Finmei uses API key (Bearer token) authentication.
+The client applies a 30-second timeout, structured service errors, response-body-aware validation detail extraction, credential scrubbing, encoded resource IDs, and runtime pagination validation. Existing structured service errors retain their identity. HTTP status and provider validation messages remain available. Error parents do not retain the original credential-bearing upstream exception.
 
-To get your authorization token, go to https://app.finmei.com, login and select Settings → Integrations. On this page you can generate your API tokens.
+## Documented tools
 
-The token will be shown only once. Each API token is assigned to a specific business and can't be used to retrieve information about other businesses in the same account.
+| Tool | API route and behavior |
+| --- | --- |
+| `create_invoice` | `POST /invoices`; translates invoice date, buyer company/individual identity, seller fields, payment options, and line items to documented field names. Requires type, invoiceDate, series, currency, buyer details, products and units at invocation time; schemas retain previous optionality. |
+| `update_invoice` | `PUT /invoices/{id}`; the reference requires the same complete fields as creation. Read the current invoice before replacing it; supply payment options, seller details, notes and other optional fields that must remain. |
+| `get_invoice` | `GET /invoices/{id}`; returns ID, invoice number, payment state, total, currency, share link, and unchanged invoice data. |
+| `list_invoices` | `GET /invoices`; reads `data` plus `meta.current_page`, `last_page`, and `total`. Maps `invoice_number`, `payment_status`, `invoice_date`, `pay_until_date`, and `total_incl_vat`. The optional amount-due field is populated only from an actual `amount_due` value; a document total is exposed separately. |
+| `delete_invoice` | `DELETE /invoices/{id}`; the documented success response has no body. HTTP failure prevents a success result. |
+| `download_invoice` | `GET /invoices/{id}/download`; prepares an authenticated downloadable PDF after retrieving the invoice. |
+| `manage_expense` create | `POST /expenses`; multipart receipt upload with documented `file`, `date`, `total`, `currency`, and `seller` fields. Existing amount and sellerName inputs map to total and seller. The additive file input carries base64 content, filename, and optional MIME type. |
+| `manage_expense` update | `PUT /expenses/{id}`; supplies date, total, currency, and seller. |
+| `manage_expense` update_file | `POST /expenses/{id}/file`; replaces only the multipart receipt file. |
+| `list_expenses` | `GET /expenses`; maps total and seller, and preserves the provider pagination envelope. |
+| `get_expense` | `GET /expenses/{id}`; returns expense ID, total, date, currency, seller and unchanged expense data. |
+| `download_expense_file` | `GET /expenses/{id}/download`; prepares the original authenticated PDF/image receipt after retrieving the expense. |
+| `get_profile` | `GET /profile`; reads business_id, business_title, business_type and company_name. Raw profile fields retain the individual/company distinctions. |
 
-The token is passed as a Bearer token in the `Authorization` header:
+Invoice creation uses saved seller information by default. Supply custom seller information with useDefaultSellerInfo=false. Buyer type is company or individual; the corresponding company name or first/last names are required by the API. Optional payment instructions support bank and other options. Provider-side validation remains authoritative for conditional VAT rules and business identity.
 
-```
-Authorization: Bearer {api_token}
-```
+The list examples use 50 records per page and return pagination metadata. Existing perPage inputs remain available and forwarded, but the reference does not document configurable page size or the prior claimed default/maximum. Runtime page/size/limit values must be positive integers, while offsets must be nonnegative integers.
 
-The API base URL is `https://app.finmei.com/api`.
+Download tools return metadata and downloadable files rather than file contents or credentials. Stable authenticated download routes do not need expiring-URL refresh. A successful tool invocation alone does not prove a deployed download can be fetched.
 
-## Features
+## Retained routes without current detailed contracts
 
-### Invoice Management
+The current official collection contains only invoices, expenses, and profile. The following existing routes and public contracts remain unchanged in purpose; availability, filtering, required fields, and exact response shapes could not be independently confirmed:
 
-Create, list, and delete invoices. Finmei supports templates, visual customization, support for multiple currencies, and flexible sharing options. Invoices can be shared via unique URLs or email. Recurring invoices can be configured to automatically bill on a regular schedule.
+| Existing tools | Retained routes |
+| --- | --- |
+| `list_customers`, `manage_customer` | `GET /customers`, `PUT/DELETE /customers/{id}` |
+| `list_products`, `get_product`, `manage_product` | `GET/POST /products`, `GET/PUT/DELETE /products/{id}` |
+| `list_payments`, `manage_payment` | `GET/POST /payments`, `GET/DELETE /payments/{id}` |
+| `list_currencies` | `GET /currencies` |
+| `manage_expense` delete | `DELETE /expenses/{id}` |
 
-### Customer Management
+No speculative customer, product, payment or currency endpoints were added. Existing legacy description/category expense inputs and buyer city/state/country/postal-code inputs remain forwarded for compatibility, but they are absent from the current reference and acceptance is not confirmed. No claim is made that their presence creates supported provider features. Trigger implementation is deferred because the public sources omit the required webhook contract.
 
-Delete a specific customer by their ID, list customers with optional filters and pagination, and update existing customer details. Everything you need to know about your customers is available in one dashboard.
+## Output and verification policy
 
-### Product Catalog
+All existing keys, scalar types, enum members, requiredness and raw fields remain. The expense action enum gains update and update_file; new input/output fields are additive and optional on existing tools. Required malformed list/entity/ID responses fail with a structured service error instead of becoming empty lists or invented IDs. Optional typed fields omit provider null or absent values; complete provider data remains in existing raw fields or additive rawResponse fields. No nullable output union was introduced. Provider Unix-second timestamps become ISO strings to preserve the original string output types.
 
-Manage a product catalog by retrieving, creating, updating, and deleting products. Products can be referenced when creating invoices.
-
-### Payment Tracking
-
-Record, list, retrieve, and delete payments associated with invoices. Keep an eye on both paid and unpaid invoices.
-
-### Expense Management
-
-Finmei makes it easy to record and store all your expenses on one platform. Enter key details about each expense, like the date, price, and seller's name. You can upload a PDF or image of your receipt with all the details.
-
-### Currency Support
-
-List all currencies supported by Finmei. The platform supports over 180 currencies.
-
-### Profile
-
-Retrieve the authenticated user's profile information via the `/api/profile` endpoint.
-
-## Events
-
-Finmei integrates API access, Webhooks and Zapier, indicating webhook support is available. However, detailed documentation on specific webhook event types, configuration, and payload formats is not publicly documented in the available API reference. Based on the nature of the platform, webhooks likely cover invoice and payment lifecycle events, but the exact event categories and configuration options cannot be confirmed from available documentation.
+The local refresh runs a filtered package build, package typecheck, scoped Biome check, diff check, and recursive comparison of every existing input/output schema against the saved baseline. It performs no live provider calls, live E2E, evals, invoice mutations, receipt uploads, or download fetches. Runtime acceptance and deployed file delivery remain unverified.

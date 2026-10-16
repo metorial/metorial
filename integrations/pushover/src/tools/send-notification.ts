@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, getBase64ByteLength, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PushoverClient } from '../lib/client';
 import { spec } from '../spec';
@@ -17,7 +17,7 @@ export let sendNotification = SlateTool.create(spec, {
     'Title is limited to 250 characters.',
     'URL is limited to 512 characters, URL title to 100 characters.',
     'Image attachments are limited to 5 MB.',
-    'Application is limited to 10,000 messages per month (25,000 for team apps).'
+    'The account shares a free monthly quota of 10,000 messages (25,000 for Teams); purchased capacity may increase this.'
   ],
   tags: {
     destructive: false,
@@ -30,7 +30,9 @@ export let sendNotification = SlateTool.create(spec, {
       recipientKey: z
         .string()
         .optional()
-        .describe('User key or group key to send to. Defaults to the authenticated user key.'),
+        .describe(
+          'User key, group key, or up to 50 comma-separated user keys. Defaults to the authenticated key. Call list_groups to discover owned groups.'
+        ),
       title: z
         .string()
         .optional()
@@ -38,7 +40,9 @@ export let sendNotification = SlateTool.create(spec, {
       device: z
         .string()
         .optional()
-        .describe('Target device name to send to a specific device instead of all devices'),
+        .describe(
+          'One device name or comma-separated device names. Ignored for multiple users and non-Team groups; an invalid device name for a single user falls back to all devices.'
+        ),
       priority: z
         .number()
         .min(-2)
@@ -75,9 +79,7 @@ export let sendNotification = SlateTool.create(spec, {
       ttl: z
         .number()
         .optional()
-        .describe(
-          'Time to live in seconds — notification is auto-deleted after this duration'
-        ),
+        .describe('Positive time to live in seconds. Ignored for emergency priority (2).'),
       retry: z
         .number()
         .min(30)
@@ -126,6 +128,75 @@ export let sendNotification = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    for (let [field, value] of [
+      ['priority', ctx.input.priority],
+      ['timestamp', ctx.input.timestamp],
+      ['ttl', ctx.input.ttl],
+      ['retry', ctx.input.retry],
+      ['expire', ctx.input.expire]
+    ] as const) {
+      if (value !== undefined && !Number.isInteger(value)) {
+        throw createApiServiceError(`${field} must be an integer.`);
+      }
+    }
+    if (
+      (ctx.input.ttl !== undefined && ctx.input.ttl <= 0) ||
+      (ctx.input.expire !== undefined && ctx.input.expire <= 0)
+    ) {
+      throw createApiServiceError('ttl and expire must be positive numbers of seconds.');
+    }
+    if (ctx.input.html && ctx.input.monospace) {
+      throw createApiServiceError('Choose either html or monospace formatting, not both.');
+    }
+    if (
+      ctx.input.priority === 2 &&
+      (ctx.input.retry === undefined || ctx.input.expire === undefined)
+    ) {
+      throw createApiServiceError('Emergency priority requires retry and expire values.');
+    }
+    if (
+      ctx.input.priority !== 2 &&
+      [ctx.input.retry, ctx.input.expire, ctx.input.callbackUrl, ctx.input.tags].some(
+        value => value !== undefined
+      )
+    ) {
+      throw createApiServiceError('retry, expire, callbackUrl, and tags require priority 2.');
+    }
+    for (let [field, value, limit] of [
+      ['message', ctx.input.message, 1024],
+      ['title', ctx.input.title, 250],
+      ['url', ctx.input.url, 512],
+      ['urlTitle', ctx.input.urlTitle, 100]
+    ] as const) {
+      if (value !== undefined && Array.from(value).length > limit) {
+        throw createApiServiceError(`${field} must not exceed ${limit} characters.`);
+      }
+    }
+    if (ctx.input.message.length === 0) {
+      throw createApiServiceError('message must not be empty.');
+    }
+    let recipients = (ctx.input.recipientKey ?? ctx.auth.userKey).split(',');
+    if (recipients.length > 50 || recipients.some(key => !/^[A-Za-z0-9]{30}$/.test(key))) {
+      throw createApiServiceError(
+        'Provide one user/group key or at most 50 comma-separated 30-character user keys without spaces.'
+      );
+    }
+    if (ctx.input.attachmentBase64 !== undefined) {
+      if (!ctx.input.attachmentType) {
+        throw createApiServiceError('attachmentType is required with attachmentBase64.');
+      }
+      if (getBase64ByteLength(ctx.input.attachmentBase64) > 5_242_880) {
+        throw createApiServiceError('The image must not exceed 5,242,880 bytes.');
+      }
+    } else if (ctx.input.attachmentType !== undefined) {
+      throw createApiServiceError('Provide attachmentBase64 when setting attachmentType.');
+    }
+    if (ctx.input.callbackUrl !== undefined && !/^https?:\/\//i.test(ctx.input.callbackUrl)) {
+      throw createApiServiceError(
+        'callbackUrl must be a publicly accessible HTTP or HTTPS URL.'
+      );
+    }
+
     let client = new PushoverClient({
       token: ctx.auth.token,
       userKey: ctx.auth.userKey

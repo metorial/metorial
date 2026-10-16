@@ -66,9 +66,11 @@ export let scrubPhone = SlateTool.create(spec, {
       let phoneType =
         result.iscell === 'Y'
           ? 'Mobile'
-          : result.iscell === 'N'
-            ? 'Landline'
-            : result.iscell || undefined;
+          : result.iscell === 'V'
+            ? 'VoIP'
+            : result.iscell === 'N'
+              ? 'Landline'
+              : result.iscell || undefined;
 
       return {
         output: {

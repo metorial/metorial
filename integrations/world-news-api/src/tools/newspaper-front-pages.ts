@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, quotaSchema } from '../lib/client';
+import { validateWebsiteUrl } from '../lib/privacy';
 import { spec } from '../spec';
 
 export let newspaperFrontPagesTool = SlateTool.create(spec, {
@@ -30,6 +31,7 @@ export let newspaperFrontPagesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      quota: quotaSchema.optional().describe('API point usage, when returned by the provider'),
       publicationName: z.string().describe('Name of the newspaper'),
       date: z.string().describe('Date of the front page'),
       language: z.string().describe('Language of the publication'),
@@ -47,16 +49,19 @@ export let newspaperFrontPagesTool = SlateTool.create(spec, {
     });
 
     let fp = result.front_page;
+    validateWebsiteUrl(fp.image, ctx.auth.token);
+    await ctx.addAttachment({ type: 'url', url: fp.image });
 
     return {
       output: {
+        ...(result.quota ? { quota: result.quota } : {}),
         publicationName: fp.name,
         date: fp.date,
         language: fp.language,
         country: fp.country,
         imageUrl: fp.image
       },
-      message: `Retrieved front page for **${fp.name}** (${fp.country}) on ${fp.date}. [View image](${fp.image})`
+      message: `Prepared the front page image for **${fp.name}** (${fp.country}) on ${fp.date}. [View image](${fp.image})`
     };
   })
   .build();

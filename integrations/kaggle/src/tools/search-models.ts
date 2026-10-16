@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleList, kaggleRecord, kaggleSummary } from '../lib/responses';
 import { spec } from '../spec';
 
 let modelSchema = z
@@ -67,8 +68,13 @@ export let searchModels = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let models = result?.models ?? result ?? [];
-    let nextPageToken = result?.nextPageToken;
+    let models = kaggleList(result, ['models'], 'models').map(item =>
+      kaggleSummary(item, 'model')
+    );
+    let nextPageToken = Array.isArray(result)
+      ? undefined
+      : kaggleRecord(result, 'models').nextPageToken;
+    if (nextPageToken === null) nextPageToken = undefined;
 
     return {
       output: { models, nextPageToken },

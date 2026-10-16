@@ -1,54 +1,48 @@
-Let me get more details from the API docs on GitHub.Now let me check the v1 API docs for more details on booking and authentication.Now I have enough information to write the specification. Let me compile what I've found.
+# Headout API Specification
 
-# Slates Specification for Headout
+The Headout partner API supports catalog discovery, inventory, booking creation and capture, and asynchronous cancellation and reschedule requests. Official reference: [Headout API](https://developers.headout.com/docs/api/).
 
-## Overview
+## Authentication and environments
 
-Headout is an online marketplace for booking tours, activities, attractions, and experiences in cities worldwide. It enables travelers to explore and book tours, activities, events, and local experiences. Founded in 2014 with headquarters in New York, the platform offers experiences across destinations including New York, Dubai, Paris, London, Rome, and many others.
+All requests use HTTPS and the `Headout-Auth` API-key header. Obtain keys through the Headout partner program. Production keys use the `pk_` prefix and testing keys use `tk_`; use each in its matching environment.
 
-## Authentication
+- Production: `https://www.headout.com`
+- Sandbox: `https://sandbox.api.dev-headout.com`
 
-Headout uses API key-based authentication. Auth keys are provided by Headout via email to approved partners. To obtain an API key, contact partnerships@headout.com or apikey@headout.com.
+The connection stores the API key. Configuration selects the environment, default language, and optional pricing currency. The API does not document a current-user/profile endpoint or OAuth flow.
 
-The API key is passed as a custom HTTP header called `Headout-Auth` on every request:
+## Tools and requests
 
-```
-Headout-Auth: <YOUR_API_KEY>
-```
+| Tool | Endpoint | Behavior |
+| --- | --- | --- |
+| `list_cities` | `GET /api/public/v1/city` | Discover city codes with offset/limit pagination. |
+| `search_products` | `GET /api/public/v2/products` | Search by required city and optional category, subcategory, collection, campaign, language, currency, offset and limit. |
+| `get_product` | `GET /api/public/v1/product/get/{productId}` | Read content, variants, required booking fields, and policies; supports `fetch-variants`, language and currency. |
+| `list_categories` | `GET /api/public/v2/categories` and optionally `/subcategories` | Discover category and subcategory IDs and their relationship. |
+| `list_collections` | `GET /api/public/v2/collections` | Discover collections with offset/limit pagination. |
+| `get_inventory` | `GET /api/public/v1/inventory/list-by/variant` | Read variant slots and per-person/group pricing; optional date range, currency, offset and limit. |
+| `create_booking` | `POST /api/public/v1/booking` | Create an `UNCAPTURED` booking, optionally capturing immediately. Include the parent `productId`, variant, inventory, customers, and expected total price/currency. |
+| `get_booking` | `GET /api/public/v1/booking` or `/booking/{id}` | List bookings or read one booking, including status, customers, voucher and tickets. |
+| `capture_booking` | `PUT /api/public/v1/booking/{id}` | Set status to `PENDING` and optionally assign a partner reference. |
+| `cancel_booking` | `POST /api/public/v2/bookings/{bookingId}/cancel/` | Submit a cancellation reason and optional comment. |
+| `reschedule_booking` | `POST /api/public/v2/bookings/{bookingId}/reschedule/` | Submit new local start/end times and an optional comment. |
 
-The auth keys are primarily required for booking APIs; other APIs can technically be used without auth, though it is strongly recommended to include the key on all calls. Headout provides both a test key (for internal testing) and a production key. All bookings made through the production key are treated as official bookings.
+## Booking flow
 
-There are no OAuth flows, scopes, or additional credentials required. The API key alone is sufficient for all operations.
+1. Discover a product and read its variant input fields. Collect fields at the documented primary-customer or all-customer level, including any required location choice IDs.
+2. Refresh inventory and pricing immediately before booking. Inventory IDs are specific to a date/time slot and differ from product and variant IDs.
+3. Create the booking with customer details and expected total price/currency. The primary customer needs the product-required name, email, phone, and other fields.
+4. Capture an `UNCAPTURED` booking within one hour. `PENDING` starts fulfillment; it does not mean tickets are ready. If automatic capture fails, use the returned booking ID in the error to check the existing booking before retrying.
+5. Use `get_booking` until a final status is available. Voucher links remain in the booking response; PDF ticket URLs are provided as downloadable files when returned by Headout.
 
-## Features
+Cancellation and reschedule acknowledgements confirm submission only. Headout processes these requests asynchronously and applies ownership, policy, and availability checks. A rejected acknowledgement is reported as a failure. Poll `get_booking` to confirm the final outcome.
 
-### Product Discovery
+## Response compatibility
 
-Retrieve a catalog of Headout products (tours, tickets, experiences) available in a given city. Products can be filtered by city code (e.g., `NEW_YORK`, `DUBAI`), collection, category, subcategory, campaign name, language, and currency. The order of products in the response is determined by best-selling and trending patterns.
+Existing tool names and input types remain stable. `productId` is an additive optional input on `create_booking` for compatibility with existing v1 calls; include it for new requests. Price fields remain optional for compatibility, but Headout recommends always sending the price object; supplied amount and currency must be paired, with the configured default currency available as a fallback.
 
-### Product Details
+Normalized outputs retain stable IDs and existing field types. Full provider responses are included alongside normalized product, inventory, booking, and listing data, preserving policies and additional fields. Nullable provider fields are omitted from normalized optional fields. Input-field choice IDs remain strings, including IDs for predefined pickup locations; complete location labels and constraints remain in the full product response. Booking creation timestamps are Unix seconds.
 
-Retrieve full details of a specific product, including images, text descriptions, FAQs, reviews, and variant information. Each product can have multiple variants (e.g., "Skip the Line", "General Admission"), each with its own pricing type, inventory, and required input fields for checkout.
+## Other documented capabilities
 
-### Collections, Categories, and Subcategories
-
-Access curated collections of experiences organized by city and language. Products are organized into categories (e.g., "Tickets") and subcategories (e.g., "Landmarks"), which can be browsed and used as filters.
-
-### Inventory and Pricing
-
-Fetch real-time inventory and pricing for a specific product variant. Inventory data includes available dates, times, and remaining capacity. Inventory can be per-person (with ticket types like Adult, Child) or per-group (bulk tickets of a single type); approximately 95% of products use per-person pricing. Inventory is volatile and should be refreshed frequently to ensure accurate pricing and availability.
-
-### Booking
-
-The booking process is a two-step flow: the first step confirms that Headout can fulfill the booking, and the second step confirms that the user has been charged and triggers post-purchase steps. Required input for a booking includes the selected product variant, inventory (date/time), passenger count, and customer details. Email, full name, and phone number are mandatory fields for the primary user.
-
-- Bookings can fail if the inventory has become stale between the time it was fetched and the booking attempt.
-- Cancellation is not currently supported via the API; cancellation requests are handled by Headout's support team.
-
-### Localization
-
-Product data, collections, categories, and URLs are available in multiple languages (EN, ES, FR, IT, DE, PT, NL) and can be returned in different currencies, enabling localized experiences for end users.
-
-## Events
-
-The provider does not support events. Based on the available documentation, Headout's API does not offer webhooks, event subscriptions, or purpose-built polling mechanisms for receiving real-time notifications about changes to products, inventory, or bookings.
+The provider also documents v2 booking/catalog alternatives, normal/seatmap date availability, seat selection, and booking-status webhook configuration. This integration exposes no triggers. Webhook delivery and registration require separate lifecycle and callback verification. Pagination returns an optional next offset; a null provider offset marks the final page.

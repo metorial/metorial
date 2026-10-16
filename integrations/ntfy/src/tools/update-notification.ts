@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,12 +6,13 @@ import { spec } from '../spec';
 export let updateNotification = SlateTool.create(spec, {
   name: 'Update Notification',
   key: 'update_notification',
-  description: `Update, clear, or delete a previously published notification by referencing its message ID. Use this to replace a notification's content, dismiss it from the notification drawer, or remove it entirely.`,
+  description: `Update, clear, or delete a previously published notification using the first message ID or its stable sequence ID. Use this to replace a notification's content, dismiss it from the notification drawer, or remove it entirely.`,
   instructions: [
     'Use action "update" to replace the content of an existing notification with new message/title/priority/tags.',
     'Use action "clear" to mark the notification as read and dismiss it from the notification drawer.',
     'Use action "delete" to completely remove the notification from clients.',
-    'The original message ID is required for all operations.'
+    'Pass the sequenceId used when publishing, or the first messageId if no sequence ID was set. Keep using that same identifier across later updates.',
+    'Only update accepts message, title, priority, tags, and markdown. Clear and delete do not replace notification content.'
   ],
   tags: {
     destructive: true,
@@ -21,7 +22,11 @@ export let updateNotification = SlateTool.create(spec, {
   .input(
     z.object({
       topic: z.string().describe('Topic the original message was published to'),
-      messageId: z.string().describe('ID of the original message to update, clear, or delete'),
+      messageId: z
+        .string()
+        .describe(
+          'First message ID, or the sequenceId used when publishing; reuse this identifier across all updates, clears, and deletes'
+        ),
       action: z
         .enum(['update', 'clear', 'delete'])
         .describe(
@@ -47,10 +52,28 @@ export let updateNotification = SlateTool.create(spec, {
       messageId: z.string().describe('ID of the published update message'),
       time: z.number().describe('Unix timestamp of the update'),
       topic: z.string().describe('Topic the update was published to'),
-      event: z.string().describe('Event type of the response')
+      event: z.string().describe('Event type of the response'),
+      sequenceId: z
+        .string()
+        .optional()
+        .describe('Stable sequence identifier, when returned by the server')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.action !== 'update' &&
+      [
+        ctx.input.message,
+        ctx.input.title,
+        ctx.input.priority,
+        ctx.input.tags,
+        ctx.input.markdown
+      ].some(value => value !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Message, title, priority, tags, and markdown are only supported for the update action.'
+      );
+    }
     let client = new Client({
       serverUrl: ctx.config.serverUrl,
       auth: ctx.auth
@@ -90,8 +113,9 @@ export let updateNotification = SlateTool.create(spec, {
       output: {
         messageId: result.messageId,
         time: result.time,
-        topic: ctx.input.topic,
-        event: eventType
+        topic: result.topic,
+        event: result.event,
+        sequenceId: result.sequenceId
       },
       message: `${actionLabel} notification \`${ctx.input.messageId}\` in topic **${ctx.input.topic}**.`
     };

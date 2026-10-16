@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyControlClient } from '../lib/control-client';
+import { appIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageKeys = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ Keys can be created with channel-specific capabilities, allowing fine-grained ac
   instructions: [
     'Requires Control API Token authentication.',
     'App ID is required for all operations (from config or input).',
-    'Capabilities map channel names/patterns to arrays of operations: publish, subscribe, presence, history, push-subscribe, push-admin, channel-metadata, statistics.'
+    'Capabilities map channel names/patterns to arrays of operations: publish, subscribe, presence, history, push-subscribe, push-admin, channel-metadata, stats. Grant stats on the wildcard resource "*", for example {"*":["stats"]}.'
   ],
   tags: {
     destructive: false,
@@ -21,11 +22,17 @@ Keys can be created with channel-specific capabilities, allowing fine-grained ac
   .input(
     z.object({
       action: z.enum(['list', 'create', 'update', 'revoke']).describe('Operation to perform'),
-      appId: z.string().optional().describe('App ID. Overrides config value if provided.'),
+      appId: appIdInput,
       keyId: z
         .string()
         .optional()
         .describe('Key ID. Required for update and revoke operations.'),
+      revocableTokens: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether tokens issued by this key can be individually revoked. Used by create and update.'
+        ),
       name: z
         .string()
         .optional()
@@ -46,9 +53,12 @@ Keys can be created with channel-specific capabilities, allowing fine-grained ac
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyControlClient(ctx.auth.token);
+    let client = new AblyControlClient(ctx.auth.token, ctx.auth.authType);
     let appId = ctx.input.appId || ctx.config.appId;
-    if (!appId) throw new Error('appId is required. Set it in config or input.');
+    if (!appId)
+      throw createApiServiceError(
+        'appId is required. Call manage_apps with action list to discover an app ID, then supply appId.'
+      );
 
     if (ctx.input.action === 'list') {
       let keys = await client.listKeys(appId);
@@ -59,11 +69,13 @@ Keys can be created with channel-specific capabilities, allowing fine-grained ac
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a key.');
-      if (!ctx.input.capability) throw new Error('capability is required for creating a key.');
+      if (!ctx.input.name) throw createApiServiceError('name is required for creating a key.');
+      if (!ctx.input.capability)
+        throw createApiServiceError('capability is required for creating a key.');
       let key = await client.createKey(appId, {
         name: ctx.input.name,
-        capability: ctx.input.capability
+        capability: ctx.input.capability,
+        revocableTokens: ctx.input.revocableTokens
       });
       return {
         output: { key },
@@ -72,10 +84,12 @@ Keys can be created with channel-specific capabilities, allowing fine-grained ac
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.keyId) throw new Error('keyId is required for updating a key.');
+      if (!ctx.input.keyId)
+        throw createApiServiceError('keyId is required for updating a key.');
       let key = await client.updateKey(appId, ctx.input.keyId, {
         name: ctx.input.name,
-        capability: ctx.input.capability
+        capability: ctx.input.capability,
+        revocableTokens: ctx.input.revocableTokens
       });
       return {
         output: { key },
@@ -84,7 +98,8 @@ Keys can be created with channel-specific capabilities, allowing fine-grained ac
     }
 
     if (ctx.input.action === 'revoke') {
-      if (!ctx.input.keyId) throw new Error('keyId is required for revoking a key.');
+      if (!ctx.input.keyId)
+        throw createApiServiceError('keyId is required for revoking a key.');
       await client.revokeKey(appId, ctx.input.keyId);
       return {
         output: { revoked: true },
@@ -92,6 +107,6 @@ Keys can be created with channel-specific capabilities, allowing fine-grained ac
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

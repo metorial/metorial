@@ -1,13 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { OwlClient } from '../lib/client';
+import {
+  OwlClient,
+  owlObject,
+  owlString,
+  requireChainId,
+  requireInput,
+  requireMetadata,
+  requireOwlNumber,
+  requireOwlString
+} from '../lib/client';
+import { rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getToken = SlateTool.create(spec, {
   name: 'Get Token',
   key: 'get_token',
   description: `Retrieve details and metadata for a specific ERC721 token from a collection.
-Returns the token's on-chain data and associated metadata (name, description, image, attributes).`,
+Returns the project's token record and associated metadata (name, description, image, attributes).`,
   tags: {
     destructive: false,
     readOnly: true
@@ -22,6 +32,7 @@ Returns the token's on-chain data and associated metadata (name, description, im
   )
   .output(
     z.object({
+      raw: rawSchema,
       chainId: z.number().optional().describe('Chain ID'),
       contractAddress: z.string().optional().describe('Contract address'),
       tokenId: z.string().optional().describe('Token ID'),
@@ -35,10 +46,9 @@ Returns the token's on-chain data and associated metadata (name, description, im
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let chainId = ctx.input.chainId ?? ctx.config.chainId;
-    if (!chainId) {
-      throw new Error('chainId is required.');
-    }
+    let chainId = requireChainId(ctx.input.chainId ?? ctx.config.chainId);
+    requireInput(ctx.input.contractAddress, 'contractAddress');
+    requireInput(ctx.input.tokenId, 'tokenId');
 
     let result = await client.getProjectToken({
       chainId,
@@ -48,11 +58,12 @@ Returns the token's on-chain data and associated metadata (name, description, im
 
     return {
       output: {
-        chainId: result.chainId ?? chainId,
-        contractAddress: result.address ?? ctx.input.contractAddress,
-        tokenId: result.tokenId ?? ctx.input.tokenId,
-        metadata: result.metadata,
-        owner: result.owner
+        raw: result,
+        chainId: requireOwlNumber(result.chainId, 'token chain ID'),
+        contractAddress: requireOwlString(result.address, 'token contract address'),
+        tokenId: requireOwlString(result.tokenId, 'token ID'),
+        metadata: owlObject(result.metadata),
+        owner: owlString(result.owner)
       },
       message: `Retrieved token **#${ctx.input.tokenId}** from collection \`${ctx.input.contractAddress}\` on chain ${chainId}.`
     };
@@ -94,6 +105,7 @@ Use this to change a token's name, description, image, or attributes after minti
   )
   .output(
     z.object({
+      raw: rawSchema,
       chainId: z.number().optional().describe('Chain ID'),
       contractAddress: z.string().optional().describe('Contract address'),
       tokenId: z.string().optional().describe('Token ID'),
@@ -103,10 +115,9 @@ Use this to change a token's name, description, image, or attributes after minti
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let chainId = ctx.input.chainId ?? ctx.config.chainId;
-    if (!chainId) {
-      throw new Error('chainId is required.');
-    }
+    let chainId = requireChainId(ctx.input.chainId ?? ctx.config.chainId);
+    requireInput(ctx.input.contractAddress, 'contractAddress');
+    requireInput(ctx.input.tokenId, 'tokenId');
 
     ctx.info({
       message: 'Updating token metadata',
@@ -114,6 +125,7 @@ Use this to change a token's name, description, image, or attributes after minti
       tokenId: ctx.input.tokenId
     });
 
+    requireMetadata(ctx.input.metadata);
     let result = await client.patchProjectToken({
       chainId,
       contractAddress: ctx.input.contractAddress,
@@ -123,10 +135,11 @@ Use this to change a token's name, description, image, or attributes after minti
 
     return {
       output: {
-        chainId: result.chainId ?? chainId,
-        contractAddress: result.address ?? ctx.input.contractAddress,
-        tokenId: result.tokenId ?? ctx.input.tokenId,
-        metadata: result.metadata
+        raw: result,
+        chainId: requireOwlNumber(result.chainId, 'token chain ID'),
+        contractAddress: requireOwlString(result.address, 'token contract address'),
+        tokenId: requireOwlString(result.tokenId, 'token ID'),
+        metadata: owlObject(result.metadata)
       },
       message: `Updated metadata for token **#${ctx.input.tokenId}** in collection \`${ctx.input.contractAddress}\`.`
     };

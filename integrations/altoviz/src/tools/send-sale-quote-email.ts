@@ -13,7 +13,11 @@ export let sendSaleQuoteEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      quoteId: z.number().describe('Altoviz quote ID to send')
+      quoteId: z.number().describe('Altoviz quote ID to send'),
+      recipients: z
+        .array(z.string())
+        .optional()
+        .describe('Recipient email addresses; omit to use the provider default')
     })
   )
   .output(
@@ -24,7 +28,7 @@ export let sendSaleQuoteEmail = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.sendSaleQuoteByEmail(ctx.input.quoteId);
+    await client.sendSaleQuoteByEmail(ctx.input.quoteId, ctx.input.recipients);
     return {
       output: { sent: true, quoteId: ctx.input.quoteId },
       message: `Quote **${ctx.input.quoteId}** sent by email.`

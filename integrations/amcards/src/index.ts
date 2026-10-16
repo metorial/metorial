@@ -2,9 +2,15 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   cancelCards,
+  createContact,
+  deleteContact,
+  getCard,
   getCards,
+  getContact,
   getContacts,
   getUser,
+  listCampaigns,
+  listQuicksendTemplates,
   listTemplates,
   scheduleDripCampaign,
   sendCard
@@ -19,7 +25,13 @@ export let provider = Slate.create({
     getContacts,
     getCards,
     getUser,
-    listTemplates
+    listTemplates,
+    createContact,
+    deleteContact,
+    getContact,
+    getCard,
+    listCampaigns,
+    listQuicksendTemplates
   ],
   triggers: []
 });

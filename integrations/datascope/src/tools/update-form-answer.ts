@@ -24,7 +24,7 @@ export let updateFormAnswer = SlateTool.create(spec, {
       subformIndex: z
         .number()
         .optional()
-        .describe('Index within a repeatable subform (0-based)')
+        .describe('Index within a repeatable subform (starts at 1)')
     })
   )
   .output(

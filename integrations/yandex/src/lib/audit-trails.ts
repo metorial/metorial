@@ -10,7 +10,7 @@ export let listTrails = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/audit-trails/v1/trails', { params });
   return response.data;
@@ -27,7 +27,7 @@ export let listEvents = async (
 ) => {
   let client = createServiceClient('https://auditlog.api.cloud.yandex.net', auth);
   let queryParams: Record<string, string | number> = { folderId };
-  if (params?.pageSize) queryParams.pageSize = params.pageSize;
+  if (params?.pageSize !== undefined) queryParams.pageSize = params.pageSize;
   if (params?.pageToken) queryParams.pageToken = params.pageToken;
   if (params?.filter) queryParams.filter = params.filter;
   let response = await client.get('/audit-log/v1/events', { params: queryParams });

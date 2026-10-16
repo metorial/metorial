@@ -8,6 +8,7 @@ export let checkCredits = SlateTool.create(spec, {
   key: 'check_credits',
   description: `Retrieve your current TPSCheck API credit usage, remaining credits, monthly limit, plan name, and credit reset date.
 Useful for monitoring usage and ensuring you don't run out of credits before your next billing cycle.`,
+  constraints: ['Checking your credit balance does not consume credits.'],
   tags: {
     readOnly: true
   }

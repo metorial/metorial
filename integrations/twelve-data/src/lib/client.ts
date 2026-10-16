@@ -1,11 +1,28 @@
-import { createAxios } from 'slates';
-
-let http = createAxios({
-  baseURL: 'https://api.twelvedata.com'
-});
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+import { invalidResponse, providerError } from './response';
 
 export class TwelveDataClient {
   constructor(private token: string) {}
+
+  private http = createAuthenticatedAxios({
+    baseURL: 'https://api.twelvedata.com',
+    timeout: 30000,
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'Twelve Data',
+        reason: 'twelve_data_request_failed',
+        extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+        extractUpstreamCode: (_error, response) =>
+          isApiErrorRecord(response?.data) && typeof response.data.code !== 'undefined'
+            ? String(response.data.code)
+            : undefined
+      })
+  });
 
   private async get<T = any>(path: string, params: Record<string, any> = {}): Promise<T> {
     let cleanParams: Record<string, string> = {};
@@ -15,13 +32,19 @@ export class TwelveDataClient {
       }
     }
 
-    let response = await http.get(path, {
+    let response = await this.http.get(path, {
       params: {
         ...cleanParams,
         apikey: this.token
       }
     });
 
+    if (!isApiErrorRecord(response.data) && !Array.isArray(response.data)) {
+      throw invalidResponse('expected a JSON object or array');
+    }
+    if (isApiErrorRecord(response.data) && response.data.status === 'error') {
+      throw providerError(response.data);
+    }
     return response.data as T;
   }
 
@@ -56,7 +79,7 @@ export class TwelveDataClient {
       delimiter: params.delimiter,
       prepost: params.prepost,
       dp: params.dp,
-      order: params.order,
+      order: params.order?.toLowerCase(),
       timezone: params.timezone,
       start_date: params.startDate,
       end_date: params.endDate,
@@ -119,9 +142,11 @@ export class TwelveDataClient {
     type?: string;
     dp?: number;
     prepost?: boolean;
+    date?: string;
   }) {
     return this.get('/eod', {
       symbol: params.symbol,
+      date: params.date,
       exchange: params.exchange,
       mic_code: params.micCode,
       country: params.country,
@@ -442,6 +467,12 @@ export class TwelveDataClient {
     sd?: number;
   }) {
     let { indicator, ...rest } = params;
+    if (!/^[a-z][a-z0-9_]*$/.test(indicator)) {
+      throw createApiServiceError(
+        'Use a lowercase indicator endpoint key from list_technical_indicators.',
+        { reason: 'invalid_indicator' }
+      );
+    }
     return this.get(`/${indicator}`, {
       symbol: rest.symbol,
       interval: rest.interval,
@@ -479,6 +510,31 @@ export class TwelveDataClient {
     return this.get('/exchanges', params || {});
   }
 
+  async getApiUsage(timezone?: string) {
+    return this.get('/api_usage', { timezone });
+  }
+
+  async getMarketState(params: { exchange?: string; code?: string; country?: string }) {
+    return this.get('/market_state', params);
+  }
+
+  async getTechnicalIndicators() {
+    return this.get('/technical_indicators');
+  }
+
+  async getFundData(params: {
+    fundType: 'etf' | 'mutual_fund';
+    symbol: string;
+    country?: string;
+    dp?: number;
+  }) {
+    return this.get(params.fundType === 'etf' ? '/etfs/world' : '/mutual_funds/world', {
+      symbol: params.symbol,
+      country: params.country,
+      dp: params.dp
+    });
+  }
+
   // Instrument Types
   async getInstrumentTypes() {
     return this.get('/instrument_type');
@@ -493,12 +549,29 @@ export class TwelveDataClient {
     type?: string;
     show_plan?: boolean;
   }) {
-    return this.get('/stocks', params || {});
+    return this.get('/stocks', {
+      symbol: params?.symbol,
+      exchange: params?.exchange,
+      mic_code: params?.micCode,
+      country: params?.country,
+      type: params?.type,
+      show_plan: params?.show_plan
+    });
   }
 
   // Earnings Calendar
-  async getEarningsCalendar(params?: { dp?: number; startDate?: string; endDate?: string }) {
+  async getEarningsCalendar(params?: {
+    dp?: number;
+    startDate?: string;
+    endDate?: string;
+    exchange?: string;
+    micCode?: string;
+    country?: string;
+  }) {
     return this.get('/earnings_calendar', {
+      exchange: params?.exchange,
+      mic_code: params?.micCode,
+      country: params?.country,
       dp: params?.dp,
       start_date: params?.startDate,
       end_date: params?.endDate

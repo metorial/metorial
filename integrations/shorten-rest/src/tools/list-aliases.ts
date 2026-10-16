@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let listAliases = SlateTool.create(spec, {
   name: 'List Short URLs',
   key: 'list_aliases',
-  description: `Lists all alias names for a given domain. Results are paginated; use the returned \`lastId\` value to fetch subsequent pages.`,
+  description: `Lists a page of alias names for a given domain, newest first. Use nextCursor to fetch subsequent pages.`,
   instructions: [
-    'To paginate, pass the lastId from the previous response as the cursor for the next request.'
+    'To paginate, pass nextCursor from the previous response as cursor for the next request.'
   ],
   tags: {
     destructive: false,
@@ -24,9 +24,14 @@ export let listAliases = SlateTool.create(spec, {
       cursor: z
         .string()
         .optional()
-        .describe(
-          'Pagination cursor from a previous response (the lastId value) to fetch the next page.'
-        )
+        .describe('nextCursor from a previous response to fetch the next page.'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Aliases per page, from 1 to 1000. Defaults to 1000.')
     })
   )
   .output(
@@ -43,7 +48,8 @@ export let listAliases = SlateTool.create(spec, {
 
     let result = await client.listAliases({
       domainName: ctx.input.domainName,
-      lastId: ctx.input.cursor
+      lastId: ctx.input.cursor,
+      limit: ctx.input.limit
     });
 
     return {

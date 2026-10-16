@@ -1,6 +1,10 @@
 # <img src="logo.jpeg" height="20"> Linkup
 
-Search the web using natural language queries and retrieve real-time content for AI grounding. Perform standard fast searches or deep iterative searches for comprehensive results. Get sourced answers with citations, raw search result chunks, or structured data extraction following a custom JSON schema. Filter results by date range, specific domains, and result count. Fetch and extract clean markdown content from individual web pages, optionally rendering JavaScript for dynamic sites. Check account credit balance.
+Search the web with sourced answers, raw results, or structured JSON. Retrieve webpage and PDF content as markdown, extract images and structured page data, and check account credit balance.
+
+For longer investigations, create a research task and use its returned ID to check progress and retrieve the completed report. List research tasks to discover earlier work and continue through their pagination metadata.
+
+Authenticate with a Linkup API key from your dashboard. Search, fetch, and research requests consume credits according to your account pricing.
 
 ## License
 

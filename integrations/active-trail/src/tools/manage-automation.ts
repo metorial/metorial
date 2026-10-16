@@ -1,6 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import {
+  ActiveTrailClient,
+  readList,
+  redactProviderData,
+  requireInteger
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let listAutomations = SlateTool.create(spec, {
@@ -26,11 +31,14 @@ export let listAutomations = SlateTool.create(spec, {
       page: ctx.input.page,
       limit: ctx.input.limit
     });
-    let automations = Array.isArray(result) ? result : [];
-    return {
-      output: { automations },
-      message: `Found **${automations.length}** automation(s).`
-    };
+    let automations = readList(result);
+    return redactProviderData(
+      {
+        output: { automations },
+        message: `Found **${automations.length}** automation(s).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -50,17 +58,22 @@ export let getAutomation = SlateTool.create(spec, {
     z.object({
       automationId: z.number().describe('Automation ID'),
       details: z.any().describe('Automation details'),
+      automation: z
+        .any()
+        .optional()
+        .describe('Complete automation information including trigger IDs'),
       activation: z.any().optional().describe('Activation status'),
       design: z.any().optional().describe('Full flow design')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
-    let _automation = await client.getAutomation(ctx.input.automationId);
+    let automation = await client.getAutomation(ctx.input.automationId);
     let details = await client.getAutomationDetails(ctx.input.automationId);
     let activation = await client.getAutomationActivation(ctx.input.automationId);
     let output: Record<string, any> = {
       automationId: ctx.input.automationId,
+      automation,
       details,
       activation
     };
@@ -69,10 +82,13 @@ export let getAutomation = SlateTool.create(spec, {
       output.design = await client.getAutomationDesign(ctx.input.automationId);
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved automation **${ctx.input.automationId}**.`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved automation **${ctx.input.automationId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -97,15 +113,18 @@ export let toggleAutomation = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     await client.setAutomationActivation(ctx.input.automationId, {
-      is_active: ctx.input.isActive
+      is_published: ctx.input.isActive
     });
-    return {
-      output: {
-        automationId: ctx.input.automationId,
-        isActive: ctx.input.isActive
+    return redactProviderData(
+      {
+        output: {
+          automationId: ctx.input.automationId,
+          isActive: ctx.input.isActive
+        },
+        message: `Automation **${ctx.input.automationId}** ${ctx.input.isActive ? 'activated' : 'deactivated'}.`
       },
-      message: `Automation **${ctx.input.automationId}** ${ctx.input.isActive ? 'activated' : 'deactivated'}.`
-    };
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -127,12 +146,18 @@ export let deleteAutomation = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
+    if (!ctx.input.automationIds.length)
+      throw createApiServiceError('Provide at least one automation ID.');
+    ctx.input.automationIds.forEach(id => requireInteger(id, 'automationIds'));
     let ids = ctx.input.automationIds.join(',');
     await client.deleteAutomations(ids);
-    return {
-      output: { success: true },
-      message: `Deleted automation(s): **${ids}**.`
-    };
+    return redactProviderData(
+      {
+        output: { success: true },
+        message: `Deleted automation(s): **${ids}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -199,9 +224,12 @@ export let getAutomationReport = SlateTool.create(spec, {
       });
     }
 
-    return {
-      output: output as any,
-      message: `Retrieved report for automation **${automationId}**.`
-    };
+    return redactProviderData(
+      {
+        output: output as any,
+        message: `Retrieved report for automation **${automationId}**.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

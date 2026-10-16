@@ -1,6 +1,8 @@
 # Payhere
 
-Manage payment plans, subscriptions, customers, and refunds. Create and update one-off or recurring payment plans with configurable pricing, billing intervals, and setup fees. List and view payments, customer records, and subscription details. Cancel subscriptions and issue full or partial refunds. Retrieve company profile and statistics.
+Connect to [Payhere Payments Ltd](https://payhere.co) with a merchant API key.
+
+Manage payment plans, subscriptions, customers, and refunds. Create and update one-off or recurring payment plans with configurable pricing, billing intervals, and setup fees. List and view payments, customer records, and subscription details. Cancel subscriptions and issue full or partial refunds. Retrieve company profile and statistics, subscription payment history, and the authenticated user.
 
 ## License
 

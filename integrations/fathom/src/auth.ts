@@ -1,16 +1,51 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  requestAxiosData,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { fathomApiError } from './lib/errors';
 
 let fathomAxios = createAxios({
-  baseURL: 'https://fathom.video/external/v1'
+  baseURL: 'https://api.fathom.ai/external/v1',
+  timeout: 30_000
 });
+
+let exchangeToken = async (
+  params: URLSearchParams,
+  secrets: string[],
+  previousRefreshToken?: string
+) => {
+  let data = await requestAxiosData(
+    previousRefreshToken ? 'token refresh' : 'token exchange',
+    () =>
+      fathomAxios.post('/oauth2/token', params.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }),
+    (error, operation) => fathomApiError(error, secrets, operation)
+  );
+  let token = normalizeOAuthTokenResponse(data, {
+    providerLabel: 'Fathom',
+    previousRefreshToken,
+    refreshTokenFallbackMode: 'falsy'
+  });
+  if (!token.token.trim() || !token.refreshToken?.trim()) {
+    throw createApiServiceError(
+      'Fathom did not return valid access and refresh tokens. Reconnect your account.'
+    );
+  }
+  return { ...token, authMethod: 'oauth' as const };
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      authMethod: z.enum(['api_key', 'oauth']).optional()
     })
   )
   .addOauth({
@@ -29,7 +64,6 @@ export let auth = SlateAuth.create()
         url: 'https://developers.fathom.ai/sdks/oauth'
       }
     ],
-
     scopes: [
       {
         title: 'Public API',
@@ -38,7 +72,6 @@ export let auth = SlateAuth.create()
         scope: 'public_api'
       }
     ],
-
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         client_id: ctx.clientId,
@@ -47,62 +80,46 @@ export let auth = SlateAuth.create()
         state: ctx.state,
         response_type: 'code'
       });
-
-      return {
-        url: `https://fathom.video/external/v1/oauth2/authorize?${params.toString()}`
-      };
+      return { url: `https://fathom.video/external/v1/oauth2/authorize?${params.toString()}` };
     },
-
-    handleCallback: async ctx => {
-      let params = new URLSearchParams();
-      params.append('grant_type', 'authorization_code');
-      params.append('code', ctx.code);
-      params.append('client_id', ctx.clientId);
-      params.append('client_secret', ctx.clientSecret);
-      params.append('redirect_uri', ctx.redirectUri);
-
-      let response = await fathomAxios.post('/oauth2/token', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      let data = response.data;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined
-        }
+    handleCallback: async ctx => ({
+      output: await exchangeToken(
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: ctx.code,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          redirect_uri: ctx.redirectUri
+        }),
+        [ctx.code, ctx.clientSecret]
+      )
+    }),
+    handleTokenRefresh: async (ctx: {
+      clientId: string;
+      clientSecret: string;
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        authMethod?: 'api_key' | 'oauth';
       };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let params = new URLSearchParams();
-      params.append('grant_type', 'refresh_token');
-      params.append('refresh_token', ctx.output.refreshToken || '');
-      params.append('client_id', ctx.clientId);
-      params.append('client_secret', ctx.clientSecret);
-
-      let response = await fathomAxios.post('/oauth2/token', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      let data = response.data;
-
+    }) => {
+      if (!ctx.output.refreshToken?.trim()) {
+        throw createApiServiceError(
+          'Fathom refresh token is missing. Reconnect your account.'
+        );
+      }
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined
-        }
+        output: await exchangeToken(
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }),
+          [ctx.output.token, ctx.output.refreshToken, ctx.clientSecret],
+          ctx.output.refreshToken
+        )
       };
     }
   })
@@ -110,20 +127,17 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
       apiKey: z
         .string()
         .describe(
-          'Fathom API key generated from Settings → API Access in the Fathom dashboard'
+          'Fathom API key generated from User Settings → API Access in the Fathom dashboard'
         )
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Enter a Fathom API key from User Settings → API Access.');
+      }
+      return { output: { token: ctx.input.apiKey.trim(), authMethod: 'api_key' as const } };
     }
   });

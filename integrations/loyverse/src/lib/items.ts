@@ -83,7 +83,7 @@ export let mapVariant = (v: any): z.infer<typeof variantSchema> => ({
   purchaseCost: v.purchase_cost,
   defaultPricingType: v.default_pricing_type,
   defaultPrice: v.default_price,
-  storesAvailability: (v.stores ?? []).map((s: any) => ({
+  storesAvailability: v.stores?.map((s: any) => ({
     storeId: s.store_id,
     pricingType: s.pricing_type,
     price: s.price,
@@ -107,7 +107,7 @@ export let mapItem = (item: any): z.infer<typeof itemSchema> => ({
   soldByWeight: item.sold_by_weight,
   isComposite: item.is_composite,
   useProduction: item.use_production,
-  components: (item.components ?? []).map((c: any) => ({
+  components: item.components?.map((c: any) => ({
     variantId: c.variant_id,
     quantity: c.quantity
   })),
@@ -120,7 +120,7 @@ export let mapItem = (item: any): z.infer<typeof itemSchema> => ({
   option1Name: item.option1_name,
   option2Name: item.option2_name,
   option3Name: item.option3_name,
-  variants: (item.variants ?? []).map(mapVariant),
+  variants: item.variants?.map(mapVariant),
   createdAt: item.created_at,
   updatedAt: item.updated_at,
   deletedAt: item.deleted_at

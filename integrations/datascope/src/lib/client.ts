@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://www.mydatascope.com/api/external';
 
@@ -6,13 +11,39 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'DataScope',
+          reason: 'datascope_api_error',
+          extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure)
+        })
     });
+  }
+
+  private unwrap(data: unknown): unknown {
+    if (
+      isApiErrorRecord(data) &&
+      (data.success === false ||
+        data.status === 'error' ||
+        data.status === 'failed' ||
+        data.status === 'failure' ||
+        (data.error !== undefined &&
+          data.error !== null &&
+          data.error !== false &&
+          data.error !== ''))
+    ) {
+      throw buildApiServiceError(
+        { response: { status: 200, data } },
+        {
+          providerLabel: 'DataScope',
+          reason: 'datascope_api_error'
+        }
+      );
+    }
+    return data;
   }
 
   // ─── Answers ──────────────────────────────────────────────
@@ -27,6 +58,7 @@ export class Client {
     limit?: number;
     offset?: number;
   }) {
+    validatePagination(params.limit, params.offset, 200);
     let response = await this.axios.get('/v2/answers', {
       params: {
         form_id: params.formId,
@@ -39,7 +71,7 @@ export class Client {
         offset: params.offset ?? 0
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async getAnswersDetailed(params: {
@@ -58,7 +90,7 @@ export class Client {
         location_id: params.locationId
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async changeFormAnswer(params: {
@@ -68,6 +100,12 @@ export class Client {
     questionValue: string;
     subformIndex?: number;
   }) {
+    if (
+      params.subformIndex !== undefined &&
+      (!Number.isInteger(params.subformIndex) || params.subformIndex < 1)
+    ) {
+      throw createApiServiceError('Subform index must be a whole number starting at 1.');
+    }
     let response = await this.axios.post('/change_form_answer', {
       form_name: params.formName,
       form_code: params.formCode,
@@ -75,14 +113,18 @@ export class Client {
       question_value: params.questionValue,
       ...(params.subformIndex !== undefined ? { subform_index: params.subformIndex } : {})
     });
-    return response.data;
+    let data = this.unwrap(response.data);
+    if (Array.isArray(data)) {
+      for (let item of data) this.unwrap(item);
+    }
+    return data;
   }
 
   // ─── Locations ────────────────────────────────────────────
 
   async getLocations() {
     let response = await this.axios.get('/locations');
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async createLocation(location: {
@@ -115,7 +157,7 @@ export class Client {
         email: location.email
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async updateLocation(
@@ -135,7 +177,7 @@ export class Client {
       email?: string;
     }
   ) {
-    let response = await this.axios.post(`/locations/${locationId}`, {
+    let response = await this.axios.post(`/locations/${encodeURIComponent(locationId)}`, {
       location: {
         name: location.name,
         description: location.description,
@@ -151,7 +193,7 @@ export class Client {
         email: location.email
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   // ─── Lists / Metadata ────────────────────────────────────
@@ -160,7 +202,7 @@ export class Client {
     let response = await this.axios.get('/metadata_objects', {
       params: { metadata_type: metadataType }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async getListElement(metadataType: string, metadataId: string) {
@@ -170,7 +212,7 @@ export class Client {
         metadata_id: metadataId
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async createListElement(
@@ -198,7 +240,7 @@ export class Client {
         params: { metadata_type: metadataType }
       }
     );
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async updateListElement(
@@ -211,7 +253,7 @@ export class Client {
       attribute2?: string;
     }
   ) {
-    let response = await this.axios.post(`/metadata_object/${elementId}`, {
+    let response = await this.axios.post(`/metadata_object/${encodeURIComponent(elementId)}`, {
       list_object: {
         name: element.name,
         description: element.description,
@@ -220,7 +262,7 @@ export class Client {
         attribute2: element.attribute2
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async createList(list: {
@@ -237,7 +279,7 @@ export class Client {
         list_type: list.listType ?? 'standard'
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async updateList(
@@ -249,7 +291,7 @@ export class Client {
       listType?: string;
     }
   ) {
-    let response = await this.axios.post(`/metadata_types/${listId}`, {
+    let response = await this.axios.post(`/metadata_types/${encodeURIComponent(listId)}`, {
       list: {
         name: list.name,
         description: list.description,
@@ -257,7 +299,7 @@ export class Client {
         list_type: list.listType
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   async bulkUpdateListElements(params: {
@@ -271,6 +313,11 @@ export class Client {
       attribute2?: string;
     }>;
   }) {
+    if (params.metadataType === 'locations') {
+      throw createApiServiceError(
+        'Use the location tools to manage locations; bulk list updates do not support locations.'
+      );
+    }
     let response = await this.axios.post('/metadata_objects/bulk_update', {
       metadata_type: params.metadataType,
       name: params.name,
@@ -282,7 +329,7 @@ export class Client {
         attribute2: el.attribute2
       }))
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   // ─── Task Assignment ──────────────────────────────────────
@@ -321,7 +368,60 @@ export class Client {
       gap: params.gap,
       code: params.code
     });
-    return response.data;
+    return this.unwrap(response.data);
+  }
+
+  async getAnswerStatuses() {
+    let response = await this.axios.get('/list_states');
+    return expectArray(this.unwrap(response.data), 'answer statuses');
+  }
+
+  async changeAnswerStatus(params: { formName: string; formCode: string; statusId: number }) {
+    if (!Number.isInteger(params.statusId) || params.statusId < 1) {
+      throw createApiServiceError(
+        'Status ID must be a positive whole number from list_answer_statuses.'
+      );
+    }
+    let response = await this.axios.post('/change_state', {
+      form_name: params.formName,
+      form_code: params.formCode,
+      form_state_id: params.statusId
+    });
+    return this.unwrap(response.data);
+  }
+
+  async getTaskAssignment(taskId: string) {
+    let response = await this.axios.get(`/task_assigns/${encodeURIComponent(taskId)}`);
+    return this.unwrap(response.data);
+  }
+
+  async listTaskAssignments(params: {
+    start?: string;
+    end?: string;
+    status?: string;
+    locationId?: string;
+    userEmail?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    validatePagination(params.limit, params.offset, 300);
+    let response = await this.axios.get('/task_assigns', {
+      params: {
+        start: params.start,
+        end: params.end,
+        status: params.status,
+        location_id: params.locationId,
+        user_email: params.userEmail,
+        limit: params.limit,
+        offset: params.offset
+      }
+    });
+    let data = this.unwrap(response.data);
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError('DataScope returned an invalid task assignment response.');
+    }
+    let tasks = expectArray(data.task_assigns, 'task assignments');
+    return { tasks, raw: data };
   }
 
   // ─── Notifications ────────────────────────────────────────
@@ -333,7 +433,7 @@ export class Client {
         end: params.end
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
   }
 
   // ─── Files ────────────────────────────────────────────────
@@ -345,6 +445,28 @@ export class Client {
         end: params.end
       }
     });
-    return response.data;
+    return this.unwrap(response.data);
+  }
+}
+
+export function expectArray(data: unknown, resource: string): unknown[] {
+  if (!Array.isArray(data)) {
+    throw createApiServiceError(
+      `DataScope returned an invalid ${resource} response; expected a list.`
+    );
+  }
+  return data;
+}
+
+function validatePagination(
+  limit: number | undefined,
+  offset: number | undefined,
+  maximum: number
+) {
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > maximum)) {
+    throw createApiServiceError(`Limit must be a whole number from 1 to ${maximum}.`);
+  }
+  if (offset !== undefined && (!Number.isInteger(offset) || offset < 0)) {
+    throw createApiServiceError('Offset must be a nonnegative whole number.');
   }
 }

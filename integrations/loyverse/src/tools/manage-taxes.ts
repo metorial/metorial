@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { pickWritable, requireForCreate } from '../lib/upsert';
 import { spec } from '../spec';
 
@@ -34,6 +34,23 @@ export let listTaxes = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      taxIds: z.array(z.string()).optional().describe('Only return taxes with these IDs'),
+      createdAtMin: z
+        .string()
+        .optional()
+        .describe('Only return taxes created at or after this ISO 8601 UTC timestamp'),
+      createdAtMax: z
+        .string()
+        .optional()
+        .describe('Only return taxes created at or before this ISO 8601 UTC timestamp'),
+      updatedAtMin: z
+        .string()
+        .optional()
+        .describe('Only return taxes updated at or after this ISO 8601 UTC timestamp'),
+      updatedAtMax: z
+        .string()
+        .optional()
+        .describe('Only return taxes updated at or before this ISO 8601 UTC timestamp'),
       limit: z.number().min(1).max(250).optional().describe('Number of taxes to return'),
       cursor: z.string().optional().describe('Pagination cursor'),
       showDeleted: z.boolean().optional().describe('Include deleted taxes')
@@ -48,6 +65,11 @@ export let listTaxes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listTaxes({
+      taxIds: joinIds(ctx.input.taxIds),
+      createdAtMin: ctx.input.createdAtMin,
+      createdAtMax: ctx.input.createdAtMax,
+      updatedAtMin: ctx.input.updatedAtMin,
+      updatedAtMax: ctx.input.updatedAtMax,
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       showDeleted: ctx.input.showDeleted
@@ -112,7 +134,7 @@ export let createOrUpdateTax = SlateTool.create(spec, {
 
     return {
       output: mapTax(result),
-      message: `${isUpdate ? 'Updated' : 'Created'} tax **${result.name}**.`
+      message: `${isUpdate ? 'Updated' : 'Created'} tax **${result.name ?? result.id}**.`
     };
   })
   .build();

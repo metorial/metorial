@@ -58,10 +58,14 @@ let tiktokAdDetailSchema = z.object({
 export let getTikTokAdDetails = SlateTool.create(spec, {
   name: 'Get TikTok Ad Details',
   key: 'get_tiktok_ad_details',
-  description: `Get full details of a specific TikTok ad. Returns comprehensive ad data including video/image URLs, estimated audience size, impression data, advertiser information, and targeting details (age, gender, location, interests). Requires an ad ID obtained from TikTok ad search results.`,
-  instructions: ['The adId must be obtained from the "Search TikTok Ads" tool results.'],
+  description: `DEPRECATED — use \`get_tiktok_ad\` instead. Get full details of a specific TikTok ad. Returns comprehensive ad data including video/image URLs, estimated audience size, impression data, advertiser information, and targeting details (age, gender, location, interests). Requires an ad ID obtained from TikTok ad search results.`,
+  instructions: [
+    'Use get_tiktok_ad with the string adId from Search TikTok Ads to preserve the exact identifier.',
+    'The adId must be obtained from the "Search TikTok Ads" tool results.'
+  ],
   constraints: ['Each successful API call consumes 1 credit.'],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }

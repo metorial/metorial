@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { gifSchema, ratingEnum } from '../lib/types';
+import {
+  gifSchema,
+  ratingEnum,
+  requestContextFields,
+  responseMetadataFields
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let randomGif = SlateTool.create(spec, {
@@ -14,6 +19,7 @@ export let randomGif = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...requestContextFields,
       tag: z
         .string()
         .optional()
@@ -27,11 +33,12 @@ export let randomGif = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       result: gifSchema.describe('A random GIF or sticker')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
     let rating = ctx.input.rating || ctx.config.rating;
 
     if (ctx.input.contentType === 'stickers') {
@@ -40,7 +47,7 @@ export let randomGif = SlateTool.create(spec, {
         rating
       });
       return {
-        output: { result: result.sticker },
+        output: { raw: result.raw, result: result.sticker },
         message: `Random sticker${ctx.input.tag ? ` for "${ctx.input.tag}"` : ''}: **${result.sticker.title || result.sticker.gifId}**`
       };
     }
@@ -50,7 +57,7 @@ export let randomGif = SlateTool.create(spec, {
       rating
     });
     return {
-      output: { result: result.gif },
+      output: { raw: result.raw, result: result.gif },
       message: `Random GIF${ctx.input.tag ? ` for "${ctx.input.tag}"` : ''}: **${result.gif.title || result.gif.gifId}**`
     };
   })

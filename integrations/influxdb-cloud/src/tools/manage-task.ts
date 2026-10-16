@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
-let taskSchema = z.object({
+export let taskSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   taskId: z.string().describe('Unique task ID'),
   name: z.string().describe('Task name'),
   description: z.string().optional().describe('Task description'),
@@ -21,13 +23,21 @@ let taskSchema = z.object({
 export let listTasks = SlateTool.create(spec, {
   name: 'List Tasks',
   key: 'list_tasks',
-  description: `List all scheduled Flux tasks in the organization. Tasks are scheduled Flux scripts that run on a defined frequency to process, transform, or downsample data.`,
+  description: `List a page of scheduled Flux tasks in the organization. Tasks are scheduled Flux scripts that run on a defined frequency to process, transform, or downsample data.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
+      after: z
+        .string()
+        .optional()
+        .describe('Resource ID to seek after; use instead of offset'),
       name: z.string().optional().describe('Filter tasks by name'),
       status: z.enum(['active', 'inactive']).optional().describe('Filter tasks by status'),
       limit: z
@@ -39,6 +49,7 @@ export let listTasks = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       tasks: z.array(taskSchema).describe('List of tasks')
     })
   )
@@ -47,28 +58,30 @@ export let listTasks = SlateTool.create(spec, {
 
     let result = await client.listTasks({
       name: ctx.input.name,
+      after: ctx.input.after,
       status: ctx.input.status,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
 
-    let tasks = (result.tasks || []).map((t: any) => ({
-      taskId: t.id,
+    let tasks = requireArray(result, 'tasks').map((t: any) => ({
+      raw: t,
+      taskId: resource(t, ['id', 'name']).id,
       name: t.name,
-      description: t.description,
-      orgId: t.orgID,
-      status: t.status,
-      flux: t.flux,
-      every: t.every,
-      cron: t.cron,
-      offset: t.offset,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      latestCompleted: t.latestCompleted
+      description: optionalString(t.description),
+      orgId: optionalString(t.orgID),
+      status: optionalString(t.status),
+      flux: optionalString(t.flux),
+      every: optionalString(t.every),
+      cron: optionalString(t.cron),
+      offset: optionalString(t.offset),
+      createdAt: optionalString(t.createdAt),
+      updatedAt: optionalString(t.updatedAt),
+      latestCompleted: optionalString(t.latestCompleted)
     }));
 
     return {
-      output: { tasks },
+      output: { tasks, raw: result },
       message: `Found **${tasks.length}** task(s).`
     };
   })
@@ -94,18 +107,19 @@ export let getTask = SlateTool.create(spec, {
 
     return {
       output: {
-        taskId: t.id,
+        raw: t,
+        taskId: resource(t, ['id', 'name']).id,
         name: t.name,
-        description: t.description,
-        orgId: t.orgID,
-        status: t.status,
-        flux: t.flux,
-        every: t.every,
-        cron: t.cron,
-        offset: t.offset,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        latestCompleted: t.latestCompleted
+        description: optionalString(t.description),
+        orgId: optionalString(t.orgID),
+        status: optionalString(t.status),
+        flux: optionalString(t.flux),
+        every: optionalString(t.every),
+        cron: optionalString(t.cron),
+        offset: optionalString(t.offset),
+        createdAt: optionalString(t.createdAt),
+        updatedAt: optionalString(t.updatedAt),
+        latestCompleted: optionalString(t.latestCompleted)
       },
       message: `Retrieved task **${t.name}** (status: ${t.status}).`
     };
@@ -118,6 +132,7 @@ export let createTask = SlateTool.create(spec, {
   description: `Create a new scheduled Flux task. Provide a Flux script and either a cron expression or an interval schedule.
 Common use cases include downsampling, data aggregation, and triggering external actions.`,
   instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.',
     'Provide either `every` (e.g. "1h", "5m") or `cron` (e.g. "0 * * * *") for scheduling, not both.',
     'The Flux script should include the task options in the script header, or they can be provided as separate parameters.'
   ],
@@ -127,6 +142,7 @@ Common use cases include downsampling, data aggregation, and triggering external
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       name: z.string().describe('Name for the task'),
       description: z.string().optional().describe('Description of the task'),
       flux: z.string().describe('Flux script to execute on schedule'),
@@ -158,18 +174,19 @@ Common use cases include downsampling, data aggregation, and triggering external
 
     return {
       output: {
-        taskId: t.id,
+        raw: t,
+        taskId: resource(t, ['id', 'name']).id,
         name: t.name,
-        description: t.description,
-        orgId: t.orgID,
-        status: t.status,
-        flux: t.flux,
-        every: t.every,
-        cron: t.cron,
-        offset: t.offset,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        latestCompleted: t.latestCompleted
+        description: optionalString(t.description),
+        orgId: optionalString(t.orgID),
+        status: optionalString(t.status),
+        flux: optionalString(t.flux),
+        every: optionalString(t.every),
+        cron: optionalString(t.cron),
+        offset: optionalString(t.offset),
+        createdAt: optionalString(t.createdAt),
+        updatedAt: optionalString(t.updatedAt),
+        latestCompleted: optionalString(t.latestCompleted)
       },
       message: `Created task **${t.name}** (ID: ${t.id}, status: ${t.status}).`
     };
@@ -212,18 +229,19 @@ export let updateTask = SlateTool.create(spec, {
 
     return {
       output: {
-        taskId: t.id,
+        raw: t,
+        taskId: resource(t, ['id', 'name']).id,
         name: t.name,
-        description: t.description,
-        orgId: t.orgID,
-        status: t.status,
-        flux: t.flux,
-        every: t.every,
-        cron: t.cron,
-        offset: t.offset,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        latestCompleted: t.latestCompleted
+        description: optionalString(t.description),
+        orgId: optionalString(t.orgID),
+        status: optionalString(t.status),
+        flux: optionalString(t.flux),
+        every: optionalString(t.every),
+        cron: optionalString(t.cron),
+        offset: optionalString(t.offset),
+        createdAt: optionalString(t.createdAt),
+        updatedAt: optionalString(t.updatedAt),
+        latestCompleted: optionalString(t.latestCompleted)
       },
       message: `Updated task **${t.name}** (ID: ${t.id}).`
     };
@@ -278,6 +296,7 @@ export let runTask = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider run'),
       runId: z.string().describe('ID of the triggered run'),
       taskId: z.string().describe('ID of the task'),
       status: z.string().describe('Run status'),
@@ -290,10 +309,11 @@ export let runTask = SlateTool.create(spec, {
 
     return {
       output: {
-        runId: run.id,
+        raw: run,
+        runId: resource(run, ['id', 'taskID', 'status']).id,
         taskId: run.taskID,
         status: run.status,
-        scheduledFor: run.scheduledFor
+        scheduledFor: optionalString(run.scheduledFor)
       },
       message: `Triggered run **${run.id}** for task ${ctx.input.taskId}.`
     };
@@ -324,9 +344,11 @@ export let getTaskRuns = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       runs: z
         .array(
           z.object({
+            raw: z.any().optional().describe('Complete provider run'),
             runId: z.string().describe('Run ID'),
             taskId: z.string().describe('Task ID'),
             status: z.string().describe('Run status'),
@@ -347,18 +369,19 @@ export let getTaskRuns = SlateTool.create(spec, {
       beforeTime: ctx.input.beforeTime
     });
 
-    let runs = (result.runs || []).map((r: any) => ({
-      runId: r.id,
+    let runs = requireArray(result, 'runs').map((r: any) => ({
+      raw: r,
+      runId: resource(r, ['id', 'taskID', 'status']).id,
       taskId: r.taskID,
       status: r.status,
-      scheduledFor: r.scheduledFor,
-      startedAt: r.startedAt,
-      finishedAt: r.finishedAt,
-      requestedAt: r.requestedAt
+      scheduledFor: optionalString(r.scheduledFor),
+      startedAt: optionalString(r.startedAt),
+      finishedAt: optionalString(r.finishedAt),
+      requestedAt: optionalString(r.requestedAt)
     }));
 
     return {
-      output: { runs },
+      output: { runs, raw: result },
       message: `Found **${runs.length}** run(s) for task ${ctx.input.taskId}.`
     };
   })

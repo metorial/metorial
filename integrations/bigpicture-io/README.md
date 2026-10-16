@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Big Picture.io
 
-Enrich and look up B2B company data from a database of 20M+ company profiles. Convert domain names into detailed company profiles including firmographics, industry classification, technology stack, financials, employee count, social profiles, and location data. Resolve IP addresses to identify the company behind website traffic, with confidence scores and geolocation. Retrieve company logos by domain. Track website visitors and associate them with company and user traits using a JavaScript SDK. Supports asynchronous webhook delivery for enrichment results.
+Look up B2B company profiles by domain, including firmographics, industry classification, technology, financial metrics, social profiles, location, and logo URLs. Resolve IPv4 or IPv6 addresses to company profiles with confidence scores, geolocation, WHOIS, and ASN details.
+
+Company enrichment can wait for results with streaming or return a pending result for later lookup. Set `stream` to `false` and supply `webhookUrl` for asynchronous delivery; `webhookId` identifies the resulting POST.
+
+Uses an API key from the [BigPicture dashboard](https://app.bigpicture.io/api). See the [API reference](https://docs.bigpicture.io/api/) for the provider's limits and response attributes.
 
 ## License
 

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ContentClient } from '../lib/client';
+import { ContentClient, providerId, providerList } from '../lib/client';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -77,8 +77,8 @@ export let searchNearbyLocations = SlateTool.create(spec, {
       language: ctx.input.language
     });
 
-    let locations = (result.data || []).map((loc: any) => ({
-      locationId: String(loc.location_id),
+    let locations = providerList(result.data).map((loc: any) => ({
+      locationId: providerId(loc.location_id),
       name: loc.name,
       distance: loc.distance,
       bearing: loc.bearing,

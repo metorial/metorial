@@ -1,7 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SensiboClient } from '../lib/client';
+import { checked, deviceIdSchema, SensiboClient } from '../lib/client';
 import { spec } from '../spec';
+
+let providerEventIdSchema = z.number().finite().refine(Number.isInteger);
 
 let eventSchema = z.object({
   eventId: z.string().optional().describe('Unique event identifier'),
@@ -26,12 +28,17 @@ let eventSchema = z.object({
     .describe('What triggered the event (user, schedule, climateReact, etc.)')
 });
 
+let outputSchema = z.object({
+  deviceId: z.string().describe('The device events belong to'),
+  events: z.array(eventSchema).describe('List of device events')
+});
+
 export let getDeviceEventsTool = SlateTool.create(spec, {
   name: 'Get Device Events',
   key: 'get_device_events',
   description: `Retrieve historical events for a Sensibo device. Events include AC state changes, schedule triggers, Climate React triggers, geofence events, motion detection events, and more. Useful for auditing what happened and when.`,
   constraints: [
-    'Events are available for a configurable number of past days (default 1, max 7).'
+    'This tool accepts 1–7 days; the provider controls actual event availability.'
   ],
   tags: {
     readOnly: true
@@ -39,7 +46,7 @@ export let getDeviceEventsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      deviceId: z.string().describe('The unique ID of the Sensibo device'),
+      deviceId: deviceIdSchema,
       days: z
         .number()
         .min(1)
@@ -48,40 +55,45 @@ export let getDeviceEventsTool = SlateTool.create(spec, {
         .describe('Number of days of history to retrieve (1-7, default 1)')
     })
   )
-  .output(
-    z.object({
-      deviceId: z.string().describe('The device events belong to'),
-      events: z.array(eventSchema).describe('List of device events')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new SensiboClient(ctx.auth.token);
-    let days = ctx.input.days ?? 1;
+    let result = await (async () => {
+      let days = ctx.input.days ?? 1;
 
-    let rawEvents = await client.getDeviceEvents(ctx.input.deviceId, days);
+      let rawEvents = await client.getDeviceEvents(ctx.input.deviceId, days);
 
-    let events = (rawEvents || []).map((e: any) => ({
-      eventId: e.id,
-      eventType: e.type || e.reason,
-      timestamp: e.time?.time || e.timestamp,
-      reason: e.reason,
-      acState: e.acState
-        ? {
-            on: e.acState.on,
-            mode: e.acState.mode,
-            targetTemperature: e.acState.targetTemperature,
-            fanLevel: e.acState.fanLevel
-          }
-        : undefined,
-      triggeredBy: e.causedByUser?.firstName || e.trigger?.type || e.source
-    }));
+      let events = rawEvents.map((e: any) => ({
+        eventId:
+          e.event_id !== undefined
+            ? String(checked(providerEventIdSchema, e.event_id, 'device event ID'))
+            : e.id,
+        eventType: e.event_kind ?? e.type ?? e.reason,
+        timestamp: e.time?.time || e.timestamp,
+        reason: e.event_description ?? e.reason,
+        acState: e.acState
+          ? {
+              on: e.acState.on,
+              mode: e.acState.mode,
+              targetTemperature: e.acState.targetTemperature,
+              fanLevel: e.acState.fanLevel
+            }
+          : undefined,
+        triggeredBy: e.causedByUser?.firstName || e.trigger?.type || e.source
+      }));
 
+      return {
+        output: {
+          deviceId: ctx.input.deviceId,
+          events
+        },
+        message: `Retrieved **${events.length}** event(s) from device **${ctx.input.deviceId}** over the last ${days} day(s).`
+      };
+    })();
     return {
-      output: {
-        deviceId: ctx.input.deviceId,
-        events
-      },
-      message: `Retrieved **${events.length}** event(s) from device **${ctx.input.deviceId}** over the last ${days} day(s).`
+      ...result,
+      output: checked(outputSchema, client.sanitize(result.output), 'tool output'),
+      message: client.sanitize(result.message)
     };
   })
   .build();

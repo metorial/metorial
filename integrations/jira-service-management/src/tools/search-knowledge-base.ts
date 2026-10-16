@@ -35,14 +35,11 @@ export let searchKnowledgeBaseTool = SlateTool.create(spec, {
           })
         )
         .describe('Matching knowledge base articles'),
-      total: z.number().describe('Total number of matching articles')
+      total: z.number().describe('Number of matching articles on this page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let result = await client.searchKnowledgeBase(
       ctx.input.serviceDeskId,
@@ -56,7 +53,7 @@ export let searchKnowledgeBaseTool = SlateTool.create(spec, {
       title: article.title,
       excerpt: article.excerpt,
       sourceType: article.source?.type,
-      sourceUrl: article.source?.pageUrl
+      sourceUrl: article.content?.iframeSrc
     }));
 
     return {

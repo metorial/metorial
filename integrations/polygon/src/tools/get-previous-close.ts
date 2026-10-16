@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import { polygonOutput, polygonRecords, polygonResponseFields } from '../lib/response';
 import { spec } from '../spec';
 
 export let getPreviousClose = SlateTool.create(spec, {
@@ -25,6 +26,7 @@ export let getPreviousClose = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       ticker: z.string().optional().describe('Ticker symbol'),
       bars: z
         .array(
@@ -50,7 +52,7 @@ export let getPreviousClose = SlateTool.create(spec, {
       adjusted: ctx.input.adjusted
     });
 
-    let bars = (response.results || []).map((r: any) => ({
+    let bars = polygonRecords(response.results).map((r: any) => ({
       open: r.o,
       high: r.h,
       low: r.l,
@@ -61,13 +63,16 @@ export let getPreviousClose = SlateTool.create(spec, {
       transactionCount: r.n
     }));
 
-    let closePrice = bars.length > 0 ? bars[0].close : undefined;
+    let closePrice = bars[0]?.close;
 
     return {
-      output: {
-        ticker: response.ticker,
-        bars
-      },
+      output: polygonOutput(
+        {
+          ticker: response.ticker,
+          bars
+        },
+        response
+      ),
       message:
         closePrice !== undefined
           ? `Previous close for **${ctx.input.ticker}**: $${closePrice}.`

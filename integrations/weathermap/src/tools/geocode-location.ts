@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpenWeatherClient } from '../lib/client';
+import { weatherArray } from '../lib/validation';
 import { spec } from '../spec';
 
 let geocodeResultSchema = z.object({
@@ -61,10 +62,27 @@ export let geocodeLocation = SlateTool.create(spec, {
       apiKey: ctx.auth.token
     });
 
+    let modes = [
+      ctx.input.locationName !== undefined,
+      ctx.input.zipCode !== undefined,
+      ctx.input.latitude !== undefined || ctx.input.longitude !== undefined
+    ].filter(Boolean).length;
+    if (modes !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one of locationName, zipCode, or latitude and longitude.'
+      );
+    }
+    if (
+      (ctx.input.locationName !== undefined && !ctx.input.locationName.trim()) ||
+      (ctx.input.zipCode !== undefined && !ctx.input.zipCode.trim())
+    ) {
+      throw createApiServiceError('locationName and zipCode must not be empty.');
+    }
+
     let results: any[] = [];
 
     if (ctx.input.zipCode) {
-      let data = await client.geocodeByZip(ctx.input.zipCode);
+      let data = await client.geocodeByZip(ctx.input.zipCode.trim());
       results = [
         {
           name: data.name,
@@ -75,13 +93,13 @@ export let geocodeLocation = SlateTool.create(spec, {
         }
       ];
     } else if (ctx.input.locationName) {
-      let data = await client.geocodeDirect(ctx.input.locationName, ctx.input.limit);
-      results = (data || []).map((r: any) => ({
+      let data = await client.geocodeDirect(ctx.input.locationName.trim(), ctx.input.limit);
+      results = weatherArray(data).map((r: any) => ({
         name: r.name,
         latitude: r.lat,
         longitude: r.lon,
         country: r.country,
-        state: r.state
+        state: r.state ?? undefined
       }));
     } else if (ctx.input.latitude !== undefined && ctx.input.longitude !== undefined) {
       let data = await client.geocodeReverse(
@@ -89,15 +107,15 @@ export let geocodeLocation = SlateTool.create(spec, {
         ctx.input.longitude,
         ctx.input.limit
       );
-      results = (data || []).map((r: any) => ({
+      results = weatherArray(data).map((r: any) => ({
         name: r.name,
         latitude: r.lat,
         longitude: r.lon,
         country: r.country,
-        state: r.state
+        state: r.state ?? undefined
       }));
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide either locationName, zipCode, or latitude+longitude for geocoding.'
       );
     }

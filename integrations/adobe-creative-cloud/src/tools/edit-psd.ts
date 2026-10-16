@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PhotoshopClient } from '../lib/photoshop';
 import { spec } from '../spec';
@@ -86,7 +86,7 @@ export let editPsd = SlateTool.create(spec, {
   .output(
     z.object({
       jobId: z.string().optional().describe('Async job identifier'),
-      status: z.string().describe('Job status'),
+      status: z.string().optional().describe('Job status'),
       statusUrl: z.string().optional().describe('URL to poll for job status'),
       manifest: z
         .any()
@@ -109,23 +109,25 @@ export let editPsd = SlateTool.create(spec, {
         return {
           output: {
             jobId: result.jobId,
-            status: result.status || 'completed',
-            manifest: result.outputs?.[0]?.layers || result
+            status: result.status ?? result.outputs?.[0]?.status,
+            statusUrl: result._links?.self?.href ?? result.links?.self?.href,
+            manifest: result.outputs?.[0]?.layers ?? result
           },
-          message: `Retrieved PSD manifest with layer information.`
+          message: `Requested PSD manifest. Poll the status URL for asynchronous results.`
         };
       }
       case 'editLayers': {
-        if (!ctx.input.output) throw new Error('Output is required for editLayers');
+        if (!ctx.input.output)
+          throw createApiServiceError('Output is required for editLayers');
         result = await client.applyPsdEdits(ctx.input.input, [ctx.input.output], {
           layers: ctx.input.layers
         });
         break;
       }
       case 'editText': {
-        if (!ctx.input.output) throw new Error('Output is required for editText');
+        if (!ctx.input.output) throw createApiServiceError('Output is required for editText');
         if (!ctx.input.textLayers || ctx.input.textLayers.length === 0)
-          throw new Error('textLayers is required for editText');
+          throw createApiServiceError('textLayers is required for editText');
         result = await client.editTextLayers(
           ctx.input.input,
           ctx.input.output,
@@ -138,9 +140,10 @@ export let editPsd = SlateTool.create(spec, {
         break;
       }
       case 'replaceSmartObject': {
-        if (!ctx.input.output) throw new Error('Output is required for replaceSmartObject');
+        if (!ctx.input.output)
+          throw createApiServiceError('Output is required for replaceSmartObject');
         if (!ctx.input.smartObject)
-          throw new Error('smartObject is required for replaceSmartObject');
+          throw createApiServiceError('smartObject is required for replaceSmartObject');
         result = await client.replaceSmartObject(
           ctx.input.input,
           ctx.input.output,
@@ -149,11 +152,16 @@ export let editPsd = SlateTool.create(spec, {
         break;
       }
       case 'createRendition': {
-        if (!ctx.input.output) throw new Error('Output is required for createRendition');
+        if (!ctx.input.output)
+          throw createApiServiceError('Output is required for createRendition');
         result = await client.createRendition(ctx.input.input, [
           {
             ...ctx.input.output,
-            type: ctx.input.renditionFormat || 'jpeg',
+            type: {
+              jpeg: 'image/jpeg',
+              png: 'image/png',
+              tiff: 'image/tiff'
+            }[ctx.input.renditionFormat ?? 'jpeg'],
             width: ctx.input.renditionWidth,
             quality: ctx.input.renditionQuality
           }
@@ -161,8 +169,10 @@ export let editPsd = SlateTool.create(spec, {
         break;
       }
       case 'applyActions': {
-        if (!ctx.input.output) throw new Error('Output is required for applyActions');
-        if (!ctx.input.actions) throw new Error('actions is required for applyActions');
+        if (!ctx.input.output)
+          throw createApiServiceError('Output is required for applyActions');
+        if (!ctx.input.actions)
+          throw createApiServiceError('actions is required for applyActions');
         result = await client.applyActions(
           ctx.input.input,
           ctx.input.output,
@@ -175,10 +185,10 @@ export let editPsd = SlateTool.create(spec, {
     return {
       output: {
         jobId: result.jobId || result._links?.self?.href?.split('/').pop(),
-        status: result.status || 'submitted',
+        status: result.status,
         statusUrl: result._links?.self?.href || result.links?.self?.href
       },
-      message: `PSD **${ctx.input.operation}** job submitted. Status: **${result.status || 'submitted'}**.`
+      message: `PSD **${ctx.input.operation}** job submitted.`
     };
   })
   .build();

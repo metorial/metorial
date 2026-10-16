@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -39,11 +39,11 @@ Results include highlighted matches and relevance scoring. Use **type** to searc
       lenMin: z
         .number()
         .optional()
-        .describe('Minimum audio length in minutes (episodes only).'),
+        .describe('Minimum episode or average podcast audio length in minutes.'),
       lenMax: z
         .number()
         .optional()
-        .describe('Maximum audio length in minutes (episodes only).'),
+        .describe('Maximum episode or average podcast audio length in minutes.'),
       episodeCountMin: z
         .number()
         .optional()
@@ -52,6 +52,22 @@ Results include highlighted matches and relevance scoring. Use **type** to searc
         .number()
         .optional()
         .describe('Maximum number of episodes (podcasts only).'),
+      updateFreqMin: z
+        .number()
+        .optional()
+        .describe('Minimum podcast release interval in hours (podcasts only).'),
+      updateFreqMax: z
+        .number()
+        .optional()
+        .describe('Maximum podcast release interval in hours (podcasts only).'),
+      interviewsOnly: z
+        .boolean()
+        .optional()
+        .describe('Only podcasts with guest interviews; requires PRO/ENTERPRISE.'),
+      sponsoredOnly: z
+        .boolean()
+        .optional()
+        .describe('Only podcasts with sponsors; requires PRO/ENTERPRISE.'),
       genreIds: z.string().optional().describe('Comma-delimited genre IDs to filter by.'),
       publishedBefore: z
         .number()
@@ -100,6 +116,10 @@ Results include highlighted matches and relevance scoring. Use **type** to searc
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       took: z.number().describe('Search execution time in seconds.'),
       count: z.number().describe('Number of results on this page.'),
       total: z.number().describe('Total number of matching results.'),
@@ -110,6 +130,44 @@ Results include highlighted matches and relevance scoring. Use **type** to searc
     })
   )
   .handleInvocation(async ctx => {
+    for (let [name, value] of Object.entries(ctx.input)) {
+      if (typeof value === 'number' && (!Number.isSafeInteger(value) || value < 0)) {
+        throw createApiServiceError(`${name} must be a non-negative integer.`);
+      }
+    }
+    if (!ctx.input.query.trim())
+      throw createApiServiceError('Provide a non-empty search query.');
+    if (
+      ctx.input.pageSize !== undefined &&
+      (ctx.input.pageSize < 1 || ctx.input.pageSize > 10)
+    ) {
+      throw createApiServiceError('pageSize must be from 1 to 10.');
+    }
+    for (let name of ['sortByDate', 'safeMode', 'uniquePodcasts'] as const) {
+      if (ctx.input[name] !== undefined && ![0, 1].includes(ctx.input[name])) {
+        throw createApiServiceError(`${name} must be 0 or 1.`);
+      }
+    }
+    for (let [lower, upper] of [
+      ['lenMin', 'lenMax'],
+      ['episodeCountMin', 'episodeCountMax'],
+      ['updateFreqMin', 'updateFreqMax']
+    ] as const) {
+      if (
+        ctx.input[lower] !== undefined &&
+        ctx.input[upper] !== undefined &&
+        ctx.input[lower] > ctx.input[upper]
+      ) {
+        throw createApiServiceError(`${lower} must not exceed ${upper}.`);
+      }
+    }
+    if (
+      ctx.input.publishedBefore !== undefined &&
+      ctx.input.publishedAfter !== undefined &&
+      ctx.input.publishedBefore <= ctx.input.publishedAfter
+    ) {
+      throw createApiServiceError('publishedBefore must be greater than publishedAfter.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl
@@ -124,6 +182,12 @@ Results include highlighted matches and relevance scoring. Use **type** to searc
       lenMax: ctx.input.lenMax,
       episodeCountMin: ctx.input.episodeCountMin,
       episodeCountMax: ctx.input.episodeCountMax,
+      updateFreqMin: ctx.input.updateFreqMin,
+      updateFreqMax: ctx.input.updateFreqMax,
+      interviewsOnly:
+        ctx.input.interviewsOnly === undefined ? undefined : Number(ctx.input.interviewsOnly),
+      sponsoredOnly:
+        ctx.input.sponsoredOnly === undefined ? undefined : Number(ctx.input.sponsoredOnly),
       genreIds: ctx.input.genreIds,
       publishedBefore: ctx.input.publishedBefore,
       publishedAfter: ctx.input.publishedAfter,
@@ -139,6 +203,7 @@ Results include highlighted matches and relevance scoring. Use **type** to searc
 
     return {
       output: {
+        raw: data,
         took: data.took,
         count: data.count,
         total: data.total,

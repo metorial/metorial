@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let manageClockTuneTool = SlateTool.create(spec, {
   ],
   constraints: ['Requires a Bearer token (private API)'],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -48,9 +48,23 @@ export let manageClockTuneTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.token) {
-      throw new Error(
+      throw createApiServiceError(
         'Bearer token is required for ClockTune management. Use the "API Credentials" authentication method.'
       );
+    }
+
+    if ((ctx.input.action === 'create' || ctx.input.action === 'update') && ctx.input.values) {
+      let values: unknown;
+      try {
+        values = JSON.parse(ctx.input.values);
+      } catch {
+        throw createApiServiceError(
+          'values must be a valid JSON object with ClockTune settings.'
+        );
+      }
+      if (!values || typeof values !== 'object' || Array.isArray(values)) {
+        throw createApiServiceError('values must be a JSON object with ClockTune settings.');
+      }
     }
 
     let client = new ManagementClient({ token: ctx.auth.token });
@@ -68,7 +82,7 @@ export let manageClockTuneTool = SlateTool.create(spec, {
       }
       case 'create': {
         if (!ctx.input.profileName || !ctx.input.values) {
-          throw new Error(
+          throw createApiServiceError(
             'profileName and values are required to create a ClockTune profile.'
           );
         }
@@ -81,8 +95,10 @@ export let manageClockTuneTool = SlateTool.create(spec, {
         break;
       }
       case 'update': {
-        if (!ctx.input.profileId || !ctx.input.values) {
-          throw new Error('profileId and values are required to update a ClockTune profile.');
+        if (ctx.input.profileId === undefined || !ctx.input.values) {
+          throw createApiServiceError(
+            'profileId and values are required to update a ClockTune profile.'
+          );
         }
         ctx.progress(`Updating ClockTune profile ${ctx.input.profileId}...`);
         result = await client.updateClockTuneProfile({
@@ -93,8 +109,8 @@ export let manageClockTuneTool = SlateTool.create(spec, {
         break;
       }
       case 'delete': {
-        if (!ctx.input.profileId) {
-          throw new Error('profileId is required to delete a ClockTune profile.');
+        if (ctx.input.profileId === undefined) {
+          throw createApiServiceError('profileId is required to delete a ClockTune profile.');
         }
         ctx.progress(`Deleting ClockTune profile ${ctx.input.profileId}...`);
         result = await client.deleteClockTuneProfile({ id: ctx.input.profileId });

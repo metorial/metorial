@@ -18,7 +18,8 @@ export let getWalletBalance = SlateTool.create(spec, {
       available: z.string().describe('Available balance in USD'),
       heldAmount: z.string().describe('Amount currently held (reserved for active tokens)'),
       pendingCharges: z.string().describe('Amount in pending charges'),
-      pendingDeposits: z.string().describe('Amount in pending deposits')
+      pendingDeposits: z.string().describe('Amount in pending deposits'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -27,7 +28,7 @@ export let getWalletBalance = SlateTool.create(spec, {
     let balance = await client.getBalance();
 
     return {
-      output: balance,
+      output: { ...balance, raw: balance },
       message: `Wallet balance: **$${balance.available}** available, **$${balance.heldAmount}** held, **$${balance.pendingCharges}** pending charges, **$${balance.pendingDeposits}** pending deposits.`
     };
   })

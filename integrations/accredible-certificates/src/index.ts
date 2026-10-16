@@ -4,8 +4,10 @@ import {
   createGroup,
   deleteCredential,
   deleteGroup,
+  generateCredentialPdf,
   getCredential,
   getGroup,
+  getIssuer,
   issueCredential,
   listDesigns,
   listGroups,
@@ -26,7 +28,9 @@ export let provider = Slate.create({
     updateGroup,
     deleteGroup,
     listGroups,
-    listDesigns
+    listDesigns,
+    getIssuer,
+    generateCredentialPdf
   ],
   triggers: []
 });

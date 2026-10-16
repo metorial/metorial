@@ -6,7 +6,17 @@ import { spec } from '../spec';
 let participantSchema = z.object({
   name: z.string().optional().describe('Name of the participant'),
   email: z.string().optional().describe('Email address of the participant'),
-  status: z.string().optional().describe('Attendance status (e.g., attended, did-not-attend)'),
+  status: z
+    .string()
+    .optional()
+    .describe(
+      'Attendance status returned by Demio (e.g., completed, did not attend, left early, or banned)'
+    ),
+  attended: z.boolean().optional().describe('Whether the participant attended'),
+  customFields: z
+    .array(z.object({ id: z.string(), name: z.string(), value: z.string() }))
+    .optional()
+    .describe('Registration form field identifiers, labels, and values'),
   joinedAt: z.string().optional().describe('Timestamp when the participant joined'),
   leftAt: z.string().optional().describe('Timestamp when the participant left'),
   attendanceMinutes: z.number().optional().describe('Total minutes the participant attended')
@@ -15,7 +25,7 @@ let participantSchema = z.object({
 export let getParticipants = SlateTool.create(spec, {
   name: 'Get Participants',
   key: 'get_participants',
-  description: `Retrieve the list of participants for a specific event date/session. Returns attendee details including attendance status, join/leave times, and engagement data. Useful for post-webinar follow-up and reporting.`,
+  description: `Retrieve participants for a specific event session, including attendance status and registration form fields. Filter attended participants, no-shows, completed sessions, early departures, or banned participants.`,
   instructions: [
     'The dateId refers to a specific event date/session, not the event itself. Use the List Events or Get Event tool first to find available date IDs.'
   ],
@@ -30,7 +40,9 @@ export let getParticipants = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('Filter participants by status (e.g., "attended", "did-not-attend")')
+        .describe(
+          'Demio status filter: attended, did-not-attend, completed, left-early, or banned. Spaced aliases did not attend and left early are also accepted.'
+        )
     })
   )
   .output(
@@ -46,21 +58,21 @@ export let getParticipants = SlateTool.create(spec, {
       apiSecret: ctx.auth.apiSecret
     });
 
-    let rawParticipants = await client.getEventDateParticipants(ctx.input.dateId);
+    let status = ctx.input.status?.toLowerCase();
+    if (status === 'did not attend') status = 'did-not-attend';
+    if (status === 'left early') status = 'left-early';
+    let rawParticipants = await client.getEventDateParticipants(ctx.input.dateId, status);
 
-    let participants = (Array.isArray(rawParticipants) ? rawParticipants : []).map(p => ({
+    let participants = rawParticipants.map(p => ({
       name: p.name,
       email: p.email,
       status: p.status,
+      attended: p.attended,
+      customFields: p.custom_fields,
       joinedAt: p.joined_at,
       leftAt: p.left_at,
       attendanceMinutes: p.attendance_minutes
     }));
-
-    if (ctx.input.status) {
-      let filterStatus = ctx.input.status.toLowerCase();
-      participants = participants.filter(p => p.status?.toLowerCase() === filterStatus);
-    }
 
     return {
       output: { participants },

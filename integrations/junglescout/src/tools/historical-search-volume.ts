@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseCollection, responseNumber, responseString } from '../lib/response';
 import { spec } from '../spec';
 
 let searchVolumeDataPointSchema = z.object({
+  periodEnd: z.string().optional().describe('End date of the seven-day period'),
   period: z.string().describe('Start date of the 7-day period (yyyy-mm-dd)'),
   estimatedExactSearchVolume: z
     .number()
@@ -33,6 +35,10 @@ export let historicalSearchVolumeTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response including native attributes and metadata'),
       keyword: z.string().describe('The queried keyword'),
       dataPoints: z
         .array(searchVolumeDataPointSchema)
@@ -52,22 +58,18 @@ export let historicalSearchVolumeTool = SlateTool.create(spec, {
       endDate: ctx.input.endDate
     });
 
-    let dataPoints: Array<{ period: string; estimatedExactSearchVolume: number | null }> = [];
-
-    // The API returns data in JSON:API format - can be a single object or array
-    let items = Array.isArray(result.data) ? result.data : result.data ? [result.data] : [];
-    for (let item of items) {
-      let estimates = item.attributes?.estimate || [];
-      for (let entry of estimates) {
-        dataPoints.push({
-          period: entry.date || '',
-          estimatedExactSearchVolume: entry.estimated_exact_search_volume ?? null
-        });
-      }
-    }
+    let dataPoints = responseCollection(result).map(item => ({
+      period: responseString(item.attributes.estimate_start_date, 'estimate start date'),
+      periodEnd: responseString(item.attributes.estimate_end_date, 'estimate end date'),
+      estimatedExactSearchVolume: responseNumber(
+        item.attributes.estimated_exact_search_volume,
+        'estimated exact search volume'
+      )
+    }));
 
     return {
       output: {
+        raw: result,
         keyword: ctx.input.keyword,
         dataPoints
       },

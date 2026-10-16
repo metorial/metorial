@@ -4,8 +4,12 @@ import {
   addRepository,
   configureAnalysisTool,
   getCommitAnalysis,
+  getCurrentUser,
   getPullRequestAnalysis,
+  getQualitySettings,
   getRepositoryAnalysis,
+  getSecurityItem,
+  listBranches,
   listCodingStandards,
   listFiles,
   listOrganizations,
@@ -13,11 +17,13 @@ import {
   listPullRequests,
   listRepositories,
   listRepositoryTools,
+  listToolPatterns,
   manageDastTarget,
   manageRepositoryToken,
   searchIssues,
   searchSbomDependencies,
-  searchSecurityItems
+  searchSecurityItems,
+  setSecurityItemIgnored
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -38,7 +44,13 @@ export let provider = Slate.create({
     listCodingStandards,
     listPeople,
     getCommitAnalysis,
-    manageRepositoryToken
+    manageRepositoryToken,
+    getCurrentUser,
+    listBranches,
+    getSecurityItem,
+    setSecurityItemIgnored,
+    listToolPatterns,
+    getQualitySettings
   ],
   triggers: []
 });

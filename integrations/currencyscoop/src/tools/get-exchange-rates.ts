@@ -35,8 +35,9 @@ Use this to get current mid-market exchange rates for one or more currencies. Op
       rates: z
         .record(z.string(), z.number())
         .describe(
-          'Map of currency codes to their exchange rates relative to the base currency'
-        )
+          'Map of currency codes to units of that currency per one unit of the base currency'
+        ),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,7 +55,8 @@ Use this to get current mid-market exchange rates for one or more currencies. Op
       output: {
         date: result.date,
         baseCurrency: result.base,
-        rates: result.rates
+        rates: result.rates,
+        raw: result.raw
       },
       message: `Retrieved **${rateCount}** real-time exchange rates with base currency **${result.base}** as of ${result.date}.`
     };

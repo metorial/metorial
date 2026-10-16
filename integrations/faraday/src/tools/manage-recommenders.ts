@@ -4,6 +4,10 @@ import { FaradayClient } from '../lib/client';
 import { spec } from '../spec';
 
 let recommenderSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Complete provider resource metadata'),
   recommenderId: z.string().describe('Unique identifier of the recommender'),
   name: z.string().describe('Human-readable name of the recommender'),
   status: z
@@ -31,6 +35,7 @@ export let listRecommenders = SlateTool.create(spec, {
     let recommenders = await client.listRecommenders();
 
     let mapped = recommenders.map((r: any) => ({
+      raw: r,
       recommenderId: r.id,
       name: r.name,
       status: r.status,
@@ -78,6 +83,7 @@ export let getRecommender = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: r,
         recommenderId: r.id,
         name: r.name,
         status: r.status,

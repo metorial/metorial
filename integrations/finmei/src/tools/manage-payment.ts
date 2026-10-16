@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import { FinmeiClient, readEntity, requireId } from '../lib/client';
 import { spec } from '../spec';
 
 export let managePayment = SlateTool.create(spec, {
@@ -47,7 +47,7 @@ export let managePayment = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.paymentId) {
-        throw new Error('paymentId is required for delete action');
+        throw createApiServiceError('paymentId is required for delete action');
       }
       await client.deletePayment(ctx.input.paymentId);
 
@@ -62,15 +62,15 @@ export let managePayment = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.paymentId) {
-        throw new Error('paymentId is required for get action');
+        throw createApiServiceError('paymentId is required for get action');
       }
       let result = await client.getPayment(ctx.input.paymentId);
-      let payment = result?.data ?? result;
+      let payment = readEntity(result, 'payment');
 
       return {
         output: {
           success: true,
-          paymentId: String(payment?.id ?? ctx.input.paymentId),
+          paymentId: requireId(payment.id, 'payment ID'),
           payment
         },
         message: `Retrieved payment \`${ctx.input.paymentId}\`.`
@@ -79,8 +79,11 @@ export let managePayment = SlateTool.create(spec, {
 
     // create
     if (!ctx.input.invoiceId) {
-      throw new Error('invoiceId is required to record a payment');
+      throw createApiServiceError('invoiceId is required to record a payment');
     }
+
+    if (ctx.input.amount === undefined)
+      throw createApiServiceError('amount is required to record a payment');
 
     let result = await client.createPayment({
       invoice_id: ctx.input.invoiceId,
@@ -91,8 +94,8 @@ export let managePayment = SlateTool.create(spec, {
       notes: ctx.input.notes
     });
 
-    let payment = result?.data ?? result;
-    let paymentId = String(payment?.id ?? '');
+    let payment = readEntity(result, 'payment');
+    let paymentId = requireId(payment.id, 'payment ID');
 
     return {
       output: {

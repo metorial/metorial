@@ -1,13 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import {
+  optionalBoolean,
+  optionalNumber,
+  optionalString,
+  requiredString
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getQuote = SlateTool.create(spec, {
   name: 'Get Quote',
   key: 'get_quote',
-  description: `Retrieve a real-time quote for a financial instrument, including current price, daily change, volume, 52-week range, and other key metrics.
-Provides a comprehensive snapshot of current market data for stocks, forex, crypto, ETFs, and more.`,
+  description: `Retrieve the latest available quote for a financial instrument, including current price, daily change, volume, 52-week range, and other key metrics.
+Freshness depends on exchange coverage, subscription entitlements, and market sessions. Provides a snapshot of available market data for stocks, forex, crypto, ETFs, and more.`,
   instructions: [
     'Use the symbol format "AAPL" for stocks, "EUR/USD" for forex, "BTC/USD" for crypto.'
   ],
@@ -42,16 +48,32 @@ Provides a comprehensive snapshot of current market data for stocks, forex, cryp
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       symbol: z.string().describe('Ticker symbol'),
       name: z.string().optional().describe('Instrument name'),
       exchange: z.string().optional().describe('Exchange name'),
       micCode: z.string().optional().describe('Market Identifier Code'),
       currency: z.string().optional().describe('Currency'),
-      datetime: z.string().optional().describe('Quote timestamp'),
-      timestamp: z.number().optional().describe('Unix timestamp'),
-      open: z.string().optional().describe('Opening price'),
-      high: z.string().optional().describe('Daily high'),
-      low: z.string().optional().describe('Daily low'),
+      datetime: z
+        .string()
+        .optional()
+        .describe('Bar opening date/time in the provider timezone'),
+      timestamp: z
+        .number()
+        .optional()
+        .describe(
+          'Bar opening Unix timestamp in seconds; this is not necessarily the last update time'
+        ),
+      lastQuoteAt: z
+        .number()
+        .optional()
+        .describe('Provider last-minute candle Unix timestamp in seconds'),
+      open: z.string().optional().describe('Opening price for the quote interval'),
+      high: z.string().optional().describe('High for the quote interval'),
+      low: z.string().optional().describe('Low for the quote interval'),
       close: z.string().optional().describe('Current/closing price'),
       volume: z.string().optional().describe('Trading volume'),
       previousClose: z.string().optional().describe('Previous closing price'),
@@ -86,31 +108,37 @@ Provides a comprehensive snapshot of current market data for stocks, forex, cryp
 
     return {
       output: {
-        symbol: result.symbol || ctx.input.symbol,
-        name: result.name,
-        exchange: result.exchange,
-        micCode: result.mic_code,
-        currency: result.currency,
-        datetime: result.datetime,
-        timestamp: result.timestamp,
-        open: result.open,
-        high: result.high,
-        low: result.low,
-        close: result.close,
-        volume: result.volume,
-        previousClose: result.previous_close,
-        change: result.change,
-        percentChange: result.percent_change,
-        averageVolume: result.average_volume,
-        isMarketOpen: result.is_market_open,
-        fiftyTwoWeekLow: result.fifty_two_week?.low,
-        fiftyTwoWeekHigh: result.fifty_two_week?.high,
-        fiftyTwoWeekLowChange: result.fifty_two_week?.low_change,
-        fiftyTwoWeekHighChange: result.fifty_two_week?.high_change,
-        fiftyTwoWeekLowChangePercent: result.fifty_two_week?.low_change_percent,
-        fiftyTwoWeekHighChangePercent: result.fifty_two_week?.high_change_percent
+        raw: result,
+        symbol: requiredString(result.symbol, 'symbol'),
+        name: optionalString(result.name),
+        exchange: optionalString(result.exchange),
+        micCode: optionalString(result.mic_code),
+        currency: optionalString(result.currency),
+        datetime: optionalString(result.datetime),
+        timestamp: optionalNumber(result.timestamp),
+        lastQuoteAt: optionalNumber(result.last_quote_at),
+        open: optionalString(result.open),
+        high: optionalString(result.high),
+        low: optionalString(result.low),
+        close: optionalString(result.close),
+        volume: optionalString(result.volume),
+        previousClose: optionalString(result.previous_close),
+        change: optionalString(result.change),
+        percentChange: optionalString(result.percent_change),
+        averageVolume: optionalString(result.average_volume),
+        isMarketOpen: optionalBoolean(result.is_market_open),
+        fiftyTwoWeekLow: optionalString(result.fifty_two_week?.low),
+        fiftyTwoWeekHigh: optionalString(result.fifty_two_week?.high),
+        fiftyTwoWeekLowChange: optionalString(result.fifty_two_week?.low_change),
+        fiftyTwoWeekHighChange: optionalString(result.fifty_two_week?.high_change),
+        fiftyTwoWeekLowChangePercent: optionalString(
+          result.fifty_two_week?.low_change_percent
+        ),
+        fiftyTwoWeekHighChangePercent: optionalString(
+          result.fifty_two_week?.high_change_percent
+        )
       },
-      message: `**${result.name || ctx.input.symbol}** (${result.symbol || ctx.input.symbol}): ${result.close} ${result.currency || ''} (${result.change >= 0 ? '+' : ''}${result.change}, ${result.percent_change}%)`
+      message: `Retrieved the latest available quote for **${result.symbol}**; use the returned timestamps and market-open state to assess freshness.`
     };
   })
   .build();

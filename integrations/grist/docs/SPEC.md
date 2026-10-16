@@ -1,6 +1,4 @@
-Now let me get more details on the API features, particularly around tables, records, columns, and access control:Now let me check if Grist has self-hosted server URL requirements and document sharing/access control via API:I now have enough information to write the specification.
-
-# Slates Specification for Grist
+# Grist API Capability Reference
 
 ## Overview
 
@@ -31,7 +29,15 @@ The full API base URL follows the pattern: `https://<host>/api`
 - **API Key:** Generated from Profile Settings in the Grist UI.
 - **Server URL:** The base URL of the Grist instance (e.g., `https://docs.getgrist.com`, `https://myteam.getgrist.com`, or a self-hosted URL).
 
-There are no OAuth2 flows or scopes. The API key inherits all permissions of the user who generated it.
+This integration uses API keys, which inherit the permissions of their owner. Grist also documents OAuth apps; OAuth connection setup is not implemented by this integration.
+
+## Implemented tools
+
+The integration exposes organization discovery; current-user identity; workspace listing, details, creation, renaming, deletion and restoration; document details, creation, updates, deletion, restoration and SQLite downloads; table listing and creation; column listing and modification; record reads and mutations; read-only SQL; webhook management; and attachment listing and downloads. The capability descriptions below describe the wider provider API, including operations that are not exposed as tools, such as file import/upload, permission administration and low-level batch user actions.
+
+SQL results preserve Grist's `statement` and `records[].fields` response. Existing optional `columns` and `rows` values are retained when returned by a server. Webhook `readyColumnId` maps to the documented `isReadyColumn` API property; the legacy `readyColId` input is still forwarded unchanged. Webhook subscription keys are excluded from tool output.
+
+Official API source: https://support.getgrist.com/api/
 
 ## Features
 

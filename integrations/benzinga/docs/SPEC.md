@@ -1,79 +1,48 @@
-Let me get more details on the webhook and specific API features.Now let me check the webhook documentation more closely.# Slates Specification for Benzinga
+# Benzinga API Specification
 
-## Overview
-
-Benzinga is a financial data and media company that provides REST APIs for accessing financial news, market data, company fundamentals, and alternative datasets. The platform offers documentation for news, market, and company data APIs, serving brokerages, fintech companies, hedge funds, and research platforms.
+The integration provides read-only access to Benzinga news, calendar events, market data, company fundamentals, corporate logos, and ticker trends. Access depends on the datasets licensed to the connected API key.
 
 ## Authentication
 
-Authentication is via API Key set as a URL query parameter `token`.
+Use a Benzinga API key from the developer portal or licensing team. Requests send the key in the `token` query parameter over HTTPS. News channel discovery additionally sends the key in the endpoint's required `Key` header. No OAuth scopes or refresh tokens are involved. The documented APIs do not expose a suitable current-user or account identity endpoint.
 
-- **Method:** API Key (query parameter)
-- **Parameter name:** `token`
-- **How to obtain:** Sign up through the Benzinga developer portal to receive your API key. Alternatively, contact `licensing@benzinga.com`.
-- **Usage example:** `https://api.benzinga.com/api/v2/calendar/ratings?token=YOUR_API_KEY`
+## Available tools
 
-There are no OAuth flows, scopes, or additional credentials required. The same API key is used across all API endpoints.
+| API family | Tools |
+| --- | --- |
+| Newsfeed | `search_news`, `get_news_article`, `get_news_channels`, `get_wiims` |
+| Calendar and Signals | `get_calendar_events`, `get_consensus_ratings`, `get_options_activity`, `get_government_trades`, `get_insider_transactions` |
+| Market Data | `get_delayed_quotes`, `get_historical_bars`, `get_market_movers`, `get_short_interest` |
+| Company Fundamentals | `get_company_fundamentals` |
+| Corporate Logos | `get_corporate_logos` |
+| Ticker Trends | `get_trending_tickers` |
 
-## Features
+These categories follow the API families documented by Benzinga. News, Calendar, Corporate Logos, and Ticker Trends have separate official API specifications. Benzinga also documents Company Fundamentals and Market Data as separate reference families within its data API.
 
-### News & Content
+## Request and response behavior
 
-Access Benzinga's editorial and newswire content including full-length articles, real-time headlines, and press releases. Coverage includes the Wilshire 5000, the TSX, and 1000 other popular tickers. Content can be filtered by ticker, channel, content type, and date. A "Why Is It Moving" (WIIMs) dataset provides short explanations for why a stock is moving on any given day. Bull vs. Bear summaries distill analyst reports into bullish and bearish arguments for a stock. Analyst Insights provide qualitative summaries of analyst research reports.
+- News supports ticker, channel, content, date, region, and publication/update timestamp filtering. `get_news_channels` returns the provider's channel catalog. `get_news_article` accepts an article ID from search results and returns an empty article list when the provider cannot return that article.
+- WIIM explanations come from the News API with the `WIIM` channel. Each associated ticker receives an explanation with the actual headline, article body, and URL. Articles without an associated ticker remain available without a fabricated symbol. The `country` input uses the News API's region filter; no country metadata is inferred from it.
+- Calendar events use the documented v2.1 routes and their exact response wrappers. The IPO `date` filter uses `ipo_date`. Economic country filtering uses `country`. Update filters use Unix timestamps in seconds.
+- Insider filings use `/api/v1/sec/insider_transactions/filings`; government ticker searches explicitly use the `ticker` search-key type. Numeric provider timestamps remain represented as strings in the existing normalized timestamp outputs.
+- Historical bars require `from` at invocation. Existing interval choices translate to the provider's case-sensitive values, including `1MONTH` to `1M`. The optional session filter supports all sessions or a specific trading session.
+- Delayed quotes handle the provider's symbol-keyed response and its `lastTradePrice`, `previousClosePrice`, and `closeDate` fields. Provider numeric strings in bars, movers, options, and short interest are converted only when they contain finite numeric values, preserving actual zero values.
+- Logo results retain the provider's original CDN URLs and request brand colors along with light/dark and vector variants.
+- Existing normalized result fields retain their original scalar types and requiredness. The optional `raw` output retains complete original responses, including provider metadata, URLs, and fields without normalized counterparts. Calendar events and fundamentals already retain their original record data.
+- Pagination and documented integer limits are checked at invocation without changing the existing number input schemas. Provider errors retain the documented `text` or structured `errors[].value` details.
 
-### Financial Calendars
+## Official sources
 
-Calendar data covers conference calls, dividends, earnings, economics, FDA events, guidance, IPOs, offerings, analyst ratings, mergers & acquisitions, and stock splits. Data can be filtered by ticker, exchange, date range, and importance level. Fields are customizable by date, country, and event type. A delta mechanism via the `parameters[updated]` parameter allows efficient retrieval of only recently changed records.
-
-### Company Fundamentals
-
-Retrieve company profile data, financial statements, earning reports, valuation ratios, and key statistics. Data includes company profile, share class, earning reports, financial statements, operating earnings, valuation ratios, and alpha/beta metrics. Ticker detail provides peer comparisons and percentile rankings.
-
-### Market Movers
-
-Identify top gaining, losing, and most active securities across exchanges.
-
-### Signals (Unusual Options Activity)
-
-This API returns structured data for various signals such as unusual options activity. Data includes option type, strike price, expiration, volume, and sentiment. Filterable by ticker and date.
-
-### Delayed Quotes & Historical Bars
-
-Access delayed stock quotes and historical price bar data (OHLCV) for securities.
-
-### Corporate Logos
-
-The Benzinga Corporate Logo API is designed to be flexible with client sizing requirements. Returns logo images in light/dark variants, vector formats, and associated brand colors for publicly traded companies. Supports search by ticker or bulk sync.
-
-### Government & Insider Trades
-
-Access data on trades made by government officials and corporate insiders, including transaction details and filing information.
-
-### SEC Filings
-
-Retrieve SEC filing data for publicly traded companies.
-
-### Short Interest
-
-Access short interest data for securities.
-
-### Squawk (Streaming Audio)
-
-Squawk is a realtime broadcast which includes important headlines, price movement and rumors as stories develop. Available via dedicated streaming client libraries.
-
-## Events
-
-Benzinga supports webhooks for real-time event delivery.
-
-### News Events (Webhook v1)
-
-Webhooks offer the same realtime delivery, but the connection is not maintained between deliveries. News webhook payloads include article content such as title, body, authors, tags, associated securities, and channels.
-
-- **Actions:** Created (new articles published).
-- **Configuration:** Must accept POST requests on URL provided to Benzinga. The webhook endpoint URL is configured by Benzinga staff on your behalf. Content selections (which types of news to receive) are also managed by Benzinga.
-- **Delivery details:** Payloads are sent as HTTP POST requests with a `X-BZ-Delivery` header for tracking. Re-delivery attempts will happen using exponential backoff starting from 500 ms for up to 5 minutes.
-- **Testing:** A dedicated webhook test trigger endpoint is available to send sample payloads to your endpoint for verification.
-
-### WebSocket Streaming
-
-Benzinga also offers a WebSocket-based data streaming connection for newsfeed data, providing an always-on real-time connection as an alternative to webhooks. The Websocket offers an always-on connection that provides data real-time as soon as it becomes available in our system.
+- [Benzinga API reference and API family index](https://docs.benzinga.com/llms.txt)
+- [News channel discovery authentication](https://docs.benzinga.com/api-reference/news-api/channels/get-available-news-channels)
+- [News API specification](https://github.com/Benzinga/benzinga-docs/blob/main/openapi/news-api.spec.yml)
+- [WIIM endpoint and response example](https://docs.benzinga.com/api-reference/news-api/wiims/get-wiims)
+- [Calendar API specification](https://github.com/Benzinga/benzinga-docs/blob/main/openapi/calendar-api.spec.yml)
+- [Insider filing response example](https://docs.benzinga.com/api-reference/calendar-api/insider-transaction/get-insider-transaction-filing)
+- [Government trade response example](https://docs.benzinga.com/api-reference/calendar-api/government-trades/get-government-trades)
+- [Data API specification](https://github.com/Benzinga/benzinga-docs/blob/main/openapi/data-api-proxy.spec.yml)
+- [Delayed quote response example](https://docs.benzinga.com/api-reference/quotedelayed/get-delayed-quotes)
+- [Market movers response example](https://docs.benzinga.com/api-reference/market-data/get-market-movers)
+- [Short interest response example](https://docs.benzinga.com/api-reference/market-data/get-short-interest-data)
+- [Corporate Logo API specification](https://github.com/Benzinga/benzinga-docs/blob/main/openapi/logo-api.spec.yml)
+- [Ticker Trends API specification](https://github.com/Benzinga/benzinga-docs/blob/main/openapi/ticker-trends-api.spec.yml)

@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Your Beaconstac Organization ID. Required for organization-specific API requests, analytics, and multi-user access management.'
+        'Optional default organization ID for resource requests. Use list_organizations to discover IDs; tools can override this default.'
       )
   })
 );

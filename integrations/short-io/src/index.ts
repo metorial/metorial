@@ -2,15 +2,22 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   archiveLink,
+  createFolder,
   createLink,
+  createLinksBulk,
   deleteLink,
+  findLinksByOriginalUrl,
   generateQrCode,
+  getDomain,
   getDomainStatistics,
   getLink,
+  getLinkPreview,
   getLinkStatistics,
   listDomains,
+  listFolders,
   listLinks,
-  updateLink
+  updateLink,
+  updateLinkPreview
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -24,7 +31,14 @@ export let provider = Slate.create({
     getLinkStatistics,
     getDomainStatistics,
     generateQrCode,
-    archiveLink
+    archiveLink,
+    createFolder,
+    createLinksBulk,
+    findLinksByOriginalUrl,
+    getDomain,
+    getLinkPreview,
+    listFolders,
+    updateLinkPreview
   ],
   triggers: []
 });

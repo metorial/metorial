@@ -43,18 +43,11 @@ export let getWorkspace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let workspace: any;
+    let workspace: Awaited<ReturnType<Client['getUserWorkspace']>>;
     if (ctx.input.ownerType === 'org') {
       workspace = await client.getOrgWorkspace(ownerHandle, ctx.input.workspaceHandle);
     } else {
@@ -63,7 +56,7 @@ export let getWorkspace = SlateTool.create(spec, {
 
     return {
       output: workspace,
-      message: `Workspace **${workspace.handle}** is in state **${workspace.state || 'unknown'}** (instance type: ${workspace.instanceType || 'unknown'}).`
+      message: `Retrieved workspace **${workspace.handle}**.`
     };
   })
   .build();

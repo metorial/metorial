@@ -1,3 +1,4 @@
+export * from './additional-workflows';
 export * from './create-anomaly-detector';
 export * from './create-batch-prediction';
 export * from './create-cluster';

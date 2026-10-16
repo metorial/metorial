@@ -18,7 +18,7 @@ export let listCommands = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'ID of a specific computer to list commands for. If omitted, returns commands from all computers.'
+          'Computer ID from list_computers. If omitted, returns commands across your computers.'
         )
     })
   )
@@ -40,6 +40,10 @@ export let listCommands = SlateTool.create(spec, {
               .string()
               .optional()
               .describe('Reference to the computer this command belongs to'),
+            computerName: z
+              .string()
+              .optional()
+              .describe('Computer name to pass to trigger_command when available'),
             runCount: z
               .number()
               .optional()
@@ -55,9 +59,10 @@ export let listCommands = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let commands = ctx.input.computerId
-      ? await client.listCommandsForComputer(ctx.input.computerId)
-      : await client.listAllCommands();
+    let commands =
+      ctx.input.computerId !== undefined
+        ? await client.listCommandsForComputer(ctx.input.computerId)
+        : await client.listAllCommands();
 
     let mapped = commands.map(c => ({
       commandId: c._id,
@@ -67,6 +72,7 @@ export let listCommands = SlateTool.create(spec, {
       voiceReply: c.voiceReply,
       allowParams: c.allowParams,
       computerRef: c.computer,
+      computerName: c.computerName,
       runCount: c.runCount,
       lastResult: c.lastResult,
       createdAt: c.createdAt,

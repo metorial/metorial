@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { domainIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let archiveLink = SlateTool.create(spec, {
   name: 'Archive or Unarchive Link',
   key: 'archive_link',
-  description: `Archive or unarchive a short link. Archived links stop redirecting but are not deleted. Use this to temporarily disable a link without losing its data.`,
+  description: `Archive or unarchive a short link in the dashboard. Archived links continue redirecting; archiving only hides them from the dashboard.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -15,6 +16,7 @@ export let archiveLink = SlateTool.create(spec, {
   .input(
     z.object({
       linkId: z.string().describe('The ID of the link to archive or unarchive.'),
+      domainId: domainIdSchema.optional(),
       archive: z.boolean().describe('Set to true to archive, false to unarchive.')
     })
   )
@@ -29,8 +31,11 @@ export let archiveLink = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = ctx.input.archive
-      ? await client.archiveLink(ctx.input.linkId)
-      : await client.unarchiveLink(ctx.input.linkId);
+      ? await client.archiveLink(ctx.input.linkId, ctx.input.domainId ?? ctx.config.domainId)
+      : await client.unarchiveLink(
+          ctx.input.linkId,
+          ctx.input.domainId ?? ctx.config.domainId
+        );
 
     return {
       output: {

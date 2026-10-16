@@ -42,8 +42,11 @@ export let listSubtitleRequests = SlateTool.create(spec, {
           videoId: z.string().describe('Video ID'),
           languageCode: z.string().describe('Language code'),
           workStatus: z.string().describe('Current work status'),
+          subtitlerId: z.string().optional().describe('Stable ID of the assigned subtitler'),
           subtitler: z.string().nullable().describe('Assigned subtitler username'),
+          reviewerId: z.string().optional().describe('Stable ID of the assigned reviewer'),
           reviewer: z.string().nullable().describe('Assigned reviewer username'),
+          approverId: z.string().optional().describe('Stable ID of the assigned approver'),
           approver: z.string().nullable().describe('Assigned approver username'),
           created: z.string().describe('Creation date'),
           workCompleted: z.string().nullable().describe('Completion date')
@@ -75,8 +78,11 @@ export let listSubtitleRequests = SlateTool.create(spec, {
       languageCode: r.language,
       workStatus: r.work_status,
       subtitler: r.subtitler?.username ?? null,
+      subtitlerId: r.subtitler?.id,
       reviewer: r.reviewer?.username ?? null,
+      reviewerId: r.reviewer?.id,
       approver: r.approver?.username ?? null,
+      approverId: r.approver?.id,
       created: r.created,
       workCompleted: r.work_completed
     }));

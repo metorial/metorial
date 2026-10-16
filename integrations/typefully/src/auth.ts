@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { providerId, TypefullyClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -22,22 +23,14 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.typefully.com/v2',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/me');
-      let user = response.data;
+      let user = await new TypefullyClient(ctx.output.token).getCurrentUser();
 
       return {
         profile: {
-          id: user.id,
-          name: user.name || user.username,
-          email: user.email,
-          imageUrl: user.profile_image_url
+          id: providerId(user.id),
+          name: user.name ?? undefined,
+          email: user.email ?? undefined,
+          imageUrl: user.profile_image_url ?? undefined
         }
       };
     }

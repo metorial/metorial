@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseResponse, providerDataSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 let contactSchema = z
@@ -54,56 +55,82 @@ Supports 1,221 TLDs and 634 ccTLDs.`,
       admin: contactSchema.describe('Administrative contact'),
       tech: contactSchema.describe('Technical contact'),
       billing: contactSchema.describe('Billing contact'),
-      nameservers: z.array(z.string()).describe('List of nameservers')
+      nameservers: z.array(z.string()).describe('List of nameservers'),
+      providerData: providerDataSchema
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.getWhois(ctx.input.domainName);
-
-    let mapContact = (c: {
-      name: string;
-      organization: string;
-      street_address: string;
-      city: string;
-      region: string;
-      zip_code: string;
-      country: string;
-      phone: string;
-      fax: string;
-      email: string;
-    }) => ({
-      name: c.name || '',
-      organization: c.organization || '',
-      streetAddress: c.street_address || '',
-      city: c.city || '',
-      region: c.region || '',
-      zipCode: c.zip_code || '',
-      country: c.country || '',
-      phone: c.phone || '',
-      fax: c.fax || '',
-      email: c.email || ''
+    let responseContact = z
+      .object({
+        name: z.string(),
+        organization: z.string(),
+        street_address: z.string(),
+        city: z.string(),
+        region: z.string(),
+        zip_code: z.string(),
+        country: z.string(),
+        phone: z.string(),
+        fax: z.string(),
+        email: z.string()
+      })
+      .passthrough();
+    let result = parseResponse(
+      z
+        .object({
+          domain: z.string().min(1),
+          domain_id: z.string(),
+          status: z.string(),
+          create_date: z.string(),
+          update_date: z.string(),
+          expire_date: z.string(),
+          domain_age: z.number(),
+          whois_server: z.string(),
+          registrar: z
+            .object({ iana_id: z.string(), name: z.string(), url: z.string() })
+            .passthrough(),
+          registrant: responseContact,
+          admin: responseContact,
+          tech: responseContact,
+          billing: responseContact,
+          nameservers: z.array(z.string())
+        })
+        .passthrough(),
+      await client.getWhois(ctx.input.domainName),
+      'domain WHOIS'
+    );
+    let mapContact = (contact: z.output<typeof responseContact>) => ({
+      name: contact.name,
+      organization: contact.organization,
+      streetAddress: contact.street_address,
+      city: contact.city,
+      region: contact.region,
+      zipCode: contact.zip_code,
+      country: contact.country,
+      phone: contact.phone,
+      fax: contact.fax,
+      email: contact.email
     });
-
     let output = {
-      domain: result.domain || '',
-      domainId: result.domain_id || '',
-      status: result.status || '',
-      createDate: result.create_date || '',
-      updateDate: result.update_date || '',
-      expireDate: result.expire_date || '',
-      domainAge: result.domain_age || 0,
-      whoisServer: result.whois_server || '',
+      domain: result.domain,
+      domainId: result.domain_id,
+      status: result.status,
+      createDate: result.create_date,
+      updateDate: result.update_date,
+      expireDate: result.expire_date,
+      domainAge: result.domain_age,
+      whoisServer: result.whois_server,
       registrar: {
-        ianaId: result.registrar?.iana_id || '',
-        name: result.registrar?.name || '',
-        url: result.registrar?.url || ''
+        ianaId: result.registrar.iana_id,
+        name: result.registrar.name,
+        url: result.registrar.url
       },
-      registrant: mapContact(result.registrant || ({} as any)),
-      admin: mapContact(result.admin || ({} as any)),
-      tech: mapContact(result.tech || ({} as any)),
-      billing: mapContact(result.billing || ({} as any)),
-      nameservers: result.nameservers || []
+      registrant: mapContact(result.registrant),
+      admin: mapContact(result.admin),
+      tech: mapContact(result.tech),
+      billing: mapContact(result.billing),
+      nameservers: result.nameservers,
+      providerData: result
     };
 
     let ageYears = output.domainAge > 0 ? Math.floor(output.domainAge / 365) : 0;

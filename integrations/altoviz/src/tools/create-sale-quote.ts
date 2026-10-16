@@ -4,13 +4,28 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let lineItemSchema = z.object({
+  taxExcludedPrice: z
+    .number()
+    .optional()
+    .describe('Unit price excluding tax; takes precedence over unitPrice'),
+  taxIncludedPrice: z.number().optional().describe('Unit price including tax'),
+  productId: z.number().optional(),
+  productInternalId: z.string().optional(),
+  classificationId: z
+    .number()
+    .optional()
+    .describe('Classification ID from get_settings when not using a product'),
+  discountType: z
+    .enum(['Percent', 'Fixed'])
+    .optional()
+    .describe('How numeric discount is interpreted; defaults to Percent'),
   description: z.string().optional(),
   quantity: z.number().optional(),
   unitPrice: z.number().optional(),
   vatId: z.number().optional().describe('VAT rate ID'),
   productNumber: z.string().optional(),
   discount: z.number().optional(),
-  unit: z.string().optional()
+  unit: z.string().optional().describe('Unit code from get_settings with includeUnits')
 });
 
 export let createSaleQuote = SlateTool.create(spec, {
@@ -35,6 +50,10 @@ export let createSaleQuote = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including fields not shown in the summary'),
       quoteId: z.number().describe('Altoviz quote ID'),
       number: z.string().nullable().optional(),
       date: z.string().nullable().optional(),
@@ -48,6 +67,7 @@ export let createSaleQuote = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         quoteId: result.id,
         number: result.number,
         date: result.date,

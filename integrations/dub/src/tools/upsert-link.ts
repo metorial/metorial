@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let upsertLink = SlateTool.create(spec, {
   name: 'Upsert Link',
   key: 'upsert_link',
-  description: `Create a new short link or update an existing one. If a link with the same URL already exists (or matching domain + key), it will be updated. Otherwise, a new link is created. Useful for idempotent link creation.`,
+  description: `Create a new short link or update an existing one. If a link with the same destination URL already exists, it will be returned or updated. Otherwise, a new link is created. Useful for idempotent link creation.`,
   tags: {
     destructive: false,
     readOnly: false

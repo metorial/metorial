@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord } from '../lib/response';
 import { spec } from '../spec';
 
 export let getAiMetrics = SlateTool.create(spec, {
@@ -10,7 +11,7 @@ export let getAiMetrics = SlateTool.create(spec, {
   instructions: [
     'Timeframe options: "24h", "7d", "30d" (default), "3m", "1y".',
     'Aggregation options: "hourly", "daily" (default), "weekly", "monthly".',
-    'Use periodOffset (-1 to -365) to compare with a previous period.'
+    'Use periodOffset (0 for the current period, -1 to -365 for earlier periods) to compare with a previous period.'
   ],
   tags: {
     readOnly: true
@@ -27,7 +28,9 @@ export let getAiMetrics = SlateTool.create(spec, {
       engines: z
         .array(z.string())
         .optional()
-        .describe('Filter by AI engines (e.g., "chatgpt", "perplexity", "gemini")'),
+        .describe(
+          'Filter by AI engines (e.g., "chatgpt_gui", "perplexity", "google_ai_overview")'
+        ),
       timeframe: z
         .enum(['24h', '7d', '30d', '3m', '1y'])
         .optional()
@@ -35,7 +38,7 @@ export let getAiMetrics = SlateTool.create(spec, {
       periodOffset: z
         .number()
         .optional()
-        .describe('Period offset for comparison (-1 to -365)'),
+        .describe('Period offset: 0 for current period, -1 to -365 for previous periods'),
       aggregation: z
         .enum(['hourly', 'daily', 'weekly', 'monthly'])
         .optional()
@@ -64,6 +67,7 @@ export let getAiMetrics = SlateTool.create(spec, {
       aggregation: ctx.input.aggregation
     });
 
+    requireRecord(data, 'AI visibility metrics');
     return {
       output: { metrics: data },
       message: `Retrieved AI visibility metrics for domain **${ctx.input.domainId}**${ctx.input.timeframe ? ` (${ctx.input.timeframe})` : ''}.`

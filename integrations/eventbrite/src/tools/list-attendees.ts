@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { attendeeSchema, mapAttendee } from '../lib/attendees';
 import { Client } from '../lib/client';
+import { validateIntegerFields } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listAttendees = SlateTool.create(spec, {
@@ -18,67 +20,49 @@ export let listAttendees = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter attendees by status (e.g., "attending", "not_attending", "checked_in").'
+          'Filter attendees by provider status: attending, not attending, or unpaid. Check checkedIn in the result for check-in status.'
         ),
+      lastItemSeen: z
+        .string()
+        .optional()
+        .describe('With changedSince, return records with a later attendee ID.'),
+      attendeeIds: z.array(z.string()).optional().describe('Only return these attendee IDs.'),
       changedSince: z
         .string()
         .optional()
         .describe('Only return attendees changed since this UTC timestamp.'),
-      page: z.number().optional().describe('Page number for pagination.')
+      page: z.number().optional().describe('Page number for pagination.'),
+      continuation: z
+        .string()
+        .optional()
+        .describe('Continuation token returned by the previous page.')
     })
   )
   .output(
     z.object({
-      attendees: z
-        .array(
-          z.object({
-            attendeeId: z.string().describe('The unique attendee ID.'),
-            orderId: z.string().optional().describe('The order ID this attendee belongs to.'),
-            eventId: z.string().optional().describe('The event ID.'),
-            ticketClassName: z.string().optional().describe('Name of the ticket class.'),
-            ticketClassId: z.string().optional().describe('ID of the ticket class.'),
-            firstName: z.string().optional().describe('Attendee first name.'),
-            lastName: z.string().optional().describe('Attendee last name.'),
-            email: z.string().optional().describe('Attendee email.'),
-            status: z.string().optional().describe('Attendee status.'),
-            checkedIn: z.boolean().optional().describe('Whether the attendee has checked in.'),
-            created: z.string().optional().describe('When the attendee record was created.'),
-            changed: z
-              .string()
-              .optional()
-              .describe('When the attendee record was last changed.')
-          })
-        )
-        .describe('List of attendees.'),
+      attendees: z.array(attendeeSchema).describe('List of attendees.'),
+      continuation: z.string().optional().describe('Token to retrieve the next page.'),
       hasMore: z.boolean().describe('Whether there are more pages.')
     })
   )
   .handleInvocation(async ctx => {
+    validateIntegerFields(ctx.input, ['page'], 1);
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listEventAttendees(ctx.input.eventId, {
       status: ctx.input.status,
+      last_item_seen: ctx.input.lastItemSeen,
+      attendee_ids: ctx.input.attendeeIds?.join(','),
       changed_since: ctx.input.changedSince,
+      continuation: ctx.input.continuation,
       page: ctx.input.page
     });
 
-    let attendees = (result.attendees || []).map((att: any) => ({
-      attendeeId: att.id,
-      orderId: att.order_id,
-      eventId: att.event_id,
-      ticketClassName: att.ticket_class_name,
-      ticketClassId: att.ticket_class_id,
-      firstName: att.profile?.first_name,
-      lastName: att.profile?.last_name,
-      email: att.profile?.email,
-      status: att.status,
-      checkedIn: att.checked_in,
-      created: att.created,
-      changed: att.changed
-    }));
+    let attendees = (result.attendees || []).map(mapAttendee);
 
     return {
       output: {
         attendees,
+        continuation: result.pagination?.continuation ?? undefined,
         hasMore: result.pagination?.has_more_items || false
       },
       message: `Found **${attendees.length}** attendees for event \`${ctx.input.eventId}\`.`

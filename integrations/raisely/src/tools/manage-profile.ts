@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RaiselyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,7 @@ export let manageProfile = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.campaignUuid) {
-        throw new Error('campaignUuid is required for creating a profile');
+        throw createApiServiceError('campaignUuid is required for creating a profile');
       }
       let data: Record<string, any> = {};
       if (ctx.input.name) data.name = ctx.input.name;
@@ -83,7 +83,7 @@ export let manageProfile = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.profileUuid) {
-        throw new Error('profileUuid is required for updating a profile');
+        throw createApiServiceError('profileUuid is required for updating a profile');
       }
       let data: Record<string, any> = {};
       if (ctx.input.name) data.name = ctx.input.name;
@@ -107,7 +107,7 @@ export let manageProfile = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.profileUuid) {
-        throw new Error('profileUuid is required for deleting a profile');
+        throw createApiServiceError('profileUuid is required for deleting a profile');
       }
       await client.deleteProfile(ctx.input.profileUuid);
       return {
@@ -118,7 +118,9 @@ export let manageProfile = SlateTool.create(spec, {
 
     if (action === 'add_member') {
       if (!ctx.input.profileUuid || !ctx.input.userUuid) {
-        throw new Error('profileUuid and userUuid are required for adding a member');
+        throw createApiServiceError(
+          'profileUuid and userUuid are required for adding a member'
+        );
       }
       let result = await client.addProfileMember(ctx.input.profileUuid, ctx.input.userUuid);
       let profile = result.data || result;
@@ -130,7 +132,9 @@ export let manageProfile = SlateTool.create(spec, {
 
     if (action === 'remove_member') {
       if (!ctx.input.profileUuid || !ctx.input.userUuid) {
-        throw new Error('profileUuid and userUuid are required for removing a member');
+        throw createApiServiceError(
+          'profileUuid and userUuid are required for removing a member'
+        );
       }
       await client.removeProfileMember(ctx.input.profileUuid, ctx.input.userUuid);
       return {
@@ -139,6 +143,6 @@ export let manageProfile = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

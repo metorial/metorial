@@ -8,8 +8,8 @@ let venueSchema = z.object({
   name: z.string().describe('Venue name'),
   url: z.string().describe('SeatGeek URL for the venue'),
   score: z.number().describe('Popularity score from 0 to 1'),
-  address: z.string().describe('Street address'),
-  extendedAddress: z.string().describe('Extended address (suite, floor, etc.)'),
+  address: z.string().optional().describe('Street address'),
+  extendedAddress: z.string().optional().describe('Extended address (suite, floor, etc.)'),
   city: z.string().describe('City'),
   state: z.string().describe('State'),
   country: z.string().describe('Country'),
@@ -39,6 +39,14 @@ export let searchVenues = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      venueIds: z
+        .array(z.number())
+        .optional()
+        .describe('Retrieve known venue IDs; combine only with sort, page, and perPage'),
+      sort: z
+        .enum(['score.asc', 'score.desc', 'id.asc', 'id.desc'])
+        .optional()
+        .describe('Sort venues; default score.desc'),
       query: z
         .string()
         .optional()
@@ -52,7 +60,7 @@ export let searchVenues = SlateTool.create(spec, {
       geoIp: z
         .string()
         .optional()
-        .describe('Filter by IP address, or "true" to use client IP'),
+        .describe('Filter by IP address, or "true" to use the requesting server IP'),
       range: z
         .string()
         .optional()
@@ -63,6 +71,7 @@ export let searchVenues = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       venues: z.array(venueSchema).describe('List of matching venues'),
       total: z.number().describe('Total number of matching venues'),
       page: z.number().describe('Current page number'),
@@ -79,17 +88,19 @@ export let searchVenues = SlateTool.create(spec, {
 
     let params: Record<string, string> = {};
 
+    if (ctx.input.venueIds?.length) params.id = ctx.input.venueIds.join(',');
+    if (ctx.input.sort) params.sort = ctx.input.sort;
     if (ctx.input.query) params.q = ctx.input.query;
     if (ctx.input.city) params.city = ctx.input.city;
     if (ctx.input.state) params.state = ctx.input.state;
     if (ctx.input.country) params.country = ctx.input.country;
     if (ctx.input.postalCode) params.postal_code = ctx.input.postalCode;
-    if (ctx.input.latitude) params.lat = String(ctx.input.latitude);
-    if (ctx.input.longitude) params.lon = String(ctx.input.longitude);
+    if (ctx.input.latitude !== undefined) params.lat = String(ctx.input.latitude);
+    if (ctx.input.longitude !== undefined) params.lon = String(ctx.input.longitude);
     if (ctx.input.geoIp) params.geoip = ctx.input.geoIp;
     if (ctx.input.range) params.range = ctx.input.range;
-    if (ctx.input.page) params.page = String(ctx.input.page);
-    if (ctx.input.perPage) params.per_page = String(ctx.input.perPage);
+    if (ctx.input.page !== undefined) params.page = String(ctx.input.page);
+    if (ctx.input.perPage !== undefined) params.per_page = String(ctx.input.perPage);
 
     let response = await client.searchVenues(params);
 
@@ -98,8 +109,8 @@ export let searchVenues = SlateTool.create(spec, {
       name: v.name,
       url: v.url,
       score: v.score,
-      address: v.address,
-      extendedAddress: v.extended_address,
+      address: v.address ?? undefined,
+      extendedAddress: v.extended_address ?? undefined,
       city: v.city,
       state: v.state,
       country: v.country,
@@ -132,7 +143,7 @@ export let searchVenues = SlateTool.create(spec, {
     }
 
     return {
-      output: { venues, total, page, perPage },
+      output: { raw: response, venues, total, page, perPage },
       message: summaryParts.join('\n')
     };
   })

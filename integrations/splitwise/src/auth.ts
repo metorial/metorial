@@ -1,8 +1,11 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, requestAxiosData, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { checkResponse, toSplitwiseError } from './lib/errors';
 
 let httpClient = createAxios({
-  baseURL: 'https://secure.splitwise.com'
+  baseURL: 'https://secure.splitwise.com',
+  timeout: 30000
 });
 
 export let auth = SlateAuth.create()
@@ -32,29 +35,35 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let response = await httpClient.post('/oauth/token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        grant_type: 'authorization_code',
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri
-      });
+      let response = await requestAxiosData(
+        'token exchange',
+        () =>
+          httpClient.post('/oauth/token', {
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri
+          }),
+        toSplitwiseError
+      );
+      checkResponse(response);
+      let token = (response as Record<string, unknown>).access_token;
+      if (typeof token !== 'string' || !token.trim()) {
+        throw createApiServiceError('Splitwise did not return an access token.');
+      }
 
       return {
         output: {
-          token: response.data.access_token
+          token
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
-      let response = await httpClient.get('/api/v3.0/get_current_user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data.user;
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
+      if (typeof user.id !== 'number')
+        throw createApiServiceError('Splitwise did not return a profile ID.');
 
       return {
         profile: {
@@ -78,6 +87,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('A Splitwise API key is required.');
+      }
       return {
         output: {
           token: ctx.input.token
@@ -86,13 +98,9 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await httpClient.get('/api/v3.0/get_current_user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data.user;
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
+      if (typeof user.id !== 'number')
+        throw createApiServiceError('Splitwise did not return a profile ID.');
 
       return {
         profile: {

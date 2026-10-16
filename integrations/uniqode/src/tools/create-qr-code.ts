@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeaconstacClient } from '../lib/client';
+import { resolveOrganizationId } from '../lib/organization';
 import { spec } from '../spec';
 
 let campaignSchema = z
@@ -77,6 +78,20 @@ Use **qrType 1** for static and **qrType 2** for dynamic. Customize the design w
         .describe('Organization ID. Falls back to the configured organizationId.'),
       campaign: campaignSchema,
       fieldsData: fieldsDataSchema,
+      staticFields: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Additional documented static fields in provider spelling, including numeric qr_type, Wi-Fi credentials, vCard fields, email subject, or body'
+        ),
+      campaignParameters: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Additional documented campaign fields in provider spelling for PDF, app links, social media, coupons, and other supported campaign types'
+        ),
+      templateId: z.number().optional().describe('QR design template ID'),
+      tagIds: z.array(z.number()).optional().describe('Tag IDs associated with the QR code'),
       attributes: attributesSchema,
       placeId: z.number().optional().describe('Place ID to associate with the QR code'),
       locationEnabled: z
@@ -87,6 +102,7 @@ Use **qrType 1** for static and **qrType 2** for dynamic. Customize the design w
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       qrCodeId: z.number().describe('Unique ID of the created QR code'),
       name: z.string().describe('Name of the QR code'),
       qrType: z.number().describe('Type of QR code: 1=Static, 2=Dynamic'),
@@ -100,13 +116,21 @@ Use **qrType 1** for static and **qrType 2** for dynamic. Customize the design w
       organizationId: ctx.config.organizationId
     });
 
-    let orgId =
-      ctx.input.organizationId ??
-      (ctx.config.organizationId ? Number(ctx.config.organizationId) : undefined);
+    let orgId = resolveOrganizationId(ctx.input.organizationId, ctx.config.organizationId);
+    if (ctx.input.qrType !== 1 && ctx.input.qrType !== 2) {
+      throw createApiServiceError('qrType must be 1 for static or 2 for dynamic.');
+    }
+    if (ctx.input.qrType === 1 && !ctx.input.fieldsData && !ctx.input.staticFields) {
+      throw createApiServiceError('Static QR codes require fieldsData or staticFields.');
+    }
+    if (ctx.input.qrType === 2 && !ctx.input.campaign && !ctx.input.campaignParameters) {
+      throw createApiServiceError('Dynamic QR codes require campaign or campaignParameters.');
+    }
 
     let campaignData: Record<string, unknown> | undefined;
     if (ctx.input.campaign) {
       campaignData = {
+        ...ctx.input.campaignParameters,
         content_type: ctx.input.campaign.contentType
       };
       if (ctx.input.campaign.customUrl !== undefined)
@@ -120,6 +144,9 @@ Use **qrType 1** for static and **qrType 2** for dynamic. Customize the design w
       if (ctx.input.campaign.active !== undefined)
         campaignData.campaign_active = ctx.input.campaign.active;
     }
+
+    if (!campaignData && ctx.input.campaignParameters)
+      campaignData = ctx.input.campaignParameters;
 
     let attributesData: Record<string, unknown> | undefined;
     if (ctx.input.attributes) {
@@ -140,34 +167,67 @@ Use **qrType 1** for static and **qrType 2** for dynamic. Customize the design w
 
     let fieldsData: Record<string, unknown> | undefined;
     if (ctx.input.fieldsData) {
-      fieldsData = {};
+      fieldsData = { ...ctx.input.staticFields };
       let f = ctx.input.fieldsData;
-      if (f.qrType !== undefined) fieldsData.qr_type = f.qrType;
+      if (f.qrType !== undefined) {
+        let types: Record<string, number> = {
+          url: 1,
+          sms: 2,
+          phone: 3,
+          email: 4,
+          vcard: 5,
+          text: 6,
+          wifi: 7
+        };
+        let type =
+          types[f.qrType.toLowerCase()] ??
+          (/^[1-7]$/.test(f.qrType) ? Number(f.qrType) : undefined);
+        if (type === undefined)
+          throw createApiServiceError(
+            'Use a documented fieldsData.qrType: url, sms, phone, email, vcard, text, or wifi.'
+          );
+        fieldsData.qr_type = type;
+      }
       if (f.url !== undefined) fieldsData.url = f.url;
       if (f.phone !== undefined) fieldsData.phone = f.phone;
-      if (f.sms !== undefined) fieldsData.sms = f.sms;
+      if (f.sms !== undefined) fieldsData.body = f.sms;
       if (f.text !== undefined) fieldsData.text = f.text;
       if (f.email !== undefined) fieldsData.email = f.email;
     }
 
+    if (!fieldsData && ctx.input.staticFields) fieldsData = ctx.input.staticFields;
+    if (ctx.input.qrType === 1 && fieldsData?.qr_type === undefined) {
+      throw createApiServiceError(
+        'Provide fieldsData.qrType or numeric staticFields.qr_type.'
+      );
+    }
+    if (ctx.input.qrType === 2 && campaignData?.content_type === undefined) {
+      throw createApiServiceError(
+        'Provide campaign.contentType or campaignParameters.content_type.'
+      );
+    }
+
     let result = await client.createQrCode({
       name: ctx.input.name,
-      organization: orgId!,
+      organization: orgId,
       qr_type: ctx.input.qrType,
       campaign: campaignData,
       fields_data: fieldsData,
       attributes: attributesData,
       place: ctx.input.placeId,
-      location_enabled: ctx.input.locationEnabled
+      location_enabled: ctx.input.locationEnabled,
+      template: ctx.input.templateId,
+      tags: ctx.input.tagIds
     });
 
     return {
       output: {
+        raw: result,
         qrCodeId: result.id,
         name: result.name,
         qrType: result.qr_type,
-        url: result.url,
-        createdAt: result.created
+        url: typeof result.url === 'string' ? result.url : undefined,
+        createdAt: typeof result.created === 'string' ? result.created : undefined
       },
       message: `Created ${ctx.input.qrType === 1 ? 'static' : 'dynamic'} QR code **"${result.name}"** (ID: ${result.id}).`
     };

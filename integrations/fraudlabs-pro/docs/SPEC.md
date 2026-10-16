@@ -1,4 +1,4 @@
-# Slates Specification for FraudLabs Pro
+# FraudLabs Pro API Integration
 
 ## Overview
 
@@ -36,7 +36,7 @@ Detects all possible fraud traits based on input parameters supplied. The more i
 
 ### Order Feedback
 
-Allows updating the status of a transaction from pending-manual-review to APPROVE, REJECT, or IGNORE. The FraudLabs Pro algorithm will improve its formula for determining the fraud score using the data collected.
+Allows updating the status of a transaction to APPROVE, REJECT, or REJECT_BLACKLIST. The FraudLabs Pro algorithm will improve its formula for determining the fraud score using the data collected.
 
 - Available actions: Approve, Reject, and Reject & Blacklist.
 - A note can be attached to the feedback for reference.
@@ -56,6 +56,28 @@ Sends an SMS with a verification code and a custom message for authentication pu
 - You need to ensure you have enough SMS credits to send verification SMS.
 - A 24-hour cooldown is required if SMS delivery fails 10 times in a day.
 
+### Payment Feedback
+
+Reports the final payment status and gateway message, with an optional screened transaction ID.
+
+## Additional screening data
+
+Order screening accepts an optional shipping method and item details (SKU, quantity, price, name, type, and merchant-defined purchase type). The free Micro plan supports up to three items per order.
+
 ## Events
 
-The provider does not support webhooks or event subscriptions. FraudLabs Pro is a request-response API where you submit orders for screening and retrieve results — it does not offer built-in webhook notifications or purpose-built polling mechanisms for external event consumption.
+FraudLabs Pro documents an order-status-changed webhook configured manually in the account settings. This integration currently exposes request-response tools and does not register webhook subscriptions.
+
+## Response compatibility
+
+The screening and retrieval tools include the full provider response in `raw`, with credentials removed. Existing typed fields remain available. For screening details, documented unavailable scalar values are omitted from their typed projection while their original nulls remain in `raw`. Provider usage-type arrays appear as `ipGeolocation.usage_types`; the legacy `usage_type` string field remains available for string responses.
+
+## Official documentation
+
+- [Order screening](https://www.fraudlabspro.com/developer/api/screen-order)
+- [Order feedback](https://www.fraudlabspro.com/developer/api/feedback-order)
+- [Order result](https://www.fraudlabspro.com/developer/api/order-result)
+- [SMS verification](https://www.fraudlabspro.com/developer/api/send-sms-verification)
+- [OTP result](https://www.fraudlabspro.com/developer/api/get-sms-verification-result)
+- [Payment feedback](https://www.fraudlabspro.com/developer/api/feedback-payment)
+- [Order-status webhook](https://www.fraudlabspro.com/developer/webhook/order-status-changed)

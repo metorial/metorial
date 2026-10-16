@@ -1,6 +1,6 @@
 # Gift Up!
 
-Create, manage, redeem, and track digital and physical gift cards. Create orders with gift cards, manage gift card products and item groups, process redemptions and balance transfers, and top up balances. Configure checkout settings, email templates, artwork, promotions, and shipping options. Retrieve financial transaction reports, manage user access and permissions, register webhooks for order and gift card events, and configure Stripe payment integration.
+Create, manage, redeem, and track Gift Up! gift cards and orders. Manage checkout items and item groups, transfer and top up balances, inspect financial transactions and promotions, and discover company, location, and shipping details.
 
 ## License
 

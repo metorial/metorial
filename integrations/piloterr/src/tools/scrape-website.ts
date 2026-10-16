@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let scrapeWebsiteOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  html: z.string().describe('Extracted HTML content from the webpage')
+});
 
 export let scrapeWebsite = SlateTool.create(spec, {
   name: 'Scrape Website',
@@ -9,14 +15,14 @@ export let scrapeWebsite = SlateTool.create(spec, {
   description: `Scrape and extract HTML content from any webpage. Supports three modes:
 - **Crawler**: Fast HTML extraction with proxy rotation and smart retries (1 credit).
 - **Rendering**: Full browser rendering with JavaScript execution, wait conditions, and ad blocking (2 credits).
-- **Web Unlocker**: Advanced anti-bot bypass for protected sites like Cloudflare, Akamai, PerimeterX, DataDome (2 credits).`,
+- **Web Unlocker**: Advanced anti-bot bypass for approved sites protected by Cloudflare, Akamai, PerimeterX, or DataDome (3 credits).`,
   instructions: [
     'Use "crawler" mode for simple static pages. Use "rendering" for JavaScript-heavy SPAs. Use "webunlocker" for sites with anti-bot protection.',
     'For rendering mode, use waitFor with a CSS selector to wait for specific elements to load before extracting HTML.'
   ],
   constraints: [
     'Web Unlocker requires target domains to be whitelisted.',
-    'Rendering mode timeout is capped at 30 seconds.'
+    'Rendering wait and timeout options add latency; use only what the target page needs.'
   ],
   tags: {
     readOnly: true
@@ -42,23 +48,16 @@ export let scrapeWebsite = SlateTool.create(spec, {
       waitInSeconds: z
         .number()
         .optional()
-        .describe('Seconds to wait before capturing content (rendering mode, 0-30)'),
+        .describe('Seconds to wait before capturing content (rendering mode)'),
       waitFor: z
         .string()
         .optional()
         .describe('CSS or XPath selector to wait for before capturing (rendering mode)'),
       blockAds: z.boolean().optional().describe('Block ads during rendering (rendering mode)'),
-      timeout: z
-        .number()
-        .optional()
-        .describe('Request timeout in seconds (rendering mode, default 30)')
+      timeout: z.number().optional().describe('Request timeout in seconds (rendering mode)')
     })
   )
-  .output(
-    z.object({
-      html: z.string().describe('Extracted HTML content from the webpage')
-    })
-  )
+  .output(scrapeWebsiteOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let html: string;
@@ -86,7 +85,7 @@ export let scrapeWebsite = SlateTool.create(spec, {
     }
 
     return {
-      output: { html },
+      output: normalizeOutput(scrapeWebsiteOutputSchema, { raw: html, html }),
       message: `Scraped HTML from **${ctx.input.url}** using **${ctx.input.mode}** mode. Received ${html.length} characters.`
     };
   })

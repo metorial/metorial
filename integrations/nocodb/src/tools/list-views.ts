@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalBoolean, requireString, responseList } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listViews = SlateTool.create(spec, {
@@ -30,23 +31,24 @@ export let listViews = SlateTool.create(spec, {
             isDefault: z.boolean().optional().describe('Whether this is the default view')
           })
         )
-        .describe('Array of view objects')
+        .describe('Array of view objects'),
+      raw: z.any().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
 
     let result = await client.listViews(ctx.input.tableId);
-    let list = result?.list ?? result ?? [];
-    let views = (Array.isArray(list) ? list : []).map((v: any) => ({
-      viewId: v.id,
-      title: v.title ?? '',
+    let list = responseList(result, 'views');
+    let views = list.map((v: any) => ({
+      viewId: requireString(v.id, 'viewId'),
+      title: requireString(v.title, 'v.title'),
       type: v.type,
-      isDefault: v.is_default ?? undefined
+      isDefault: optionalBoolean(v.is_default)
     }));
 
     return {
-      output: { views },
+      output: { views, raw: result },
       message: `Found **${views.length}** view(s) for table \`${ctx.input.tableId}\`.`
     };
   })

@@ -8,9 +8,13 @@ let labelSchema = z.object({
   name: z.string().describe('Short name of the label'),
   fullName: z.string().nullable().describe('Full hierarchical name including parent labels'),
   level: z.number().nullable().describe('Nesting level in label hierarchy'),
-  openSuggestionsCount: z.number().describe('Number of open suggestions with this label'),
+  openSuggestionsCount: z
+    .number()
+    .optional()
+    .describe('Number of open suggestions with this label'),
   createdAt: z.string().describe('When the label was created'),
-  updatedAt: z.string().describe('When the label was last updated')
+  updatedAt: z.string().describe('When the label was last updated'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listLabels = SlateTool.create(spec, {
@@ -27,14 +31,15 @@ export let listLabels = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      labels: z.array(labelSchema),
-      totalRecords: z.number().describe('Total number of labels')
+      labels: z.array(labelSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of labels')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let result = await client.listLabels({
@@ -42,22 +47,23 @@ export let listLabels = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let labels = result.labels.map((l: any) => ({
+    let labels = result.labels?.map((l: any) => ({
       labelId: l.id,
       name: l.name,
-      fullName: l.full_name || null,
+      fullName: l.full_name ?? null,
       level: l.level ?? null,
-      openSuggestionsCount: l.open_suggestions_count || 0,
+      openSuggestionsCount: l.open_suggestions_count,
       createdAt: l.created_at,
-      updatedAt: l.updated_at
+      updatedAt: l.updated_at,
+      raw: l
     }));
 
     return {
       output: {
         labels,
-        totalRecords: result.pagination?.totalRecords || labels.length
+        totalRecords: result.pagination?.totalRecords
       },
-      message: `Found **${labels.length}** labels.`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

@@ -32,7 +32,8 @@ export let createComment = SlateTool.create(spec, {
     z.object({
       commentId: z.string().describe('ID of the created comment'),
       threadId: z.string().describe('Thread ID the comment was added to'),
-      createdAt: z.string().describe('Timestamp when the comment was created')
+      createdAt: z.string().describe('Timestamp when the comment was created'),
+      raw: z.unknown().optional().describe('Complete provider comment response')
     })
   )
   .handleInvocation(async ctx => {
@@ -48,8 +49,9 @@ export let createComment = SlateTool.create(spec, {
     return {
       output: {
         commentId: comment.id,
-        threadId: comment.threadId,
-        createdAt: comment.createdAt
+        threadId: ctx.input.threadId,
+        createdAt: comment.createdAt,
+        raw: comment.raw
       },
       message: `Created comment on thread **${ctx.input.threadId}**.`
     };

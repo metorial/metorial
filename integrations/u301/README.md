@@ -1,6 +1,6 @@
-# <img src="logo.png" height="20"> U 301
+# <img src="logo.png" height="20"> U301
 
-Shorten URLs with custom domains and slugs, delete short links, and generate QR codes for shortened URLs. List available domains including public system domains and private custom domains. Track link performance and manage link-in-bio pages.
+Shorten URLs with custom domains and slugs, delete short links, and generate downloadable SVG QR codes. Discover accessible workspaces, retrieve short links, list links with pagination, and inspect daily or hourly click analytics.
 
 ## License
 

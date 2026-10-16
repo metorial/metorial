@@ -1,3 +1,4 @@
+export * from './coupon-eligibility';
 export * from './create-coupon';
 export * from './create-product';
 export * from './delete-coupon';

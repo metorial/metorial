@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { IngestClient } from '../lib/client';
+import { IngestClient, record, records, text } from '../lib/client';
+import { attachUrl } from '../lib/files';
 import { spec } from '../spec';
 
 let renditionSchema = z.object({
@@ -17,7 +18,7 @@ let renditionSchema = z.object({
     .optional()
     .describe('Custom output size'),
   fit: z.enum(['cover', 'contain', 'crop', 'none']).optional().describe('Resize fit mode'),
-  quality: z.number().optional().describe('Quality (0-100)'),
+  quality: z.number().optional().describe('Quality (1-100)'),
   fps: z.number().optional().describe('Frames per second'),
   speed: z
     .object({
@@ -137,12 +138,25 @@ export let getSourceTool = SlateTool.create(spec, {
     let client = new IngestClient(ctx.auth.token, ctx.config.environment);
     let result = await client.getSource(ctx.input.sourceId);
 
-    let attrs = result.data?.attributes || {};
+    let attrs = record(result.data.attributes, 'source attributes');
+    if (attrs.status === 'ready') {
+      if (typeof attrs.source === 'string') await attachUrl(ctx, attrs.source);
+      if (attrs.outputs && typeof attrs.outputs === 'object') {
+        for (let rendition of Array.isArray(attrs.outputs.renditions)
+          ? attrs.outputs.renditions
+          : []) {
+          if (rendition?.status === 'ready' && typeof rendition.url === 'string')
+            await attachUrl(ctx, rendition.url);
+        }
+        if (typeof attrs.outputs.transcription?.url === 'string')
+          await attachUrl(ctx, attrs.outputs.transcription.url);
+      }
+    }
 
     return {
       output: {
-        sourceId: attrs.id || result.data?.id,
-        status: attrs.status,
+        sourceId: text(attrs.id ?? result.data.id, 'source ID'),
+        status: text(attrs.status, 'source status'),
         inputUrl: attrs.input,
         sourceUrl: attrs.source,
         width: attrs.width,
@@ -153,7 +167,7 @@ export let getSourceTool = SlateTool.create(spec, {
         created: attrs.created,
         updated: attrs.updated
       },
-      message: `Source **${attrs.id || result.data?.id}** is **${attrs.status}**.`
+      message: `Source **${text(attrs.id ?? result.data.id, 'source ID')}** is **${attrs.status}**.`
     };
   })
   .build();
@@ -161,7 +175,7 @@ export let getSourceTool = SlateTool.create(spec, {
 export let listSourcesTool = SlateTool.create(spec, {
   name: 'List Sources',
   key: 'list_sources',
-  description: `List all ingested sources. Returns source IDs, status, and metadata sorted by most recent first.`,
+  description: `List all ingested sources. Returns source IDs, status, and metadata.`,
   tags: {
     readOnly: true
   }
@@ -188,15 +202,18 @@ export let listSourcesTool = SlateTool.create(spec, {
     let client = new IngestClient(ctx.auth.token, ctx.config.environment);
     let result = await client.listSources();
 
-    let sources = (result.data || []).map((s: any) => ({
-      sourceId: s.attributes?.id || s.id,
-      status: s.attributes?.status,
-      inputUrl: s.attributes?.input,
-      width: s.attributes?.width,
-      height: s.attributes?.height,
-      duration: s.attributes?.duration,
-      created: s.attributes?.created
-    }));
+    let sources = records(result.data, 'sources').map(s => {
+      let attrs = record(s.attributes, 'source attributes');
+      return {
+        sourceId: text(attrs.id ?? s.id, 'source ID'),
+        status: attrs.status,
+        inputUrl: attrs.input,
+        width: attrs.width,
+        height: attrs.height,
+        duration: attrs.duration,
+        created: attrs.created
+      };
+    });
 
     return {
       output: { sources },
@@ -272,15 +289,15 @@ export let requestUploadUrlTool = SlateTool.create(spec, {
 
     let result = await client.requestUploadUrl(body);
 
-    let attrs = result.data?.attributes || {};
+    let attrs = record(result.data.attributes, 'source attributes');
 
     return {
       output: {
-        sourceId: attrs.id || result.data?.id,
-        uploadUrl: attrs.url,
+        sourceId: text(attrs.id ?? result.data.id, 'source ID'),
+        uploadUrl: text(attrs.url, 'upload URL'),
         expires: attrs.expires
       },
-      message: `Upload URL ready for source **${attrs.id || result.data?.id}**. Upload your file with a PUT request to the URL.`
+      message: `Upload URL ready for source **${text(attrs.id ?? result.data.id, 'source ID')}**. Upload your file with a PUT request to the URL.`
     };
   })
   .build();

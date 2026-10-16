@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deviceName, rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let restartDevice = SlateTool.create(spec, {
@@ -11,9 +12,10 @@ export let restartDevice = SlateTool.create(spec, {
     destructive: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ deviceName }))
   .output(
     z.object({
+      raw: rawResponse,
       success: z.string().describe('Whether the restart was successful ("1" for success)'),
       message: z.string().describe('Response message from the device')
     })
@@ -21,17 +23,18 @@ export let restartDevice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      deviceName: ctx.auth.deviceName
+      deviceName: ctx.input.deviceName ?? ctx.auth.deviceName
     });
 
     let response = await client.restart();
 
     return {
       output: {
+        raw: response,
         success: response.success,
         message: response.value
       },
-      message: `Device **${ctx.auth.deviceName}** restart ${response.success === '1' ? 'initiated successfully' : 'failed'}.`
+      message: `Device **${ctx.input.deviceName ?? ctx.auth.deviceName}** restart ${response.success === '1' ? 'initiated successfully' : 'failed'}.`
     };
   })
   .build();

@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Demio
 
-Manage webinar events, register participants, and track attendee engagement on Demio. List and retrieve details for live, series, and automated webinar events. Register participants programmatically and generate unique join links. Retrieve participant and attendance data for specific event dates.
+Discover webinar events and sessions, register participants, and retrieve attendance reports on Demio. Find session IDs and schedules, generate registrants' unique join links, retrieve registration field values, and filter participant reports by attendance status. Verify API access with the connection check.
+
+Connect using your API key and API secret from Account Settings > API. See the [integration specification](docs/SPEC.md) for supported operations and [Demio's API documentation](https://api-docs.demio.com/) for provider details.
 
 ## License
 

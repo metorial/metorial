@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { supervisedReference } from '../lib/client';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -30,6 +31,7 @@ Works with decision trees, ensembles, deepnets, logistic regressions, linear reg
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the evaluation'),
       name: z.string().optional().describe('Name of the evaluation'),
       statusCode: z.number().describe('Status code'),
@@ -40,44 +42,27 @@ Works with decision trees, ensembles, deepnets, logistic regressions, linear reg
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let modelId = ctx.input.modelId;
-    let modelType = modelId.split('/')[0];
-
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
+      ...supervisedReference(ctx.input.modelId, true),
       dataset: ctx.input.datasetId
     };
 
-    if (modelType === 'ensemble') {
-      body.ensemble = modelId;
-    } else if (modelType === 'deepnet') {
-      body.deepnet = modelId;
-    } else if (modelType === 'logisticregression') {
-      body.logisticregression = modelId;
-    } else if (modelType === 'linearregression') {
-      body.linearregression = modelId;
-    } else if (modelType === 'timeseries') {
-      body.timeseries = modelId;
-    } else if (modelType === 'fusion') {
-      body.fusion = modelId;
-    } else {
-      body.model = modelId;
-    }
-
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.projectId) body.project = ctx.input.projectId;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
 
     let result = await client.createResource('evaluation', body);
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
-        statusCode: result.status?.code ?? result.code,
-        statusMessage: result.status?.message ?? 'Created',
+        statusCode: result.status.code,
+        statusMessage: result.status.message,
         created: result.created
       },
-      message: `Evaluation **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status?.message ?? 'pending'}. Evaluation is asynchronous — retrieve the resource when finished to see metrics.`
+      message: `Evaluation **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status.message}. Evaluation is asynchronous — retrieve the resource when finished to see metrics.`
     };
   })
   .build();

@@ -1,57 +1,21 @@
-Let me try to access the AMcards API documentation directly and the Zapier integration page for more details on available actions.Now I have a comprehensive view of the AMcards API from the Zapier integration page. Let me compile the specification.
+# AMcards integration
 
-# Slates Specification for Amcards
+AMcards prints and mails personalized greeting cards and runs drip campaigns. This integration uses a bearer access token generated at [Generate Access Token](https://amcards.com/user/generate-access-token/). No workspace or account ID is required during setup.
 
-## Overview
+## Workflows
 
-AMcards is a platform that enables businesses to create and send personalized physical greeting cards and gifts to clients, employees, and partners. The AMcards API allows you to automate the process of sending physical greeting cards. Users can create drip campaigns and automate cards for birthdays, anniversaries, holidays, referrals, and specific dates.
+- `get_account_info` identifies the connected account and preserves the complete provider response.
+- `list_quicksend_templates` discovers configured templates for `send_card`. Public templates must first be added to Quicksend Templates in AMcards; `list_templates` browses public templates separately.
+- `list_campaigns` discovers configured drip campaign IDs for `schedule_drip_campaign`.
+- `send_card` submits a card request. `schedule_drip_campaign` submits a campaign request and exposes the returned mailing and card IDs. Both accept optional custom merge fields and return-address overrides. Omitting the send date lets AMcards schedule mailing for the following day.
+- `get_card_history` pages through cards and can filter by an external CRM contact ID. `get_card` retrieves the complete record for one card.
+- `search_contacts` pages through contacts with name/email filters. `get_contact` retrieves a complete contact; `create_contact` resolves its owner from the connected account; `delete_contact` deletes an internal AMcards contact ID.
+- `cancel_cards_by_contact` requests cancellation of editable cards using the external contact ID. Printed or mailed cards cannot be cancelled through this operation.
 
-## Authentication
+List tools retain their existing returned-item count and additionally expose the provider’s total count, next offset when available, and unmodified response. Card status is returned as a string to preserve the existing output type; the documented provider values include `0` (editable), `2` (in the mail), `4` (delivered), and `6` (printed).
 
-AMcards uses API keys for authentication. The API key is passed as a Bearer token in the `Authorization` header of requests.
+## API references
 
-- **Base URL:** `https://amcards.com/.api/v1/`
-- **Header:** `Authorization: Bearer <API_KEY>`
+The [first-party Python SDK](https://github.com/amcards/python-amcards) and its [API documentation](https://python-amcards.readthedocs.io/en/latest/amcards.html) document bearer authentication, singular resource routes, pagination using `limit`/`offset`, `objects` list envelopes, and card/campaign send requests. The [official Zapier guide](https://help.amcards.com/hc/en-us/articles/7131855100429-How-to-use-AMcards-com-with-Zapier) explains the distinction between public templates and configured Quicksend Templates.
 
-The API key can be obtained from your AMcards account settings. Amcards requires you to configure your own API key credentials.
-
-## Features
-
-### Send Individual Cards
-
-Create and send personalized physical greeting cards to recipients. A card requires selecting a Quicksend Template and providing recipient and sender address details (name, address, city, state, postal code). Optional parameters include a custom message, a scheduled send date, and a third-party contact ID for linking to external CRM records.
-
-- Templates are pre-configured in the AMcards platform and referenced by ID.
-- The "Initiator" field is required to identify who triggered the card send.
-- Cards are physically printed, stuffed, and mailed by AMcards.
-
-### Schedule Drip Campaigns
-
-Create drip campaigns or use pre-built ones to send a series of cards to a recipient over time. Campaigns are pre-configured in the AMcards platform and triggered via the API with recipient details.
-
-- Supports additional recipient fields like salutation, birth date, phone number, and anniversary date, which can be used for personalization within the campaign.
-- Optional "FROM" address fields allow overriding the default sender.
-- A send date can be specified to schedule when the campaign starts.
-- A third-party contact ID can be provided for external system tracking.
-
-### Cancel Cards by Contact
-
-Cancels all editable cards related to the specified contact. This uses the third-party contact ID to identify which contact's pending cards should be cancelled.
-
-- Only cards that are still in an editable state (not yet printed/mailed) can be cancelled.
-
-### Contact Management
-
-The API can query contacts in real-time, searching by email, first name, or last name. Results include all stored contact fields — names, addresses, and timestamps.
-
-### Card Retrieval
-
-Retrieve your complete card history through the API. This includes all cards associated with your account — queued, printed, mailed, or delivered.
-
-### User Account Information
-
-Retrieve information about the authenticated user account via the user endpoint.
-
-## Events
-
-The provider does not support events. AMcards does not offer webhooks or event subscription mechanisms through its API. Integrations typically rely on external triggers (e.g., from CRM systems or scheduling tools) to initiate AMcards actions rather than AMcards emitting events.
+Provider behavior has not been verified with live calls in this refresh. The legacy public-template and contact-cancellation routes were preserved because the accessible first-party SDK does not document them and the main API documentation was unavailable behind a browser challenge.

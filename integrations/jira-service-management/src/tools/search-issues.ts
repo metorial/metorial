@@ -27,7 +27,9 @@ export let searchIssuesTool = SlateTool.create(spec, {
 Use JQL syntax like \`project = "KEY" AND status = "Open"\` or \`assignee = currentUser() ORDER BY updated DESC\`.`,
   instructions: [
     'Use JQL syntax for the query parameter. Examples: `project = PROJ`, `status = "In Progress"`, `assignee = accountId`.',
-    'Combine conditions with AND/OR and sort with ORDER BY.'
+    'Combine conditions with AND/OR and sort with ORDER BY.',
+    'For efficient pagination, pass the returned nextPageToken and omit startAt. With a cursor, startAt skips relative to that cursor.',
+    'Search stops after the requested result window and is limited to 10 API requests and 30 seconds, including offset skipping. Narrow the query or use cursors for deep pagination.'
   ],
   tags: {
     readOnly: true
@@ -47,28 +49,51 @@ Use JQL syntax like \`project = "KEY" AND status = "Open"\` or \`assignee = curr
       startAt: z
         .number()
         .optional()
-        .describe('Index of the first result to return for pagination')
+        .describe('Offset from the search start, or relative to nextPageToken when provided'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation cursor from a previous search_issues response. Omit startAt to return the next page directly.'
+        )
     })
   )
   .output(
     z.object({
-      total: z.number().describe('Total number of matching issues'),
-      startAt: z.number().describe('Index of the first returned result'),
+      total: z
+        .number()
+        .optional()
+        .describe(
+          'Exact total, when available. The current enhanced search API does not provide this field.'
+        ),
+      startAt: z
+        .number()
+        .describe('Requested offset relative to the search start or supplied cursor'),
       maxResults: z.number().describe('Maximum results returned'),
-      issues: z.array(issueSchema).describe('List of matching issues')
+      issues: z.array(issueSchema).describe('List of matching issues'),
+      returnedCount: z
+        .number()
+        .optional()
+        .describe('Number of issues returned in this response; not a total match count'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Cursor for the next page, when returned by Jira'),
+      isLast: z
+        .boolean()
+        .optional()
+        .describe('Whether Jira marked the final provider page reached by this response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let result = await client.searchIssues(
       ctx.input.jql,
       ctx.input.fields,
       ctx.input.maxResults,
-      ctx.input.startAt
+      ctx.input.startAt,
+      ctx.input.nextPageToken
     );
 
     let issues = (result.issues || []).map((issue: any) => ({
@@ -90,12 +115,14 @@ Use JQL syntax like \`project = "KEY" AND status = "Open"\` or \`assignee = curr
 
     return {
       output: {
-        total: result.total,
         startAt: result.startAt,
         maxResults: result.maxResults,
-        issues
+        issues,
+        returnedCount: issues.length,
+        nextPageToken: result.nextPageToken,
+        isLast: result.isLast
       },
-      message: `Found **${result.total}** issues matching the query. Returned ${issues.length} results starting at index ${result.startAt}.`
+      message: `Returned **${issues.length}** issues starting at offset ${result.startAt}${ctx.input.nextPageToken ? ' from the supplied cursor' : ''}.${result.nextPageToken ? ' Use nextPageToken to continue.' : ''}`
     };
   })
   .build();

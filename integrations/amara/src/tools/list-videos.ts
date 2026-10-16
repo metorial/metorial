@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -63,20 +63,27 @@ export let listVideos = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let videos = result.objects.map(v => ({
-      videoId: v.id,
-      title: v.title,
-      description: v.description,
-      duration: v.duration,
-      thumbnail: v.thumbnail,
-      created: v.created,
-      team: v.team,
-      project: v.project,
-      primaryAudioLanguageCode: v.primary_audio_language_code,
-      videoType: v.video_type,
-      allUrls: v.all_urls,
-      languageCount: v.languages?.length ?? 0
-    }));
+    let videos = result.objects.map(v => {
+      if (!Array.isArray(v?.languages)) {
+        throw createApiServiceError('Amara returned a video without a valid languages list.', {
+          reason: 'amara_invalid_response'
+        });
+      }
+      return {
+        videoId: v.id,
+        title: v.title,
+        description: v.description,
+        duration: v.duration,
+        thumbnail: v.thumbnail,
+        created: v.created,
+        team: v.team,
+        project: v.project,
+        primaryAudioLanguageCode: v.primary_audio_language_code,
+        videoType: v.video_type,
+        allUrls: v.all_urls,
+        languageCount: v.languages.length
+      };
+    });
 
     return {
       output: {

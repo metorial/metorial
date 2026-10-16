@@ -1,7 +1,30 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DeveloperClient } from '../lib/client';
+import { parseMinerstatResponse } from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  coins: z.array(
+    z.object({
+      coinId: z.string().describe('Unique coin identifier'),
+      ticker: z.string().describe('Coin ticker symbol'),
+      name: z.string().describe('Full coin name'),
+      coinType: z.string().describe('Type: "coin" or "pool" (multi pool)'),
+      algorithm: z.string().describe('Mining algorithm'),
+      networkHashrate: z.number().describe('Network hashrate in H/s (-1 if unavailable)'),
+      difficulty: z.number().describe('Current mining difficulty (-1 if unavailable)'),
+      reward: z.number().describe('Reward per H/s per hour (-1 if unavailable)'),
+      rewardUnit: z.string().describe('Reward denomination'),
+      blockReward: z.number().describe('Block reward (-1 if unavailable)'),
+      priceUsd: z.number().describe('Price in USD (-1 if unavailable)'),
+      volumeUsd24h: z.number().describe('24h trading volume in USD (-1 if unavailable)'),
+      lastUpdated: z.number().describe('UNIX timestamp of last update')
+    })
+  ),
+  response: z.any().optional().describe('Original API response'),
+  totalCount: z.number().describe('Number of coins returned')
+});
 
 export let getCoinsTool = SlateTool.create(spec, {
   name: 'Get Coins',
@@ -27,31 +50,10 @@ export let getCoinsTool = SlateTool.create(spec, {
         .describe('Comma-separated algorithm names to filter (e.g. "SHA-256,Scrypt")')
     })
   )
-  .output(
-    z.object({
-      coins: z.array(
-        z.object({
-          coinId: z.string().describe('Unique coin identifier'),
-          ticker: z.string().describe('Coin ticker symbol'),
-          name: z.string().describe('Full coin name'),
-          coinType: z.string().describe('Type: "coin" or "pool" (multi pool)'),
-          algorithm: z.string().describe('Mining algorithm'),
-          networkHashrate: z.number().describe('Network hashrate in H/s (-1 if unavailable)'),
-          difficulty: z.number().describe('Current mining difficulty (-1 if unavailable)'),
-          reward: z.number().describe('Reward per H/s per hour (-1 if unavailable)'),
-          rewardUnit: z.string().describe('Reward denomination'),
-          blockReward: z.number().describe('Block reward (-1 if unavailable)'),
-          priceUsd: z.number().describe('Price in USD (-1 if unavailable)'),
-          volumeUsd24h: z.number().describe('24h trading volume in USD (-1 if unavailable)'),
-          lastUpdated: z.number().describe('UNIX timestamp of last update')
-        })
-      ),
-      totalCount: z.number().describe('Number of coins returned')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     if (!ctx.auth.developerApiKey) {
-      throw new Error(
+      throw createApiServiceError(
         'Developer API key is required to query coin data. Please provide it in your authentication credentials.'
       );
     }
@@ -81,16 +83,17 @@ export let getCoinsTool = SlateTool.create(spec, {
       lastUpdated: c.updated
     }));
 
-    let filterDesc: any[] = [];
+    let filterDesc: string[] = [];
     if (ctx.input.tickers) filterDesc.push(`tickers: ${ctx.input.tickers}`);
     if (ctx.input.algorithm) filterDesc.push(`algorithms: ${ctx.input.algorithm}`);
     let filterText = filterDesc.length > 0 ? ` (filtered by ${filterDesc.join(', ')})` : '';
 
     return {
-      output: {
+      output: parseMinerstatResponse(outputSchema, {
         coins: mapped,
-        totalCount: mapped.length
-      },
+        totalCount: mapped.length,
+        response: coins
+      }),
       message: `Retrieved **${mapped.length}** coins${filterText}.`
     };
   })

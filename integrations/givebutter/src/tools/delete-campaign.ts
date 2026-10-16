@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let deleteCampaignOutputSchema = z.object({
+  deleted: z.boolean().describe('Whether the campaign was successfully deleted')
+});
+
 export let deleteCampaign = SlateTool.create(spec, {
   name: 'Delete Campaign',
   key: 'delete_campaign',
@@ -16,19 +20,15 @@ export let deleteCampaign = SlateTool.create(spec, {
       campaignId: z.number().describe('ID of the campaign to delete')
     })
   )
-  .output(
-    z.object({
-      deleted: z.boolean().describe('Whether the campaign was successfully deleted')
-    })
-  )
+  .output(deleteCampaignOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     await client.deleteCampaign(ctx.input.campaignId);
 
     return {
-      output: { deleted: true },
-      message: `Deleted campaign **${ctx.input.campaignId}**.`
+      output: client.output(deleteCampaignOutputSchema, { deleted: true }),
+      message: client.publicData(`Deleted campaign **${ctx.input.campaignId}**.`)
     };
   })
   .build();

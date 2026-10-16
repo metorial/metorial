@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import {
+  invalidResponse,
+  optionalDecimalString,
+  record,
+  records,
+  requiredString
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getAnalystData = SlateTool.create(spec, {
@@ -24,6 +31,10 @@ Includes consensus target prices (high, low, median, average) and revenue foreca
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       symbol: z.string().describe('Ticker symbol'),
       priceTarget: z
         .object({
@@ -49,32 +60,40 @@ Includes consensus target prices (high, low, median, average) and revenue foreca
       country: ctx.input.country
     };
 
-    let priceTarget: any;
+    let raw: Record<string, any> = {};
+    let symbol: string | undefined;
+    let priceTarget:
+      | { high?: string; low?: string; median?: string; average?: string }
+      | undefined;
     let revenueEstimates: any[] | undefined;
 
     if (ctx.input.dataType === 'price_target' || ctx.input.dataType === 'both') {
       let ptResult = await client.getPriceTarget(baseParams);
-      priceTarget = {
-        high: ptResult.price_target?.high || ptResult.high,
-        low: ptResult.price_target?.low || ptResult.low,
-        median: ptResult.price_target?.median || ptResult.median,
-        average: ptResult.price_target?.average || ptResult.average
-      };
+      raw.priceTarget = ptResult;
+      symbol = requiredString(record(ptResult.meta, 'meta').symbol, 'meta.symbol');
+      if (isApiErrorRecord(ptResult.price_target)) {
+        priceTarget = {
+          high: optionalDecimalString(ptResult.price_target.high),
+          low: optionalDecimalString(ptResult.price_target.low),
+          median: optionalDecimalString(ptResult.price_target.median),
+          average: optionalDecimalString(ptResult.price_target.average)
+        };
+      }
     }
 
     if (ctx.input.dataType === 'revenue_estimates' || ctx.input.dataType === 'both') {
       let reResult = await client.getRevenueEstimates(baseParams);
-      revenueEstimates = reResult.revenue_estimate || reResult.revenue_estimates || [];
-      if (!Array.isArray(revenueEstimates)) {
-        revenueEstimates = [revenueEstimates];
-      }
+      raw.revenueEstimates = reResult;
+      let revenueSymbol = requiredString(record(reResult.meta, 'meta').symbol, 'meta.symbol');
+      if (symbol !== undefined && symbol !== revenueSymbol)
+        throw invalidResponse('analyst response symbols disagree');
+      symbol = revenueSymbol;
+      revenueEstimates = records(reResult.revenue_estimate, 'revenue_estimate');
     }
 
     let parts: string[] = [];
     if (priceTarget) {
-      parts.push(
-        `Price target: avg **${priceTarget.average}**, range ${priceTarget.low}–${priceTarget.high}`
-      );
+      parts.push('available price-target fields');
     }
     if (revenueEstimates) {
       parts.push(`${revenueEstimates.length} revenue estimate(s)`);
@@ -82,7 +101,8 @@ Includes consensus target prices (high, low, median, average) and revenue foreca
 
     return {
       output: {
-        symbol: ctx.input.symbol,
+        raw,
+        symbol: requiredString(symbol, 'meta.symbol'),
         priceTarget,
         revenueEstimates
       },

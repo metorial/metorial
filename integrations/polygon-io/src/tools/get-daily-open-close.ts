@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 export let getDailyOpenClose = SlateTool.create(spec, {
@@ -50,15 +51,15 @@ export let getDailyOpenClose = SlateTool.create(spec, {
 
       return {
         output: {
-          ticker: data.symbol || ctx.input.ticker,
-          from: data.from,
-          open: data.open,
-          high: data.high,
-          low: data.low,
-          close: data.close,
-          volume: data.volume,
-          afterHours: data.afterHours,
-          preMarket: data.preMarket
+          ticker: data.symbol ?? undefined,
+          from: data.from ?? undefined,
+          open: data.open ?? undefined,
+          high: data.high ?? undefined,
+          low: data.low ?? undefined,
+          close: data.close ?? undefined,
+          volume: data.volume ?? undefined,
+          afterHours: data.afterHours ?? undefined,
+          preMarket: data.preMarket ?? undefined
         },
         message: `**${ctx.input.ticker}** on ${ctx.input.date}: Open $${data.open}, Close $${data.close}, High $${data.high}, Low $${data.low}, Volume ${data.volume?.toLocaleString()}.`
       };
@@ -69,17 +70,20 @@ export let getDailyOpenClose = SlateTool.create(spec, {
       adjusted: ctx.input.adjusted
     });
 
-    let result = data.results?.[0];
+    let result = responseRows(data.results)?.[0];
 
     return {
       output: {
-        ticker: data.ticker || ctx.input.ticker,
-        from: result ? undefined : undefined,
-        open: result?.o,
-        high: result?.h,
-        low: result?.l,
-        close: result?.c,
-        volume: result?.v
+        ticker: data.ticker ?? undefined,
+        from:
+          typeof result?.t === 'number' && Number.isFinite(new Date(result.t).getTime())
+            ? new Date(result.t).toISOString().slice(0, 10)
+            : undefined,
+        open: result?.o ?? undefined,
+        high: result?.h ?? undefined,
+        low: result?.l ?? undefined,
+        close: result?.c ?? undefined,
+        volume: result?.v ?? undefined
       },
       message: result
         ? `Previous close for **${ctx.input.ticker}**: Open $${result.o}, Close $${result.c}, High $${result.h}, Low $${result.l}, Volume ${result.v?.toLocaleString()}.`

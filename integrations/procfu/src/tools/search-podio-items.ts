@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProcFuClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,6 +41,13 @@ Returns up to 20 matching items. Use simplified mode to get compact contact/fiel
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !Number.isInteger(ctx.input.maxResults) ||
+      ctx.input.maxResults < 1 ||
+      ctx.input.maxResults > 20
+    ) {
+      throw createApiServiceError('maxResults must be a whole number between 1 and 20.');
+    }
     let client = new ProcFuClient({ token: ctx.auth.token });
 
     let conditionCode = ctx.input.condition === 'equals' ? 'E' : 'C';
@@ -54,7 +61,12 @@ Returns up to 20 matching items. Use simplified mode to get compact contact/fiel
       ctx.input.simplified
     );
 
-    let items = Array.isArray(result) ? result : [];
+    if (!Array.isArray(result)) {
+      throw createApiServiceError(
+        'ProcFu did not return a search result array. Call get_last_error to inspect the failure.'
+      );
+    }
+    let items = result;
 
     return {
       output: {

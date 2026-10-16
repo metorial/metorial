@@ -17,6 +17,9 @@ export let listDrafts = SlateTool.create(spec, {
       inboxId: z.string().describe('Inbox to list drafts from'),
       limit: z.number().optional().describe('Maximum drafts per page'),
       pageToken: z.string().optional().describe('Pagination cursor from a previous response'),
+      labels: z.array(z.string()).optional().describe('Filter drafts by labels.'),
+      before: z.string().optional().describe('Only drafts before this ISO 8601 timestamp.'),
+      after: z.string().optional().describe('Only drafts after this ISO 8601 timestamp.'),
       ascending: z.boolean().optional().describe('Sort oldest first when true')
     })
   )
@@ -46,13 +49,16 @@ export let listDrafts = SlateTool.create(spec, {
     let result = await client.listDrafts(ctx.input.inboxId, {
       limit: ctx.input.limit,
       pageToken: ctx.input.pageToken,
-      ascending: ctx.input.ascending
+      ascending: ctx.input.ascending,
+      labels: ctx.input.labels,
+      before: ctx.input.before,
+      after: ctx.input.after
     });
 
     let drafts = result.drafts.map(d => ({
       draftId: d.draft_id,
       inboxId: d.inbox_id,
-      to: d.to,
+      to: d.to ?? [],
       subject: d.subject,
       preview: d.preview,
       sendStatus: d.send_status,

@@ -4,9 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'membervault',
-  name: 'Membervault',
+  name: 'MemberVault',
   description:
-    'Manage users, products, and engagement tracking for online courses, memberships, and digital products on MemberVault.',
+    'List MemberVault products, grant or revoke product access, and delete user accounts.',
   metadata: {},
   config,
   auth

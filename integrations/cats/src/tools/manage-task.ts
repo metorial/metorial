@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let createTask = SlateTool.create(spec, {
@@ -16,7 +17,7 @@ export let createTask = SlateTool.create(spec, {
     z.object({
       description: z.string().describe('Task description'),
       dueDate: z.string().optional().describe('Due date (RFC 3339)'),
-      priority: z.number().optional().describe('Priority level (1-5, 1 = highest)'),
+      priority: z.number().optional().describe('Priority level (1-5, 1 = lowest)'),
       assignedToUserId: z.number().optional().describe('User ID to assign the task to'),
       regardingType: z
         .enum(['candidate', 'contact', 'company', 'job'])
@@ -37,15 +38,29 @@ export let createTask = SlateTool.create(spec, {
     let body: Record<string, any> = {
       description: ctx.input.description
     };
-    if (ctx.input.dueDate) body.due_date = ctx.input.dueDate;
-    if (ctx.input.priority) body.priority = ctx.input.priority;
-    if (ctx.input.assignedToUserId) body.assigned_to = ctx.input.assignedToUserId;
-    if (ctx.input.regardingType) body.regarding_type = ctx.input.regardingType;
-    if (ctx.input.regardingId) body.regarding_id = ctx.input.regardingId;
-    if (ctx.input.isCompleted !== undefined) body.is_completed = ctx.input.isCompleted;
+    if (ctx.input.dueDate !== undefined) body.date_due = ctx.input.dueDate;
+    if (ctx.input.priority !== undefined) body.priority = ctx.input.priority;
+    if (ctx.input.assignedToUserId !== undefined)
+      body.assigned_to_id = ctx.input.assignedToUserId;
+    if ((ctx.input.regardingType === undefined) !== (ctx.input.regardingId === undefined)) {
+      throw createApiServiceError('Provide regardingType and regardingId together.');
+    }
+    if (ctx.input.regardingType !== undefined) {
+      body.data_item = { type: ctx.input.regardingType, id: ctx.input.regardingId };
+    }
 
     let result = await client.createTask(body);
-    let taskId = result?.id?.toString() ?? result?._links?.self?.href?.split('/').pop() ?? '';
+    let taskId = requiredId(result?.id, 'created record');
+
+    if (ctx.input.isCompleted !== undefined) {
+      try {
+        await client.updateTask(taskId, { is_completed: ctx.input.isCompleted });
+      } catch {
+        throw createApiServiceError(
+          `Task ${taskId} was created, but setting its completion state failed. Inspect it with get_task before retrying.`
+        );
+      }
+    }
 
     return {
       output: { taskId },
@@ -76,6 +91,7 @@ export let getTask = SlateTool.create(spec, {
       isCompleted: z.boolean().optional().describe('Whether completed'),
       createdAt: z.string().optional().describe('Created date'),
       updatedAt: z.string().optional().describe('Updated date'),
+      raw: z.any().optional().describe('Complete provider response, retaining null values'),
       links: z.any().optional().describe('HAL links')
     })
   )
@@ -85,13 +101,14 @@ export let getTask = SlateTool.create(spec, {
 
     return {
       output: {
-        taskId: (data.id ?? ctx.input.taskId).toString(),
-        description: data.description,
-        dueDate: data.due_date,
-        priority: data.priority,
-        isCompleted: data.is_completed,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        taskId: requiredId(data?.id, 'record'),
+        description: data.description ?? undefined,
+        dueDate: data.date_due ?? undefined,
+        priority: data.priority ?? undefined,
+        isCompleted: data.is_completed ?? undefined,
+        createdAt: data.date_created ?? undefined,
+        updatedAt: data.date_updated ?? undefined,
+        raw: data,
         links: data._links
       },
       message: `Retrieved task **${ctx.input.taskId}**.`
@@ -128,10 +145,11 @@ export let updateTask = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = {};
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.dueDate) body.due_date = ctx.input.dueDate;
-    if (ctx.input.priority) body.priority = ctx.input.priority;
-    if (ctx.input.assignedToUserId) body.assigned_to = ctx.input.assignedToUserId;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.dueDate !== undefined) body.date_due = ctx.input.dueDate;
+    if (ctx.input.priority !== undefined) body.priority = ctx.input.priority;
+    if (ctx.input.assignedToUserId !== undefined)
+      body.assigned_to_id = ctx.input.assignedToUserId;
     if (ctx.input.isCompleted !== undefined) body.is_completed = ctx.input.isCompleted;
 
     await client.updateTask(ctx.input.taskId, body);
@@ -184,18 +202,18 @@ export let listTasks = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let tasks = (data?._embedded?.tasks ?? []).map((t: any) => ({
-      taskId: t.id?.toString() ?? '',
-      description: t.description,
-      dueDate: t.due_date,
-      priority: t.priority,
-      isCompleted: t.is_completed
+    let tasks = collection(data, 'tasks').map((t: any) => ({
+      taskId: requiredId(t.id, 'record'),
+      description: t.description ?? undefined,
+      dueDate: t.date_due ?? undefined,
+      priority: t.priority ?? undefined,
+      isCompleted: t.is_completed ?? undefined
     }));
 
     return {
       output: {
         tasks,
-        totalCount: data?.total ?? tasks.length,
+        totalCount: data?.total ?? undefined,
         currentPage: data?.page ?? ctx.input.page ?? 1
       },
       message: `Listed **${tasks.length}** task(s).`

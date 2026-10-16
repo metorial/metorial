@@ -18,7 +18,7 @@ export let getGeneration = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      generationId: z.string().describe('Generation ID'),
+      generationId: z.string().optional().describe('Generation ID'),
       name: z.string().describe('Generation name'),
       prompt: z.string().describe('The prompt used'),
       status: z
@@ -48,6 +48,7 @@ export let getGeneration = SlateTool.create(spec, {
               .describe('Image titles by language')
           })
         )
+        .optional()
         .describe('Generated images (available when status is done)'),
       nbImages: z.number().optional().describe('Number of images'),
       tags: z.array(z.string()).optional().describe('Tags'),
@@ -60,8 +61,16 @@ export let getGeneration = SlateTool.create(spec, {
 
     let generation = await client.getGeneration(ctx.input.generationId);
 
+    for (let image of generation.images ?? []) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: `https://api.all-images.ai/v1/images/full/${encodeURIComponent(image.imageId)}.jpg`,
+        headers: { 'api-key': ctx.auth.token }
+      });
+    }
+
     let statusInfo =
-      generation.status === 3
+      generation.status === 3 && generation.images
         ? `**Done** with ${generation.images.length} images`
         : generation.status === 4
           ? '**Error** — can be retried after modifying the prompt'
@@ -69,7 +78,7 @@ export let getGeneration = SlateTool.create(spec, {
 
     return {
       output: generation,
-      message: `Generation **"${generation.name}"** (ID: \`${generation.generationId}\`) — status: ${statusInfo}.`
+      message: `Generation **"${generation.name}"**${generation.generationId ? ` (ID: \`${generation.generationId}\`)` : ''} — status: ${statusInfo}.`
     };
   })
   .build();

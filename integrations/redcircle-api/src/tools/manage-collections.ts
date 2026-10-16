@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -128,6 +128,17 @@ export let manageCollections = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ['get', 'update', 'start', 'delete'].includes(ctx.input.action) &&
+      !ctx.input.collectionId?.trim()
+    ) {
+      throw createApiServiceError(
+        'Provide collectionId. Use manage_collections with action list to find collections.'
+      );
+    }
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim()) {
+      throw createApiServiceError('Provide a name to create a collection.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
@@ -145,10 +156,10 @@ export let manageCollections = SlateTool.create(spec, {
       return {
         output: {
           collections: data.collections ?? [],
-          collectionsCount: data.collections_count,
+          collectionsCount: data.collections_count ?? data.total_count,
           requestInfo: data.request_info
         },
-        message: `Found **${data.collections_count ?? count}** collections.`
+        message: `Found **${data.collections_count ?? data.total_count ?? count}** collections.`
       };
     }
 

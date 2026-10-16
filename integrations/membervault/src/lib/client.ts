@@ -1,13 +1,13 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
-export interface MemberVaultProduct {
-  courseId: string;
-  courseName: string;
-  coursePrice: string;
-  courseUrl: string;
-  courseStatus: string;
-  [key: string]: unknown;
-}
+export type MemberVaultProduct = Record<string, unknown>;
 
 export interface AddUserParams {
   email: string;
@@ -27,62 +27,110 @@ export interface DeleteUserParams {
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
+  private legacyAxios: ReturnType<typeof createAxios>;
   private token: string;
 
   constructor(config: { token: string; subdomain: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('Enter your MemberVault API key.', {
+        reason: 'missing_api_key'
+      });
+    }
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(config.subdomain)) {
+      throw createApiServiceError(
+        'Enter only your MemberVault account subdomain, without a URL or domain suffix.',
+        { reason: 'invalid_subdomain' }
+      );
+    }
     this.token = config.token;
-    this.axios = createAxios({
+    this.legacyAxios = createAxios({
       baseURL: `https://${config.subdomain}.mvsite.app/api`
     });
+    this.axios = createAxios({
+      baseURL: `https://${config.subdomain}.mvsite.app/api`,
+      timeout: 30_000,
+      maxRedirects: 0
+    });
+  }
+
+  private async request(
+    endpoint: string,
+    params: Record<string, unknown> = {}
+  ): Promise<unknown> {
+    let data = await requestAxiosData<unknown>(
+      endpoint,
+      () => this.axios.get(`/${endpoint}`, { params: { ...params, apikey: this.token } }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'MemberVault',
+          reason: 'api_request_failed',
+          operation,
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          nestedKeys: ['errors', 'error']
+        })
+    );
+
+    if (
+      data === false ||
+      (isApiErrorRecord(data) &&
+        (data.success === false ||
+          (data.error !== undefined &&
+            data.error !== null &&
+            data.error !== false &&
+            data.error !== 0 &&
+            data.error !== '') ||
+          (Array.isArray(data.errors) && data.errors.length > 0)))
+    ) {
+      throw buildApiServiceError(
+        { response: { data } },
+        {
+          providerLabel: 'MemberVault',
+          reason: 'api_request_failed',
+          operation: endpoint,
+          nestedKeys: ['errors', 'error'],
+          fallbackMessage: 'The provider reported that the operation failed.'
+        }
+      );
+    }
+
+    return data;
   }
 
   async listProducts(): Promise<MemberVaultProduct[]> {
-    let response = await this.axios.get('/courses', {
-      params: {
-        apikey: this.token
-      }
-    });
-    return response.data;
+    return requestAxiosData<MemberVaultProduct[]>(
+      'courses',
+      () => this.legacyAxios.get('/courses', { params: { apikey: this.token } }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'MemberVault',
+          reason: 'api_request_failed',
+          operation,
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          nestedKeys: ['errors', 'error']
+        })
+    );
+  }
+
+  async getCourses(): Promise<unknown> {
+    return this.request('get_courses');
   }
 
   async addUserToProduct(params: AddUserParams): Promise<unknown> {
-    let queryParams: Record<string, string> = {
-      apikey: this.token,
+    return this.request('add_user', {
       email: params.email,
-      course_id: params.productId
-    };
-
-    if (params.firstName) {
-      queryParams.first_name = params.firstName;
-    }
-    if (params.lastName) {
-      queryParams.last_name = params.lastName;
-    }
-
-    let response = await this.axios.get('/adduser', {
-      params: queryParams
+      course_id: params.productId,
+      ...pickDefined({ first_name: params.firstName, last_name: params.lastName })
     });
-    return response.data;
   }
 
   async removeUserFromProduct(params: RemoveUserParams): Promise<unknown> {
-    let response = await this.axios.get('/removeuser', {
-      params: {
-        apikey: this.token,
-        email: params.email,
-        course_id: params.productId
-      }
+    return this.request('remove_user', {
+      email: params.email,
+      course_id: params.productId
     });
-    return response.data;
   }
 
   async deleteUser(params: DeleteUserParams): Promise<unknown> {
-    let response = await this.axios.get('/deleteuser', {
-      params: {
-        apikey: this.token,
-        email: params.email
-      }
-    });
-    return response.data;
+    return this.request('delete_user', { email: params.email });
   }
 }

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageSubscriptions = SlateTool.create(spec, {
   name: 'Manage Subscriptions',
   key: 'manage_subscriptions',
-  description: `Subscribe or unsubscribe users to/from Zulip channels. Can manage subscriptions for the authenticated user or other users (admin only).`,
+  description: `Subscribe or unsubscribe users to/from Zulip channels. Can manage subscriptions for the authenticated user or other users (subject to channel permissions).`,
   tags: {
     destructive: false,
     readOnly: false
@@ -31,11 +31,15 @@ export let manageSubscriptions = SlateTool.create(spec, {
       subscribed: z
         .record(z.string(), z.array(z.string()))
         .optional()
-        .describe('Map of user emails to channels they were subscribed to'),
+        .describe(
+          'Map of user IDs (emails on older servers) to channels they were subscribed to'
+        ),
       alreadySubscribed: z
         .record(z.string(), z.array(z.string()))
         .optional()
-        .describe('Map of user emails to channels they were already subscribed to'),
+        .describe(
+          'Map of user IDs (emails on older servers) to channels they were already subscribed to'
+        ),
       removed: z
         .array(z.string())
         .optional()
@@ -43,7 +47,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
       notRemoved: z
         .array(z.string())
         .optional()
-        .describe('Channels that could not be unsubscribed from')
+        .describe('Channels the user was already unsubscribed from')
     })
   )
   .handleInvocation(async ctx => {

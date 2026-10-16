@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassMarkerClient } from '../lib/client';
+import { optionalNumber, readNumber, validateWholeNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 let resultSchema = z.object({
@@ -28,7 +29,11 @@ let resultSchema = z.object({
   cmUserId: z.string().optional().describe('Custom user ID passed via URL parameter'),
   accessCode: z.string().optional().describe('Access code used (for link results)'),
   viewResultsUrl: z.string().optional().describe('URL to view formatted results'),
-  certificateUrl: z.string().optional().describe('URL to the certificate PDF')
+  certificateUrl: z
+    .string()
+    .optional()
+    .describe('Certificate PDF URL. Use download_certificate to download it.'),
+  raw: z.any().describe('Complete result record, including additional provider fields')
 });
 
 export let getExamResults = SlateTool.create(spec, {
@@ -36,11 +41,11 @@ export let getExamResults = SlateTool.create(spec, {
   key: 'get_exam_results',
   description: `Retrieve exam/quiz results from ClassMarker. Can fetch results for all groups, all links, or a specific group/test or link/test combination. Results include user details, scores, timing, and grading status. Only results completed after the specified timestamp are returned.`,
   instructions: [
-    'Provide a `finishedAfterTimestamp` to only retrieve results completed after that time. This must be less than 3 months old.',
+    'Provide a `finishedAfterTimestamp` to only retrieve results completed after that time. Normally this must be less than 3 months old; ClassMarker support can temporarily enable older history.',
     'Use `source` to choose between group or link results. Optionally specify `groupId`/`linkId` and `testId` to narrow results to a specific exam.'
   ],
   constraints: [
-    'The `finishedAfterTimestamp` must be less than 3 months old.',
+    'Historical timestamps older than 3 months require temporary approval from ClassMarker support.',
     'Maximum 200 results per request. Use `nextFinishedAfterTimestamp` from the response to paginate.',
     'Rate limit: 30 requests per hour per API key.'
   ],
@@ -57,15 +62,15 @@ export let getExamResults = SlateTool.create(spec, {
       groupId: z
         .number()
         .optional()
-        .describe('Specific group ID to filter results (only for source=groups)'),
+        .describe('Group ID from list_groups_and_links (source=groups only; requires testId)'),
       linkId: z
         .number()
         .optional()
-        .describe('Specific link ID to filter results (only for source=links)'),
+        .describe('Link ID from list_groups_and_links (source=links only; requires testId)'),
       testId: z
         .number()
         .optional()
-        .describe('Specific test ID to filter results (requires groupId or linkId)'),
+        .describe('Assigned test ID from list_groups_and_links (requires groupId or linkId)'),
       finishedAfterTimestamp: z
         .number()
         .describe('Unix timestamp - only return results completed after this time'),
@@ -81,7 +86,10 @@ export let getExamResults = SlateTool.create(spec, {
       nextFinishedAfterTimestamp: z
         .number()
         .optional()
-        .describe('Timestamp to use for the next pagination request')
+        .describe('Timestamp to use for the next pagination request'),
+      response: z
+        .any()
+        .describe('Complete ClassMarker response, including group and test metadata')
     })
   )
   .handleInvocation(async ctx => {
@@ -91,10 +99,29 @@ export let getExamResults = SlateTool.create(spec, {
     });
 
     let { source, groupId, linkId, testId, finishedAfterTimestamp, limit } = ctx.input;
-    let data: any;
+    validateWholeNumber(groupId, 'groupId');
+    validateWholeNumber(linkId, 'linkId');
+    validateWholeNumber(testId, 'testId');
+    validateWholeNumber(finishedAfterTimestamp, 'finishedAfterTimestamp', 0);
+    validateWholeNumber(limit, 'limit', 1, 200);
+    if (
+      (source === 'groups' && linkId !== undefined) ||
+      (source === 'links' && groupId !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Use groupId only with source=groups and linkId only with source=links.'
+      );
+    }
+    let containerId = source === 'groups' ? groupId : linkId;
+    if ((containerId === undefined) !== (testId === undefined)) {
+      throw createApiServiceError(
+        'Provide testId together with the groupId or linkId, or omit both to retrieve all results.'
+      );
+    }
+    let data: Awaited<ReturnType<ClassMarkerClient['getGroupRecentResults']>>;
 
     if (source === 'groups') {
-      if (groupId && testId) {
+      if (groupId !== undefined && testId !== undefined) {
         data = await client.getGroupTestResults(groupId, testId, {
           finishedAfterTimestamp,
           limit
@@ -102,7 +129,7 @@ export let getExamResults = SlateTool.create(spec, {
       } else {
         data = await client.getGroupRecentResults({ finishedAfterTimestamp, limit });
       }
-    } else if (linkId && testId) {
+    } else if (linkId !== undefined && testId !== undefined) {
       data = await client.getLinkTestResults(linkId, testId, {
         finishedAfterTimestamp,
         limit
@@ -112,38 +139,52 @@ export let getExamResults = SlateTool.create(spec, {
     }
 
     let rawResults = data.results || [];
-    let results = rawResults.map((r: any) => ({
-      userId: r.user_id,
-      firstName: r.first,
-      lastName: r.last,
-      email: r.email,
-      testId: r.test_id,
-      groupId: r.group_id,
-      linkId: r.link_id,
-      linkResultId: r.link_result_id,
-      percentage: r.percentage,
-      pointsScored: r.points_scored,
-      pointsAvailable: r.points_available,
-      timeStarted: r.time_started,
-      timeFinished: r.time_finished,
-      duration: r.duration,
-      percentagePassmark: r.percentage_passmark,
-      passed: r.passed,
-      requiresGrading: r.requires_grading,
-      status: r.status,
-      cmUserId: r.cm_user_id,
-      accessCode: r.access_code,
-      viewResultsUrl: r.view_results_url,
-      certificateUrl: r.certificate_url
-    }));
+    let results = rawResults.map((entry: any) => {
+      let r = entry.result ?? entry;
+      return {
+        userId: r.user_id == null ? undefined : String(r.user_id),
+        firstName: r.first,
+        lastName: r.last,
+        email: r.email,
+        testId: optionalNumber(r.test_id, 'test_id'),
+        groupId: optionalNumber(r.group_id, 'group_id'),
+        linkId: optionalNumber(r.link_id, 'link_id'),
+        linkResultId: optionalNumber(r.link_result_id, 'link_result_id'),
+        percentage: readNumber(r.percentage, 'percentage'),
+        pointsScored: readNumber(r.points_scored, 'points_scored'),
+        pointsAvailable: readNumber(r.points_available, 'points_available'),
+        timeStarted: readNumber(r.time_started, 'time_started'),
+        timeFinished: readNumber(r.time_finished, 'time_finished'),
+        duration: r.duration,
+        percentagePassmark: optionalNumber(r.percentage_passmark, 'percentage_passmark'),
+        passed: r.passed,
+        requiresGrading: r.requires_grading,
+        status: r.status,
+        cmUserId: r.cm_user_id,
+        accessCode: r.access_code,
+        viewResultsUrl: r.view_results_url,
+        certificateUrl: r.certificate_url ?? undefined,
+        raw: r
+      };
+    });
 
     return {
       output: {
         results,
-        numResultsAvailable: data.num_results_available || 0,
-        numResultsReturned: data.num_results_returned || results.length,
-        moreResultsExist: data.more_results_exist || false,
-        nextFinishedAfterTimestamp: data.next_finished_after_timestamp
+        numResultsAvailable: readNumber(
+          data.num_results_available ?? (data.status === 'no_results' ? 0 : undefined),
+          'available result count'
+        ),
+        numResultsReturned: readNumber(
+          data.num_results_returned ?? results.length,
+          'returned result count'
+        ),
+        moreResultsExist: data.more_results_exist ?? false,
+        nextFinishedAfterTimestamp: optionalNumber(
+          data.next_finished_after_timestamp,
+          'next result timestamp'
+        ),
+        response: data
       },
       message: `Retrieved **${results.length}** result(s) from ${source}. ${data.more_results_exist ? 'More results are available.' : 'No more results.'}`
     };

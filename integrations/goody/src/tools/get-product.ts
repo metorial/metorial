@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let productAttributeSchema = z.object({
@@ -65,10 +65,7 @@ export let getProduct = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let p = await client.getProduct(ctx.input.productId);
 
@@ -78,26 +75,27 @@ export let getProduct = SlateTool.create(spec, {
         name: p.name,
         brandName: p.brand?.name,
         brandId: p.brand?.id,
-        subtitle: p.subtitle,
-        subtitleShort: p.subtitle_short,
-        recipientDescription: p.recipient_description,
+        subtitle: p.subtitle ?? null,
+        subtitleShort: p.subtitle_short ?? null,
+        recipientDescription: p.recipient_description ?? null,
         price: p.price,
         priceIsVariable: p.price_is_variable,
-        priceMin: p.price_min,
-        priceMax: p.price_max,
+        priceMin: p.price_min ?? null,
+        priceMax: p.price_max ?? null,
         images: (p.images || []).map((img: any) => ({
-          url: img.url,
-          width: img.width,
-          height: img.height
+          url: img.image_large?.url ?? img.url,
+          width: img.image_large?.width ?? img.width,
+          height: img.image_large?.height ?? img.height
         })),
         variants: (p.variants || []).map((v: any) => ({
           variantId: v.id,
           name: v.name,
-          subtitle: v.subtitle,
-          imageLarge: v.image_large
+          subtitle: v.subtitle ?? null,
+          imageLarge:
+            (typeof v.image_large === 'string' ? v.image_large : v.image_large?.url) ?? null
         })),
-        variantsLabel: p.variants_label,
-        variantsNumSelectable: p.variants_num_selectable,
+        variantsLabel: p.variants_label ?? null,
+        variantsNumSelectable: p.variants_num_selectable ?? null,
         attributes: (p.attributes || []).map((a: any) => ({
           label: a.label,
           content: a.content

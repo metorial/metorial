@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DotSimpleClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteMediaFiles = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let deleteMediaFiles = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       fileIds: z.array(z.number()).min(1).describe('Array of numeric media file IDs to delete')
     })
   )
@@ -29,7 +31,7 @@ export let deleteMediaFiles = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     await client.deleteMediaFiles(ctx.input.fileIds);

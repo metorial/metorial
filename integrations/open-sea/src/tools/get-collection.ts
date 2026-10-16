@@ -93,12 +93,12 @@ export let getCollection = SlateTool.create(spec, {
     let traits: any = null;
     if (ctx.input.includeTraits) {
       let traitsData = await client.getCollectionTraits(ctx.input.collectionSlug);
-      traits = traitsData.categories ?? traitsData;
+      traits = traitsData.counts ?? traitsData.categories ?? traitsData;
     }
 
     let result = {
-      collectionSlug: collectionData.collection ?? ctx.input.collectionSlug,
-      name: collectionData.name ?? '',
+      collectionSlug: collectionData.collection,
+      name: collectionData.name,
       description: collectionData.description ?? null,
       imageUrl: collectionData.image_url ?? null,
       bannerImageUrl: collectionData.banner_image_url ?? null,

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapYelpOutput } from '../lib/response';
 import { spec } from '../spec';
 
 let aiBusinessSchema = z.object({
@@ -14,8 +15,8 @@ let aiBusinessSchema = z.object({
   categories: z
     .array(
       z.object({
-        alias: z.string(),
-        title: z.string()
+        alias: z.string().optional(),
+        title: z.string().optional()
       })
     )
     .optional()
@@ -41,6 +42,19 @@ let aiBusinessSchema = z.object({
     .describe('Business coordinates')
 });
 
+let outputSchema = z.object({
+  rawResult: z
+    .record(z.string(), z.unknown())
+    .describe('Complete response returned by Yelp, including original nullable fields'),
+  responseText: z.string().optional().describe('Natural language response from Yelp AI'),
+  chatId: z.string().optional().describe('Session ID for continuing the conversation'),
+  types: z.array(z.string()).optional().describe('Response types (e.g., "business_search")'),
+  businesses: z
+    .array(aiBusinessSchema)
+    .optional()
+    .describe('Businesses referenced in the response')
+});
+
 export let aiChat = SlateTool.create(spec, {
   name: 'AI Chat',
   key: 'ai_chat',
@@ -49,9 +63,12 @@ export let aiChat = SlateTool.create(spec, {
     'For the first message in a conversation, omit the chatId. Use the returned chatId for follow-up messages.',
     'Providing latitude/longitude helps get location-relevant results.'
   ],
-  constraints: ['Requires a Premium plan API key.'],
+  constraints: [
+    'Requires a Yelp API key with AI API access. Availability and optional reservation capabilities depend on Yelp approval and the API plan.',
+    'For accounts enabled for reservations, conversational requests can book tables.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -68,20 +85,7 @@ export let aiChat = SlateTool.create(spec, {
       locale: z.string().optional().describe('User locale (e.g., "en_US")')
     })
   )
-  .output(
-    z.object({
-      responseText: z.string().describe('Natural language response from Yelp AI'),
-      chatId: z.string().optional().describe('Session ID for continuing the conversation'),
-      types: z
-        .array(z.string())
-        .optional()
-        .describe('Response types (e.g., "business_search")'),
-      businesses: z
-        .array(aiBusinessSchema)
-        .optional()
-        .describe('Businesses referenced in the response')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -93,46 +97,81 @@ export let aiChat = SlateTool.create(spec, {
       locale: ctx.input.locale
     });
 
-    let businesses: any[] = [];
-    if (result.entities) {
-      for (let entity of result.entities) {
-        if (entity.businesses) {
-          for (let b of entity.businesses) {
-            businesses.push({
-              businessId: b.id,
-              alias: b.alias,
-              name: b.name,
-              url: b.url,
-              rating: b.rating,
-              reviewCount: b.review_count,
-              price: b.price,
-              categories: b.categories,
-              phone: b.phone,
-              location: b.location
-                ? {
-                    address1: b.location.address1,
-                    city: b.location.city,
-                    state: b.location.state,
-                    zipCode: b.location.zip_code,
-                    country: b.location.country,
-                    formattedAddress: b.location.formatted_address
-                  }
-                : undefined,
-              coordinates: b.coordinates
+    return mapYelpOutput(outputSchema, () => {
+      if (result.response?.text === undefined && result.entities === undefined) {
+        throw createApiServiceError(
+          'Yelp AI returned neither response text nor structured entities.',
+          { reason: 'yelp_invalid_response' }
+        );
+      }
+      if (result.response !== undefined && !isApiErrorRecord(result.response)) {
+        throw createApiServiceError('Yelp AI returned invalid response metadata.', {
+          reason: 'yelp_invalid_response'
+        });
+      }
+      let businesses: z.infer<typeof aiBusinessSchema>[] | undefined;
+      if (result.entities !== undefined) {
+        if (!Array.isArray(result.entities)) {
+          throw createApiServiceError('Yelp AI returned invalid entities.', {
+            reason: 'yelp_invalid_response'
+          });
+        }
+        for (let entity of result.entities) {
+          if (!isApiErrorRecord(entity as unknown)) {
+            throw createApiServiceError('Yelp AI returned an invalid entity.', {
+              reason: 'yelp_invalid_response'
             });
+          }
+          if (entity.businesses !== undefined) {
+            if (!Array.isArray(entity.businesses)) {
+              throw createApiServiceError('Yelp AI returned invalid business entities.', {
+                reason: 'yelp_invalid_response'
+              });
+            }
+            businesses ??= [];
+            for (let b of entity.businesses) {
+              if (!isApiErrorRecord(b as unknown)) {
+                throw createApiServiceError('Yelp AI returned an invalid business.', {
+                  reason: 'yelp_invalid_response'
+                });
+              }
+              businesses.push({
+                businessId: b.id,
+                alias: b.alias,
+                name: b.name,
+                url: b.url,
+                rating: b.rating ?? undefined,
+                reviewCount: b.review_count,
+                price: b.price ?? undefined,
+                categories: b.categories,
+                phone: b.phone ?? undefined,
+                location: b.location
+                  ? {
+                      address1: b.location.address1,
+                      city: b.location.city,
+                      state: b.location.state,
+                      zipCode: b.location.zip_code,
+                      country: b.location.country,
+                      formattedAddress: b.location.formatted_address
+                    }
+                  : undefined,
+                coordinates: b.coordinates ?? undefined
+              });
+            }
           }
         }
       }
-    }
 
-    return {
-      output: {
-        responseText: result.response?.text || '',
-        chatId: result.chat_id,
-        types: result.types,
-        businesses
-      },
-      message: result.response?.text || 'Received AI response.'
-    };
+      return {
+        output: {
+          rawResult: result,
+          responseText: result.response?.text,
+          chatId: result.chat_id,
+          types: result.types,
+          businesses
+        },
+        message: result.response?.text ?? 'Received structured AI response.'
+      };
+    });
   })
   .build();

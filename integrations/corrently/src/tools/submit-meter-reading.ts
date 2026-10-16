@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,6 +24,7 @@ export let submitMeterReading = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       totalReading: z.number().optional().describe('Total meter reading in Wh'),
       greenEnergy: z
         .number()
@@ -45,7 +46,7 @@ export let submitMeterReading = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let zip = ctx.input.zip || ctx.config.zip;
     if (!zip) {
-      throw new Error('A German postal code (zip) is required.');
+      throw createApiServiceError('A German postal code (zip) is required.');
     }
 
     let client = new Client({ token: ctx.auth.token });
@@ -58,6 +59,7 @@ export let submitMeterReading = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         totalReading: result['1.8.0'],
         greenEnergy: result['1.8.1'],
         greyEnergy: result['1.8.2'],

@@ -3,13 +3,14 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let connectionOutputSchema = z.object({
+export let connectionOutputSchema = z.object({
   connectionId: z.string().describe('Unique connection identifier'),
   handle: z.string().describe('Connection handle'),
   plugin: z.string().optional().describe('Plugin name'),
   type: z.string().optional().describe('Connection type'),
   credentialSource: z.string().optional().describe('Credential source'),
   state: z.string().optional().describe('Connection state'),
+  status: z.string().optional().describe('Connection status reported by the provider'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   updatedAt: z.string().optional().describe('Last update timestamp')
 });
@@ -34,7 +35,9 @@ export let createConnection = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -43,18 +46,11 @@ export let createConnection = SlateTool.create(spec, {
   )
   .output(connectionOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let connection: any;
+    let connection: Awaited<ReturnType<Client['getUserConnection']>>;
     if (ctx.input.ownerType === 'org') {
       connection = await client.createOrgConnection(ownerHandle, {
         handle: ctx.input.handle,
@@ -87,7 +83,9 @@ export let updateConnection = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -101,18 +99,11 @@ export let updateConnection = SlateTool.create(spec, {
   )
   .output(connectionOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let connection: any;
+    let connection: Awaited<ReturnType<Client['getUserConnection']>>;
     if (ctx.input.ownerType === 'org') {
       connection = await client.updateOrgConnection(ownerHandle, ctx.input.connectionHandle, {
         handle: ctx.input.handle,
@@ -146,7 +137,9 @@ export let deleteConnection = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -160,18 +153,11 @@ export let deleteConnection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let connection: any;
+    let connection: Awaited<ReturnType<Client['getUserConnection']>>;
     if (ctx.input.ownerType === 'org') {
       connection = await client.deleteOrgConnection(ownerHandle, ctx.input.connectionHandle);
     } else {
@@ -196,10 +182,16 @@ export let testConnection = SlateTool.create(spec, {
   .input(
     z.object({
       connectionHandle: z.string().describe('Handle of the connection to test'),
+      ownerType: z
+        .enum(['user', 'org'])
+        .optional()
+        .describe('Whether the owner is a user or organization'),
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user). Defaults to the authenticated user.')
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        )
     })
   )
   .output(
@@ -208,18 +200,14 @@ export let testConnection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let testResult = await client.testUserConnection(ownerHandle, ctx.input.connectionHandle);
+    let testResult =
+      ctx.input.ownerType === 'org'
+        ? await client.testOrgConnection(ownerHandle, ctx.input.connectionHandle)
+        : await client.testUserConnection(ownerHandle, ctx.input.connectionHandle);
 
     return {
       output: { testResult },

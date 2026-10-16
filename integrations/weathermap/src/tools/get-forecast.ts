@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpenWeatherClient } from '../lib/client';
+import { weatherArray, weatherString, weatherTimestamp } from '../lib/validation';
 import { spec } from '../spec';
 
 let forecastEntrySchema = z.object({
@@ -79,39 +80,37 @@ export let getForecast = SlateTool.create(spec, {
       ctx.input.count
     );
 
-    let forecasts = (data.list || []).map((entry: any) => ({
-      timestamp: new Date(entry.dt * 1000).toISOString(),
+    let forecasts = weatherArray(data.list).map((entry: any) => ({
+      timestamp: weatherTimestamp(entry.dt),
       temperature: entry.main.temp,
       feelsLike: entry.main.feels_like,
       temperatureMin: entry.main.temp_min,
       temperatureMax: entry.main.temp_max,
       pressure: entry.main.pressure,
       humidity: entry.main.humidity,
-      seaLevelPressure: entry.main.sea_level,
-      groundLevelPressure: entry.main.grnd_level,
-      windSpeed: entry.wind?.speed,
-      windDirection: entry.wind?.deg,
-      windGust: entry.wind?.gust,
-      cloudiness: entry.clouds?.all,
-      visibility: entry.visibility,
-      precipitationProbability: entry.pop,
-      rainVolume: entry.rain?.['3h'],
-      snowVolume: entry.snow?.['3h'],
-      conditionGroup: entry.weather?.[0]?.main || '',
-      conditionDescription: entry.weather?.[0]?.description || '',
-      conditionIcon: entry.weather?.[0]?.icon || ''
+      seaLevelPressure: entry.main.sea_level ?? undefined,
+      groundLevelPressure: entry.main.grnd_level ?? undefined,
+      windSpeed: entry.wind?.speed ?? undefined,
+      windDirection: entry.wind?.deg ?? undefined,
+      windGust: entry.wind?.gust ?? undefined,
+      cloudiness: entry.clouds?.all ?? undefined,
+      visibility: entry.visibility ?? undefined,
+      precipitationProbability: entry.pop ?? undefined,
+      rainVolume: entry.rain?.['3h'] ?? undefined,
+      snowVolume: entry.snow?.['3h'] ?? undefined,
+      conditionGroup: weatherString(entry.weather?.[0]?.main),
+      conditionDescription: weatherString(entry.weather?.[0]?.description),
+      conditionIcon: weatherString(entry.weather?.[0]?.icon)
     }));
 
     let output = {
-      cityName: data.city?.name || '',
-      country: data.city?.country || '',
+      cityName: weatherString(data.city?.name),
+      country: weatherString(data.city?.country),
       latitude: data.city?.coord?.lat,
       longitude: data.city?.coord?.lon,
       timezone: data.city?.timezone,
-      sunrise: data.city?.sunrise
-        ? new Date(data.city.sunrise * 1000).toISOString()
-        : undefined,
-      sunset: data.city?.sunset ? new Date(data.city.sunset * 1000).toISOString() : undefined,
+      sunrise: data.city?.sunrise ? weatherTimestamp(data.city.sunrise) : undefined,
+      sunset: data.city?.sunset ? weatherTimestamp(data.city.sunset) : undefined,
       totalEntries: forecasts.length,
       forecasts
     };

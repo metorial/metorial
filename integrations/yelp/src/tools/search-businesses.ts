@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapYelpOutput } from '../lib/response';
 import { spec } from '../spec';
 
 let categorySchema = z.object({
@@ -33,6 +34,14 @@ let businessSchema = z.object({
   url: z.string().optional().describe('Yelp URL for the business'),
   reviewCount: z.number().optional().describe('Number of reviews'),
   categories: z.array(categorySchema).optional().describe('Business categories'),
+  attributes: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Business attributes returned for the current API plan'),
+  mobileLink: z
+    .string()
+    .optional()
+    .describe('Link to the business for the requested device platform'),
   rating: z.number().optional().describe('Yelp rating (1-5)'),
   coordinates: coordinatesSchema.optional().describe('Business coordinates'),
   transactions: z
@@ -55,6 +64,8 @@ let mapBusiness = (b: any) => ({
   url: b.url,
   reviewCount: b.review_count,
   categories: b.categories,
+  attributes: b.attributes,
+  mobileLink: b.mobile_link,
   rating: b.rating,
   coordinates: b.coordinates,
   transactions: b.transactions,
@@ -77,6 +88,17 @@ let mapBusiness = (b: any) => ({
 });
 
 export { businessSchema, categorySchema, coordinatesSchema, locationSchema, mapBusiness };
+
+let outputSchema = z.object({
+  total: z.number().describe('Total number of matching businesses'),
+  businesses: z.array(businessSchema).describe('List of matching businesses'),
+  region: z
+    .object({
+      center: coordinatesSchema.optional()
+    })
+    .optional()
+    .describe('Center of the search region')
+});
 
 export let searchBusinesses = SlateTool.create(spec, {
   name: 'Search Businesses',
@@ -115,9 +137,18 @@ export let searchBusinesses = SlateTool.create(spec, {
       categories: z
         .string()
         .optional()
-        .describe('Comma-delimited category aliases (e.g., "bars,french")'),
+        .describe(
+          'Comma-delimited category aliases (e.g., "bars,french"); call list_categories to discover aliases'
+        ),
       locale: z.string().optional().describe('Locale code (e.g., "en_US")'),
-      limit: z.number().optional().describe('Number of results to return (1-50, default 20)'),
+      devicePlatform: z
+        .enum(['android', 'ios', 'mobile-generic'])
+        .optional()
+        .describe('Device platform for the returned mobile link'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of results to return (whole number from 0 to 50, default 20)'),
       offset: z.number().optional().describe('Offset for pagination'),
       sortBy: z
         .enum(['best_match', 'rating', 'review_count', 'distance'])
@@ -140,18 +171,7 @@ export let searchBusinesses = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      total: z.number().describe('Total number of matching businesses'),
-      businesses: z.array(businessSchema).describe('List of matching businesses'),
-      region: z
-        .object({
-          center: coordinatesSchema.optional()
-        })
-        .optional()
-        .describe('Center of the search region')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -163,6 +183,7 @@ export let searchBusinesses = SlateTool.create(spec, {
       radius: ctx.input.radius,
       categories: ctx.input.categories,
       locale: ctx.input.locale,
+      devicePlatform: ctx.input.devicePlatform,
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sortBy: ctx.input.sortBy,
@@ -172,15 +193,17 @@ export let searchBusinesses = SlateTool.create(spec, {
       attributes: ctx.input.attributes
     });
 
-    let businesses = (result.businesses || []).map(mapBusiness);
+    return mapYelpOutput(outputSchema, () => {
+      let businesses = result.businesses.map(mapBusiness);
 
-    return {
-      output: {
-        total: result.total,
-        businesses,
-        region: result.region
-      },
-      message: `Found **${result.total}** businesses${ctx.input.term ? ` matching "${ctx.input.term}"` : ''}${ctx.input.location ? ` near ${ctx.input.location}` : ''}. Returned ${businesses.length} results.`
-    };
+      return {
+        output: {
+          total: result.total,
+          businesses,
+          region: result.region
+        },
+        message: `Found **${result.total}** businesses${ctx.input.term ? ` matching "${ctx.input.term}"` : ''}${ctx.input.location ? ` near ${ctx.input.location}` : ''}. Returned ${businesses.length} results.`
+      };
+    });
   })
   .build();

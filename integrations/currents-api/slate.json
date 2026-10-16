@@ -1,16 +1,17 @@
 {
   "name": "@metorial/currents-api",
-  "description": "Search and retrieve global news articles from over 14,000 sources across 70 countries and 18 languages. Fetch latest news in real time, search historical articles by keywords, date range, language, country, category, and domain. Discover available news sources and filter by language or category. Analyze topic trends and sentiment over time. Access reference data for supported languages, regions, and categories.",
+  "description": "Retrieve current news feeds and search articles by keywords, boolean queries, date range, language, country, category, publisher domain, and author. Use V2 cursor pagination, discover valid filter codes, and check the connected API key.",
   "categories": ["apis-and-http-requests", "news-and-media", "web-search"],
   "skills": [
     "fetch latest news articles",
     "search news by keywords",
+    "search news with boolean queries",
     "filter news by category",
     "filter news by country",
     "filter news by date range",
-    "discover news sources",
-    "analyze topic trends",
-    "analyze news sentiment",
-    "retrieve supported languages and regions"
+    "filter news by publisher domain and author",
+    "paginate news search with cursors",
+    "retrieve supported languages and regions",
+    "check the connected API key"
   ]
 }

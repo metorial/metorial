@@ -9,7 +9,8 @@ export let manageMemberPlan = SlateTool.create(spec, {
   key: 'manage_member_plan',
   description: `Add or remove a free plan from a member. Use this to assign new free plans or revoke existing free plan connections for a given member.`,
   constraints: [
-    'Only free plans can be added or removed via the Admin API. Paid plan subscriptions must be managed through Stripe checkout flows.'
+    'Only free plans can be added or removed via the Admin API. Paid plan subscriptions must be managed through Stripe checkout flows.',
+    'After an acknowledgement, the tool reads the member separately. A failed read does not roll back the plan change; retrieve the member before repeating it.'
   ]
 })
   .input(
@@ -19,7 +20,14 @@ export let manageMemberPlan = SlateTool.create(spec, {
       action: z.enum(['add', 'remove']).describe('Whether to add or remove the plan')
     })
   )
-  .output(memberSchema)
+  .output(
+    memberSchema.extend({
+      planChangeResponse: z
+        .unknown()
+        .optional()
+        .describe('Actual provider acknowledgement for the plan change')
+    })
+  )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 

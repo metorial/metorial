@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DotSimpleClient } from '../lib/client';
+import { DotSimpleClient, getCollection } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTags = SlateTool.create(spec, {
@@ -12,7 +13,7 @@ export let listTags = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ workspaceId }))
   .output(
     z.object({
       tags: z
@@ -30,11 +31,11 @@ export let listTags = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listTags();
-    let tagList = (result?.data ?? (Array.isArray(result) ? result : [])).map((t: any) => ({
+    let tagList = getCollection(result).map((t: any) => ({
       tagId: t.id,
       tagUuid: t.uuid,
       name: t.name,

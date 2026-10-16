@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -47,7 +47,8 @@ Specify the **action** to perform: create, update, delete, moveTemplate, or move
 
     switch (action) {
       case 'create': {
-        if (!folderName) throw new Error('folderName is required for create action');
+        if (!folderName)
+          throw createApiServiceError('folderName is required for create action');
         let result = await client.createFolder(folderName);
         return {
           output: {
@@ -60,8 +61,9 @@ Specify the **action** to perform: create, update, delete, moveTemplate, or move
         };
       }
       case 'update': {
-        if (!folderId) throw new Error('folderId is required for update action');
-        if (!folderName) throw new Error('folderName is required for update action');
+        if (!folderId) throw createApiServiceError('folderId is required for update action');
+        if (!folderName)
+          throw createApiServiceError('folderName is required for update action');
         let result = await client.updateFolder(folderId, folderName);
         return {
           output: {
@@ -74,7 +76,7 @@ Specify the **action** to perform: create, update, delete, moveTemplate, or move
         };
       }
       case 'delete': {
-        if (!folderId) throw new Error('folderId is required for delete action');
+        if (!folderId) throw createApiServiceError('folderId is required for delete action');
         await client.deleteFolder(folderId);
         return {
           output: { deleted: true },
@@ -82,8 +84,10 @@ Specify the **action** to perform: create, update, delete, moveTemplate, or move
         };
       }
       case 'moveTemplate': {
-        if (!folderId) throw new Error('folderId is required for moveTemplate action');
-        if (!templateId) throw new Error('templateId is required for moveTemplate action');
+        if (!folderId)
+          throw createApiServiceError('folderId is required for moveTemplate action');
+        if (!templateId)
+          throw createApiServiceError('templateId is required for moveTemplate action');
         await client.moveTemplateToFolder(folderId, templateId);
         return {
           output: { moved: true, folderId },
@@ -91,8 +95,10 @@ Specify the **action** to perform: create, update, delete, moveTemplate, or move
         };
       }
       case 'moveRender': {
-        if (!folderId) throw new Error('folderId is required for moveRender action');
-        if (!renderId) throw new Error('renderId is required for moveRender action');
+        if (!folderId)
+          throw createApiServiceError('folderId is required for moveRender action');
+        if (!renderId)
+          throw createApiServiceError('renderId is required for moveRender action');
         await client.moveRenderToFolder(folderId, renderId);
         return {
           output: { moved: true, folderId },

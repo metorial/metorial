@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type PaginatedResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchContractAwards = SlateTool.create(spec, {
@@ -38,6 +38,12 @@ export let searchContractAwards = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter to awards modified on or after this date (YYYY-MM-DD)'),
+      capturedDate: z
+        .string()
+        .optional()
+        .describe(
+          'Date HigherGov captured the last amendment, in YYYY-MM-DD format (prime contracts only)'
+        ),
       naicsCode: z
         .string()
         .optional()
@@ -76,7 +82,28 @@ export let searchContractAwards = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let input = ctx.input;
 
-    let response: any;
+    let incompatible =
+      input.awardType === 'subcontract'
+        ? ([
+            'awardId',
+            'parentAwardId',
+            'naicsCode',
+            'pscCode',
+            'searchId',
+            'vehicleKey',
+            'capturedDate'
+          ] as const)
+        : input.awardType === 'idv'
+          ? (['searchId', 'capturedDate'] as const)
+          : [];
+    for (let field of incompatible) {
+      if (input[field] !== undefined)
+        throw createApiServiceError(
+          `${field} is not supported for ${input.awardType} awards. Choose the appropriate awardType or omit this filter.`
+        );
+    }
+
+    let response: PaginatedResponse<Record<string, unknown>>;
     if (input.awardType === 'idv') {
       response = await client.getIdvAwards({
         awardId: input.awardId,
@@ -118,6 +145,7 @@ export let searchContractAwards = SlateTool.create(spec, {
         awardingAgencyKey: input.awardingAgencyKey,
         fundingAgencyKey: input.fundingAgencyKey,
         lastModifiedDate: input.lastModifiedDate,
+        capturedDate: input.capturedDate,
         naicsCode: input.naicsCode,
         pscCode: input.pscCode,
         searchId: input.searchId,

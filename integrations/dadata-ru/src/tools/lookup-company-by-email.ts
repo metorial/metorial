@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 export let lookupCompanyByEmail = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ Useful for enriching leads and contacts with company data based on their email.`
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       found: z.boolean().describe('Whether a company was found for this email'),
       emailSource: z.string().nullable().describe('Source email'),
       emailType: z
@@ -47,11 +49,12 @@ Useful for enriching leads and contacts with company data based on their email.`
     });
 
     let data = await client.findCompanyByEmail({ query: ctx.input.email });
-    let s = data.suggestions?.[0];
+    let s = readSuggestions(data)[0];
 
     if (!s) {
       return {
         output: {
+          rawData: data,
           found: false,
           emailSource: ctx.input.email,
           emailType: null,
@@ -74,7 +77,8 @@ Useful for enriching leads and contacts with company data based on their email.`
 
     return {
       output: {
-        found: true,
+        rawData: data,
+        found: s.data?.company != null,
         emailSource: s.data?.email?.source ?? null,
         emailType: s.data?.email?.type ?? null,
         emailLocal: s.data?.email?.local ?? null,
@@ -85,12 +89,18 @@ Useful for enriching leads and contacts with company data based on their email.`
         companyOgrn: s.data?.company?.ogrn ?? null,
         companyOkved: s.data?.company?.okved ?? null,
         companyOkvedName: s.data?.company?.okved_name ?? null,
-        companyEmployeeCount: s.data?.company?.employee_count ?? null,
-        companyIncome: s.data?.company?.income ?? null,
+        companyEmployeeCount:
+          s.data?.company?.employee_count != null
+            ? String(s.data.company.employee_count)
+            : null,
+        companyIncome: s.data?.company?.income != null ? String(s.data.company.income) : null,
         companyCity: s.data?.company?.city ?? null,
         companyTimezone: s.data?.company?.timezone ?? null
       },
-      message: `Found company **${s.data?.company?.name || 'Unknown'}** (INN: ${s.data?.company?.inn || 'N/A'}) for email "${ctx.input.email}".`
+      message:
+        s.data?.company == null
+          ? `No company found for email "${ctx.input.email}".`
+          : `Found company **${s.data?.company?.name || 'Unknown'}** (INN: ${s.data?.company?.inn || 'N/A'}) for email "${ctx.input.email}".`
     };
   })
   .build();

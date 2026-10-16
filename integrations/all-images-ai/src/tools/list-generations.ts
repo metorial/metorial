@@ -16,16 +16,21 @@ export let listGenerations = SlateTool.create(spec, {
       name: z.string().optional().describe('Filter generations by name'),
       tag: z.string().optional().describe('Filter generations by tag'),
       limit: z.number().optional().describe('Number of results per page'),
-      offset: z.number().optional().describe('Starting position for pagination')
+      offset: z.number().optional().describe('Starting position for pagination'),
+      sort: z.string().optional().describe('Provider sort expression')
     })
   )
   .output(
     z.object({
-      filteredResults: z.number().describe('Total number of matching generations'),
+      filteredResults: z.number().optional().describe('Total number of matching generations'),
+      resultCountMetadata: z
+        .unknown()
+        .optional()
+        .describe('Unmodified provider result count metadata, when provided'),
       generations: z
         .array(
           z.object({
-            generationId: z.string().describe('Generation ID'),
+            generationId: z.string().optional().describe('Generation ID'),
             name: z.string().describe('Generation name'),
             prompt: z.string().describe('The prompt used'),
             status: z
@@ -52,6 +57,7 @@ export let listGenerations = SlateTool.create(spec, {
                   titles: z.record(z.string(), z.string()).optional()
                 })
               )
+              .optional()
               .describe('Generated images'),
             nbImages: z.number().optional().describe('Number of images'),
             tags: z.array(z.string()).optional().describe('Tags'),
@@ -69,12 +75,13 @@ export let listGenerations = SlateTool.create(spec, {
       name: ctx.input.name,
       tag: ctx.input.tag,
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      sort: ctx.input.sort
     });
 
     return {
       output: result,
-      message: `Found **${result.filteredResults}** generations. Returned **${result.generations.length}** results.`
+      message: `${result.filteredResults !== undefined ? `Found **${result.filteredResults}** generations. ` : ''}Returned **${result.generations.length}** results.`
     };
   })
   .build();

@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let createTransactionOutputSchema = z.object({
+  transactionId: z.string().describe('ID of the created transaction'),
+  campaignId: z.number().nullable().describe('Campaign ID'),
+  amount: z.number().nullable().describe('Transaction amount'),
+  status: z.string().nullable().describe('Transaction status'),
+  createdAt: z.string().nullable().describe('When created')
+});
+
 export let createTransaction = SlateTool.create(spec, {
   name: 'Create Transaction',
   key: 'create_transaction',
@@ -58,15 +66,7 @@ export let createTransaction = SlateTool.create(spec, {
         .describe('When the transaction occurred (ISO 8601). Defaults to now.')
     })
   )
-  .output(
-    z.object({
-      transactionId: z.string().describe('ID of the created transaction'),
-      campaignId: z.number().nullable().describe('Campaign ID'),
-      amount: z.number().nullable().describe('Transaction amount'),
-      status: z.string().nullable().describe('Transaction status'),
-      createdAt: z.string().nullable().describe('When created')
-    })
-  )
+  .output(createTransactionOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -97,14 +97,16 @@ export let createTransaction = SlateTool.create(spec, {
     });
 
     return {
-      output: {
+      output: client.output(createTransactionOutputSchema, {
         transactionId: String(t.id),
-        campaignId: t.campaign_id ?? null,
-        amount: t.amount ?? null,
-        status: t.status ?? null,
-        createdAt: t.created_at ?? null
-      },
-      message: `Created transaction **${t.id}** — ${ctx.input.amount} from ${ctx.input.firstName} ${ctx.input.lastName}.`
+        campaignId: t.campaign_id,
+        amount: t.amount,
+        status: t.status,
+        createdAt: t.created_at
+      }),
+      message: client.publicData(
+        `Created transaction **${t.id}** — ${ctx.input.amount} from ${ctx.input.firstName} ${ctx.input.lastName}.`
+      )
     };
   })
   .build();

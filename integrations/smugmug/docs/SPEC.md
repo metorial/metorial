@@ -1,101 +1,35 @@
-Now let me look for more details about SmugMug API resources and check if they support webhooks.# Slates Specification for SmugMug
+# SmugMug integration specification
 
-## Overview
+## Authentication and account discovery
 
-SmugMug is a photo hosting and sharing platform for photographers, offering image and video storage, organization into albums and folders, and online selling of prints. It is a cloud-based software designed to help freelancers, professional photographers, and studios upload, store, share and sell images, with capabilities for creating personalized digital stores and websites. The API provides programmatic access to a user's SmugMug account, allowing them to manage photos, albums, and account settings.
+[SmugMug OAuth 1.0a](https://api.smugmug.com/api/v2/doc/tutorial/authorization.html) uses HMAC-SHA1-signed requests. Request tokens, authorization, and access-token exchange use the documented `https://api.smugmug.com/services/oauth/1.0a/` endpoints. Request tokens last five minutes and are single-use; access tokens last until revoked. No OAuth refresh endpoint is documented or needed.
 
-## Authentication
+The original `oauth1` connection requests `Modify`, and separate `oauth1_read` and `oauth1_add` methods request `Read` and `Add`. All use `Access=Full` so private resources are accessible when the account grants access. The `api_keys` method accepts an existing consumer key/secret and access token/secret. No account IDs or credentials belong in connection configuration. Omitting `nickname` from `get_user` calls the real [`/api/v2!authuser`](https://api.smugmug.com/api/v2/doc/reference/user.html) identity endpoint.
 
-SmugMug uses **OAuth 1.0a** for authentication. The SmugMug API uses OAuth1, with request signing handled as part of the authentication process.
+## Tools
 
-### Prerequisites
+The integration registers 22 tools:
 
-- You must be logged in with a SmugMug account to apply for an API key.
-- Each individual application or use of the API should use its own key.
-- Apply for an API key at `https://api.smugmug.com/api/developer/apply`, which provides both an **API Key** (Consumer Key) and an **API Secret** (Consumer Secret).
+- Account: `get_user`, `update_profile_biography`.
+- Albums: `create_album`, `update_album`, `delete_album`, `get_album`, `list_album_images`, `get_album_share_uris`.
+- Images: `get_image`, `update_image`, `delete_image`, `upload_image_from_url`, `move_or_collect_images`, `export_image_metadata`.
+- Organization: `get_node`, `create_node`, `update_node`, `delete_node`, `browse_folder`.
+- Discovery: `search`, `get_comments`, `get_watermarks`.
 
-### OAuth 1.0a Flow
+Album and node operations use the provider's [album](https://api.smugmug.com/api/v2/doc/reference/album.html) and [node](https://api.smugmug.com/api/v2/doc/reference/node.html) resources. Folder paths use each folder's URL-name segments. `browse_folder` returns folder details and its node ID; use `get_node` with `includeChildren` to browse a page of descendants. Existing folder APIs are retained for [legacy-account compatibility](https://api.smugmug.com/api/v2/doc/reference/folder.html).
 
-The three-legged OAuth 1.0a flow uses these endpoints:
+List and search inputs retain their existing number schemas. Positive integral `start` and `count` values are checked at runtime. Pagination reads the provider's actual `Pages.Total`, `Pages.Start`, and `Pages.Count`; see [paging](https://api.smugmug.com/api/v2/doc/tutorial/paging.html). Watermarks are fetched across pages.
 
-1. **Request Token**: `https://secure.smugmug.com/services/oauth/1.0a/getRequestToken` — Obtain an unauthorized request token. An `oauth_callback` parameter is required.
-2. **User Authorization**: `https://api.smugmug.com/services/oauth/authorize.mg` — Redirect the user to authorize the application.
-3. **Access Token**: `https://secure.smugmug.com/services/oauth/1.0a/getAccessToken` — Exchange the authorized request token for an access token.
+Biography updates modify only the documented writable `BioText` field in the authenticated user's [profile](https://api.smugmug.com/api/v2/doc/reference/user-profile.html).
 
-### Authorization Parameters
+## Files
 
-The application can request specific Access (Public [default] or Full) and Permissions (Read [default], Add or Modify) for a user's account by including `Access` and `Permissions` parameters in the authorization URL.
+[Uploader API](https://api.smugmug.com/api/v2/doc/reference/upload.html) requests POST binary media to `https://upload.smugmug.com/`, with OAuth in the Authorization header and the required album URI, response-type, and version headers. The source URL must be directly accessible over HTTP(S), without redirects or embedded credentials. Upload success requires `stat=ok` and actual image response data.
 
-- **Access**: `Public` (default) — only public content; `Full` — all content including private.
-- **Permissions**: `Read` (default) — read-only; `Add` — read and create; `Modify` — read, create, update, and delete.
+`get_image` retains its existing metadata, size-details, archive URL, and scalar output contracts. [Image documentation](https://api.smugmug.com/api/v2/doc/reference/image.html) says private media downloads may require OAuth. Provider-scoped download URL signatures are preserved. Returned size details do not prove that a later client can access private media.
 
-### Token Behavior
+`export_image_metadata` retrieves actual image data and original-file metadata, creates a JSON file, and prepares it for download. `status=prepared` means that file preparation was registered; subsequent upload or download success is not established by this status. It does not download image/video bytes. No media URL expiry or renewal interval is invented.
 
-- OAuth tokens don't expire unless the user manually de-authorizes them through SmugMug Account Settings.
-- If you are only accessing your own data, SmugMug automatically generates an access token and secret which can be found in account settings under the privacy section > Authorized Services.
+## Limitations
 
-### Public Access
-
-An API Key alone (without OAuth access tokens) can be used to access publicly available data. Full OAuth authentication is required for private data and write operations.
-
-## Features
-
-### Node Management (Folders, Albums, Pages)
-
-A node is a folder, album, or page. Folders contain albums, pages, and other folders, and albums contain images. The API allows creating, reading, updating, and deleting nodes in a hierarchical structure.
-
-- Nodes can be of type Folder, Album, or Page.
-- There is a limit to how deep the folder hierarchy can be — the root can contain folder trees up to five folders deep.
-- Supports sorting, searching, and traversing the node tree.
-
-### Album Management
-
-The album endpoint provides access to album settings and album contents. Albums are also known as galleries.
-
-- Create, update, and delete albums within folders.
-- Configure album settings including privacy (Private, Unlisted, Public), password protection, watermarks, printmarks, download permissions, EXIF display, commenting, and searchability.
-- Apply album templates and set highlight/cover images.
-- Move or collect images across albums.
-
-### Image and Video Management
-
-An image is a photo or video stored on SmugMug.
-
-- Upload images and videos to albums via a dedicated upload endpoint (`https://upload.smugmug.com/`).
-- Upload from local files or from external URLs.
-- Replace existing images with new files.
-- Retrieve image metadata, EXIF data, and multiple size variants.
-- Update image properties such as title, caption, and keywords.
-- Delete images and move images between albums.
-- Download original/archive images.
-
-### User and Profile Management
-
-Retrieve and manage user account information and public-facing profile data.
-
-- A user profile includes social networking links, biographical text, and bio and cover images.
-- Access user-level resources such as featured albums, recent images, popular media, geo-tagged media, and top keywords.
-- Manage site settings for the user's SmugMug site.
-
-### Search
-
-Search across the user's content including albums, images, and nodes.
-
-- Text-based search scoped to a user, album, node, or folder.
-- Search for albums and images with configurable sort direction and method.
-
-### Comments
-
-Retrieve and manage comments on albums and nodes.
-
-### Watermarks
-
-Manage watermark images that can be applied to albums for display on photos.
-
-### Sharing
-
-Access share URIs for albums to facilitate sharing of galleries with others.
-
-## Events
-
-The provider does not support events. SmugMug's API v2 does not offer webhooks or a purpose-built event subscription mechanism.
+No triggers are registered. The static documentation does not establish a webhook subscription contract. This refresh does not claim complete coverage of site settings, featured albums, watermark editing, comment writes, or private media downloading. No live account, OAuth consent, media upload/download, or deployed file-delivery verification was performed.

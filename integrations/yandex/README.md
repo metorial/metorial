@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Yandex
 
-Manage Yandex Cloud infrastructure and services. Create, start, stop, and delete virtual machines. Store and retrieve objects in S3-compatible Object Storage buckets. Deploy and invoke serverless functions with event triggers. Manage databases including PostgreSQL, MySQL, ClickHouse, MongoDB, and Redis clusters. Translate text between languages, synthesize and recognize speech, and analyze images with OCR. Manage IAM service accounts, roles, and access keys. Create and configure virtual networks, subnets, and security groups. Store and manage Docker images in Container Registry. Deploy and scale Managed Kubernetes clusters. Send and receive messages via Message Queue. Stream data in real time with Data Streams. Monitor resources with metrics, alerts, and dashboards. Manage DNS zones and API gateways. Access Yandex search results programmatically. Manage files on Yandex Disk. Automate advertising campaigns via Yandex Direct. Set up event-driven triggers for storage events, container registry changes, message queues, timers, logging, IoT messages, budgets, and monitoring alerts.
+Manage Yandex Cloud virtual machines, disks, Object Storage buckets, serverless functions, IAM service accounts and API keys, VPC networks and subnets, DNS zones and records, clouds and folders, container registries, translation, and logging. Discover compute images, function versions, log groups, and asynchronous operation status.
+
+Choose IAM authentication for infrastructure management. API keys support specific services and depend on scopes and validity periods. Start with `list_clouds` and `list_folders` to discover resource IDs. The legacy S3 bucket/object listings preserve their original raw responses; use `list_folder_buckets` for the IAM-authenticated bucket management API.
 
 ## License
 

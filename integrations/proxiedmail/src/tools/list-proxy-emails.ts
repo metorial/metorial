@@ -15,7 +15,12 @@ let proxyBindingSchema = z.object({
   realAddresses: z
     .record(z.string(), realAddressInfoSchema)
     .describe('Map of forwarding addresses and their status'),
-  isBrowsable: z.boolean().describe('Whether received emails can be browsed via the API'),
+  isBrowsable: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether received emails can be browsed via the API, when returned by the provider'
+    ),
   receivedEmailsCount: z.number().describe('Number of emails received by this proxy address'),
   description: z.string().nullable().describe('User-provided description'),
   callbackUrl: z.string().nullable().describe('Webhook callback URL'),

@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .default('en')
       .describe(
-        'Language code for dictionary lookups (e.g., "en" for English, "fr" for French)'
+        'Default language code for dictionary lookups. English uses "en"; availability of other codes depends on the provider.'
       )
   })
 );

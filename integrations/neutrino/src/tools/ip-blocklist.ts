@@ -38,7 +38,8 @@ export let ipBlocklistTool = SlateTool.create(spec, {
       isHijacked: z.boolean().describe('Part of a hijacked netblock'),
       isSpider: z.boolean().describe('Detected as hostile spider'),
       isDshield: z.boolean().describe('DShield attack source'),
-      lastSeen: z.number().describe('Unix timestamp of last detection (0 if not listed)')
+      lastSeen: z.number().describe('Unix timestamp of last detection (0 if not listed)'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,25 +55,26 @@ export let ipBlocklistTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result.raw,
         ip: result.ip,
         isListed: result.isListed,
-        listCount: result.listCount ?? 0,
-        blocklists: result.blocklists ?? [],
-        isProxy: result.isProxy ?? false,
-        isTor: result.isTor ?? false,
-        isVpn: result.isVpn ?? false,
-        isMalware: result.isMalware ?? false,
-        isSpyware: result.isSpyware ?? false,
-        isBot: result.isBot ?? false,
-        isSpamBot: result.isSpamBot ?? false,
-        isExploitBot: result.isExploitBot ?? false,
-        isHijacked: result.isHijacked ?? false,
-        isSpider: result.isSpider ?? false,
-        isDshield: result.isDshield ?? false,
-        lastSeen: result.lastSeen ?? 0
+        listCount: result.listCount,
+        blocklists: result.blocklists,
+        isProxy: result.isProxy,
+        isTor: result.isTor,
+        isVpn: result.isVpn,
+        isMalware: result.isMalware,
+        isSpyware: result.isSpyware,
+        isBot: result.isBot,
+        isSpamBot: result.isSpamBot,
+        isExploitBot: result.isExploitBot,
+        isHijacked: result.isHijacked,
+        isSpider: result.isSpider,
+        isDshield: result.isDshield,
+        lastSeen: result.lastSeen
       },
       message: result.isListed
-        ? `⚠️ **${result.ip}** is listed on **${result.listCount}** blocklist(s): ${(result.blocklists ?? []).join(', ')}.`
+        ? `⚠️ **${result.ip}** is listed on **${result.listCount}** blocklist(s): ${(result.blocklists).join(', ')}.`
         : `✅ **${result.ip}** is not listed on any blocklists.`
     };
   })

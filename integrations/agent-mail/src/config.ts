@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     podId: z
       .string()
       .optional()
-      .describe('Pod ID to scope all operations to a specific pod for multi-tenant setups')
+      .describe(
+        'Optional pod ID for inbox, domain, webhook, and allow/block list management. Call list_pods to discover pod IDs. Message, thread, and draft tools use their inboxId input.'
+      )
   })
 );

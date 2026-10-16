@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCommodities = SlateTool.create(spec, {
   name: 'Get Commodity Prices',
   key: 'get_commodities',
-  description: `Retrieve current and historical prices for 70+ commodities including energy, metals, industrial, agricultural, and livestock categories. Supports date range filtering and up to 15 years of historical data.`,
+  description: `Retrieve current or historical commodity prices by commodityName, including energy, metals, agriculture, and livestock. Use download_catalog to discover supported names. Dates or frequency select history; limit, offset, and sort apply locally to the returned commodity records. The legacy symbols-only request is retained, but is not described by the current API reference.`,
   constraints: ['Available on Professional plan and higher'],
   tags: {
     readOnly: true
@@ -14,6 +14,16 @@ export let getCommodities = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      commodityName: z
+        .string()
+        .optional()
+        .describe(
+          'Commodity name from the commodities catalog, for example aluminum. Selects the documented commodity-price API.'
+        ),
+      frequency: z
+        .enum(['day', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'])
+        .optional()
+        .describe('Historical frequency; requires commodityName.'),
       symbols: z
         .string()
         .optional()
@@ -27,21 +37,22 @@ export let getCommodities = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
-        limit: z.number(),
-        offset: z.number(),
-        count: z.number(),
-        total: z.number()
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+        count: z.number().optional(),
+        total: z.number().optional()
       }),
       commodities: z.array(
         z.object({
-          symbol: z.string(),
+          symbol: z.string().optional(),
           name: z.string(),
           price: z.number().nullable(),
-          dayHigh: z.number().nullable(),
-          dayLow: z.number().nullable(),
-          change: z.number().nullable(),
-          changePercent: z.number().nullable(),
+          dayHigh: z.number().nullable().optional(),
+          dayLow: z.number().nullable().optional(),
+          change: z.number().nullable().optional(),
+          changePercent: z.number().nullable().optional(),
           date: z.string()
         })
       )
@@ -52,6 +63,8 @@ export let getCommodities = SlateTool.create(spec, {
 
     let result = await client.getCommodities({
       symbols: ctx.input.symbols,
+      commodityName: ctx.input.commodityName,
+      frequency: ctx.input.frequency,
       dateFrom: ctx.input.dateFrom,
       dateTo: ctx.input.dateTo,
       sort: ctx.input.sort,
@@ -73,9 +86,10 @@ export let getCommodities = SlateTool.create(spec, {
     return {
       output: {
         pagination: result.pagination,
+        raw: result.raw,
         commodities
       },
-      message: `Retrieved ${commodities.length} commodity price records. Total available: ${result.pagination.total}.`
+      message: `Retrieved ${commodities.length} commodity price records.`
     };
   })
   .build();

@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Better Proposals
 
-Create, send, and track professional business proposals, contracts, and sales documents. Manage proposals by status (new, opened, sent, signed, paid) with digital signature support and payment collection. Create and assign custom cover designs, use templates for new proposals, and define document types. Manage client companies and quotes. Retrieve account settings, brand configurations, supported currencies, and custom merge tags for dynamic content personalization. Monitor proposal lifecycle events including creation, sending, opening, signing, and payment.
+Create and edit business proposals, generate personal recipient links, and track proposal status. Use templates, create covers, manage client companies and document types, and create quotes. Retrieve account and brand settings, supported currencies, and custom merge tags. List tools support pagination.
+
+Authenticate with a Better Proposals API token. API access requires a supported Premium or Enterprise plan after the trial. Generating recipient links counts as a send against your plan limit; it does not email the recipients.
+
+See the [integration specification](docs/SPEC.md) and [official API documentation](https://betterproposals.io/resources/api/).
 
 ## License
 

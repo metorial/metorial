@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getAttributes, getCollection, nullableNumber, requireRecord } from '../lib/response';
 import { spec } from '../spec';
 
 export let listProjects = SlateTool.create(spec, {
@@ -27,28 +28,37 @@ export let listProjects = SlateTool.create(spec, {
             currencyCode: z.string().nullable().describe('Currency code for the project')
           })
         )
-        .describe('List of active projects')
+        .describe('List of active projects'),
+      rawResponse: z.any().describe('Original project response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listProjects();
 
-    let projects = Array.isArray(data) ? data : data?.groups || data?.data || [];
-
-    let mapped = projects.map((p: any) => ({
-      projectId: String(p.project_id ?? p.id ?? ''),
-      projectName: p.category ?? p.name ?? null,
-      keywordsCount: p.keywords_count ?? null,
-      tagsCount: p.tags_count ?? null,
-      tags: p.tags ?? null,
-      authKey: p.auth ?? null,
-      lastUpdatedAt: p.keywords_last_updated_at ?? null,
-      currencyCode: p.currency_code ?? null
-    }));
+    let projects = getCollection(data, 'groups');
+    let mapped = projects.map(project => {
+      let resource = requireRecord(project, 'project');
+      let p = getAttributes(resource);
+      let projectId = p.project_id ?? resource.id;
+      let count = p.keywords_count;
+      if (count !== null && typeof count === 'object' && !Array.isArray(count))
+        count = count.ACTIVE;
+      if (Array.isArray(count) && count.length === 0) count = undefined;
+      return {
+        projectId: projectId == null ? null : String(projectId),
+        projectName: p.category ?? p.name ?? resource.id ?? null,
+        keywordsCount: nullableNumber(count, 'active keyword count'),
+        tagsCount: nullableNumber(p.tags_count, 'tag count'),
+        tags: p.tags ?? null,
+        authKey: p.auth ?? null,
+        lastUpdatedAt: p.keywords_last_updated_at ?? null,
+        currencyCode: p.currency_code ?? null
+      };
+    });
 
     return {
-      output: { projects: mapped },
+      output: { projects: mapped, rawResponse: data },
       message: `Found **${mapped.length}** active project(s).`
     };
   })

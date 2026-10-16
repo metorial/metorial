@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, requestAxiosData, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { readWorkiomResponse, workiomError } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -23,13 +24,17 @@ export let auth = SlateAuth.create()
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
       let http = createAxios({ baseURL: 'https://api.workiom.com' });
-      await http.get('/api/services/app/Apps/GetAll', {
-        headers: { 'X-Api-Key': ctx.output.token }
-      });
+      let data = await requestAxiosData(
+        'validate API key',
+        () =>
+          http.get('/api/services/app/Apps/GetAll', {
+            headers: { 'X-Api-Key': ctx.output.token }
+          }),
+        workiomError
+      );
+      readWorkiomResponse(data, 'validate API key');
       return {
-        profile: {
-          name: 'Workiom User'
-        }
+        profile: {}
       };
     }
   })
@@ -43,13 +48,20 @@ export let auth = SlateAuth.create()
     }),
     getOutput: async ctx => {
       let http = createAxios({ baseURL: 'https://api.workiom.com' });
-      let response = await http.post('/api/TokenAuth/Authenticate', {
-        userNameOrEmailAddress: ctx.input.username,
-        password: ctx.input.password
-      });
-      let token = response.data?.result?.accessToken;
+      let data = await requestAxiosData(
+        'authenticate',
+        () =>
+          http.post('/api/TokenAuth/Authenticate', {
+            userNameOrEmailAddress: ctx.input.username,
+            password: ctx.input.password
+          }),
+        workiomError
+      );
+      let token = readWorkiomResponse(data, 'authenticate')?.accessToken;
       if (!token) {
-        throw new Error('Failed to authenticate. Please check your credentials.');
+        throw createApiServiceError('Failed to authenticate. Please check your credentials.', {
+          reason: 'workiom_missing_access_token'
+        });
       }
       return {
         output: {
@@ -62,9 +74,15 @@ export let auth = SlateAuth.create()
       input: { username: string; password: string };
     }) => {
       let http = createAxios({ baseURL: 'https://api.workiom.com' });
-      await http.get('/api/services/app/Apps/GetAll', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
+      let data = await requestAxiosData(
+        'validate access token',
+        () =>
+          http.get('/api/services/app/Apps/GetAll', {
+            headers: { Authorization: `Bearer ${ctx.output.token}` }
+          }),
+        workiomError
+      );
+      readWorkiomResponse(data, 'validate access token');
       return {
         profile: {
           name: ctx.input.username

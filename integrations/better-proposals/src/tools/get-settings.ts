@@ -18,7 +18,9 @@ export let getSettings = SlateTool.create(spec, {
         .array(z.enum(['account', 'brand', 'mergeTags']))
         .optional()
         .default(['account', 'brand', 'mergeTags'])
-        .describe('Which settings to include. Defaults to all.')
+        .describe('Which settings to include. Defaults to all.'),
+      mergeTagsPage: z.number().optional().describe('Page number for custom merge tags'),
+      mergeTagsPerPage: z.number().optional().describe('Number of custom merge tags per page')
     })
   )
   .output(
@@ -45,7 +47,10 @@ export let getSettings = SlateTool.create(spec, {
       brandSettings = result.data;
     }
     if (include.includes('mergeTags')) {
-      let result = await client.getMergeTags();
+      let result = await client.getMergeTags(
+        ctx.input.mergeTagsPage,
+        ctx.input.mergeTagsPerPage
+      );
       mergeTags = result.data;
     }
 

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CincopaClient } from '../lib/client';
+import { requireSuccess } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageAsset = SlateTool.create(spec, {
@@ -44,7 +45,7 @@ export let manageAsset = SlateTool.create(spec, {
         fileName: ctx.input.fileName
       });
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Asset \`${assetId}\` metadata updated.`
       };
     }
@@ -52,7 +53,7 @@ export let manageAsset = SlateTool.create(spec, {
     if (action === 'delete') {
       let data = await client.deleteAsset(assetId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Asset \`${assetId}\` permanently deleted.`
       };
     }
@@ -60,11 +61,11 @@ export let manageAsset = SlateTool.create(spec, {
     if (action === 'resync') {
       let data = await client.resyncAsset(assetId);
       return {
-        output: { success: data.success === true },
+        output: { success: requireSuccess(data) },
         message: `Asset \`${assetId}\` queued for reprocessing.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

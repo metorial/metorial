@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GristClient } from '../lib/client';
+import { GristClient, getGristItems } from '../lib/client';
 import { spec } from '../spec';
 
 let recordSchema = z.object({
@@ -58,7 +58,7 @@ export let fetchRecords = SlateTool.create(spec, {
       hidden: ctx.input.includeHidden
     });
 
-    let records = (result.records || []).map((r: any) => ({
+    let records = getGristItems(result, 'records').map((r: any) => ({
       recordId: r.id,
       fields: r.fields
     }));
@@ -112,7 +112,7 @@ export let addRecords = SlateTool.create(spec, {
       ctx.input.records,
       ctx.input.noparse
     );
-    let recordIds = result.records?.map((r: any) => r.id) || [];
+    let recordIds = getGristItems(result, 'records').map(r => r.id);
 
     return {
       output: { recordIds },

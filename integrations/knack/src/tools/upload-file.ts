@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { KnackClient } from '../lib/client';
+import { KnackClient, resolveApplicationId } from '../lib/client';
 import { spec } from '../spec';
 
 export let uploadFile = SlateTool.create(spec, {
@@ -9,6 +9,8 @@ export let uploadFile = SlateTool.create(spec, {
   description: `Upload a file or image to a Knack record. This performs a two-step process: first uploads the file asset to Knack, then attaches it to a record by creating or updating the record with the asset ID. The record must have a file or image field to attach the asset to.`,
   instructions: [
     'Provide the file content as a base64-encoded string along with the file name and MIME content type.',
+    'An uploaded asset belongs to one field only. Re-upload the bytes for every additional field or record.',
+    'Use get_record_file to download the uploaded file after it is associated with a record.',
     'Specify whether to create a new record or update an existing one with the uploaded asset.'
   ],
   constraints: ['Only works with object-based access (API key authentication).'],
@@ -18,6 +20,10 @@ export let uploadFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      assetType: z
+        .enum(['file', 'image'])
+        .optional()
+        .describe('Asset upload type; defaults to file. Use image for an image field.'),
       objectKey: z
         .string()
         .describe('Object key containing the file/image field (e.g., "object_1")'),
@@ -49,7 +55,7 @@ export let uploadFile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new KnackClient({
-      applicationId: ctx.config.applicationId,
+      applicationId: resolveApplicationId(ctx.auth, ctx.config),
       token: ctx.auth.token,
       authMode: ctx.auth.authMode
     });
@@ -61,7 +67,8 @@ export let uploadFile = SlateTool.create(spec, {
       ctx.input.fieldKey,
       ctx.input.fileName,
       ctx.input.fileContent,
-      ctx.input.contentType
+      ctx.input.contentType,
+      ctx.input.assetType
     );
 
     ctx.info(`File uploaded with asset ID: ${assetId}, attaching to record`);
@@ -82,7 +89,13 @@ export let uploadFile = SlateTool.create(spec, {
       record = await client.createObjectRecord(ctx.input.objectKey, fields);
     }
 
-    let recordId = record.id || ctx.input.recordId || 'unknown';
+    let recordId = typeof record.id === 'string' ? record.id : undefined;
+
+    if (!recordId)
+      return {
+        output: { record, assetId },
+        message: `Uploaded **${ctx.input.fileName}** and Knack completed the record request.`
+      };
 
     return {
       output: { record, assetId },

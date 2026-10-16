@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -26,7 +26,7 @@ export let getCorrelationsTool = SlateTool.create(spec, {
   description: `Retrieve correlations between tracked attributes. Correlations describe relationships between two data points (e.g., "You have a better day when you walk more"). Generated weekly from up to a year of data. Can retrieve all correlations or look up a specific pair.`,
   instructions: [
     'To find the correlation between two specific attributes, provide both firstAttribute and secondAttribute.',
-    'Use strongOnly=true to filter for stronger relationships, confidendOnly=true for five-star confidence.',
+    'Use strongOnly=true to filter for stronger relationships, confidentOnly=true for five-star confidence.',
     'Filter by a single attribute to find all correlations involving that attribute.'
   ],
   tags: {
@@ -54,6 +54,17 @@ export let getCorrelationsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the next page, when returned'),
+      previousPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the previous page, when returned'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       correlations: z.array(correlationSchema).describe('List of correlations'),
       totalCount: z
         .number()
@@ -64,6 +75,11 @@ export let getCorrelationsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
+
+    if (ctx.input.secondAttribute !== undefined && !ctx.input.firstAttribute)
+      throw createApiServiceError(
+        'secondAttribute requires firstAttribute. Discover attribute names with get_attributes.'
+      );
 
     if (ctx.input.firstAttribute && ctx.input.secondAttribute) {
       let correlation = await client.getCorrelationCombo({
@@ -88,6 +104,7 @@ export let getCorrelationsTool = SlateTool.create(spec, {
 
       return {
         output: {
+          raw: correlation,
           correlations: [mapped],
           hasMore: false
         },
@@ -120,6 +137,9 @@ export let getCorrelationsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        nextPageUrl: result.next,
+        previousPageUrl: result.previous,
+        raw: result,
         correlations,
         totalCount: result.count,
         hasMore: result.next !== null

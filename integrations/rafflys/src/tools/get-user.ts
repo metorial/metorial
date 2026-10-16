@@ -29,12 +29,12 @@ export let getUserTool = SlateTool.create(spec, {
 
     return {
       output: {
-        userId: user.id?.toString(),
-        name: user.name || user.username,
+        userId: user.id.toString(),
+        name: user.name,
         email: user.email,
-        rawProfile: user as Record<string, unknown>
+        rawProfile: user.rawProfile
       },
-      message: `Retrieved account details for user **${user.name || user.username || user.id}**.`
+      message: `Retrieved account details for user **${user.name || user.id}**.`
     };
   })
   .build();

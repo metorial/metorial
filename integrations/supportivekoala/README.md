@@ -1,6 +1,6 @@
-# <img src="logo.png" height="20"> Supportivekoala
+# <img src="logo.svg" height="20"> Supportivekoala
 
-Generate images programmatically from customizable templates. Create and manage reusable image templates with configurable dimensions and dynamic parameters. Populate templates with text, images, and other content to produce images in PNG, JPEG, or WebP formats. Retrieve and list previously generated images hosted on the cloud.
+Generate images programmatically from customizable templates. Create and manage reusable image templates with configurable dimensions and dynamic parameters. Populate templates with text, images, and other content to produce images in PNG, JPEG, or WebP formats. Retrieve and list previously generated images hosted on the cloud. Generated and individually retrieved images include a prepared download when the hosted HTTPS URL is usable. Download availability is checked later; generation is not retried automatically.
 
 ## License
 

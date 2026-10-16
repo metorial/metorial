@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { bannerOutputSchema, mapBanner } from '../lib/banner';
 import { AbyssaleClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -23,30 +24,17 @@ export let getGenerationStatus = SlateTool.create(spec, {
     z.object({
       isFinalized: z.boolean().describe('Whether the generation request has completed'),
       generationRequestId: z.string().describe('ID of the generation request'),
-      banners: z
-        .array(
-          z.object({
-            bannerId: z.string().describe('Generated banner UUID'),
-            fileType: z.string().describe('File type (jpeg, png, pdf, mp4, gif, etc.)'),
-            fileUrl: z.string().describe('URL where the file is stored'),
-            cdnUrl: z.string().describe('CDN URL for high-speed access'),
-            filename: z.string().describe('Generated filename'),
-            formatName: z.string().describe('Format name as defined in the template'),
-            width: z.number().describe('Width in pixels'),
-            height: z.number().describe('Height in pixels'),
-            templateId: z.string().describe('Template UUID'),
-            templateName: z.string().describe('Template name')
-          })
-        )
-        .describe('Successfully generated banners'),
+      banners: z.array(bannerOutputSchema).describe('Successfully generated files'),
       errors: z
         .array(
           z.object({
-            templateFormatName: z.string().describe('Format name that failed'),
-            reason: z.string().describe('Error description')
+            templateFormatName: z.string().optional().describe('Format name that failed'),
+            reason: z.string().optional().describe('Error description')
           })
         )
-        .describe('Errors for formats that failed generation')
+        .optional()
+        .describe('Errors for formats that failed generation'),
+      raw: z.record(z.string(), z.any()).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -54,33 +42,29 @@ export let getGenerationStatus = SlateTool.create(spec, {
 
     let result = await client.getGenerationRequestStatus(ctx.input.generationRequestId);
 
-    let banners = result.banners.map(b => ({
-      bannerId: b.id,
-      fileType: b.file.type,
-      fileUrl: b.file.url,
-      cdnUrl: b.file.cdn_url,
-      filename: b.file.filename,
-      formatName: b.format.id,
-      width: b.format.width,
-      height: b.format.height,
-      templateId: b.template.id,
-      templateName: b.template.name
-    }));
-
-    let errors = result.errors.map(e => ({
-      templateFormatName: e.template_format_name,
-      reason: e.reason
+    let banners = result.banners.map(mapBanner);
+    for (let banner of result.banners) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: banner.file.url,
+        filename: banner.file.filename
+      });
+    }
+    let errors = result.errors?.map(error => ({
+      templateFormatName: error.template_format_name,
+      reason: error.reason
     }));
 
     let status = result.is_finalized ? 'Completed' : 'In progress';
-    let errorMsg = errors.length > 0 ? ` with **${errors.length}** error(s)` : '';
+    let errorMsg = (errors?.length ?? 0) > 0 ? ` with **${errors?.length}** error(s)` : '';
 
     return {
       output: {
         isFinalized: result.is_finalized,
         generationRequestId: result.id,
         banners,
-        errors
+        errors,
+        raw: result
       },
       message: `Generation request \`${result.id}\`: **${status}**. ${banners.length} banner(s) generated${errorMsg}.`
     };

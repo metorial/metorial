@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawSchema, transcriptionOutput } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getTranscription = SlateTool.create(spec, {
@@ -46,7 +47,10 @@ export let getTranscription = SlateTool.create(spec, {
         .nullable()
         .describe('Tags associated with the transcription.'),
       createdAt: z.string().optional().describe('Creation timestamp.'),
-      updatedAt: z.string().optional().describe('Last update timestamp.')
+      updatedAt: z.string().optional().describe('Last update timestamp.'),
+      raw: rawSchema
+        .optional()
+        .describe('Transcription metadata, excluding temporary media and file download URLs.')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,18 +58,7 @@ export let getTranscription = SlateTool.create(spec, {
     let result = await client.getTranscription(ctx.input.transcriptionId);
 
     return {
-      output: {
-        transcriptionId: result.id,
-        name: result.name,
-        state: result.state,
-        language: result.language,
-        audioLengthInSeconds: result.audioLengthInSeconds,
-        costInCents: result.costInCents,
-        sharingEnabled: result.sharingEnabled,
-        tags: result.tags,
-        createdAt: result.created_at,
-        updatedAt: result.updated_at
-      },
+      output: transcriptionOutput(result),
       message: `Transcription **${result.name}** (${result.id}) is in state **${result.state}** with language **${result.language}**.`
     };
   })

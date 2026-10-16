@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,6 +9,11 @@ let surveyRecipientSchema = z.object({
   lastName: z.string().optional().describe('Recipient last name'),
   company: z.string().optional().describe('Recipient company name'),
   tags: z.array(z.string()).optional().describe('Tags to assign to the recipient'),
+  unsetProperties: z
+    .array(z.string())
+    .optional()
+    .describe('Property names or labels to remove'),
+  unsetTags: z.array(z.string()).optional().describe('Tag names to remove'),
   properties: z
     .array(
       z.object({
@@ -16,7 +21,9 @@ let surveyRecipientSchema = z.object({
         type: z
           .enum(['string', 'date', 'integer', 'collection', 'boolean'])
           .describe('Property type'),
-        value: z.union([z.string(), z.number(), z.boolean()]).describe('Property value')
+        value: z
+          .union([z.string(), z.number(), z.boolean()])
+          .describe('Property value. For collection properties, use comma-separated text.')
       })
     )
     .optional()
@@ -58,8 +65,15 @@ Recipients that don't exist will be automatically created as customers.`,
 })
   .input(
     z.object({
-      campaignId: z.string().describe('ID of the transactional campaign to use for sending'),
-      delay: z.number().optional().describe('Number of days to delay sending the survey'),
+      campaignId: z
+        .string()
+        .describe('Transactional campaign ID. Call get_campaigns to find active campaigns.'),
+      delay: z
+        .number()
+        .optional()
+        .describe(
+          'Number of days to delay sending. Overrides campaign scheduling; omit to respect its sending time frame.'
+        ),
       recipients: z
         .array(surveyRecipientSchema)
         .min(1)
@@ -68,10 +82,22 @@ Recipients that don't exist will be automatically created as customers.`,
   )
   .output(
     z.object({
-      results: z.record(z.string(), z.any()).describe('Map of email addresses to send status')
+      results: z
+        .record(z.string(), z.any())
+        .describe(
+          'Provider result, including queue status or per-recipient results when available'
+        )
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.recipients.length > 100)
+      throw createApiServiceError('Send surveys to at most 100 recipients per request.');
+    if (
+      ctx.input.delay !== undefined &&
+      (!Number.isInteger(ctx.input.delay) || ctx.input.delay < 0)
+    ) {
+      throw createApiServiceError('Survey delay must be a non-negative whole number of days.');
+    }
     let client = new Client(ctx.auth.token);
 
     let subscribers = ctx.input.recipients.map(r => ({
@@ -80,6 +106,8 @@ Recipients that don't exist will be automatically created as customers.`,
       last_name: r.lastName,
       company: r.company,
       tags: r.tags,
+      unset_properties: r.unsetProperties,
+      unset_tags: r.unsetTags,
       properties: normalizeProperties(r.properties)
     }));
 
@@ -88,7 +116,7 @@ Recipients that don't exist will be automatically created as customers.`,
 
     return {
       output: { results: result },
-      message: `Survey sent to **${count}** recipient(s)${ctx.input.delay ? ` with a ${ctx.input.delay}-day delay` : ''}.`
+      message: `Survey request accepted for **${count}** recipient(s)${ctx.input.delay ? ` with a ${ctx.input.delay}-day delay` : ''}.`
     };
   })
   .build();

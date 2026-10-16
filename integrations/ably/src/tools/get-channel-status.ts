@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyRestClient } from '../lib/client';
+import { nextPageOutput, pageInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getChannelStatus = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ Use this to check if a channel is active, how many connections/subscribers/publi
 })
   .input(
     z.object({
+      page: pageInput,
       channelId: z
         .string()
         .optional()
@@ -43,6 +45,11 @@ Use this to check if a channel is active, how many connections/subscribers/publi
   )
   .output(
     z.object({
+      nextPageUrl: nextPageOutput,
+      raw: z
+        .any()
+        .optional()
+        .describe('Complete channel details returned by the provider in single-channel mode'),
       channelId: z.string().optional().describe('Channel name (single channel mode)'),
       isActive: z.boolean().optional().describe('Whether the channel is currently active'),
       occupancy: z
@@ -60,7 +67,7 @@ Use this to check if a channel is active, how many connections/subscribers/publi
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyRestClient(ctx.auth.token);
+    let client = new AblyRestClient(ctx.auth.token, ctx.auth.authType);
 
     if (ctx.input.channelId) {
       let status = await client.getChannelStatus(ctx.input.channelId);
@@ -68,8 +75,9 @@ Use this to check if a channel is active, how many connections/subscribers/publi
 
       return {
         output: {
-          channelId: status?.channelId || ctx.input.channelId,
-          isActive: status?.status?.isActive ?? false,
+          channelId: status?.channelId,
+          raw: status,
+          isActive: status?.status?.isActive,
           occupancy: {
             connections: occupancy.connections,
             subscribers: occupancy.subscribers,
@@ -79,21 +87,25 @@ Use this to check if a channel is active, how many connections/subscribers/publi
             presenceSubscribers: occupancy.presenceSubscribers
           }
         },
-        message: `Channel **${ctx.input.channelId}** is ${status?.status?.isActive ? 'active' : 'inactive'}. Subscribers: ${occupancy.subscribers ?? 0}, Publishers: ${occupancy.publishers ?? 0}, Presence members: ${occupancy.presenceMembers ?? 0}.`
+        message: `Retrieved channel status for **${ctx.input.channelId}**.`
       };
     }
 
-    let channels = await client.listChannels({
-      prefix: ctx.input.prefix,
-      limit: ctx.input.limit,
-      by: ctx.input.includeDetails ? 'value' : 'id'
-    });
+    let page = await client.listChannels(
+      {
+        prefix: ctx.input.prefix,
+        limit: ctx.input.limit,
+        by: ctx.input.includeDetails ? 'value' : 'id'
+      },
+      ctx.input.page
+    );
 
     return {
       output: {
-        channels: channels || []
+        channels: page.items,
+        nextPageUrl: page.nextPageUrl
       },
-      message: `Found **${(channels || []).length}** active channel(s)${ctx.input.prefix ? ` with prefix "${ctx.input.prefix}"` : ''}.`
+      message: `Found **${page.items.length}** active channel(s)${ctx.input.prefix ? ` with prefix "${ctx.input.prefix}"` : ''}.`
     };
   })
   .build();

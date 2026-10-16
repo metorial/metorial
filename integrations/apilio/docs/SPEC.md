@@ -1,49 +1,49 @@
-Now I have enough information to create the specification. Let me compile what I've learned:
+# Apilio Integration
 
-# Slates Specification for Apilio
+## Official API
 
-## Overview
-
-Apilio is a cloud-based smart home automation platform that allows users to connect and control devices from various brands (Tuya, Philips Hue, Sonoff, Tado, etc.) and build complex automation logic using variables, conditions, and logicblocks with AND/OR/NOT operators. It goes beyond simple if-then rules by supporting multi-condition evaluation, delayed actions, and cross-brand device coordination, integrating with services like IFTTT via webhooks and a REST API.
+[Apilio's REST API reference](https://documenter.getpostman.com/view/13480928/TzCHAVD2)
+is linked from the [provider website](https://www.apilio.com/). Requests use
+`https://api.apilio.com/api/v1` over HTTPS. The collection's saved request
+examples use a local development host; the collection overview specifies the
+production host above.
 
 ## Authentication
 
-The Apilio REST API uses a basic authentication token to authenticate requests. You can retrieve the key from your profile page at `https://apilio.herokuapp.com/user`.
+Copy the preformatted Basic authentication key from your Apilio profile. The
+integration accepts the encoded key with or without its `Basic` prefix and
+sends it in the Authorization header. These API credentials differ from the
+web application's login credentials. No OAuth flow or connection configuration
+is required.
 
-The token must be sent with each API request. HTTPS is required for all API calls.
+The documented API limit is 60 requests per minute. After reaching it, the
+reference instructs clients to wait five minutes. API access may depend on the
+account's plan.
 
-There are no OAuth flows or scopes. Authentication is a single API token per user account.
+## Tools
 
-## Features
+- List boolean, string, and numeric variables; read a variable by UUID and type.
+- Set or toggle boolean values, set or clear strings, and set/add/subtract
+  numeric values. Toggle and arithmetic read the current value before updating;
+  concurrent writes can race with these operations.
+- List all conditions or filter by variable, time, or Tuya condition type.
+  Lists expose names and UUIDs; read one condition to obtain its current state.
+- Read condition details by UUID. Supplying the condition type selects its
+  documented detail endpoint directly. When omitted, the integration discovers
+  the type from the three documented condition lists before reading details.
+- List logicblocks and their last evaluation result, trigger evaluation with
+  POST, or activate/deactivate an existing logicblock with PATCH.
 
-### Variable Management
+Provider UUIDs are returned as the existing `variableId`, `conditionId`, and
+`logicblockId` fields. Numeric values returned as decimal strings are converted
+to numbers. The API examples omit creation timestamps, so `createdAt` is
+optional. Condition lists omit evaluation state, and the active-state update
+response omits the last evaluation result; those outputs are optional only
+where the relevant endpoint does not return them.
 
-Apilio allows creating variables that store different statuses — such as device on/off states, whether you are home or at work, etc. Being able to use stored information and not just reacting to events allows building richer, more custom automations. The API supports three variable types:
+## Boundaries
 
-- **Boolean variables**: Can be set to true, set to false, or toggled.
-- **String variables**: Can be set to a value or cleared.
-- **Numeric variables**: Can be set to a value, or have a value added to or subtracted from the current value.
-
-### Condition Management
-
-Conditions define the rules that compare variable values against expected states (e.g., "Is it nighttime?" checks if a boolean variable equals true). Conditions can be combined with AND/OR/NOT logic. The API allows retrieving condition details and their current evaluation state.
-
-### Logicblock Evaluation
-
-Logicblocks are the core automation units that combine conditions and trigger different sets of actions based on whether the overall evaluation is positive or negative. The API allows:
-
-- Triggering (evaluating) a logicblock.
-- Activating or deactivating a logicblock.
-- Retrieving logicblock details and current evaluation state.
-
-### Action Chains
-
-You can specify a delay for each action in a custom routine. Apilio lets you daisy-chain IFTTT applets, Tuya actions, Philips Hue actions, and webhook actions, with a different delay for each action in the sequence. Logicblocks support separate action chains for positive and negative evaluation results.
-
-### Outgoing Webhook Actions
-
-Webhooks are an easy way of sending information instantly from Apilio to other services. When the actions are executed in a Logicblock, a webhook sends a message to the unique URL you specify. Webhook actions support custom headers, request bodies, and can include Apilio variable values as parameters.
-
-## Events
-
-The provider does not support events in the traditional webhook/subscription sense. Apilio provides **incoming webhook URLs** that external services can call to update variables or trigger logicblock evaluations, but it does not offer an event subscription mechanism where Apilio pushes notifications to registered listeners when something changes internally. Outgoing webhooks exist only as logicblock actions (not as subscribable event streams).
+The documented API controls existing resources. Resource creation and deletion,
+a profile/identity endpoint, pagination, file downloads, and event subscription
+registration are not documented in this reference. Outgoing webhook actions
+configured in Apilio are separate from subscribable API events.

@@ -59,7 +59,7 @@ export let getCredential = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment ?? (ctx.config as { environment?: string }).environment
     });
 
     let credential = await client.getCredential(ctx.input.credentialId);
@@ -71,7 +71,7 @@ export let getCredential = SlateTool.create(spec, {
         description: credential.description,
         credentialUrl: credential.url,
         issuedOn: credential.issued_on,
-        expiredOn: credential.expired_on,
+        expiredOn: credential.expired_on ?? undefined,
         approved: credential.approve,
         isComplete: credential.complete,
         isPrivate: credential.private,
@@ -80,18 +80,18 @@ export let getCredential = SlateTool.create(spec, {
         courseLink: credential.course_link,
         recipientName: credential.recipient?.name,
         recipientEmail: credential.recipient?.email,
-        recipientPhoneNumber: credential.recipient?.phone_number,
+        recipientPhoneNumber: credential.recipient?.phone_number ?? undefined,
         issuerName: credential.issuer?.name,
         issuerId: credential.issuer?.id,
         certificateImageUrl: credential.certificate?.image?.preview,
         badgeImageUrl: credential.badge?.image?.preview,
         seoImageUrl: credential.seo_image,
-        customAttributes: credential.custom_attributes,
+        customAttributes: credential.custom_attributes ?? undefined,
         evidenceItems: credential.evidence_items?.map((e: any) => ({
           evidenceItemId: e.id,
           description: e.description,
           type: e.type,
-          linkUrl: e.link_url
+          linkUrl: e.link_url ?? undefined
         }))
       },
       message: `Credential **${credential.name || credential.id}** for **${credential.recipient?.name}** (${credential.recipient?.email}) in group **${credential.group_name}**.`

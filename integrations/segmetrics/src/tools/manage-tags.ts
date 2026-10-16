@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 let tagSchema = z.union([
@@ -28,6 +29,7 @@ Use this to sync segmentation or lifecycle stage data from external systems.`,
 })
   .input(
     z.object({
+      ...importScopeFields,
       action: z
         .enum(['add', 'remove'])
         .describe('Whether to add or remove the specified tags.'),
@@ -50,11 +52,7 @@ Use this to sync segmentation or lifecycle stage data from external systems.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
 
     let params = {
       contactId: ctx.input.contactId,

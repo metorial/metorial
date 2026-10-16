@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let priceSchema = z.object({
@@ -54,7 +54,7 @@ Use the ticker format \`SYMBOL.EXCHANGE\` (e.g., \`AAPL.US\`, \`BMW.XETRA\`, \`B
       order: ctx.input.order
     });
 
-    let priceArray = Array.isArray(prices) ? prices : [];
+    let priceArray = eodhdArray(prices, 'get-historical-prices');
 
     return {
       output: {

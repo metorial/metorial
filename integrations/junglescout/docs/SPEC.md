@@ -1,61 +1,43 @@
-Now let me fetch the developer documentation page for more details on authentication and the X-API-Type header:# Slates Specification for Jungle Scout
+# Jungle Scout API specification
 
-## Overview
+Jungle Scout exposes six read-only Amazon research endpoints at `https://developer.junglescout.com`. The integration covers all six without querying Seller Central or modifying Amazon listings.
 
-Jungle Scout is an Amazon marketplace intelligence platform that provides data on product sales estimates, keyword search volumes, competitive analysis, and market trends. Its API offers programmatic access to Amazon marketplace data across 10 supported marketplaces (US, UK, DE, IN, CA, FR, IT, ES, MX, JP).
+## Authentication and marketplace
 
-## Authentication
+Connect a key name and API key from the provider's Developer settings. The `Authorization` header contains `KEY_NAME:API_KEY`. Requests also send `X-API-Type: junglescout` or `cobalt`, `Accept: application/vnd.junglescout.v1+json`, and `Content-Type: application/vnd.api+json`. Every request includes a configured, authorized marketplace: `us`, `uk`, `de`, `in`, `ca`, `fr`, `it`, `es`, `mx`, or `jp`. This API key flow has no OAuth refresh lifecycle.
 
-Jungle Scout uses **API Key authentication** via custom headers. There is no OAuth2 flow.
+## Capabilities
 
-To authenticate:
+| Tool | Provider endpoint | Behavior |
+| --- | --- | --- |
+| `keywords_by_asin` | `POST /api/keywords/keywords_by_asin_query` | Up to ten ASINs; search-volume and competition filters; keyword metrics, primary-ASIN and competitor ranking data. |
+| `keywords_by_keyword` | `POST /api/keywords/keywords_by_keyword_query` | Seed terms, category and volume filters; keyword relevance, promotions, and competition data. |
+| `historical_search_volume` | `GET /api/keywords/historical_search_volume` | Weekly periods with start/end dates and exact search volume. |
+| `search_product_database` | `POST /api/product_database_query` | Product filters including update-date bounds; prices, sales, rank, weight, fees, and listing quality. |
+| `sales_estimates` | `GET /api/sales_estimates_query` | Daily sales and price data, parent/variant relationships, and product structure flags. |
+| `share_of_voice` | `GET /api/share_of_voice` | Brand organic/sponsored/combined visibility, keyword bid/volume, and top-product clicks/conversions. |
 
-1. Generate an API key from the Developer section of your Jungle Scout account. You will receive two values: a **Key Name** and an **API Key** (the API Key is only visible at the time of generation).
+The two keyword searches and product database use `page[size]` (maximum 100) and `page[cursor]`. `nextPageCursor` comes from `links.next`; retain the same query filters and body when requesting another page. The other endpoints return their time series or complete analysis directly.
 
-2. Include an `Authorization` header with the format `Key_Name:API_Key` (no spaces around the colon).
+Historical date ranges must use calendar dates in `YYYY-MM-DD` format, with the start before the end and a maximum span of 366 days. Sales estimate end dates must precede the current UTC date. Variant sales estimates represent the aggregate parent sales. Product update bounds also use `YYYY-MM-DD`.
 
-3. Every request requires the following headers:
-   - `Authorization`: `{KEY_NAME}:{API_KEY}`
-   - `X-API-Type`: Either `junglescout` (standard accounts) or `cobalt` (enterprise accounts)
-   - `Accept`: `application/vnd.junglescout.v1+json`
-   - `Content-Type`: `application/vnd.api+json`
+All existing tool keys, input JSON types, enum members, optionalness, and normalized output fields are retained. Additions are optional. Every tool additionally returns its complete provider response as `raw`, preserving native attributes and metadata. Missing optional metrics remain null, never zero. Required resource identifiers, names, and dates are validated instead of inventing empty values. Product `asin` contains the bare ASIN; additive `id` preserves the marketplace-qualified resource identifier. Share-of-voice values are provider fractions, and bid values use marketplace currency.
 
-4. All requests to the API must contain a `marketplace` query parameter. The API supports the following country codes: `us`, `uk`, `de`, `in`, `ca`, `fr`, `it`, `es`, `mx`, `jp`.
+## Documentation discrepancies
 
-**Prerequisites:** You need a Jungle Scout account (Growth Accelerator or Brand Owner plans only) or a Jungle Scout Cobalt account with a customized API plan included. Two-factor authentication must be enabled on your account before using the API.
+The official OpenAPI request schema types `search_terms` as an array of strings, while its example and the Help Center show one scalar string. The existing array input and schema-backed wire format are retained; actual provider acceptance has not been verified. The historical Help Center's generic pagination text conflicts with the endpoint schema and dedicated pagination guide; no unsupported pagination parameters are added to the historical endpoint.
 
-**Base URL:** `https://developer.junglescout.com`
+Product database listing-quality response examples use values such as 64, while request filter documentation uses a 1–10 scale. Returned scores are preserved without rescaling; the filter remains provider-defined.
 
-## Features
+The published endpoint catalog exposes no suitable account/profile endpoint, write lifecycle, webhook registration, or file output. No identity or trigger tool is fabricated.
 
-### Keyword Research by ASIN
+## Official references
 
-Query by ASIN and get back related keywords and data. Useful for discovering which keywords drive traffic to specific products, including search volume, suggested bid data, and competition metrics. Supports filtering by minimum search volume and sorting options.
-
-### Keyword Research by Keyword
-
-Query by keyword and get back related keywords and data. Allows exploring keyword ideas and variations starting from a seed keyword, returning related keywords with their associated metrics.
-
-### Historical Search Volume
-
-Query by keyword and get back weekly historical search volume. Enables trend analysis by showing how keyword search volume changes over time, useful for identifying seasonal patterns and market trends.
-
-### Product Database Search
-
-Query Amazon's catalog using multiple available inputs and get back matching ASINs and their latest known values, including sales estimates for the last 30 days. Supports filtering by categories, keywords, price ranges, and other product attributes. Useful for product research and identifying opportunities across Amazon's catalog.
-
-### Sales Estimates
-
-Query by ASIN and get daily historical sales estimates and price values for a selected date range. Provides historical data on estimated sales volume and pricing, enabling sales trend analysis and competitor monitoring over time.
-
-### Share of Voice
-
-Query by keyword and get the last known Brand Share of Voice plus limited keyword data. Shows how different brands compete for visibility on specific search terms, useful for competitive analysis and brand positioning assessment.
-
-### Marketplace Support
-
-Data is available in 10 marketplaces: US, UK, DE, IN, CA, FR, IT, ES, MX, and JP. All queries require specifying a target marketplace, and API keys are linked to a subset of allowed marketplaces.
-
-## Events
-
-The provider does not support events. Jungle Scout's API is a data query API that provides on-demand access to Amazon marketplace intelligence. There are no webhooks, event subscriptions, or purpose-built polling mechanisms available.
+- [API overview, auth, pagination, errors](https://developer.junglescout.com/api)
+- [Version 1 OpenAPI schema](https://developer.junglescout.com/api-docs/v1/swagger.json)
+- [Keywords by ASIN](https://support.junglescout.com/hc/en-us/articles/21534097722391-Use-Cases-for-Keyword-by-ASIN-Endpoint)
+- [Keywords by keyword](https://support.junglescout.com/hc/en-us/articles/21534098073879-Use-Cases-for-Keyword-by-Keyword-Endpoint)
+- [Product database](https://support.junglescout.com/hc/en-us/articles/21534081093783-Use-Cases-for-Product-Database-Endpoint)
+- [Historical search volume](https://support.junglescout.com/hc/en-us/articles/21534072937623-Use-Cases-for-Historical-Search-Volume-Endpoint)
+- [Sales estimates](https://support.junglescout.com/hc/en-us/articles/21534073571607-Use-Cases-for-Sales-Estimates-Endpoint)
+- [Share of voice](https://support.junglescout.com/hc/en-us/articles/21534065411351-Use-Cases-for-Share-of-Voice-Endpoint)

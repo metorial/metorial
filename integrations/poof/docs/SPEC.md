@@ -1,74 +1,33 @@
-# Slates Specification for Poof
-
-## Overview
-
-Poof is a payments infrastructure platform that enables accepting cryptocurrency payments, credit card payments, ACH bank transfers, and Cash App payments. It provides APIs for creating blockchain wallets, processing payments, sending payouts, and managing transactions across multiple cryptocurrencies and fiat currencies.
+# Poof Integration
 
 ## Authentication
 
-Poof uses **API key** authentication.
+Use a Poof API key as the raw `Authorization` header value, with JSON request bodies. Obtain the key from the developer dashboard and link the payment methods you intend to use. The optional username saved during connection setup is informational; `create_checkout` requires its own explicit merchant username.
 
-- Sign in to Poof to retrieve your API key and add the key to the Authorization header when making a request.
-- Pass the headers field in your POST/GET requests. Call the website `https://www.poof.io` followed by the endpoint URL for making POST/GET requests.
-- The API key is passed as the `Authorization` header value (e.g., `"Authorization": "Your_API_Key"`).
-- The `Content-Type` header should be set to `application/json`.
+## Tools
 
-**Note:** No authentication is required when calling the Instant Checkout endpoint. Instant Checkouts do not require an API key and can be done through adding a username in your POST request.
+- `create_checkout`: hosted checkout, optional customer fields, product quantities, redirects, notification URL, defaults, and metadata.
+- `create_crypto_invoice`: legacy cryptocurrency invoice with an amount, cryptocurrency, local currency, and redirect.
+- `create_payment_link`: v2 payment link with optional metadata.
+- `create_deposit_address`: monitored deposit address and returned charge information. `cryptoAmount` represents the provider's `charge` value; the provider's `amount` represents the USD amount.
+- `manage_wallet`: create a wallet or read the legacy v1 wallet balance. The documented v1 route remains supported independently of the current v2 balance route.
+- `send_payout`: send cryptocurrency to an external address. Requires sufficient funds and a supported Poof wallet; external wallets cannot use payouts. Returned amounts and addresses come from the provider response.
+- `create_fiat_payment`: create invoices or charges through linked PayPal, Cash App, Skrill, or Coinbase accounts. Provider QR-code URLs are available for download; existing response fields remain available.
+- `get_transactions`: retrieve by transaction ID, query using a filter/search pair, or list transactions. A transaction ID takes precedence over query inputs.
+- `get_crypto_rates`: exchange rates, token prices, and gas prices. The existing exchange-rate base defaults to USD; price and gas-price requests require a cryptocurrency.
+- `get_product`: fetch product details.
+- `get_smart_contracts`: fetch the supported ERC-20 contracts.
 
-## Features
+There are 11 tools and no triggers. Banking/ACH, webhook registration, and MPC signing are not exposed by this integration. No account/profile endpoint is documented in the reviewed public API, so there is no identity tool.
 
-### Checkout & Payment Collection
+## Compatibility and errors
 
-Create checkout sessions for users and collect payments. Supports hosted checkout pages, embeddable payment buttons, and payment links. Optional form fields can be displayed (e.g., Email, Name), and redirect URLs can be configured for success and cancellation. Products can be attached to checkouts with quantity support.
+Existing tool keys, field types, enums, requiredness, raw responses, and legacy routes are preserved. Failed HTTP responses and explicit provider error bodies become structured service errors. Missing payment URLs and missing wallet balances produce errors instead of JSON text presented as a URL or a fabricated zero balance.
 
-### Cryptocurrency Invoicing
+## Provider references
 
-Create cryptocurrency invoices that can be redirected to at checkout or hosted in an iFrame on your website. Invoices support specifying amounts in local currency (e.g., USD, EUR, CNY) while charging in a chosen cryptocurrency (e.g., BTC, LTC, DOGE, ETH).
+- [Authentication and current API](https://docs.poof.io/reference/poof-api)
+- [Legacy API, including v1 invoice and balance responses](https://www.poof.io/api)
+- [Current API reference index](https://docs.poof.io/reference/erc-20-tokens)
 
-### Blockchain Wallet Management
-
-Poof provides tools for creating blockchain wallets. You can create wallets, generate deposit addresses, and check balances across supported cryptocurrencies. Multi-chain support includes Tron, Cardano, Cosmos, Polkadot, Bitcoin Cash, and 200+ tokens.
-
-- The payouts endpoint is disabled for users with external wallets.
-
-### Cryptocurrency Payouts
-
-Create payouts in the respective cryptocurrency you provide to Poof. Send transactions to external addresses from your Poof wallet balance.
-
-### Fiat Payments
-
-Create fiat invoices and charges. Poof allows businesses and developers to pull payments from a linked bank account through the API. ACH debit transactions are commonly used for recurring payments, such as monthly bills, and can also be used for one-time payments.
-
-- Banking related APIs are currently a restricted and private endpoint. Contact support@poof.io with your business use case to gain access.
-
-### ACH Transfers
-
-Create ACH debit transfers and check transfer statuses for bank-to-bank money movement.
-
-### Transaction Management
-
-Fetch individual transactions, list all transactions, and query transactions. Transaction data includes payment ID, amount, currency, customer name, and email.
-
-### ERC-20 Token Support
-
-Fetch smart contract details, token prices, and gas prices for Ethereum-based tokens.
-
-### Products
-
-Fetch product details to attach to checkout flows and payment buttons.
-
-### Multiparty Computation (MPC) Cryptography
-
-Generate ECDSA digital signatures and private key shares using Shamir's Secret Sharing (SSS) via sMPC-CMP infrastructure for enhanced wallet security.
-
-## Events
-
-Poof supports **webhooks** for receiving automated payment notifications.
-
-### Payment Notifications
-
-Subscribe to webhook notifications by adding an endpoint to the Webhook subscriptions section on the developers page within Poof. Click "add an endpoint" to add the URL (HTTPS only) where you'd like to receive webhooks. Webhooks can also be created programmatically via the API.
-
-- Webhook payloads include: payment ID, local currency (e.g., USD), customer name, customer email, and items.
-- You can subscribe to recurring payment notifications through Poof webhooks.
-- Payment updates to deposit addresses can be automatically sent via webhooks.
+Current reference pages often omit response examples. The integration does not infer unsupported response structures or replace legacy routes solely because a newer reference page exists.

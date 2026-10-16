@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,14 @@ export let transferBalances = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.sourceGiftCards.includes(ctx.input.destinationGiftCard)) {
+      throw createApiServiceError(
+        'The destination gift card must not also be a source gift card.'
+      );
+    }
+    if (new Set(ctx.input.sourceGiftCards).size !== ctx.input.sourceGiftCards.length) {
+      throw createApiServiceError('Provide each source gift card only once.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       testMode: ctx.config.testMode

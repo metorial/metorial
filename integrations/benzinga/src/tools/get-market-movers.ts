@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, numericValue } from '../lib/client';
 import { spec } from '../spec';
 
 let moverItemSchema = z.object({
@@ -40,6 +40,10 @@ export let getMarketMoversTool = SlateTool.create(spec, {
         .optional()
         .describe('Start period (YYYY-MM-DD, timestamp, or relative like "1D", "-1W", "YTD")'),
       to: z.string().optional().describe('End period (YYYY-MM-DD or timestamp)'),
+      moversQuery: z
+        .string()
+        .optional()
+        .describe('Provider movers query for movement thresholds'),
       screenerQuery: z
         .string()
         .optional()
@@ -52,6 +56,7 @@ export let getMarketMoversTool = SlateTool.create(spec, {
     z.object({
       gainers: z.array(moverItemSchema).describe('Top gaining securities'),
       losers: z.array(moverItemSchema).describe('Top losing securities'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       fromDate: z.string().optional().describe('Period start'),
       toDate: z.string().optional().describe('Period end')
     })
@@ -64,6 +69,7 @@ export let getMarketMoversTool = SlateTool.create(spec, {
       maxResults: ctx.input.maxResults,
       from: ctx.input.from,
       to: ctx.input.to,
+      moversQuery: ctx.input.moversQuery,
       screenerQuery: ctx.input.screenerQuery
     });
 
@@ -71,26 +77,27 @@ export let getMarketMoversTool = SlateTool.create(spec, {
     let gainers = (result.gainers || []).map((g: any) => ({
       symbol: g.symbol,
       companyName: g.companyName,
-      change: g.change,
-      changePercent: g.changePercent,
-      close: g.close,
-      volume: g.volume,
-      averageVolume: g.averageVolume,
-      previousClose: g.previousClose
+      change: numericValue(g.change),
+      changePercent: numericValue(g.changePercent),
+      close: numericValue(g.close),
+      volume: numericValue(g.volume),
+      averageVolume: numericValue(g.averageVolume),
+      previousClose: numericValue(g.previousClose)
     }));
     let losers = (result.losers || []).map((l: any) => ({
       symbol: l.symbol,
       companyName: l.companyName,
-      change: l.change,
-      changePercent: l.changePercent,
-      close: l.close,
-      volume: l.volume,
-      averageVolume: l.averageVolume,
-      previousClose: l.previousClose
+      change: numericValue(l.change),
+      changePercent: numericValue(l.changePercent),
+      close: numericValue(l.close),
+      volume: numericValue(l.volume),
+      averageVolume: numericValue(l.averageVolume),
+      previousClose: numericValue(l.previousClose)
     }));
 
     return {
       output: {
+        raw: data,
         gainers,
         losers,
         fromDate: result.fromDate,

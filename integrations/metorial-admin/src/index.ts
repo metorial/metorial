@@ -1,9 +1,15 @@
-import { Slate } from '@slates/provider';
+import { Slate } from 'slates';
 import { spec } from './spec';
-import { callEndpoint, listEndpoints, listInstances } from './tools';
+import {
+  callEndpoint,
+  getAccountContext,
+  getInstance,
+  listEndpoints,
+  listInstances
+} from './tools';
 
 export let provider = Slate.create({
   spec,
-  tools: [listEndpoints, listInstances, callEndpoint],
+  tools: [listEndpoints, listInstances, callEndpoint, getAccountContext, getInstance],
   triggers: []
 });

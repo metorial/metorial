@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 let candidateSummarySchema = z.object({
@@ -19,8 +20,8 @@ export let searchCandidates = SlateTool.create(spec, {
   description: `Search for candidates using full-text keyword search or advanced filters. Use **query** for keyword/boolean search across all indexed fields including resumes. Use **filters** for structured field-level filtering with operators like \`exactly\`, \`contains\`, \`between\`, \`greater_than\`, \`less_than\`, \`is_empty\`, and \`geo_distance\`.`,
   instructions: [
     'Provide either a query string OR filters, not both.',
-    'Filters use boolean logic: wrap conditions in AND, OR, NOT objects.',
-    'Example filter: { "AND": [{ "field": "first_name", "operator": "exactly", "value": "John" }] }'
+    'Filters use lowercase and/or arrays of conditions and a lowercase not object containing one condition. Each condition uses field, filter, and value keys.',
+    'Example filter: { "and": [{ "field": "first_name", "filter": "exactly", "value": "John" }] }'
   ],
   tags: {
     readOnly: true
@@ -33,7 +34,7 @@ export let searchCandidates = SlateTool.create(spec, {
         .any()
         .optional()
         .describe(
-          'Advanced filter object with boolean logic (AND, OR, NOT) and field-level operators'
+          'Advanced filter object using lowercase and/or arrays, a not condition object, and field/filter/value condition keys'
         ),
       page: z.number().optional().describe('Page number (default: 1)'),
       perPage: z.number().optional().describe('Results per page (default: 25, max: 100)')
@@ -49,8 +50,11 @@ export let searchCandidates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.query !== undefined && ctx.input.filters !== undefined) {
+      throw createApiServiceError('Provide query or filters, not both.');
+    }
     let data: any;
-    if (ctx.input.filters) {
+    if (ctx.input.filters !== undefined) {
       data = await client.filterCandidates(ctx.input.filters, {
         page: ctx.input.page,
         perPage: ctx.input.perPage
@@ -62,20 +66,20 @@ export let searchCandidates = SlateTool.create(spec, {
       });
     }
 
-    let candidates = (data?._embedded?.candidates ?? []).map((c: any) => ({
-      candidateId: c.id?.toString() ?? '',
-      firstName: c.first_name,
-      lastName: c.last_name,
-      title: c.title,
-      currentEmployer: c.current_employer,
-      isActive: c.is_active,
-      isHot: c.is_hot
+    let candidates = collection(data, 'candidates').map((c: any) => ({
+      candidateId: requiredId(c.id, 'record'),
+      firstName: c.first_name ?? undefined,
+      lastName: c.last_name ?? undefined,
+      title: c.title ?? undefined,
+      currentEmployer: c.current_employer ?? undefined,
+      isActive: c.is_active ?? undefined,
+      isHot: c.is_hot ?? undefined
     }));
 
     return {
       output: {
         candidates,
-        totalCount: data?.total ?? candidates.length,
+        totalCount: data?.total ?? undefined,
         currentPage: data?.page ?? ctx.input.page ?? 1
       },
       message: `Found **${candidates.length}** candidate(s).`

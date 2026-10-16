@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSuccess } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let removeFormEntry = SlateTool.create(spec, {
@@ -27,7 +27,7 @@ export let removeFormEntry = SlateTool.create(spec, {
     let result = await client.removeFormEntry(ctx.input.entryId);
 
     return {
-      output: { success: result === true || result === 'true' },
+      output: { success: requireSuccess(result) },
       message: `Removed form entry (ID: ${ctx.input.entryId}).`
     };
   })

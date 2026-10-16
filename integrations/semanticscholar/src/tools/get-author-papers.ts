@@ -22,6 +22,7 @@ let paperSchema = z
         url: z.string().nullable().optional(),
         status: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional(),
     authors: z
@@ -84,7 +85,7 @@ Supports filtering by publication date range.`,
       publicationDateOrYear: ctx.input.publicationDateOrYear
     });
 
-    let papers = result.data || [];
+    let papers = result.data;
 
     return {
       output: {
@@ -92,7 +93,7 @@ Supports filtering by publication date range.`,
         next: result.next,
         papers
       },
-      message: `Retrieved **${papers.length}** papers for author "${ctx.input.authorId}".${result.next ? ` More results available at offset ${result.next}.` : ''}`
+      message: `Retrieved **${papers.length}** papers for author "${ctx.input.authorId}".${result.next !== undefined ? ` More results available at offset ${result.next}.` : ''}`
     };
   })
   .build();

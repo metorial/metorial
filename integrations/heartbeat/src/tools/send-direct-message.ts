@@ -15,7 +15,11 @@ export let sendDirectMessage = SlateTool.create(spec, {
   .input(
     z.object({
       userId: z.string().describe('ID of the user to send the message to'),
-      text: z.string().describe('Message content to send')
+      text: z.string().describe('Message content to send'),
+      fromUserId: z
+        .string()
+        .optional()
+        .describe('Admin sender ID; omitted uses the API key creator')
     })
   )
   .output(
@@ -29,7 +33,8 @@ export let sendDirectMessage = SlateTool.create(spec, {
 
     await client.sendDirectMessage({
       userId: ctx.input.userId,
-      text: ctx.input.text
+      text: ctx.input.text,
+      fromUserId: ctx.input.fromUserId
     });
 
     return {

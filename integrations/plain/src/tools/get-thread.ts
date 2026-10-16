@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,7 +45,7 @@ export let getThread = SlateTool.create(spec, {
 
     let thread = await client.getThread(ctx.input.threadId);
     if (!thread) {
-      throw new Error('Thread not found');
+      throw createApiServiceError('Thread not found');
     }
 
     return {
@@ -61,9 +61,9 @@ export let getThread = SlateTool.create(spec, {
         priority: thread.priority,
         tenantId: thread.tenant?.id ?? null,
         tenantName: thread.tenant?.name ?? null,
-        labels: (thread.labels || []).map((l: any) => ({
+        labels: thread.labels.map((l: any) => ({
           labelId: l.id,
-          labelTypeName: l.labelType?.name ?? ''
+          labelTypeName: l.labelType.name
         })),
         createdAt: thread.createdAt?.iso8601,
         updatedAt: thread.updatedAt?.iso8601

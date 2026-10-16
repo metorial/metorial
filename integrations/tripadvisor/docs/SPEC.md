@@ -1,88 +1,45 @@
-# Slates Specification for Tripadvisor
+# Tripadvisor API Specification
 
-## Overview
+## Authentication and settings
 
-Tripadvisor is the world's largest travel platform, providing user-generated reviews, ratings, and photos for hotels, restaurants, and attractions. The API provides dynamic access to Tripadvisor content, allowing partners to integrate it into their websites and applications. Tripadvisor also offers connectivity solutions for hospitality industry partners, including hotel availability, booking, and review collection capabilities.
+The Content API sends the primary API key as the `key` query parameter over HTTPS. Language (`en`) and currency (`USD`) retain their existing configurable defaults and per-tool overrides.
 
-## Authentication
+Review Express connectivity operations send `X-TripAdvisor-API-Key`. The optional `reviewExpressToken` authentication field allows a separate connectivity key. When absent, existing connections continue to use the saved primary key. The documented property mapping request also includes `key`, as shown by Tripadvisor. Connectivity access requires an approved account, completed hotel mapping, and hotel opt-in. Email requests generally use the partner's mapped property ID, which differs from a Tripadvisor location ID.
 
-Tripadvisor uses **API key** authentication across its APIs.
+## Content API
 
-### Content API
+- `search_locations`: `GET /api/v1/location/search`; keyword, category, phone, address, coordinates, radius, units, and language.
+- `search_nearby_locations`: `GET /api/v1/location/nearby_search`; coordinates and optional search filters.
+- `get_location_details`: `GET /api/v1/location/{locationId}/details`; language and currency.
+- `get_location_reviews`: `GET /api/v1/location/{locationId}/reviews`; language, limit, and offset.
+- `get_location_photos`: `GET /api/v1/location/{locationId}/photos`; language, limit, offset, and source. Returns existing photo URL metadata rather than downloading images.
+- `map_location`: retains `GET /api/partner/2.0/location_mapper/{latitude},{longitude}` and the `-mapper` API key suffix. Tripadvisor marks this documentation outdated; access remains account dependent and has not been verified live.
 
-The Content API uses API Keys to authenticate requests. All API requests must be made over HTTPS.
+Search returns up to ten matches. Reviews and photos have plan-dependent limits; the documentation advertises up to five for standard subscriptions. Tripadvisor now advertises the Terra API platform alongside the Content API; existing routes and contracts are preserved here rather than silently changing APIs or credentials.
 
-To obtain an API key:
-Go to www.tripadvisor.com/developers, sign up for a Tripadvisor account, and click "Create API key."
+## Review Express
 
-To include it with each request, set it as the value of the `key` query parameter.
+- `send_review_request`: `POST /api/partner/1.0/email_requests`; JSON guest batch, limited to 10,000 body characters. Returns actual request IDs, statuses, and provider errors. A queued request is not evidence that an email has already been delivered.
+- `manage_review_request`: `PUT` or `DELETE /api/partner/1.0/email_requests/{requestId}`. Success requires the matching provider request ID and actual `updated: 1` or `canceled: 1` acknowledgement. The optional status is returned only when supplied by the provider.
+- `list_review_requests`: documented `GET /api/partner/1.0/email_requests`, queried by partner property or partner request reference, or `GET /email_requests/{requestId}`. Returns actual provider records and numeric paging metadata; authentication-bearing paging URLs are not exposed.
+- `list_location_mappings`: documented `GET /api/partner/1.0/location_mappings` or `/location_mappings/{partnerId}`, with optional `review_express_opted_in` filter. Returns partner property IDs, Tripadvisor IDs, actual opt-in booleans, and original mapping metadata.
+- `check_review_optin`: retains the existing `GET /api/partner/1.0/email_requests/opt_in_status` route and request semantics. This exact route is not confirmed by the current public documentation. Use `list_location_mappings` for the positively documented connectivity mapping capability.
 
-Example: `https://api.content.tripadvisor.com/api/v1/location/search?key=YOUR_API_KEY&searchQuery=Bora Bora`
+No account/self endpoint or webhook API was found for these products. Hotel availability callbacks, pricing APIs, and advertising APIs are separate partnership products outside this integration's implemented surface.
 
-The Tripadvisor Content API is intended for consumer-facing (B2C) websites and apps only. An application must be approved by Tripadvisor before the key is granted full production access.
+## Official sources
 
-### Connectivity Solutions APIs (Review Express, Hotel Availability, etc.)
-
-The Review Express API key is different from your TripConnect ID. Review Express API keys are emailed to connectivity partners as soon as the partner has accepted Review Express API Terms & Conditions.
-
-To include it with each request, set it as the value of the `X-TripAdvisor-API-Key` header.
-
-These APIs require a formal partnership with Tripadvisor and involve hotel-to-Tripadvisor location ID mapping.
-
-## Features
-
-### Location Search
-
-Location Search returns a list of locations for a given search query. You can search by keyword or text query to find hotels, restaurants, and attractions. Locations are defined within this API as hotels, restaurants, or attractions.
-
-### Nearby Location Search
-
-Search for locations near a specific geographic point by providing latitude and longitude coordinates. Results can be filtered by category (hotels, restaurants, attractions).
-
-### Location Details
-
-Location Details provides access to comprehensive information about a location such as name, address, rating, and URLs for the listing on Tripadvisor. The response provides data such as name, address, overall traveler rating, number of reviews, link to read all reviews, link to write reviews, and additional data elements.
-
-- Data includes ratings, rankings, subratings, awards, trip types, and geographic hierarchy.
-- Supports localization via a `language` parameter.
-
-### Location Reviews
-
-Location Reviews provides the most recent reviews for a specific location.
-
-- Returns up to 5 reviews per location.
-
-### Location Photos
-
-Location Photos provides access to high-quality recent photos for a specific location.
-
-- Returns up to 5 photos per location.
-
-### Location ID Mapping
-
-Tripadvisor provides a `/location_mapper` call for Content API users, made using a mapper-specific API key, which is your API key plus "-mapper". This allows mapping external property identifiers to Tripadvisor location IDs using latitude/longitude coordinates.
-
-### Review Express (Connectivity Partners)
-
-The Review Express API enables connectivity partners to provide automated Review Express services to opted-in hotel partners — creating requests on their behalf to send emails to recent guests, encouraging a review of their experiences.
-
-- Connectivity partners can create email requests from the point of booking up to one day after the check-out date for each guest record for opted-in hotels, and then modify or cancel those requests if the bookings change.
-- Requires hotel location ID mapping and hotel opt-in to the Review Express program.
-- Parameters include recipient email, check-in/check-out dates, language, and country.
-- You can check opt-in status of mapped hotels in bulk.
-- Review Express API is solely for collecting reviews.
-
-### Hotel Availability Check (Connectivity Partners)
-
-The Hotel Availability Check API is used by approved partners to show their prices and availability on the Tripadvisor website. This API also allows users to book reservations right on Tripadvisor, without redirecting to a hotel landing page.
-
-- This is a partner-facing API where Tripadvisor calls the partner's endpoint to check availability and pricing.
-- Supports detailed tax/fee breakdowns, cancellation policies, room types, rate plans, and amenities.
-
-### TripConnect Campaign Data
-
-Available to TripConnect partners to retrieve performance data about their advertising campaigns on Tripadvisor, including click and conversion metrics.
-
-## Events
-
-The provider does not support events. Tripadvisor's APIs are request-response based and do not offer webhooks or event subscription mechanisms.
+- [Location search](https://tripadvisor-content-api.readme.io/reference/searchforlocations)
+- [Nearby search](https://tripadvisor-content-api.readme.io/reference/searchfornearbylocations)
+- [Location details](https://tripadvisor-content-api.readme.io/reference/getlocationdetails)
+- [Location reviews](https://tripadvisor-content-api.readme.io/reference/getlocationreviews)
+- [Location photos](https://tripadvisor-content-api.readme.io/reference/getlocationphotos)
+- [Legacy location mapper](https://developer-tripadvisor.com/content-api/documentation/location_mapper/)
+- [Review Express access](https://developer-tripadvisor.com/connectivity-solutions/review-express-api/)
+- [Review Express security](https://developer-tripadvisor.com/connectivity-solutions/review-express-api/documentation/security/)
+- [Create requests](https://www.developer-tripadvisor.com/apis/review-express/create.html)
+- [List requests](https://developer-tripadvisor.com/apis/review-express/list.html)
+- [Update requests](https://developer-tripadvisor.com/connectivity-solutions/review-express-api/documentation/update/)
+- [Cancel requests](https://developer-tripadvisor.com/connectivity-solutions/review-express-api/documentation/cancel/)
+- [Property mappings and opt-in](https://developer-tripadvisor.com/connectivity-solutions/review-express-api/documentation/check-opt-in-status/)
+- [Provider errors](https://developer-tripadvisor.com/connectivity-solutions/review-express-api/documentation/errors/)

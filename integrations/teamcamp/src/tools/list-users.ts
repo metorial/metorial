@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  optionalString,
+  requiredBoolean,
+  requiredString,
+  requireRecords
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -14,6 +20,12 @@ export let listUsers = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       users: z.array(
         z.object({
           userId: z.string().describe('Unique user identifier'),
@@ -31,18 +43,18 @@ export let listUsers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let users = await client.getUsers();
 
-    let mapped = (Array.isArray(users) ? users : []).map((u: any) => ({
-      userId: u.id ?? '',
-      name: u.name ?? '',
-      email: u.email ?? '',
-      phone: u.phone || undefined,
-      profilePhoto: u.profile_photo || undefined,
-      isOwner: u.isOwner ?? false,
-      isAdmin: u.isAdmin ?? false
+    let mapped = requireRecords(users, true).map(user => ({
+      userId: requiredString(user.id, 'user id'),
+      name: requiredString(user.name, 'user name'),
+      email: requiredString(user.email, 'user email'),
+      phone: optionalString(user.phone),
+      profilePhoto: optionalString(user.profile_photo),
+      isOwner: requiredBoolean(user.isOwner, 'isOwner'),
+      isAdmin: requiredBoolean(user.isAdmin, 'isAdmin')
     }));
 
     return {
-      output: { users: mapped },
+      output: { users: mapped, raw: users },
       message: `Found **${mapped.length}** user(s) in the workspace.`
     };
   })

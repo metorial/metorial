@@ -1,18 +1,41 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  isApiErrorRecord,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { createFreeAgentHttp, type Environment, getBaseUrl } from './lib/client';
+
+type AuthInput = { environment?: Environment };
+type AuthOutput = {
+  token: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  environment?: Environment;
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      environment: z.enum(['production', 'sandbox']).optional()
     })
   )
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
+    inputSchema: z.object({
+      environment: z
+        .enum(['production', 'sandbox'])
+        .optional()
+        .describe(
+          'FreeAgent environment for this connection. Defaults to production. Sandbox requires an app registered for the sandbox API.'
+        )
+    }),
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -20,9 +43,7 @@ export let auth = SlateAuth.create()
         url: 'https://dev.freeagent.com/docs/oauth'
       }
     ],
-
     scopes: [],
-
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         client_id: ctx.clientId,
@@ -30,20 +51,13 @@ export let auth = SlateAuth.create()
         response_type: 'code',
         state: ctx.state
       });
-
       return {
-        url: `https://api.freeagent.com/v2/approve_app?${params.toString()}`
+        url: `${getBaseUrl(ctx.input.environment ?? 'production')}/approve_app?${params}`
       };
     },
-
     handleCallback: async ctx => {
-      let http = createAxios({
-        baseURL: 'https://api.freeagent.com/v2'
-      });
-
-      let credentials = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
-
-      let response = await http.post(
+      let environment = ctx.input.environment ?? 'production';
+      let response = await createFreeAgentHttp(environment).post(
         '/token_endpoint',
         new URLSearchParams({
           grant_type: 'authorization_code',
@@ -51,84 +65,76 @@ export let auth = SlateAuth.create()
           redirect_uri: ctx.redirectUri
         }).toString(),
         {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
+          auth: { username: ctx.clientId, password: ctx.clientSecret },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }
       );
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.freeagent.com/v2'
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'FreeAgent',
+        operation: 'authorization',
+        required: true
       });
-
-      let credentials = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
-
-      let response = await http.post(
+      if (!tokens.refreshToken) {
+        throw createApiServiceError(
+          'FreeAgent did not return a refresh token. Reconnect the account.'
+        );
+      }
+      return { output: { ...tokens, environment } };
+    },
+    handleTokenRefresh: async (ctx: {
+      input: AuthInput;
+      output: AuthOutput;
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'FreeAgent refresh token is missing. Reconnect the account.'
+        );
+      }
+      let environment = ctx.output.environment ?? ctx.input.environment ?? 'production';
+      let response = await createFreeAgentHttp(environment).post(
         '/token_endpoint',
         new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken || ''
+          refresh_token: ctx.output.refreshToken
         }).toString(),
         {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
+          auth: { username: ctx.clientId, password: ctx.clientSecret },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }
       );
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'FreeAgent',
+            operation: 'refresh',
+            required: true,
+            previousRefreshToken: ctx.output.refreshToken,
+            refreshTokenFallbackMode: 'falsy'
+          }),
+          environment
         }
       };
     },
-
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: {};
-      scopes: string[];
-    }) => {
-      let http = createAxios({
-        baseURL: 'https://api.freeagent.com/v2'
-      });
-
-      let response = await http.get('/users/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data.user;
-
+    getProfile: async (ctx: { input: AuthInput; output: AuthOutput }) => {
+      let environment = ctx.output.environment ?? ctx.input.environment ?? 'production';
+      let response = await createFreeAgentHttp(environment, ctx.output.token).get('/users/me');
+      let user = response.data?.user;
+      if (
+        !isApiErrorRecord(user) ||
+        typeof user.url !== 'string' ||
+        typeof user.email !== 'string'
+      ) {
+        throw createApiServiceError('FreeAgent did not return a valid current-user profile.');
+      }
       return {
         profile: {
           id: user.url,
           email: user.email,
-          name: [user.first_name, user.last_name].filter(Boolean).join(' ')
+          name: [user.first_name, user.last_name]
+            .filter(value => typeof value === 'string')
+            .join(' ')
         }
       };
     }

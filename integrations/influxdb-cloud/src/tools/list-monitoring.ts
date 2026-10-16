@@ -1,10 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 let checkSchema = z
   .object({
+    raw: z.any().optional().describe('Complete provider resource'),
     checkId: z.string().describe('Unique check ID'),
     name: z.string().describe('Check name'),
     type: z.string().optional().describe('Check type (threshold or deadman)'),
@@ -18,6 +20,7 @@ let checkSchema = z
 
 let notificationEndpointSchema = z
   .object({
+    raw: z.any().optional().describe('Complete provider resource'),
     endpointId: z.string().describe('Unique endpoint ID'),
     name: z.string().describe('Endpoint name'),
     type: z.string().optional().describe('Endpoint type (http, slack, or pagerduty)'),
@@ -31,6 +34,7 @@ let notificationEndpointSchema = z
 
 let notificationRuleSchema = z
   .object({
+    raw: z.any().optional().describe('Complete provider resource'),
     ruleId: z.string().describe('Unique rule ID'),
     name: z.string().describe('Rule name'),
     type: z.string().optional().describe('Rule type'),
@@ -46,20 +50,23 @@ let notificationRuleSchema = z
 export let listChecks = SlateTool.create(spec, {
   name: 'List Checks',
   key: 'list_checks',
-  description: `List all monitoring checks in the organization. Checks query data and assign a status level (ok, info, warn, crit) based on specific conditions.
+  description: `List a page of monitoring checks in the organization. Checks query data and assign a status level (ok, info, warn, crit) based on specific conditions.
 Supports threshold checks and deadman checks.`,
+  instructions: ['Call list_organizations to discover orgId.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z.number().optional().describe('Maximum number of checks to return'),
       offset: z.number().optional().describe('Number of checks to skip for pagination')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       checks: z.array(checkSchema).describe('List of checks')
     })
   )
@@ -70,19 +77,20 @@ Supports threshold checks and deadman checks.`,
       offset: ctx.input.offset
     });
 
-    let checks = (result.checks || []).map((c: any) => ({
-      checkId: c.id,
+    let checks = requireArray(result, 'checks').map((c: any) => ({
+      raw: c,
+      checkId: resource(c, ['id', 'name']).id,
       name: c.name,
-      type: c.type,
-      status: c.status,
-      description: c.description,
-      orgId: c.orgID,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt
+      type: optionalString(c.type),
+      status: optionalString(c.status),
+      description: optionalString(c.description),
+      orgId: optionalString(c.orgID),
+      createdAt: optionalString(c.createdAt),
+      updatedAt: optionalString(c.updatedAt)
     }));
 
     return {
-      output: { checks },
+      output: { checks, raw: result },
       message: `Found **${checks.length}** check(s).`
     };
   })
@@ -91,19 +99,22 @@ Supports threshold checks and deadman checks.`,
 export let listNotificationEndpoints = SlateTool.create(spec, {
   name: 'List Notification Endpoints',
   key: 'list_notification_endpoints',
-  description: `List all notification endpoints in the organization. Notification endpoints define where alert messages are sent (HTTP, Slack, PagerDuty).`,
+  description: `List a page of notification endpoints in the organization. Notification endpoints define where alert messages are sent (HTTP, Slack, PagerDuty).`,
+  instructions: ['Call list_organizations to discover orgId.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z.number().optional().describe('Maximum number of endpoints to return'),
       offset: z.number().optional().describe('Number of endpoints to skip for pagination')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       endpoints: z.array(notificationEndpointSchema).describe('List of notification endpoints')
     })
   )
@@ -114,19 +125,20 @@ export let listNotificationEndpoints = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let endpoints = (result.notificationEndpoints || []).map((e: any) => ({
-      endpointId: e.id,
+    let endpoints = requireArray(result, 'notificationEndpoints').map((e: any) => ({
+      raw: e,
+      endpointId: resource(e, ['id', 'name']).id,
       name: e.name,
-      type: e.type,
-      status: e.status,
-      description: e.description,
-      orgId: e.orgID,
-      createdAt: e.createdAt,
-      updatedAt: e.updatedAt
+      type: optionalString(e.type),
+      status: optionalString(e.status),
+      description: optionalString(e.description),
+      orgId: optionalString(e.orgID),
+      createdAt: optionalString(e.createdAt),
+      updatedAt: optionalString(e.updatedAt)
     }));
 
     return {
-      output: { endpoints },
+      output: { endpoints, raw: result },
       message: `Found **${endpoints.length}** notification endpoint(s).`
     };
   })
@@ -135,19 +147,22 @@ export let listNotificationEndpoints = SlateTool.create(spec, {
 export let listNotificationRules = SlateTool.create(spec, {
   name: 'List Notification Rules',
   key: 'list_notification_rules',
-  description: `List all notification rules in the organization. Notification rules check data in the statuses measurement and send messages to notification endpoints when conditions are met.`,
+  description: `List a page of notification rules in the organization. Notification rules check data in the statuses measurement and send messages to notification endpoints when conditions are met.`,
+  instructions: ['Call list_organizations to discover orgId.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z.number().optional().describe('Maximum number of rules to return'),
       offset: z.number().optional().describe('Number of rules to skip for pagination')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       rules: z.array(notificationRuleSchema).describe('List of notification rules')
     })
   )
@@ -158,20 +173,21 @@ export let listNotificationRules = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let rules = (result.notificationRules || []).map((r: any) => ({
-      ruleId: r.id,
+    let rules = requireArray(result, 'notificationRules').map((r: any) => ({
+      raw: r,
+      ruleId: resource(r, ['id', 'name']).id,
       name: r.name,
-      type: r.type,
-      status: r.status,
-      description: r.description,
-      endpointId: r.endpointID,
-      orgId: r.orgID,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt
+      type: optionalString(r.type),
+      status: optionalString(r.status),
+      description: optionalString(r.description),
+      endpointId: optionalString(r.endpointID),
+      orgId: optionalString(r.orgID),
+      createdAt: optionalString(r.createdAt),
+      updatedAt: optionalString(r.updatedAt)
     }));
 
     return {
-      output: { rules },
+      output: { rules, raw: result },
       message: `Found **${rules.length}** notification rule(s).`
     };
   })

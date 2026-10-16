@@ -1,18 +1,18 @@
 {
   "name": "@metorial/doppler-marketing-automation",
-  "description": "Manage email marketing campaigns, subscriber lists, and contact data for Doppler Marketing Automation (fromdoppler.com). Create, send, and delete email campaigns programmatically. Build and organize subscriber lists, import contacts individually or in bulk, and assign custom fields and tags to subscribers. Retrieve campaign performance reports including opens, clicks, bounces, unsubscribes, delivery rates, and geolocation data, filterable by date range. Create and manage custom fields for subscriber personalization and segmentation. Access removed and unsubscribed contact listings filtered by date. Bulk import operations support a callback URL for completion notification.",
+  "description": "Manage Doppler email marketing lists, subscribers, custom fields, campaigns, HTML content, and recipients. Start subscriber imports and monitor their asynchronous tasks. Retrieve account resources, search account subscribers, review campaign performance, and list unsubscribed contacts. Download campaign HTML as a file. Configure HTML and recipient lists before sending a campaign immediately or on a schedule.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "send email campaigns",
     "manage subscriber lists",
     "import contacts in bulk",
+    "monitor import tasks",
     "create custom fields",
     "retrieve campaign analytics",
-    "track opens and clicks",
-    "manage subscriber tags",
+    "search subscribers",
     "list unsubscribed contacts",
-    "build email campaigns",
-    "monitor bounce rates"
+    "edit campaign HTML",
+    "configure campaign recipients"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/doppler-marketing-automation.svg"
 }

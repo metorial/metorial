@@ -1,6 +1,6 @@
 # Templated
 
-Generate images, videos, and PDFs from reusable templates by programmatically modifying text, images, colors, fonts, and other layers. Create, manage, duplicate, and organize templates with tags and folders. Upload custom fonts and images for use in designs. Render multi-page documents, animated videos, and merge outputs into single PDFs. Retrieve account usage and quota information. Supports webhook events for embedded editor actions including template creation, saving, and downloading.
+Generate images, videos, and PDFs from reusable templates. Create, inspect, update, duplicate, clone, and organize templates with tags and folders. Discover page and layer IDs, retrieve or duplicate existing renders, recreate editable templates from render payloads, and merge outputs into PDFs. List and delete uploaded images and fonts. Retrieve account identity, API usage, and quota information.
 
 ## License
 

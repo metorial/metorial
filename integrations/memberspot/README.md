@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Memberspot
 
-Manage members, course access, and progress on the Memberspot e-learning platform. List, look up, and delete users. Grant, revoke, or delete course access for members (auto-creating members when granting access). Retrieve available offers/courses, track course progress, and fetch exam results. Control chapter-level access for fine-grained content delivery. Set and list custom user properties for personalization and segmentation. Generate single sign-on login tokens for passwordless user access.
+Manage members, course access, and progress on the Memberspot e-learning platform. List, look up, and delete users. Grant, revoke, or delete course access for members (auto-creating members when granting access). Discover offers, courses, and exams, track paginated course progress, and fetch exam results. Identify the connected school and set or remove offer expiration dates. Control chapter-level access for fine-grained content delivery. Set and list custom user properties for personalization and segmentation. Generate single sign-on login tokens for passwordless user access.
 
 ## License
 

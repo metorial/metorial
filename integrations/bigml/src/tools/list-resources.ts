@@ -1,34 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, RESOURCE_TYPES } from '../lib/helpers';
 import { spec } from '../spec';
 
-let resourceTypeEnum = z.enum([
-  'source',
-  'dataset',
-  'model',
-  'ensemble',
-  'deepnet',
-  'logisticregression',
-  'linearregression',
-  'prediction',
-  'batchprediction',
-  'evaluation',
-  'cluster',
-  'anomaly',
-  'association',
-  'topicmodel',
-  'timeseries',
-  'pca',
-  'fusion',
-  'optiml',
-  'script',
-  'library',
-  'execution',
-  'project',
-  'externalconnector',
-  'configuration'
-]);
+let resourceTypeEnum = z.enum(RESOURCE_TYPES);
 
 export let listResources = SlateTool.create(spec, {
   name: 'List Resources',
@@ -66,6 +41,10 @@ Use filters to narrow results by name, tags, creation date, and other resource-s
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete BigML response with credentials removed from pagination links'),
       totalCount: z.number().describe('Total number of matching resources'),
       limit: z.number().describe('Number of results per page'),
       offset: z.number().describe('Current offset'),
@@ -108,13 +87,14 @@ Use filters to narrow results by name, tags, creation date, and other resource-s
       tags: obj.tags
     }));
 
-    let totalCount = result.meta.total_count;
+    let totalCount = (result.meta.total_count ?? result.meta.query_total)!;
     let offset = result.meta.offset;
     let limit = result.meta.limit;
     let hasMore = !!result.meta.next;
 
     return {
       output: {
+        raw: result,
         totalCount,
         limit,
         offset,

@@ -1,9 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getFileAuthHeaders } from '../lib/client';
 import { spec } from '../spec';
 
-let mediaAssetSchema = z.object({
+export let mediaAssetSchema = z.object({
   assetId: z.string().describe('Unique asset identifier'),
   folder: z.boolean().describe('Whether this asset is a folder'),
   mimeType: z.string().describe('MIME type of the asset'),
@@ -26,7 +26,9 @@ export let listMediaAssets = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace to list media assets from'),
+      workspaceId: z
+        .string()
+        .describe('Workspace ID. Call list_workspaces to discover available workspaces.'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)')
     })
   )
@@ -75,7 +77,9 @@ export let getMediaAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace containing the asset'),
+      workspaceId: z
+        .string()
+        .describe('Workspace ID. Call list_workspaces to discover available workspaces.'),
       assetId: z.string().describe('ID of the media asset to retrieve')
     })
   )
@@ -83,6 +87,14 @@ export let getMediaAsset = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let asset = await client.getMediaAsset(ctx.input.workspaceId, ctx.input.assetId);
+    if (!asset.folder) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: asset.url,
+        mimeType: asset.mimeType,
+        headers: getFileAuthHeaders(asset.url, ctx.auth.token)
+      });
+    }
 
     return {
       output: {
@@ -112,7 +124,9 @@ export let deleteMediaAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace containing the asset'),
+      workspaceId: z
+        .string()
+        .describe('Workspace ID. Call list_workspaces to discover available workspaces.'),
       assetId: z.string().describe('ID of the media asset to delete')
     })
   )
@@ -134,6 +148,47 @@ export let deleteMediaAsset = SlateTool.create(spec, {
         dateUpdated: asset.dateUpdated
       },
       message: `Deleted media asset **${asset.filename}**.`
+    };
+  })
+  .build();
+
+export let uploadMediaAsset = SlateTool.create(spec, {
+  name: 'Upload Media Asset',
+  key: 'upload_media_asset',
+  description:
+    'Upload an image from a publicly accessible URL to a workspace media library. Use the returned asset URL in template generation to avoid repeatedly downloading external images.',
+  tags: { readOnly: false, destructive: false }
+})
+  .input(
+    z.object({
+      workspaceId: z
+        .string()
+        .describe('Workspace ID. Call list_workspaces to discover available workspaces.'),
+      fileUrl: z.url().describe('Public URL returning image bytes with an image Content-Type'),
+      filename: z.string().describe('Filename for the uploaded image, including its extension')
+    })
+  )
+  .output(mediaAssetSchema)
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let asset = await client.uploadMediaAsset(
+      ctx.input.workspaceId,
+      ctx.input.fileUrl,
+      ctx.input.filename
+    );
+    return {
+      output: {
+        assetId: asset.id,
+        folder: asset.folder,
+        mimeType: asset.mimeType,
+        filename: asset.filename,
+        size: asset.size,
+        url: asset.url,
+        thumbnailUrl: asset.thumbnailUrl,
+        dateCreated: asset.dateCreated,
+        dateUpdated: asset.dateUpdated
+      },
+      message: `Uploaded media asset **${asset.filename}** (${asset.id}).`
     };
   })
   .build();

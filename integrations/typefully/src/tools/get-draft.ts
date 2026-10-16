@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TypefullyClient } from '../lib/client';
+import { providerId, TypefullyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let platformPostOutputSchema = z.object({
@@ -24,15 +24,32 @@ export let getDraft = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      socialSetId: z.string().describe('ID of the social set'),
-      draftId: z.string().describe('ID of the draft to retrieve')
+      socialSetId: z
+        .string()
+        .describe('Social set ID. Call list_social_sets to discover accessible social sets.'),
+      draftId: z.string().describe('ID of the draft to retrieve'),
+      excludeCommentMarkers: z
+        .boolean()
+        .optional()
+        .describe(
+          'True for plain display text. Omit when editing: returned comment-thread markers must be preserved in update_draft.'
+        )
     })
   )
   .output(
     z.object({
       draftId: z.string().describe('ID of the draft'),
-      socialSetId: z.string().describe('ID of the social set'),
+      socialSetId: z
+        .string()
+        .describe('Social set ID. Call list_social_sets to discover accessible social sets.'),
       status: z.string().describe('Draft status'),
+      publishState: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Publishing progress; in_progress means accepted asynchronously. Poll get_draft until finished.'
+        ),
       createdAt: z.string().describe('When the draft was created'),
       updatedAt: z.string().describe('When the draft was last updated'),
       scheduledDate: z.string().nullable().describe('Scheduled publication time'),
@@ -51,6 +68,11 @@ export let getDraft = SlateTool.create(spec, {
           mastodon: platformOutputSchema.optional().describe('Mastodon content')
         })
         .describe('Platform-specific content'),
+      rawDraft: z
+        .record(z.string(), z.unknown())
+        .describe(
+          'Complete actual draft response, including additional platform content and metadata'
+        ),
       publishedUrls: z
         .object({
           x: z.string().nullable().optional().describe('Published X post URL'),
@@ -65,13 +87,17 @@ export let getDraft = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TypefullyClient(ctx.auth.token);
 
-    let draft = await client.getDraft(ctx.input.socialSetId, ctx.input.draftId);
+    let draft = await client.getDraft(
+      ctx.input.socialSetId,
+      ctx.input.draftId,
+      ctx.input.excludeCommentMarkers
+    );
 
     let mapPlatform = (config: any) => {
       if (!config) return undefined;
       return {
         enabled: config.enabled,
-        posts: (config.posts ?? []).map((post: any) => ({
+        posts: config.posts.map((post: any) => ({
           text: post.text,
           ...(post.media_ids?.length ? { mediaIds: post.media_ids } : {})
         }))
@@ -80,15 +106,16 @@ export let getDraft = SlateTool.create(spec, {
 
     return {
       output: {
-        draftId: draft.id,
-        socialSetId: draft.social_set_id,
+        draftId: providerId(draft.id),
+        socialSetId: providerId(draft.social_set_id),
         status: draft.status,
+        publishState: draft.publish_state,
         createdAt: draft.created_at,
         updatedAt: draft.updated_at,
         scheduledDate: draft.scheduled_date,
         publishedAt: draft.published_at,
         draftTitle: draft.draft_title,
-        tags: draft.tags ?? [],
+        tags: draft.tags,
         preview: draft.preview,
         shareUrl: draft.share_url,
         privateUrl: draft.private_url,
@@ -99,6 +126,7 @@ export let getDraft = SlateTool.create(spec, {
           bluesky: mapPlatform(draft.platforms?.bluesky),
           mastodon: mapPlatform(draft.platforms?.mastodon)
         },
+        rawDraft: { ...draft },
         publishedUrls: {
           x: draft.x_published_url,
           linkedin: draft.linkedin_published_url,

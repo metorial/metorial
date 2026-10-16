@@ -1,7 +1,43 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlisioClient } from '../lib/client';
+import {
+  optionalValue,
+  providerBoolean,
+  providerInteger,
+  readArray,
+  validateOutput
+} from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  currencies: z
+    .array(
+      z.object({
+        name: z.string().describe('Cryptocurrency name'),
+        cryptoId: z.string().describe('Cryptocurrency identifier'),
+        currency: z.string().describe('Currency code'),
+        icon: z.string().optional().describe('Icon URL'),
+        rateUsd: z.string().optional().describe('Exchange rate in USD'),
+        priceUsd: z.string().optional().describe('Price in USD'),
+        precision: z.number().optional().describe('Decimal precision'),
+        fiat: z.string().optional().describe('Fiat currency used for rate'),
+        fiatRate: z.string().optional().describe('Exchange rate in requested fiat'),
+        minSumIn: z.string().optional().describe('Minimum invoice amount'),
+        invoiceCommissionPercentage: z
+          .string()
+          .optional()
+          .describe('Invoice commission percentage'),
+        hidden: z.boolean().optional().describe('Whether the currency is hidden'),
+        maintenance: z
+          .boolean()
+          .optional()
+          .describe('Whether the currency is under maintenance')
+      })
+    )
+    .describe('List of supported cryptocurrencies'),
+  raw: z.unknown().describe('Original provider response with credentials removed')
+});
 
 export let getCurrencies = SlateTool.create(spec, {
   name: 'Get Currencies',
@@ -22,59 +58,33 @@ export let getCurrencies = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      currencies: z
-        .array(
-          z.object({
-            name: z.string().describe('Cryptocurrency name'),
-            cryptoId: z.string().describe('Cryptocurrency identifier'),
-            currency: z.string().describe('Currency code'),
-            icon: z.string().optional().describe('Icon URL'),
-            rateUsd: z.string().optional().describe('Exchange rate in USD'),
-            priceUsd: z.string().optional().describe('Price in USD'),
-            precision: z.number().optional().describe('Decimal precision'),
-            fiat: z.string().optional().describe('Fiat currency used for rate'),
-            fiatRate: z.string().optional().describe('Exchange rate in requested fiat'),
-            minSumIn: z.string().optional().describe('Minimum invoice amount'),
-            invoiceCommissionPercentage: z
-              .string()
-              .optional()
-              .describe('Invoice commission percentage'),
-            hidden: z.boolean().optional().describe('Whether the currency is hidden'),
-            maintenance: z
-              .boolean()
-              .optional()
-              .describe('Whether the currency is under maintenance')
-          })
-        )
-        .describe('List of supported cryptocurrencies')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new PlisioClient({ token: ctx.auth.token });
 
     let result = await client.getCurrencies(ctx.input.fiatCurrency);
 
-    let currencies = (Array.isArray(result) ? result : []).map((c: any) => ({
+    let currencies = readArray(result).map(c => ({
       name: c.name,
       cryptoId: c.cid,
-      currency: c.currency,
-      icon: c.icon,
-      rateUsd: c.rate_usd,
-      priceUsd: c.price_usd,
-      precision: c.precision,
-      fiat: c.fiat,
-      fiatRate: c.fiat_rate,
-      minSumIn: c.min_sum_in,
-      invoiceCommissionPercentage: c.invoice_commission_percentage,
-      hidden: c.hidden,
-      maintenance: c.maintenance
+      currency: optionalValue(c.currency),
+      icon: optionalValue(c.icon),
+      rateUsd: optionalValue(c.rate_usd),
+      priceUsd: optionalValue(c.price_usd),
+      precision: providerInteger(c.precision),
+      fiat: optionalValue(c.fiat),
+      fiatRate: optionalValue(c.fiat_rate),
+      minSumIn: optionalValue(c.min_sum_in),
+      invoiceCommissionPercentage: optionalValue(c.invoice_commission_percentage),
+      hidden: providerBoolean(c.hidden),
+      maintenance: providerBoolean(c.maintenance)
     }));
 
     return {
-      output: { currencies },
-      message: `Found **${currencies.length}** supported cryptocurrencies${ctx.input.fiatCurrency ? ` with rates in ${ctx.input.fiatCurrency}` : ''}.`
+      output: validateOutput(outputSchema, { currencies, raw: result }),
+      message: client.redact(
+        `Found **${currencies.length}** supported cryptocurrencies${ctx.input.fiatCurrency ? ` with rates in ${ctx.input.fiatCurrency}` : ''}.`
+      )
     };
   })
   .build();

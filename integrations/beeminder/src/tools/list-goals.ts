@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeeminderClient } from '../lib/client';
-import { goalSchema, mapGoal } from '../lib/schemas';
+import { goalSchema, mapGoal, responseArray } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listGoals = SlateTool.create(spec, {
@@ -17,7 +17,8 @@ export let listGoals = SlateTool.create(spec, {
       includeArchived: z
         .boolean()
         .optional()
-        .describe('If true, returns archived goals instead of active goals')
+        .describe('If true, returns archived goals instead of active goals'),
+      emaciated: z.boolean().optional().describe('Omit road matrices from the goal objects')
     })
   )
   .output(
@@ -28,14 +29,15 @@ export let listGoals = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
     let raw = ctx.input.includeArchived
-      ? await client.getArchivedGoals()
-      : await client.getGoals();
+      ? await client.getArchivedGoals(ctx.input.emaciated)
+      : await client.getGoals(ctx.input.emaciated);
 
-    let goals = (raw as any[]).map(mapGoal);
+    let goals = responseArray(raw).map(mapGoal);
 
     return {
       output: { goals },

@@ -1,50 +1,43 @@
-# Slates Specification for Veriphone
+# Veriphone Integration Reference
 
-## Overview
-
-Veriphone is a phone number validation and carrier lookup service. It provides a REST API to verify, format, and retrieve metadata (country, carrier, line type, region) for phone numbers across all countries worldwide.
+Veriphone validates phone numbers, retrieves numbering-plan and carrier information, generates example numbers, and processes CSV lists.
 
 ## Authentication
 
-Veriphone uses API keys to authenticate requests. You can view and manage your API key in your control panel.
+Connect with the API key from your Veriphone account. Requests use the documented `Authorization: Bearer` header. Connection settings remain an API key named `token` under the `api_key` auth method, with no additional configuration or OAuth scopes.
 
-To use the Veriphone API, developers must sign up for an API key on the Veriphone website at https://veriphone.io. To obtain your API key, navigate to the control panel, click on the account section, and copy the API key displayed on the screen.
+## Tools
 
-The API key is passed as a query parameter named `key` on each request. For example:
+| Tool | Provider route | Behavior |
+| --- | --- | --- |
+| `verify_phone` | `GET /v2/verify` | Preserve the existing validation and camel-case metadata contract. An invalid-number result is returned as a verdict rather than treated as an account error. |
+| `generate_example_phone` | `GET /v2/example` | Preserve the existing example-number route and contract. The current REST reference omits this route; the official integration guide still lists the example-number capability. |
+| `get_credits` | `GET /v3/credits` | Identify the account by email and return plan, active state, balances, and usage. |
+| `get_current_coverage` | `GET /v3/coverage/current` | Return country coverage and its update timestamp. |
+| `lookup_current_carrier` | `GET /v3/verify?mode=current` | Return the original and current carrier details, portability state, and available formatting and validity metadata. |
+| `upload_bulk_file` | `POST /v3/file/upload` | Upload CSV content using multipart form data with zero-based phone-column and first-data-row indexes. |
+| `start_bulk_verification` | `POST /v3/file/verify` | Start verification for an uploaded file, optionally selecting a country and lookup mode. |
+| `list_bulk_files` | `GET /v3/file/list` | Return all non-deleted uploads, newest first. No pagination is documented. |
+| `get_bulk_file` | `GET /v3/file/get` | Return upload metadata, or the provider's empty object for an inaccessible or missing file. |
+| `get_bulk_status` | `GET /v3/file/status` | Return the processing state; the provider uses an empty status for an inaccessible or missing file. |
+| `download_bulk_file` | `GET /v3/file/download` | Prepare an authenticated CSV download for an existing upload. Returns verified results if available and otherwise the original CSV. |
+| `delete_bulk_file` | `POST /v3/file/delete` | Permanently delete an upload and its results. |
 
-```
-https://api.veriphone.io/v2/verify?phone=+14152007986&key=YOUR_API_KEY
-```
+The two original tools retain v2 behavior. The provider explicitly supports existing v2 integrations; the new tools use the current v3 API. No tool is deprecated.
 
-API requests without a valid API key will fail.
+## Credit and data behavior
 
-Requests carrying your API key will deduct 1 credit from your balance, so be sure to keep your key secure. Do not share it in publicly accessible areas such as GitHub or client-side code.
+Static verification costs one credit for a successful verification. Current carrier resolution costs ten credits when resolved, or one when resolution is unavailable and static results are returned. Current lookup does not establish device reachability. Account and coverage checks do not spend verification credits.
 
-## Features
+For bulk work, upload first and inspect the returned samples before starting verification. CSV files must be non-empty, at most 100 MB, and no more than one million rows; the provider enforces CSV parsing and row limits. Column and first-row indexes must be non-negative whole numbers. Before starting, the account must cover the full file cost at the selected mode's full rate. Poll until `completed` before expecting verified results in a download.
 
-### Phone Number Validation
+Download preparation does not confirm subsequent retrieval. The provider download endpoint is accessed with the account's credentials while the upload exists; deleting the upload removes its original file and results.
 
-The verify feature takes a phone number and an optional default country as input, and tells you if the number is valid. For valid numbers, it also returns the number's type (mobile, land line, toll free, etc.), the carrier, and other fields.
+No raw CSV content, credentials, or download authentication fields are returned in structured output. Metadata and current carrier responses retain additional provider fields without substituting missing facts.
 
-- **Parameters:** Phone number (required), default country code (optional).
-- If the number does not start with a country prefix indicated by a leading '+', the number will be checked against the default country's numbering scheme. If no default country is provided, a country will be inferred from the IP address originating the request.
-- Response includes: validity status, phone type, region, country, country code, country prefix, international and local formatted numbers, E.164 format, and carrier.
+## References
 
-### Example Phone Number Generation
-
-The example feature returns a dummy phone number for any country and phone type combination. The country and phone type are optional. If no country is specified, a country will be inferred from the IP address originating the request. If no phone type is specified, 'mobile' will be used as default type.
-
-- **Parameters:** Country code (optional), phone type (optional, e.g., `mobile`, `fixed_line`).
-- Useful for testing and development purposes.
-
-### Bulk Validation
-
-Bulk validation is available: upload your CSV, validate, and download. This is provided via the web interface rather than the API.
-
-### Data Enrichment
-
-Veriphone provides extra parameters for segmenting any lead or customer database, including country, region, carrier, and line type.
-
-## Events
-
-The provider does not support events. Veriphone is a stateless validation API with no webhook or event subscription capabilities.
+- [Current API reference](https://veriphone.io/docs/v3)
+- [Supported v2 API reference](https://veriphone.io/docs/v2)
+- [Bulk verification API](https://veriphone.io/docs/bulk)
+- [Official integration guide and example-number capability](https://veriphone.io/docs/mcp)

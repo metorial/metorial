@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GristClient } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,10 @@ export let runSql = SlateTool.create(spec, {
   .output(
     z.object({
       statement: z.string().describe('The executed SQL statement'),
+      records: z
+        .array(z.object({ fields: z.record(z.string(), z.any()) }).passthrough())
+        .optional()
+        .describe('Query records with values keyed by returned column name'),
       columns: z.array(z.string()).optional().describe('Column names in the result set'),
       rows: z.array(z.array(z.any())).optional().describe('Result rows as arrays of values')
     })
@@ -47,15 +51,26 @@ export let runSql = SlateTool.create(spec, {
       ctx.input.timeout
     );
 
-    let rowCount = result.records?.length || result.rows?.length || 0;
+    if (typeof result.statement !== 'string') {
+      throw createApiServiceError('Grist returned a SQL result without its statement.');
+    }
+    let rowCount = Array.isArray(result.records)
+      ? result.records.length
+      : Array.isArray(result.rows)
+        ? result.rows.length
+        : undefined;
 
     return {
       output: {
-        statement: result.statement || ctx.input.sql,
+        statement: result.statement,
+        records: result.records,
         columns: result.columns,
         rows: result.rows
       },
-      message: `Query returned **${rowCount}** row(s).`
+      message:
+        rowCount === undefined
+          ? 'SQL query completed.'
+          : `Query returned **${rowCount}** row(s).`
     };
   })
   .build();

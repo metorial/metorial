@@ -1,19 +1,22 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { validateHttpsUrl } from './lib/http';
+import { requestAccessToken } from './lib/token';
+
+let authOutputSchema = z.object({
+  token: z.string(),
+  authMethod: z.enum(['api_key', 'oauth']),
+  baseUrl: z.string().optional(),
+  tokenEndpoint: z.string().optional(),
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+  oauthToken: z.string().optional(),
+  oauthTokenExpiresAt: z.string().optional(),
+  expiresAt: z.string().optional()
+});
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      authMethod: z.enum(['api_key', 'oauth']),
-      baseUrl: z.string().optional(),
-      tokenEndpoint: z.string().optional(),
-      clientId: z.string().optional(),
-      clientSecret: z.string().optional(),
-      oauthToken: z.string().optional(),
-      oauthTokenExpiresAt: z.string().optional()
-    })
-  )
+  .output(authOutputSchema)
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
@@ -22,16 +25,13 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Your Nasdaq Data Link API key. Find it on your account settings page at data.nasdaq.com.'
+          'Your Nasdaq Data Link API key from your account settings at data.nasdaq.com.'
         )
     }),
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey,
-          authMethod: 'api_key' as const
-        }
-      };
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('A Nasdaq Data Link API key is required.');
+      return { output: { token: ctx.input.apiKey, authMethod: 'api_key' as const } };
     }
   })
   .addCustomAuth({
@@ -39,41 +39,52 @@ export let auth = SlateAuth.create()
     name: 'OAuth2 Client Credentials',
     key: 'oauth_client_credentials',
     inputSchema: z.object({
-      clientId: z.string().describe('OAuth2 client ID provided by Nasdaq sales team.'),
-      clientSecret: z.string().describe('OAuth2 client secret provided by Nasdaq sales team.'),
+      clientId: z.string().describe('Client ID provided by Nasdaq.'),
+      clientSecret: z.string().describe('Client secret provided by Nasdaq.'),
       tokenEndpoint: z
         .string()
-        .describe('OAuth2 token endpoint URL provided by Nasdaq sales team.'),
+        .describe(
+          'Nasdaq Cloud REST authentication URL, normally https://YOUR_HOST/v1/auth/token.'
+        ),
       baseUrl: z
         .string()
-        .describe('Base URL for the Real-Time/Delayed REST API provided by Nasdaq sales team.')
+        .describe(
+          'Nasdaq Cloud REST API base URL provided by Nasdaq, without a version suffix.'
+        )
     }),
     getOutput: async ctx => {
-      let http = createAxios();
-
-      let params = new URLSearchParams();
-      params.append('grant_type', 'client_credentials');
-      params.append('client_id', ctx.input.clientId);
-      params.append('client_secret', ctx.input.clientSecret);
-
-      let response = await http.post(ctx.input.tokenEndpoint, params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      let expiresAt = new Date(Date.now() + response.data.expires_in * 1000).toISOString();
-
+      let baseUrl = validateHttpsUrl(ctx.input.baseUrl, 'API base URL');
+      let tokenEndpoint = validateHttpsUrl(ctx.input.tokenEndpoint, 'Token endpoint');
+      let result = await requestAccessToken({ ...ctx.input, tokenEndpoint });
       return {
         output: {
-          token: ctx.input.clientId,
+          token: result.token,
           authMethod: 'oauth' as const,
-          baseUrl: ctx.input.baseUrl,
-          tokenEndpoint: ctx.input.tokenEndpoint,
+          baseUrl,
+          tokenEndpoint,
           clientId: ctx.input.clientId,
           clientSecret: ctx.input.clientSecret,
-          oauthToken: response.data.access_token,
-          oauthTokenExpiresAt: expiresAt
+          oauthToken: result.token,
+          oauthTokenExpiresAt: result.expiresAt,
+          expiresAt: result.expiresAt
+        }
+      };
+    },
+    handleTokenRefresh: async (ctx: { output: z.infer<typeof authOutputSchema> }) => {
+      let { clientId, clientSecret, tokenEndpoint, baseUrl } = ctx.output;
+      if (!clientId || !clientSecret || !tokenEndpoint || !baseUrl) {
+        throw createApiServiceError(
+          'Nasdaq client credentials or API URLs are missing. Reconnect with OAuth2 Client Credentials.'
+        );
+      }
+      let result = await requestAccessToken({ clientId, clientSecret, tokenEndpoint });
+      return {
+        output: {
+          ...ctx.output,
+          token: result.token,
+          oauthToken: result.token,
+          oauthTokenExpiresAt: result.expiresAt,
+          expiresAt: result.expiresAt
         }
       };
     }

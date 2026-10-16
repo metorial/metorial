@@ -1,4 +1,4 @@
-# Slates Specification for Bestbuy
+# Best Buy Integration Specification
 
 ## Overview
 
@@ -11,7 +11,7 @@ Best Buy uses **API Key** authentication for its public APIs.
 - To access the Best Buy API, developers must obtain an API key through the Developer Portal. This key is essential for authentication.
 - Sign up for a developer API Key at https://developer.bestbuy.com/. The library requires an API key to be provided before it can be used.
 - The API key is passed as a query parameter `apiKey` on each request. For example: `https://api.bestbuy.com/v1/products?apiKey=YourAPIKey&format=json`
-- Best Buy will no longer support or provide API keys to those using free email services (e.g., Gmail/Yahoo). API keys are associated with a company and not an individual.
+- API-key applications and account eligibility are managed through the Developer Portal.
 
 **Commerce API** (partner-only):
 
@@ -35,21 +35,35 @@ The Stores API provides addresses, location, hours and services offered for all 
 
 ### In-Store Product Availability
 
-You can query the Products API together with the Stores API to find in-store availability of products. Near real-time availability can be retrieved for specific SKUs by store ID or postal code. Results include stock status and pickup time estimates.
+Near real-time availability can be retrieved for a specific SKU with exactly one store ID or postal code. The response contains `stores` and `ispuEligible`; postal-code searches cover a 250-mile radius. The tool reports the number of returned stores as `total` and preserves store fields, including nullable pickup estimates.
 
 ### Product Recommendations
 
-The Recommendations API allows you to pull Trending, Most Viewed and Also Viewed products based on customer behavior at BESTBUY.COM. Additional recommendation types include Also Bought and Viewed Ultimately Bought. All recommendations can be filtered by category. Results return the top ten ranked products.
+The Recommendations API supports Trending, Most Viewed, Also Viewed, Also Bought, and Viewed Ultimately Bought. Trending and Most Viewed support category filtering; the other three require a SKU. Trending compares rolling three-hour viewing windows. Most Viewed accumulates at most 48 hours of views and refreshes every two hours; SKU-relative recommendations aggregate 30 days. Results include at most ten ranked products. Null short descriptions are omitted from the normalized result and retained in `rawResponse.results[].descriptions.short`. Numeric review scores are rendered as strings to preserve the existing tool output type; the original value remains in `rawResponse`.
 
 ### Open Box / Buying Options
 
 The Buying Options API provides access to Open Box inventory including condition, reduced prices and other helpful product information. Open Box products can be queried by single SKU, a list of SKUs (up to 100), or by category. Each offer includes a condition rating (excellent or certified) and discounted pricing.
 
 - Only available products are returned; inventory is refreshed every five minutes.
+- Category queries support `page` and `pageSize`. SKU-list queries accept at most 100 entries and are not paginated. Original provider SKUs remain available in `rawResponse`; the normalized Open Box SKU remains numeric.
+
+### Cursor Browsing
+
+`browse_catalog` supports Products, Stores, and Categories using `cursorMark=*` initially and the returned `nextCursorMark` subsequently. It returns the complete provider response with credential query parameters removed from URLs. This provides deep catalog traversal without changing the existing page-based tools' output contracts.
+
+### Errors and Authentication
+
+Requests use the `apiKey` query parameter with a 30-second timeout. Credential parameters are removed from response URLs, and known API-key values are redacted from all returned response data and messages while preserving unrelated metadata, nulls, and cursor values. Blank API keys, malformed inputs, invalid required response fields, and upstream failures produce actionable service errors. This public catalog API has no current-user/profile endpoint, so no identity tool is exposed.
 
 ### Commerce (Partner-Only)
 
 Commerce API functionality includes: Look up product availability, delivery dates, shipping costs prior to order submission; Create orders including Store Pick Up, Ship to Home and Home Delivery. Partners can also look up order information and modify or cancel orders. Access requires a separate CAPI key obtained through a partnership application.
+
+## Official References
+
+- [Best Buy API reference](https://bestbuyapis.github.io/api-documentation/)
+- [API catalog and invite-only Commerce API](https://developer.bestbuy.com/apis)
 
 ## Events
 

@@ -1,6 +1,12 @@
 # <img src="logo.png" height="20"> Aivoov
 
-Convert text to speech audio using 2300+ AI voices from Google, Amazon, IBM, and Microsoft. Generate audio in MP3 and WAV formats across 155+ languages. Combine multiple voices in a single request to create conversational audio. Control pitch, speaking rate, and volume per text segment using SSML. Browse and filter available voices by language.
+Generate spoken audio with multiple voices and per-segment speech controls, browse voices by language, and transcribe audio into downloadable transcripts and SRT subtitles.
+
+Use `list_voices` before `generate_audio`. Audio generation provides a downloadable file and preserves its original `audioBase64` output for existing workflows. The audio format is detected from the returned content; the API does not expose an output-format selector.
+
+For speech recognition, submit Base64-encoded MP3, WAV, FLAC, or OGG audio with `create_transcription`, then poll `get_transcription` using the returned job ID. Completed jobs provide transcript and subtitle downloads. Uploaded audio must be no larger than 10 MB.
+
+Connect with an API key from **My Profile → API**. API access requires an eligible plan and character credit. See the [official text-to-speech API](https://github.com/AiVOOV/aivoov-api) and [speech-to-text API](https://github.com/AiVOOV/aivoov-api/blob/main/speech-to-text-api.md) documentation.
 
 ## License
 

@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'polygon',
   name: 'Polygon',
-  description: undefined,
+  description:
+    'Financial market data from Massive (formerly Polygon.io), covering stocks, options, forex, crypto, and indices.',
   metadata: {},
   config,
   auth

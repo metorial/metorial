@@ -25,6 +25,7 @@ export let listPronunciationDictionariesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       dictionaries: z
         .array(
           z.object({
@@ -53,21 +54,22 @@ export let listPronunciationDictionariesTool = SlateTool.create(spec, {
       cursor: ctx.input.cursor
     });
 
-    let dictionaries = (result.pronunciation_dictionaries || []).map((d: any) => ({
+    let dictionaries = result.pronunciation_dictionaries.map(d => ({
       dictionaryId: d.id,
       name: d.name,
-      description: d.description,
-      latestVersionId: d.latest_version_id,
-      rulesCount: d.latest_version_rules_num,
-      createdBy: d.created_by,
-      creationTimeUnix: d.creation_time_unix
+      description: d.description ?? undefined,
+      latestVersionId: d.latest_version_id ?? undefined,
+      rulesCount: d.latest_version_rules_num ?? undefined,
+      createdBy: d.created_by ?? undefined,
+      creationTimeUnix: d.creation_time_unix ?? undefined
     }));
 
     return {
       output: {
+        raw: result.raw,
         dictionaries,
-        hasMore: result.has_more || false,
-        nextCursor: result.next_cursor
+        hasMore: result.has_more,
+        nextCursor: result.next_cursor ?? undefined
       },
       message: `Found ${dictionaries.length} pronunciation dictionaries${result.has_more ? ' (more available)' : ''}.`
     };

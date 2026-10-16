@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,11 +34,32 @@ Drafts support scheduling via \`sendAt\` for delayed sending.`,
         .enum(['create', 'update', 'send'])
         .describe('Operation to perform on the draft'),
       inboxId: z.string().describe('Inbox for the draft'),
+      forwardOf: z
+        .string()
+        .optional()
+        .describe('Source message ID for a forward draft (create only).'),
+      replyAll: z
+        .boolean()
+        .optional()
+        .describe('Include original recipients in a reply draft (create only).'),
+      clientId: z
+        .string()
+        .optional()
+        .describe('Client identifier for idempotent draft creation.'),
+      clearSendAt: z.boolean().optional().describe('Cancel scheduled sending on update.'),
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          'Unique key to prevent duplicate sends when retrying the send action within 24 hours.'
+        ),
       draftId: z.string().optional().describe('Required for update and send actions'),
       to: z
         .array(z.string())
         .optional()
-        .describe('Recipient email addresses (required for create)'),
+        .describe(
+          'Recipient email addresses; may be omitted for an unfinished or reply draft'
+        ),
       cc: z.array(z.string()).optional().describe('CC recipients'),
       bcc: z.array(z.string()).optional().describe('BCC recipients'),
       replyTo: z.array(z.string()).optional().describe('Reply-to addresses'),
@@ -49,8 +70,11 @@ Drafts support scheduling via \`sendAt\` for delayed sending.`,
       attachments: z.array(attachmentSchema).optional().describe('File attachments'),
       inReplyTo: z.string().optional().describe('Message ID this draft is a reply to'),
       sendAt: z.string().optional().describe('ISO 8601 timestamp to schedule sending'),
-      addLabels: z.array(z.string()).optional().describe('Labels to add when sending'),
-      removeLabels: z.array(z.string()).optional().describe('Labels to remove when sending')
+      addLabels: z.array(z.string()).optional().describe('Labels to add on update or send'),
+      removeLabels: z
+        .array(z.string())
+        .optional()
+        .describe('Labels to remove on update or send')
     })
   )
   .output(
@@ -66,11 +90,34 @@ Drafts support scheduling via \`sendAt\` for delayed sending.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.clearSendAt && ctx.input.sendAt !== undefined)
+      throw createApiServiceError('Use either clearSendAt or sendAt, not both.');
+    if (ctx.input.inReplyTo && ctx.input.forwardOf)
+      throw createApiServiceError('Use either inReplyTo or forwardOf, not both.');
+    if (
+      ctx.input.action !== 'create' &&
+      (ctx.input.forwardOf !== undefined ||
+        ctx.input.replyAll !== undefined ||
+        ctx.input.clientId !== undefined)
+    )
+      throw createApiServiceError(
+        'forwardOf, replyAll, and clientId are only supported when creating a draft.'
+      );
+    if (ctx.input.clearSendAt && ctx.input.action !== 'update')
+      throw createApiServiceError('clearSendAt is only supported for draft updates.');
+    if (
+      ctx.input.action === 'update' &&
+      ctx.input.labels !== undefined &&
+      (ctx.input.addLabels !== undefined || ctx.input.removeLabels !== undefined)
+    )
+      throw createApiServiceError(
+        'Use labels for replacement, or addLabels/removeLabels for incremental changes.'
+      );
     let client = new Client({ token: ctx.auth.token, podId: ctx.config.podId });
 
     if (ctx.input.action === 'create') {
       let draft = await client.createDraft(ctx.input.inboxId, {
-        to: ctx.input.to || [],
+        to: ctx.input.to,
         cc: ctx.input.cc,
         bcc: ctx.input.bcc,
         replyTo: ctx.input.replyTo,
@@ -80,6 +127,9 @@ Drafts support scheduling via \`sendAt\` for delayed sending.`,
         labels: ctx.input.labels,
         attachments: ctx.input.attachments,
         inReplyTo: ctx.input.inReplyTo,
+        forwardOf: ctx.input.forwardOf,
+        replyAll: ctx.input.replyAll,
+        clientId: ctx.input.clientId,
         sendAt: ctx.input.sendAt
       });
 
@@ -94,7 +144,8 @@ Drafts support scheduling via \`sendAt\` for delayed sending.`,
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.draftId) throw new Error('draftId is required for update action');
+      if (!ctx.input.draftId)
+        throw createApiServiceError('draftId is required for update action');
 
       let draft = await client.updateDraft(ctx.input.inboxId, ctx.input.draftId, {
         to: ctx.input.to,
@@ -107,6 +158,9 @@ Drafts support scheduling via \`sendAt\` for delayed sending.`,
         labels: ctx.input.labels,
         attachments: ctx.input.attachments,
         inReplyTo: ctx.input.inReplyTo,
+        clearSendAt: ctx.input.clearSendAt,
+        addLabels: ctx.input.addLabels,
+        removeLabels: ctx.input.removeLabels,
         sendAt: ctx.input.sendAt
       });
 
@@ -121,13 +175,14 @@ Drafts support scheduling via \`sendAt\` for delayed sending.`,
     }
 
     // send
-    if (!ctx.input.draftId) throw new Error('draftId is required for send action');
+    if (!ctx.input.draftId) throw createApiServiceError('draftId is required for send action');
 
     let result = await client.sendDraft(
       ctx.input.inboxId,
       ctx.input.draftId,
       ctx.input.addLabels,
-      ctx.input.removeLabels
+      ctx.input.removeLabels,
+      ctx.input.idempotencyKey
     );
 
     return {

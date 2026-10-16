@@ -10,7 +10,7 @@ export let listDnsZones = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/dns/v1/zones', { params });
   return response.data;
@@ -55,7 +55,7 @@ export let listRecordSets = async (
 ) => {
   let client = createServiceClient(BASE_URL, auth);
   let params: Record<string, string | number> = {};
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get(`/dns/v1/zones/${dnsZoneId}:listRecordSets`, { params });
   return response.data;

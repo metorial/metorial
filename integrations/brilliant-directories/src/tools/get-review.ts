@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,10 @@ Returns the review content, ratings, reviewer info, and associated member data.`
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       review: z.any().describe('The review record(s) returned.')
     })
   )
@@ -42,15 +46,18 @@ Returns the review content, ratings, reviewer info, and associated member data.`
     let result: any;
     if (ctx.input.reviewId) {
       result = await client.getReview(ctx.input.reviewId);
-    } else if (ctx.input.property && ctx.input.propertyValue) {
+    } else if (ctx.input.property && ctx.input.propertyValue !== undefined) {
       result = await client.getReviewByProperty(ctx.input.property, ctx.input.propertyValue);
     } else {
-      throw new Error('Either reviewId or both property and propertyValue must be provided.');
+      throw createApiServiceError(
+        'Either reviewId or both property and propertyValue must be provided.'
+      );
     }
 
     return {
       output: {
         status: result.status,
+        raw: result,
         review: result.message
       },
       message: `Retrieved review data successfully.`

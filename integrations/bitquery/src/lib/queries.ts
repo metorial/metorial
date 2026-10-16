@@ -304,10 +304,12 @@ query GetOHLC($network: evm_network!, $baseCurrency: String!, $quoteCurrency: St
       Block {
         Time(interval: {count: $interval, in: minutes})
       }
-      open: Trade_Price: Trade_Price(minimum: Block_Number)
-      high: Trade_Price: Trade_Price(maximum: Trade_Price)
-      low: Trade_Price: Trade_Price(minimum: Trade_Price)
-      close: Trade_Price: Trade_Price(maximum: Block_Number)
+      Trade {
+        open: Price(minimum: Block_Number)
+        high: Price(maximum: Trade_Price)
+        low: Price(minimum: Trade_Price)
+        close: Price(maximum: Block_Number)
+      }
       volume: sum(of: Trade_Side_AmountInUSD)
       tradeCount: count
     }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { JiraClient } from '../lib/client';
 import { spec } from '../spec';
@@ -64,16 +64,14 @@ export let manageCustomerTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId
-    });
+    let client = new JiraClient(ctx.auth);
 
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.email) throw new Error('email is required for create action');
-      if (!ctx.input.displayName) throw new Error('displayName is required for create action');
+      if (!ctx.input.email) throw createApiServiceError('email is required for create action');
+      if (!ctx.input.displayName)
+        throw createApiServiceError('displayName is required for create action');
 
       let result = await client.createCustomer(ctx.input.email, ctx.input.displayName);
 
@@ -91,7 +89,7 @@ export let manageCustomerTool = SlateTool.create(spec, {
 
     if (action === 'list') {
       if (!ctx.input.serviceDeskId)
-        throw new Error('serviceDeskId is required for list action');
+        throw createApiServiceError('serviceDeskId is required for list action');
 
       let result = await client.getServiceDeskCustomers(
         ctx.input.serviceDeskId,
@@ -113,8 +111,9 @@ export let manageCustomerTool = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!ctx.input.serviceDeskId) throw new Error('serviceDeskId is required');
-      if (!ctx.input.accountIds?.length) throw new Error('accountIds are required');
+      if (!ctx.input.serviceDeskId) throw createApiServiceError('serviceDeskId is required');
+      if (!ctx.input.accountIds?.length)
+        throw createApiServiceError('accountIds are required');
 
       await client.addCustomersToServiceDesk(ctx.input.serviceDeskId, ctx.input.accountIds);
 
@@ -125,8 +124,9 @@ export let manageCustomerTool = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!ctx.input.serviceDeskId) throw new Error('serviceDeskId is required');
-      if (!ctx.input.accountIds?.length) throw new Error('accountIds are required');
+      if (!ctx.input.serviceDeskId) throw createApiServiceError('serviceDeskId is required');
+      if (!ctx.input.accountIds?.length)
+        throw createApiServiceError('accountIds are required');
 
       await client.removeCustomersFromServiceDesk(
         ctx.input.serviceDeskId,
@@ -139,6 +139,6 @@ export let manageCustomerTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

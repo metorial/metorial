@@ -23,17 +23,19 @@ export let cancelAudiofile = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      message: z.string().describe('Confirmation message from CastingWords')
+      message: z.string().describe('Confirmation message from CastingWords'),
+      raw: z.unknown().describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let result = await client.refundAudiofile(ctx.input.audiofileId, ctx.input.test);
+    let { result, raw } = await client.refundAudiofile(ctx.input.audiofileId, ctx.input.test);
 
     return {
       output: {
-        message: result.message ?? 'Refund processed successfully'
+        message: result.message,
+        raw
       },
       message: `Cancelled and refunded audiofile **${ctx.input.audiofileId}**.`
     };

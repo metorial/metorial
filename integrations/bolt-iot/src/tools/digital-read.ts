@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type BoltResponse, Client } from '../lib/client';
+import { deviceName, rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let digitalRead = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ export let digitalRead = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      deviceName,
       pins: z
         .array(z.string())
         .describe('List of pin numbers to read from (e.g., ["0", "1", "2"])')
@@ -24,6 +26,7 @@ export let digitalRead = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponse,
       success: z
         .string()
         .describe('Whether the read operation was successful ("1" for success)'),
@@ -33,10 +36,10 @@ export let digitalRead = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      deviceName: ctx.auth.deviceName
+      deviceName: ctx.input.deviceName ?? ctx.auth.deviceName
     });
 
-    let response: any;
+    let response: BoltResponse;
     if (ctx.input.pins.length === 1) {
       response = await client.digitalRead(ctx.input.pins[0]!);
     } else {
@@ -45,6 +48,7 @@ export let digitalRead = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         success: response.success,
         resultValue: response.value
       },

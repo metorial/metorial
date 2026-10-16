@@ -1,36 +1,78 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { baseUrl: string; token: string }) {
     let normalizedBase = config.baseUrl.replace(/\/+$/, '');
-    this.axios = createAxios({
+    let parsed: URL;
+    try {
+      parsed = new URL(normalizedBase);
+    } catch {
+      throw createApiServiceError(
+        'baseUrl must be an absolute HTTP or HTTPS NocoDB instance URL.'
+      );
+    }
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw createApiServiceError(
+        'baseUrl must use HTTP or HTTPS without credentials, query parameters, or a fragment.'
+      );
+    }
+    if (!config.token.trim()) throw createApiServiceError('A NocoDB API token is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: normalizedBase,
-      headers: {
-        'xc-token': config.token
-      }
+      authHeader: { name: 'xc-token', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'NocoDB',
+          reason: 'api_request_failed',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          detailKeys: ['message', 'msg', 'error', 'code', 'detail'],
+          nestedKeys: ['errors', 'message'],
+          extractUpstreamCode: (_error, response, helpers) =>
+            helpers.isRecord(response?.data) && typeof response.data.error === 'string'
+              ? response.data.error
+              : undefined
+        })
     });
   }
 
   // ── Bases ──
 
-  async listBases(): Promise<any> {
-    let res = await this.axios.get('/api/v2/meta/bases/');
+  async listBases(workspaceId?: string): Promise<any> {
+    let path =
+      workspaceId !== undefined
+        ? `/api/v2/meta/workspaces/${encodeURIComponent(workspaceId)}/bases`
+        : '/api/v2/meta/bases/';
+    let res = await this.axios.get(path);
     return res.data;
   }
 
   async getBase(baseId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/bases/${baseId}`);
+    let res = await this.axios.get(`/api/v2/meta/bases/${encodeURIComponent(baseId)}`);
     return res.data;
   }
 
-  async createBase(data: {
-    title: string;
-    description?: string;
-    color?: string;
-  }): Promise<any> {
-    let res = await this.axios.post('/api/v2/meta/bases/', data);
+  async createBase(
+    data: {
+      title: string;
+      description?: string;
+      color?: string;
+      meta?: any;
+    },
+    workspaceId?: string
+  ): Promise<any> {
+    let path =
+      workspaceId !== undefined
+        ? `/api/v2/meta/workspaces/${encodeURIComponent(workspaceId)}/bases`
+        : '/api/v2/meta/bases/';
+    let res = await this.axios.post(path, data);
     return res.data;
   }
 
@@ -38,69 +80,87 @@ export class Client {
     baseId: string,
     data: { title?: string; description?: string; color?: string; meta?: any }
   ): Promise<any> {
-    let res = await this.axios.patch(`/api/v2/meta/bases/${baseId}`, data);
+    let res = await this.axios.patch(`/api/v2/meta/bases/${encodeURIComponent(baseId)}`, data);
     return res.data;
   }
 
   async deleteBase(baseId: string): Promise<any> {
-    let res = await this.axios.delete(`/api/v2/meta/bases/${baseId}`);
+    let res = await this.axios.delete(`/api/v2/meta/bases/${encodeURIComponent(baseId)}`);
     return res.data;
   }
 
   // ── Tables ──
 
-  async listTables(baseId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/bases/${baseId}/tables`);
+  async listTables(baseId: string, sourceId?: string): Promise<any> {
+    let path = `/api/v2/meta/bases/${encodeURIComponent(baseId)}${sourceId !== undefined ? `/${encodeURIComponent(sourceId)}` : ''}/tables`;
+    let res = await this.axios.get(path);
     return res.data;
   }
 
   async getTable(tableId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/tables/${tableId}`);
+    let res = await this.axios.get(`/api/v2/meta/tables/${encodeURIComponent(tableId)}`);
     return res.data;
   }
 
   async createTable(
     baseId: string,
-    data: { table_name: string; title?: string; columns?: any[] }
+    data: { table_name: string; title?: string; columns?: any[]; description?: string },
+    sourceId?: string
   ): Promise<any> {
-    let res = await this.axios.post(`/api/v2/meta/bases/${baseId}/tables`, data);
+    let path = `/api/v2/meta/bases/${encodeURIComponent(baseId)}${sourceId !== undefined ? `/${encodeURIComponent(sourceId)}` : ''}/tables`;
+    let res = await this.axios.post(path, data);
     return res.data;
   }
 
   async updateTable(tableId: string, data: { title?: string; meta?: any }): Promise<any> {
-    let res = await this.axios.patch(`/api/v2/meta/tables/${tableId}`, data);
+    let res = await this.axios.patch(
+      `/api/v2/meta/tables/${encodeURIComponent(tableId)}`,
+      data
+    );
     return res.data;
   }
 
   async deleteTable(tableId: string): Promise<any> {
-    let res = await this.axios.delete(`/api/v2/meta/tables/${tableId}`);
+    let res = await this.axios.delete(`/api/v2/meta/tables/${encodeURIComponent(tableId)}`);
     return res.data;
   }
 
   // ── Fields (Columns) ──
 
-  async listFields(tableId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/tables/${tableId}`);
-    return res.data?.columns ?? [];
-  }
-
   async getField(fieldId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/columns/${fieldId}`);
+    let res = await this.axios.get(`/api/v2/meta/columns/${encodeURIComponent(fieldId)}`);
     return res.data;
   }
 
   async createField(tableId: string, data: any): Promise<any> {
-    let res = await this.axios.post(`/api/v2/meta/tables/${tableId}/columns`, data);
+    let res = await this.axios.post(
+      `/api/v2/meta/tables/${encodeURIComponent(tableId)}/columns`,
+      data
+    );
     return res.data;
   }
 
   async updateField(fieldId: string, data: any): Promise<any> {
-    let res = await this.axios.patch(`/api/v2/meta/columns/${fieldId}`, data);
+    let res = await this.axios.patch(
+      `/api/v2/meta/columns/${encodeURIComponent(fieldId)}`,
+      data
+    );
     return res.data;
   }
 
   async deleteField(fieldId: string): Promise<any> {
-    let res = await this.axios.delete(`/api/v2/meta/columns/${fieldId}`);
+    let res = await this.axios.delete(`/api/v2/meta/columns/${encodeURIComponent(fieldId)}`);
+    return res.data;
+  }
+
+  async countRecords(
+    tableId: string,
+    params?: { where?: string; viewId?: string }
+  ): Promise<any> {
+    let res = await this.axios.get(
+      `/api/v2/tables/${encodeURIComponent(tableId)}/records/count`,
+      { params }
+    );
     return res.data;
   }
 
@@ -117,7 +177,9 @@ export class Client {
       viewId?: string;
     }
   ): Promise<any> {
-    let res = await this.axios.get(`/api/v2/tables/${tableId}/records`, { params });
+    let res = await this.axios.get(`/api/v2/tables/${encodeURIComponent(tableId)}/records`, {
+      params
+    });
     return res.data;
   }
 
@@ -126,24 +188,36 @@ export class Client {
     recordId: string,
     params?: { fields?: string }
   ): Promise<any> {
-    let res = await this.axios.get(`/api/v2/tables/${tableId}/records/${recordId}`, {
-      params
-    });
+    let res = await this.axios.get(
+      `/api/v2/tables/${encodeURIComponent(tableId)}/records/${encodeURIComponent(recordId)}`,
+      {
+        params
+      }
+    );
     return res.data;
   }
 
   async createRecords(tableId: string, records: Record<string, any>[]): Promise<any> {
-    let res = await this.axios.post(`/api/v2/tables/${tableId}/records`, records);
+    let res = await this.axios.post(
+      `/api/v2/tables/${encodeURIComponent(tableId)}/records`,
+      records
+    );
     return res.data;
   }
 
   async updateRecords(tableId: string, records: Record<string, any>[]): Promise<any> {
-    let res = await this.axios.patch(`/api/v2/tables/${tableId}/records`, records);
+    let res = await this.axios.patch(
+      `/api/v2/tables/${encodeURIComponent(tableId)}/records`,
+      records
+    );
     return res.data;
   }
 
   async deleteRecords(tableId: string, records: { Id: number }[]): Promise<any> {
-    let res = await this.axios.delete(`/api/v2/tables/${tableId}/records`, { data: records });
+    let res = await this.axios.delete(
+      `/api/v2/tables/${encodeURIComponent(tableId)}/records`,
+      { data: records }
+    );
     return res.data;
   }
 
@@ -159,7 +233,7 @@ export class Client {
     }
   ): Promise<any> {
     let res = await this.axios.get(
-      `/api/v2/tables/${tableId}/links/${linkFieldId}/records/${recordId}`,
+      `/api/v2/tables/${encodeURIComponent(tableId)}/links/${encodeURIComponent(linkFieldId)}/records/${encodeURIComponent(recordId)}`,
       { params }
     );
     return res.data;
@@ -172,7 +246,7 @@ export class Client {
     linkedRecordIds: { Id: number }[]
   ): Promise<any> {
     let res = await this.axios.post(
-      `/api/v2/tables/${tableId}/links/${linkFieldId}/records/${recordId}`,
+      `/api/v2/tables/${encodeURIComponent(tableId)}/links/${encodeURIComponent(linkFieldId)}/records/${encodeURIComponent(recordId)}`,
       linkedRecordIds
     );
     return res.data;
@@ -185,7 +259,7 @@ export class Client {
     linkedRecordIds: { Id: number }[]
   ): Promise<any> {
     let res = await this.axios.delete(
-      `/api/v2/tables/${tableId}/links/${linkFieldId}/records/${recordId}`,
+      `/api/v2/tables/${encodeURIComponent(tableId)}/links/${encodeURIComponent(linkFieldId)}/records/${encodeURIComponent(recordId)}`,
       { data: linkedRecordIds }
     );
     return res.data;
@@ -194,86 +268,32 @@ export class Client {
   // ── Views ──
 
   async listViews(tableId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/tables/${tableId}/views`);
-    return res.data;
-  }
-
-  async getView(viewId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/views/${viewId}`);
-    return res.data;
-  }
-
-  async createView(
-    tableId: string,
-    data: { title: string; type?: number; copy_from_id?: string }
-  ): Promise<any> {
-    let res = await this.axios.post(`/api/v2/meta/tables/${tableId}/views`, data);
-    return res.data;
-  }
-
-  async updateView(viewId: string, data: any): Promise<any> {
-    let res = await this.axios.patch(`/api/v2/meta/views/${viewId}`, data);
-    return res.data;
-  }
-
-  async deleteView(viewId: string): Promise<any> {
-    let res = await this.axios.delete(`/api/v2/meta/views/${viewId}`);
+    let res = await this.axios.get(`/api/v2/meta/tables/${encodeURIComponent(tableId)}/views`);
     return res.data;
   }
 
   // ── Webhooks (Hooks) ──
 
   async listWebhooks(tableId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/tables/${tableId}/hooks`);
-    return res.data;
-  }
-
-  async getWebhook(hookId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/hooks/${hookId}`);
+    let res = await this.axios.get(`/api/v2/meta/tables/${encodeURIComponent(tableId)}/hooks`);
     return res.data;
   }
 
   async createWebhook(tableId: string, data: any): Promise<any> {
-    let res = await this.axios.post(`/api/v2/meta/tables/${tableId}/hooks`, data);
+    let res = await this.axios.post(
+      `/api/v2/meta/tables/${encodeURIComponent(tableId)}/hooks`,
+      data
+    );
     return res.data;
   }
 
   async updateWebhook(hookId: string, data: any): Promise<any> {
-    let res = await this.axios.patch(`/api/v2/meta/hooks/${hookId}`, data);
+    let res = await this.axios.patch(`/api/v2/meta/hooks/${encodeURIComponent(hookId)}`, data);
     return res.data;
   }
 
   async deleteWebhook(hookId: string): Promise<any> {
-    let res = await this.axios.delete(`/api/v2/meta/hooks/${hookId}`);
-    return res.data;
-  }
-
-  async testWebhook(hookId: string): Promise<any> {
-    let res = await this.axios.post(`/api/v2/meta/hooks/${hookId}/test`);
-    return res.data;
-  }
-
-  // ── Storage ──
-
-  async uploadAttachment(formData: any, params?: { path?: string }): Promise<any> {
-    let res = await this.axios.post('/api/v2/storage/upload', formData, {
-      params,
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-    return res.data;
-  }
-
-  // ── Workspaces ──
-
-  async listWorkspaces(): Promise<any> {
-    let res = await this.axios.get('/api/v2/meta/workspaces');
-    return res.data;
-  }
-
-  async getWorkspace(workspaceId: string): Promise<any> {
-    let res = await this.axios.get(`/api/v2/meta/workspaces/${workspaceId}`);
+    let res = await this.axios.delete(`/api/v2/meta/hooks/${encodeURIComponent(hookId)}`);
     return res.data;
   }
 }

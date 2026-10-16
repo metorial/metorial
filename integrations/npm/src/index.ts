@@ -4,6 +4,7 @@ import {
   deprecatePackage,
   getDownloads,
   getPackage,
+  getSecurityAdvisories,
   getUserProfile,
   manageDistTags,
   manageTokens,
@@ -15,6 +16,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     getPackage,
+    getSecurityAdvisories,
     searchPackages,
     getDownloads,
     manageDistTags,

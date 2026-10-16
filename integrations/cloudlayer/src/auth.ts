@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,8 @@ export let auth = SlateAuth.create()
       apiKey: z.string().describe('Cloudlayer API key (starts with cl-)')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('Provide your Cloudlayer API key from the dashboard.');
       return {
         output: {
           token: ctx.input.apiKey

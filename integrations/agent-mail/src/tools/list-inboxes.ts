@@ -26,6 +26,7 @@ export let listInboxes = SlateTool.create(spec, {
       inboxes: z
         .array(
           z.object({
+            email: z.string().optional().describe('Email address of the inbox'),
             inboxId: z.string().describe('Unique inbox identifier'),
             podId: z.string().describe('Pod the inbox belongs to'),
             displayName: z.string().optional().describe('Display name of the inbox'),
@@ -46,6 +47,7 @@ export let listInboxes = SlateTool.create(spec, {
 
     let inboxes = result.inboxes.map(i => ({
       inboxId: i.inbox_id,
+      email: i.email,
       podId: i.pod_id,
       displayName: i.display_name,
       createdAt: i.created_at

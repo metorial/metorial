@@ -52,7 +52,7 @@ The service must be previously configured in your ProcFu account settings.`,
 
     return {
       output: { response: result },
-      message: `Sent **${ctx.input.method}** request to **${ctx.input.requestUrl}** via OAuth service **${ctx.input.serviceName}**.`
+      message: `Received the response for **${ctx.input.method}** **${ctx.input.requestUrl}** via OAuth service **${ctx.input.serviceName}**.`
     };
   })
   .build();

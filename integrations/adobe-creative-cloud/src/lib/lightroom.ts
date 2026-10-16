@@ -28,7 +28,7 @@ export class LightroomClient {
   ) {
     let response = await this.http.get(`/v2/catalogs/${catalogId}/assets`, {
       params: {
-        limit: params?.limit || 50,
+        limit: params?.limit ?? 50,
         ...(params?.capturedAfter ? { captured_after: params.capturedAfter } : {}),
         ...(params?.capturedBefore ? { captured_before: params.capturedBefore } : {}),
         ...(params?.subtype ? { subtype: params.subtype } : {})
@@ -45,7 +45,7 @@ export class LightroomClient {
   async listAlbums(catalogId: string, params?: { limit?: number }) {
     let response = await this.http.get(`/v2/catalogs/${catalogId}/albums`, {
       params: {
-        limit: params?.limit || 50
+        limit: params?.limit ?? 50
       }
     });
     return response.data;
@@ -75,7 +75,7 @@ export class LightroomClient {
   async listAlbumAssets(catalogId: string, albumId: string, params?: { limit?: number }) {
     let response = await this.http.get(`/v2/catalogs/${catalogId}/albums/${albumId}/assets`, {
       params: {
-        limit: params?.limit || 50
+        limit: params?.limit ?? 50
       }
     });
     return response.data;

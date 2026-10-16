@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DiscoveryClient } from '../lib/client';
 import { mapPagination, mapVenue } from '../lib/mappers';
+import { parseTicketmasterOutput } from '../lib/output';
 import { spec } from '../spec';
 
 let venueSchema = z.object({
@@ -17,21 +18,21 @@ let venueSchema = z.object({
   countryName: z.string(),
   postalCode: z.string(),
   address: z.string(),
-  addressLine2: z.string(),
+  addressLine2: z.string().optional(),
   latitude: z.string(),
   longitude: z.string(),
   timezone: z.string(),
-  parkingDetail: z.string(),
-  accessibleSeatingDetail: z.string(),
+  parkingDetail: z.string().optional(),
+  accessibleSeatingDetail: z.string().optional(),
   generalInfo: z.object({
-    generalRule: z.string(),
-    childRule: z.string()
+    generalRule: z.string().optional(),
+    childRule: z.string().optional()
   }),
   boxOfficeInfo: z.object({
-    phoneNumberDetail: z.string(),
-    openHoursDetail: z.string(),
-    acceptedPaymentDetail: z.string(),
-    willCallDetail: z.string()
+    phoneNumberDetail: z.string().optional(),
+    openHoursDetail: z.string().optional(),
+    acceptedPaymentDetail: z.string().optional(),
+    willCallDetail: z.string().optional()
   }),
   upcomingEvents: z.record(z.string(), z.any()),
   images: z.array(
@@ -44,6 +45,16 @@ let venueSchema = z.object({
   ),
   dmas: z.array(z.object({ dmaId: z.string() })),
   social: z.record(z.string(), z.any())
+});
+
+let outputSchema = z.object({
+  venues: z.array(venueSchema),
+  pagination: z.object({
+    totalElements: z.number(),
+    totalPages: z.number(),
+    currentPage: z.number(),
+    pageSize: z.number()
+  })
 });
 
 export let searchVenuesTool = SlateTool.create(spec, {
@@ -60,6 +71,12 @@ export let searchVenuesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      geoPoint: z
+        .string()
+        .optional()
+        .describe(
+          'Geohash for location search; preferred over the deprecated latlong parameter'
+        ),
       keyword: z.string().optional().describe('Search keyword to match against venue name'),
       countryCode: z.string().optional().describe('ISO country code (e.g., US, CA, GB)'),
       stateCode: z.string().optional().describe('State/province code (e.g., CA, NY, ON)'),
@@ -80,17 +97,7 @@ export let searchVenuesTool = SlateTool.create(spec, {
       page: z.number().optional().describe('Page number (0-indexed)')
     })
   )
-  .output(
-    z.object({
-      venues: z.array(venueSchema),
-      pagination: z.object({
-        totalElements: z.number(),
-        totalPages: z.number(),
-        currentPage: z.number(),
-        pageSize: z.number()
-      })
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DiscoveryClient({
       token: ctx.auth.token,
@@ -99,6 +106,7 @@ export let searchVenuesTool = SlateTool.create(spec, {
     });
 
     let response = await client.searchVenues({
+      geoPoint: ctx.input.geoPoint,
       keyword: ctx.input.keyword,
       countryCode: ctx.input.countryCode,
       stateCode: ctx.input.stateCode,
@@ -118,8 +126,8 @@ export let searchVenuesTool = SlateTool.create(spec, {
     let pagination = mapPagination(response?.page);
 
     return {
-      output: { venues, pagination },
-      message: `Found **${pagination.totalElements}** venues (showing page ${pagination.currentPage + 1} of ${pagination.totalPages}).`
+      output: parseTicketmasterOutput(outputSchema, { venues, pagination }, 'search-venues'),
+      message: `Returned **${venues.length}** venues.`
     };
   })
   .build();

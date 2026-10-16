@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let listCandidates = SlateTool.create(spec, {
@@ -43,20 +44,20 @@ export let listCandidates = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let candidates = (data?._embedded?.candidates ?? []).map((c: any) => ({
-      candidateId: c.id?.toString() ?? '',
-      firstName: c.first_name,
-      lastName: c.last_name,
-      title: c.title,
-      currentEmployer: c.current_employer,
-      isActive: c.is_active,
-      isHot: c.is_hot
+    let candidates = collection(data, 'candidates').map((c: any) => ({
+      candidateId: requiredId(c.id, 'record'),
+      firstName: c.first_name ?? undefined,
+      lastName: c.last_name ?? undefined,
+      title: c.title ?? undefined,
+      currentEmployer: c.current_employer ?? undefined,
+      isActive: c.is_active ?? undefined,
+      isHot: c.is_hot ?? undefined
     }));
 
     return {
       output: {
         candidates,
-        totalCount: data?.total ?? candidates.length,
+        totalCount: data?.total ?? undefined,
         currentPage: data?.page ?? ctx.input.page ?? 1
       },
       message: `Listed **${candidates.length}** candidate(s).`

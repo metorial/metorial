@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CleanerClient } from '../lib/client';
+import { readCleanResult } from '../lib/response';
 import { spec } from '../spec';
 
 export let geocodeAddress = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ Uses the address standardization endpoint which provides geocoding as part of th
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       standardizedAddress: z.string().nullable().describe('Standardized address'),
       latitude: z.string().nullable().describe('Latitude'),
       longitude: z.string().nullable().describe('Longitude'),
@@ -51,10 +53,11 @@ Uses the address standardization endpoint which provides geocoding as part of th
     });
 
     let data = await client.cleanAddress(ctx.input.address);
-    let r = Array.isArray(data) ? data[0] : data;
+    let r = readCleanResult(data);
 
     return {
       output: {
+        rawData: data,
         standardizedAddress: r?.result ?? null,
         latitude: r?.geo_lat ?? null,
         longitude: r?.geo_lon ?? null,

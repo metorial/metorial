@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CardlyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -101,7 +101,9 @@ Available events: \`contact.order.created\`, \`contact.order.sent\`, \`contact.o
       enabled: z
         .boolean()
         .optional()
-        .describe('Whether to enable the webhook immediately (defaults to true)'),
+        .describe(
+          'Defaults to enabled. False creates the webhook, then disables it in a second request; it may briefly receive events.'
+        ),
       metadata: z
         .record(z.string(), z.unknown())
         .optional()
@@ -150,6 +152,17 @@ export let updateWebhook = SlateTool.create(spec, {
   .output(webhookOutputSchema)
   .handleInvocation(async ctx => {
     let client = new CardlyClient({ token: ctx.auth.token });
+
+    if (
+      ctx.input.url === undefined &&
+      ctx.input.events === undefined &&
+      ctx.input.enabled === undefined &&
+      ctx.input.metadata === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide a target URL, events, enabled status, or metadata to update a webhook.'
+      );
+    }
 
     let webhook = await client.updateWebhook(ctx.input.webhookId, {
       url: ctx.input.url,

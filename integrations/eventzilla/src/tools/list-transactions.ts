@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { asText, paginationSchema, readCollection, readPagination } from '../lib/responses';
 import { spec } from '../spec';
 
 let transactionSchema = z.object({
@@ -42,6 +43,10 @@ export let listTransactionsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema
+        .optional()
+        .describe('Pagination details returned by Eventzilla'),
+      raw: z.unknown().optional().describe('Complete response returned by Eventzilla'),
       transactions: z.array(transactionSchema).describe('List of transactions')
     })
   )
@@ -53,21 +58,17 @@ export let listTransactionsTool = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let rawTransactions = Array.isArray(data?.transactions)
-      ? data.transactions
-      : Array.isArray(data)
-        ? data
-        : [];
+    let rawTransactions = readCollection(data, 'transactions');
 
     let transactions = rawTransactions.map((t: any) => ({
-      transactionRef: t.transaction_ref,
+      transactionRef: t.transaction_ref ?? t.refno,
       checkoutId: t.checkout_id,
       transactionDate: t.transaction_date,
-      transactionAmount: t.transaction_amount,
-      ticketsInTransaction: t.tickets_in_transaction,
+      transactionAmount: asText(t.transaction_amount),
+      ticketsInTransaction: asText(t.tickets_in_transaction),
       eventDate: t.event_date,
       transactionStatus: t.transaction_status,
-      userId: t.user_id,
+      userId: t.user_id ?? t.buyer_id,
       eventId: t.event_id,
       eventTitle: t.title,
       email: t.email,
@@ -79,7 +80,7 @@ export let listTransactionsTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { transactions },
+      output: { transactions, pagination: readPagination(data), raw: data },
       message: `Found **${transactions.length}** transaction(s) for event ${ctx.input.eventId}.`
     };
   })

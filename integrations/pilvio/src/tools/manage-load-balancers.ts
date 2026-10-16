@@ -1,15 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let forwardingRuleSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   sourcePort: z.number().describe('Source port'),
   targetPort: z.number().describe('Target port'),
   ruleId: z.string().optional().describe('Rule ID')
 });
 
 let lbSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   lbUuid: z.string().describe('Load balancer UUID'),
   name: z.string().optional().describe('Load balancer name'),
   privateAddress: z.string().optional().describe('Private IP address'),
@@ -19,6 +21,7 @@ let lbSchema = z.object({
   targets: z
     .array(
       z.object({
+        raw: z.unknown().optional().describe('Complete provider response for this resource'),
         vmUuid: z.string().describe('Target VM UUID'),
         privateIp: z.string().optional().describe('Target VM private IP')
       })
@@ -54,13 +57,19 @@ export let manageLoadBalancers = SlateTool.create(spec, {
           'add_target',
           'remove_target',
           'add_rule',
-          'remove_rule'
+          'remove_rule',
+          'set_billing'
         ])
         .describe('Operation to perform'),
       lbUuid: z.string().optional().describe('Load balancer UUID'),
       name: z.string().optional().describe('LB name (for create/rename)'),
       networkUuid: z.string().optional().describe('Private network UUID (for create)'),
-      billingAccountId: z.number().optional().describe('Billing account ID (for create)'),
+      billingAccountId: z
+        .number()
+        .optional()
+        .describe(
+          'Call list_billing_accounts to discover billing account IDs. Billing account ID (for create/set_billing)'
+        ),
       reservePublicIp: z
         .boolean()
         .optional()
@@ -105,27 +114,30 @@ export let manageLoadBalancers = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     let mapLb = (lb: any) => ({
+      raw: lb,
       lbUuid: lb.uuid,
-      name: lb.name,
-      privateAddress: lb.private_address,
-      publicAddress: lb.public_address || lb.public_ipv4,
-      networkUuid: lb.network_uuid,
+      name: lb.display_name ?? lb.name ?? undefined,
+      privateAddress: lb.private_address ?? undefined,
+      publicAddress: lb.public_address ?? lb.public_ipv4 ?? undefined,
+      networkUuid: lb.network_uuid ?? undefined,
       forwardingRules: (lb.forwarding_rules || []).map((r: any) => ({
         sourcePort: r.source_port,
         targetPort: r.target_port,
-        ruleId: r.id || r.rule_id
+        ruleId: r.uuid ?? (r.id !== undefined ? String(r.id) : r.rule_id),
+        raw: r
       })),
       targets: (lb.targets || []).map((t: any) => ({
-        vmUuid: t.vm_uuid || t.uuid,
-        privateIp: t.private_ip || t.private_ipv4
+        vmUuid: t.target_uuid ?? t.vm_uuid ?? t.uuid,
+        privateIp: t.target_ip_address ?? t.private_ip ?? t.private_ipv4 ?? undefined,
+        raw: t
       })),
-      createdAt: lb.created_at
+      createdAt: lb.created_at ?? undefined
     });
 
     switch (action) {
       case 'list': {
         let lbs = await client.listLoadBalancers();
-        let mapped = (Array.isArray(lbs) ? lbs : []).map(mapLb);
+        let mapped = lbs.map(mapLb);
         return {
           output: { loadBalancers: mapped, success: true },
           message: `Found **${mapped.length}** load balancer(s).`
@@ -133,17 +145,18 @@ export let manageLoadBalancers = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.lbUuid) throw new Error('lbUuid is required for get action');
+        if (!ctx.input.lbUuid)
+          throw createApiServiceError('lbUuid is required for get action');
         let lb = await client.getLoadBalancer(ctx.input.lbUuid);
         return {
           output: { loadBalancer: mapLb(lb), success: true },
-          message: `Load balancer **${lb.name || lb.uuid}** with ${(lb.targets || []).length} target(s).`
+          message: `Load balancer **${lb.display_name ?? lb.name ?? lb.uuid}** with ${(lb.targets || []).length} target(s).`
         };
       }
 
       case 'create': {
         if (!ctx.input.name || !ctx.input.networkUuid)
-          throw new Error('name and networkUuid are required for create action');
+          throw createApiServiceError('name and networkUuid are required for create action');
         let lb = await client.createLoadBalancer({
           name: ctx.input.name,
           networkUuid: ctx.input.networkUuid,
@@ -162,7 +175,7 @@ export let manageLoadBalancers = SlateTool.create(spec, {
 
       case 'rename': {
         if (!ctx.input.lbUuid || !ctx.input.name)
-          throw new Error('lbUuid and name are required for rename action');
+          throw createApiServiceError('lbUuid and name are required for rename action');
         let lb = await client.renameLoadBalancer(ctx.input.lbUuid, ctx.input.name);
         return {
           output: { loadBalancer: mapLb(lb), success: true },
@@ -170,8 +183,24 @@ export let manageLoadBalancers = SlateTool.create(spec, {
         };
       }
 
+      case 'set_billing': {
+        if (!ctx.input.lbUuid || ctx.input.billingAccountId === undefined) {
+          throw createApiServiceError(
+            'lbUuid and billingAccountId are required for set_billing.'
+          );
+        }
+        let lb = await client.updateLoadBalancerBilling(
+          ctx.input.lbUuid,
+          ctx.input.billingAccountId
+        );
+        return {
+          output: { loadBalancer: mapLb(lb), success: true },
+          message: `Updated billing for load balancer **${ctx.input.lbUuid}**.`
+        };
+      }
       case 'delete': {
-        if (!ctx.input.lbUuid) throw new Error('lbUuid is required for delete action');
+        if (!ctx.input.lbUuid)
+          throw createApiServiceError('lbUuid is required for delete action');
         await client.deleteLoadBalancer(ctx.input.lbUuid);
         return {
           output: { success: true },
@@ -181,7 +210,7 @@ export let manageLoadBalancers = SlateTool.create(spec, {
 
       case 'add_target': {
         if (!ctx.input.lbUuid || !ctx.input.vmUuid)
-          throw new Error('lbUuid and vmUuid are required for add_target action');
+          throw createApiServiceError('lbUuid and vmUuid are required for add_target action');
         await client.addLoadBalancerTarget(ctx.input.lbUuid, ctx.input.vmUuid);
         return {
           output: { success: true },
@@ -191,7 +220,9 @@ export let manageLoadBalancers = SlateTool.create(spec, {
 
       case 'remove_target': {
         if (!ctx.input.lbUuid || !ctx.input.vmUuid)
-          throw new Error('lbUuid and vmUuid are required for remove_target action');
+          throw createApiServiceError(
+            'lbUuid and vmUuid are required for remove_target action'
+          );
         await client.removeLoadBalancerTarget(ctx.input.lbUuid, ctx.input.vmUuid);
         return {
           output: { success: true },
@@ -205,7 +236,7 @@ export let manageLoadBalancers = SlateTool.create(spec, {
           ctx.input.sourcePort === undefined ||
           ctx.input.targetPort === undefined
         ) {
-          throw new Error(
+          throw createApiServiceError(
             'lbUuid, sourcePort, and targetPort are required for add_rule action'
           );
         }
@@ -222,7 +253,7 @@ export let manageLoadBalancers = SlateTool.create(spec, {
 
       case 'remove_rule': {
         if (!ctx.input.lbUuid || !ctx.input.ruleId)
-          throw new Error('lbUuid and ruleId are required for remove_rule action');
+          throw createApiServiceError('lbUuid and ruleId are required for remove_rule action');
         await client.removeLoadBalancerRule(ctx.input.lbUuid, ctx.input.ruleId);
         return {
           output: { success: true },

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listEnrollmentsTool = SlateTool.create(spec, {
@@ -45,6 +45,7 @@ export let listEnrollmentsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       enrollments: z.array(
         z.object({
           enrollmentId: z.string().describe('Enrollment ID'),
@@ -63,13 +64,10 @@ export let listEnrollmentsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let include: string[] = [];
-    if (ctx.input.includeGrades) include.push('current_points', 'total_scores');
+    if (ctx.input.includeGrades) include.push('current_points');
 
     let raw = await client.listEnrollments(ctx.input.courseId, {
       type: ctx.input.enrollmentType,
@@ -92,7 +90,7 @@ export let listEnrollmentsTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { enrollments },
+      output: { raw: raw, enrollments },
       message: `Found **${enrollments.length}** enrollment(s) in course ${ctx.input.courseId}.`
     };
   })

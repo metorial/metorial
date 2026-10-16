@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let manageDomains = SlateTool.create(spec, {
   name: 'Manage Domains',
   key: 'manage_domains',
-  description: `List, create, update, or delete custom domains for your short links. Domains let you use your own branded URLs instead of the default dub.sh domain.`,
+  description: `List, create, update, or delete custom domains for your short links. Deleting a domain also deletes all its associated links. Domains let you use your own branded URLs instead of the default dub.sh domain.`,
   tags: {
+    destructive: true,
     readOnly: false
   }
 })
@@ -87,7 +88,7 @@ export let manageDomains = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.domainSlug)
-        throw new Error('domainSlug is required for creating a domain');
+        throw createApiServiceError('domainSlug is required for creating a domain');
       let domain = await client.createDomain({
         slug: ctx.input.domainSlug,
         expiredUrl: ctx.input.expiredUrl,
@@ -112,7 +113,17 @@ export let manageDomains = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.domainSlug)
-        throw new Error('domainSlug is required for updating a domain');
+        throw createApiServiceError('domainSlug is required for updating a domain');
+      if (
+        [
+          ctx.input.newSlug,
+          ctx.input.expiredUrl,
+          ctx.input.notFoundUrl,
+          ctx.input.archived,
+          ctx.input.placeholder
+        ].every(value => value === undefined)
+      )
+        throw createApiServiceError('Provide at least one domain property to update.');
       let domain = await client.updateDomain(ctx.input.domainSlug, {
         slug: ctx.input.newSlug,
         expiredUrl: ctx.input.expiredUrl,
@@ -137,7 +148,7 @@ export let manageDomains = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.domainSlug)
-        throw new Error('domainSlug is required for deleting a domain');
+        throw createApiServiceError('domainSlug is required for deleting a domain');
       let result = await client.deleteDomain(ctx.input.domainSlug);
       return {
         output: {
@@ -147,6 +158,6 @@ export let manageDomains = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

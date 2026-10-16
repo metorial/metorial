@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -47,6 +47,10 @@ With a playlistId, returns the full playlist with its items (episodes or podcast
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original provider response, including unmodified metadata.'),
       playlistId: z
         .string()
         .optional()
@@ -100,25 +104,27 @@ With a playlistId, returns the full playlist with its items (episodes or podcast
       baseUrl: ctx.config.baseUrl
     });
 
+    let sort = ctx.input.sort;
     if (ctx.input.playlistId) {
+      if (sort === 'name_a_to_z' || sort === 'name_z_to_a') {
+        throw createApiServiceError(
+          'Name sorting applies only when listing playlists. Omit playlistId or choose an item sort order.'
+        );
+      }
       let data = await client.getPlaylist({
         playlistId: ctx.input.playlistId,
         type: ctx.input.playlistType,
         lastTimestampMs: ctx.input.lastTimestampMs,
-        sort: ctx.input.sort as
-          | 'recent_added_first'
-          | 'oldest_added_first'
-          | 'recent_published_first'
-          | 'oldest_published_first'
-          | undefined
+        sort
       });
 
       return {
         output: {
+          raw: data,
           playlistId: data.id,
           name: data.name,
           description: data.description,
-          image: data.image || '',
+          image: data.image,
           visibility: data.visibility,
           total: data.total,
           items: data.items,
@@ -127,26 +133,27 @@ With a playlistId, returns the full playlist with its items (episodes or podcast
         message: `Fetched playlist **${data.name}** with ${data.total} items.`
       };
     } else {
+      if (sort === 'recent_published_first' || sort === 'oldest_published_first') {
+        throw createApiServiceError(
+          'Publication sorting requires a playlistId. Choose a name or added-date sort for playlist listing.'
+        );
+      }
       let data = await client.getPlaylists({
-        sort: ctx.input.sort as
-          | 'recent_added_first'
-          | 'oldest_added_first'
-          | 'name_a_to_z'
-          | 'name_z_to_a'
-          | undefined,
+        sort,
         page: ctx.input.page
       });
 
       return {
         output: {
+          raw: data,
           total: data.total,
           playlists: data.playlists.map(p => ({
             playlistId: p.id,
             name: p.name,
             description: p.description,
-            image: p.image || '',
+            image: p.image,
             visibility: p.visibility,
-            totalItems: p.total
+            totalItems: p.episode_count + p.podcast_count
           })),
           pageNumber: data.page_number,
           hasNext: data.has_next,

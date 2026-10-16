@@ -1,6 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ScheduleGroupListOptions } from '../lib/client';
+import {
+  mapSchedule,
+  nullableString,
+  pageMetadata,
+  paginationFor,
+  rawSchema,
+  requiredString,
+  responseArray,
+  responseData,
+  responseItems,
+  responseRecord,
+  scalarString,
+  teamIdSchema
+} from '../lib/responses';
 import { spec } from '../spec';
 
 let scheduleGroupSchema = z.object({
@@ -13,17 +27,19 @@ let scheduleGroupSchema = z.object({
         scheduleId: z.string().describe('Schedule identifier'),
         channelId: z.string().optional().describe('Target channel ID'),
         content: z.string().nullable().optional().describe('Post text content'),
-        status: z.string().optional().describe('Schedule status')
+        status: z.string().optional().describe('Schedule status'),
+        raw: rawSchema
       })
     )
     .optional()
-    .describe('Schedules in the group')
+    .describe('Schedules in the group'),
+  raw: rawSchema
 });
 
 export let listScheduleGroups = SlateTool.create(spec, {
   name: 'List Schedule Groups',
   key: 'list_schedule_groups',
-  description: `Retrieve schedule groups for a team with filtering and pagination. Filter by channel, status, social network, media type, and date range.`,
+  description: `Retrieve schedule groups for a team with filtering and pagination. Filter by channel, status, social network, media type, and date range. Call list_teams to discover the team ID.`,
   instructions: [
     'Status codes: 0 = Draft, 1 = Scheduled, 3 = Published, 4 = Failed.',
     'Social network values: threads, youtube, instagram, tiktok, tiktok_business, twitter, pinterest, facebook, linkedin, mastodon, bluesky.',
@@ -36,7 +52,7 @@ export let listScheduleGroups = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
+      teamId: teamIdSchema,
       groupIds: z.array(z.string()).optional().describe('Filter by specific group IDs'),
       channelIds: z.array(z.string()).optional().describe('Filter by channel IDs'),
       statusCodes: z
@@ -51,7 +67,12 @@ export let listScheduleGroups = SlateTool.create(spec, {
       since: z.string().optional().describe('Start of date range filter (ISO 8601)'),
       until: z.string().optional().describe('End of date range filter (ISO 8601)'),
       cursor: z.string().optional().describe('Pagination cursor'),
-      pageSize: z.number().optional().describe('Results per page')
+      pageSize: z.number().optional().describe('Results per page'),
+      orderByField: z
+        .enum(['CreatedAt', 'ContentLength'])
+        .optional()
+        .describe('Field to sort by'),
+      orderByDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction')
     })
   )
   .output(
@@ -63,53 +84,36 @@ export let listScheduleGroups = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-
-    let options: any = {};
-    if (ctx.input.groupIds) options.ids = ctx.input.groupIds;
-
-    let filter: any = {};
-    if (ctx.input.channelIds) filter.channels = ctx.input.channelIds;
-    if (ctx.input.statusCodes) filter.status = ctx.input.statusCodes;
-    if (ctx.input.socialNetworks) filter.socialNetworks = ctx.input.socialNetworks;
-    if (ctx.input.mediaTypes) filter.mediaType = ctx.input.mediaTypes;
-    if (Object.keys(filter).length > 0) options.filter = filter;
-
-    if (ctx.input.since || ctx.input.until) {
-      options.dateRange = {};
-      if (ctx.input.since) options.dateRange.since = ctx.input.since;
-      if (ctx.input.until) options.dateRange.until = ctx.input.until;
-    }
-
-    let pagination: any = {};
-    if (ctx.input.cursor) pagination.cursor = ctx.input.cursor;
-    if (ctx.input.pageSize) pagination.pageSize = ctx.input.pageSize;
-    if (Object.keys(pagination).length > 0) options.pagination = pagination;
-
-    let result = await client.listScheduleGroups(
-      ctx.input.teamId,
-      Object.keys(options).length > 0 ? options : undefined
-    );
-
-    let data = result.data || result;
-    let items = Array.isArray(data) ? data : data.items || data.scheduleGroups || [];
-    let groups = items.map((g: any) => ({
-      scheduleGroupId: g.id,
-      status: g.status,
-      publishOn: g.publishOn || g.publish_on,
-      schedules: (g.schedules || []).map((s: any) => ({
-        scheduleId: s.id,
-        channelId: s.channelId || s.channel_id,
-        content: s.content,
-        status: s.status
-      }))
-    }));
-
-    return {
-      output: {
-        groups,
-        nextCursor: data.next || null,
-        totalCount: data.totalNumberOfRows
+    let options: ScheduleGroupListOptions = {
+      ids: ctx.input.groupIds,
+      filter: {
+        channels: ctx.input.channelIds,
+        status: ctx.input.statusCodes,
+        socialNetworks: ctx.input.socialNetworks,
+        mediaType: ctx.input.mediaTypes
       },
+      dateRange: { since: ctx.input.since, until: ctx.input.until },
+      pagination: paginationFor(ctx.input)
+    };
+    let data = responseData(await client.listScheduleGroups(ctx.input.teamId, options));
+    let groups = responseItems(data, ['items', 'scheduleGroups']).map(value => {
+      let group = responseRecord(value, 'schedule group');
+      let publishOn = group.publishOn !== undefined ? group.publishOn : group.publish_on;
+      return {
+        scheduleGroupId: requiredString(group.id, 'schedule group ID'),
+        status: scalarString(group.status),
+        publishOn: nullableString(publishOn),
+        schedules:
+          group.schedules === undefined
+            ? undefined
+            : responseArray(group.schedules, 'group schedules').map(value =>
+                mapSchedule(value, publishOn)
+              ),
+        raw: group
+      };
+    });
+    return {
+      output: { groups, ...pageMetadata(data) },
       message: `Retrieved ${groups.length} schedule group(s).`
     };
   });

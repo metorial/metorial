@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CuttlyClient, getEditStatusMessage } from '../lib/client';
+import { CuttlyClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteLink = SlateTool.create(spec, {
   name: 'Delete Link',
   key: 'delete_link',
-  description: `Permanently delete a Cutt.ly shortened link. Once deleted, the short link will no longer redirect to the destination URL and the alias becomes available for reuse.`,
+  description: `Permanently delete a Cutt.ly shortened link. Once deleted, the short link will no longer redirect to the destination URL.`,
   instructions: [
     'This action is irreversible — the link and all associated analytics data will be permanently removed.'
   ],
@@ -33,11 +33,7 @@ export let deleteLink = SlateTool.create(spec, {
       apiType: ctx.config.apiType
     });
 
-    let result = await client.deleteLink(ctx.input.shortLink);
-
-    if (result.status !== 1) {
-      throw new Error(`Failed to delete link: ${getEditStatusMessage(result.status)}`);
-    }
+    await client.deleteLink(ctx.input.shortLink);
 
     return {
       output: {

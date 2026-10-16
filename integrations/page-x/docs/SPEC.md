@@ -1,62 +1,27 @@
-I see from the Pipedream results that PAGE X appears to be a CRM platform accessible via RapidAPI. Let me research more about it.Now let me check the PageX CRM website for more details about features.Now I have enough information to write the specification. Based on my research:
+# Page X API specification
 
-- **Page X (PageXCRM)** is a CRM tool for lead management
-- The API is hosted via RapidAPI at `pagexcrm.p.rapidapi.com`
-- Authentication uses two keys: a PageX API key and a RapidAPI key
-- The API appears to be very simple — primarily focused on sending/creating leads
-- The only documented action is creating a new lead with fields like customer_id, name, email, phone, platform, country
-- No webhooks or event support found
-
-# Slates Specification for Page X
-
-## Overview
-
-Page X (PageXCRM) is a CRM platform focused on capturing and managing leads from websites and external systems to streamline sales processes. It offers sales automation, lead tracking, analytics, and client communication features. The API is hosted through RapidAPI and is primarily oriented toward lead ingestion.
+This integration submits leads to PageXCRM through the provider's [published RapidAPI API](https://rapidapi.com/thunderhurt/api/pagexcrm). The published API version contains one endpoint: `POST https://pagexcrm.p.rapidapi.com/api/lead`.
 
 ## Authentication
 
-Page X uses a dual API key authentication model, as the API is accessed through RapidAPI's infrastructure.
+Provide the PageXCRM API key from [Integrations > API](https://www.pagexcrm.com/plugins/api) and a RapidAPI key subscribed to PageXCRM. Requests send the PageXCRM key in `api_key`, the RapidAPI key in `x-rapidapi-key`, and `x-rapidapi-host: pagexcrm.p.rapidapi.com`.
 
-Two credentials are required:
+## Create lead
 
-1. **Page X API Key** (`api_key`): Obtained from your PageXCRM account. This key is sent as part of the request body (form data) to identify your Page X account/customer.
-2. **RapidAPI Key** (`x-rapidapi-key`): Obtained by subscribing to the PageXCRM API on [RapidAPI](https://rapidapi.com/thunderhurt/api/pagexcrm). This key is sent as a request header.
+The `create_lead` tool retains its existing required `name` and `email` string inputs. The provider documents those fields, `phone`, `plat`, `customer_id`, and `more` as optional, with at least one lead value required. For compatibility, this tool keeps the existing name/email requirements without requiring nonempty contact strings. Any nonblank name, email, phone, customer identifier, source platform or country, or a nonempty custom detail object, permits submission. Only a request with all these fields blank/absent and no custom details is rejected.
 
-Additionally, the following header must be included in all requests:
+| Tool field | Provider field | Behavior |
+| --- | --- | --- |
+| `customerId` | `customer_id` | Optional external customer identifier for the lead; falls back to the optional configuration value. It is not an account identifier required to authenticate. |
+| `name`, `email`, `phone` | Same names | Lead contact details. |
+| `platform` | `plat` | Source platform, such as a website or advertising platform. |
+| `more` | `more` | Custom detail object, matching the provider's example with company/source keys. The prose calls this an array; the published example is an object. |
+| `country` | `more.country` | Preserved country input delivered through documented custom details. Conflicting `country` and `more.country` values are rejected. |
 
-- `x-rapidapi-host`: `pagexcrm.p.rapidapi.com`
+The request uses a JSON object matching the provider's published request example. The provider does not explicitly declare a request media type in the public documentation; live request acceptance has not been verified.
 
-**Example request headers:**
+The documented success response is an object with `status: "success"` and a string `message`. Only that response shape confirms success. Error status bodies, HTTP/network failures and malformed responses raise a service error. The tool retains `success` and optional `rawResponse` outputs; the complete success object is preserved with only API credentials redacted from echoed fields, keys or strings. No provider lead ID is fabricated because the success example contains none.
 
-```
-x-rapidapi-key: <your-rapidapi-key>
-x-rapidapi-host: pagexcrm.p.rapidapi.com
-Content-Type: multipart/form-data
-```
+## Capability boundary
 
-The Page X `api_key` is included as a form field in the request body alongside the lead data.
-
-## Features
-
-### Lead Creation
-
-Submit new leads into the PageXCRM system from external sources such as websites, ad platforms, or other applications. Each lead can include the following fields:
-
-- **Customer ID**: Identifier for the customer/account within PageXCRM.
-- **Name**: Full name of the lead.
-- **Email**: Email address of the lead.
-- **Phone**: Phone number of the lead.
-- **Platform**: The source platform the lead originated from (e.g., website name, ad platform).
-- **Country**: The lead's country.
-
-This is the primary (and currently the only publicly documented) API capability. The API is designed as a one-way lead ingestion mechanism — it accepts lead data to be stored and managed within the PageXCRM platform.
-
-**Limitations:**
-
-- The API is very limited in scope — it does not expose endpoints for reading, updating, or deleting leads or other CRM data.
-- There are no documented endpoints for retrieving contacts, managing pipelines, or accessing analytics via the API.
-- All API interactions go through RapidAPI, so a RapidAPI subscription is required.
-
-## Events
-
-The provider does not support events. There are no documented webhooks or event subscription mechanisms available through the Page X API.
+No current-user/account identity, list/read/update/delete lead, download, or webhook-registration endpoint appears in the published version inventory. No endpoint is invented for those operations. The [provider website](https://pagexcrm.com/) advertises broader product functionality and webhooks; that product claim does not supply an API contract for additional tools or triggers.

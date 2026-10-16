@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAutocomplete = SlateTool.create(spec, {
@@ -50,12 +50,13 @@ export let getAutocomplete = SlateTool.create(spec, {
     let client = new CountdownClient({ token: ctx.auth.token });
     let ebayDomain = ctx.input.ebayDomain || ctx.config.ebayDomain;
 
+    if (!ctx.input.searchTerm.trim()) throw createApiServiceError('Provide a searchTerm.');
     let result = await client.getAutocomplete({
       ebayDomain,
       searchTerm: ctx.input.searchTerm
     });
 
-    let suggestions = result.autocomplete_results || [];
+    let suggestions = requireArray(result.autocomplete_results, 'autocomplete_results');
 
     return {
       output: {

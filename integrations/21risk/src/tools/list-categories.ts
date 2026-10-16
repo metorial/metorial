@@ -22,6 +22,12 @@ export let listCategories = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation URL returned by this tool. Supply it alone to retrieve the next page.'
+        ),
       filter: z
         .string()
         .optional()
@@ -36,13 +42,22 @@ export let listCategories = SlateTool.create(spec, {
   .output(
     z.object({
       categories: z.array(categorySchema).describe('List of categories'),
-      count: z.number().describe('Number of categories returned')
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Provider continuation URL for the next page, when supplied'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total matching count, when supplied'),
+      count: z.number().describe('Number of categories returned in this page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let categories = await client.getCategories({
+      nextLink: ctx.input.nextLink,
       filter: ctx.input.filter,
       select: ctx.input.select,
       expand: ctx.input.expand,
@@ -51,14 +66,16 @@ export let listCategories = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let results = Array.isArray(categories) ? categories : [categories];
+    let results = categories.records;
 
     return {
       output: {
         categories: results,
-        count: results.length
+        count: results.length,
+        nextLink: categories.nextLink,
+        totalCount: categories.totalCount
       },
-      message: `Retrieved **${results.length}** categorie(s).`
+      message: `Retrieved **${results.length}** category record(s).`
     };
   })
   .build();

@@ -1,6 +1,8 @@
 # Giphy
 
-Search, discover, and retrieve GIFs, stickers, animated emoji, and video clips from GIPHY's library of millions of items. Upload GIF and video content to GIPHY channels. Get trending GIFs and stickers, translate words and phrases into matching GIFs, fetch random GIFs, and retrieve content by ID. Access search discovery tools including trending searches, search suggestions, autocomplete, and content categories. Register analytics events for user interactions (views, clicks, sends). Filter results by content rating and language.
+Search, discover, and retrieve GIFs, stickers, animated emoji from GIPHY's library of millions of items. Upload GIF and video content to GIPHY channels. Get trending GIFs and stickers, translate words and phrases into matching GIFs, fetch random GIFs, and retrieve content by ID. Access search discovery tools including trending searches, search suggestions, autocomplete, and content categories. Register real view, click, and send interactions using provider-returned analytics URLs. Create anonymous end-user IDs for request personalization. Filter results by content rating, language, channel, and contrast; select rendition bundles and supply end-user country and region. Metadata includes unchanged media URLs and complete provider responses.
+
+GIPHY requires attribution and direct client requests. Media caching and proxying require explicit provider approval. Clips and account identity APIs are not included. See [API requirements](https://developers.giphy.com/docs/api/#best-practices).
 
 ## License
 

@@ -1,6 +1,14 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import {
+  FinmeiClient,
+  optionalNumber,
+  optionalString,
+  optionalTimestamp,
+  pagination,
+  readList,
+  requireId
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let listExpenses = SlateTool.create(spec, {
@@ -14,11 +22,11 @@ export let listExpenses = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (default: 1)'),
+      page: z.number().optional().describe('Page number for pagination (1-based)'),
       perPage: z
         .number()
         .optional()
-        .describe('Number of expenses per page (default: 20, max: 100)')
+        .describe('Number of expenses per page (the provider may use a fixed page size)')
     })
   )
   .output(
@@ -37,6 +45,7 @@ export let listExpenses = SlateTool.create(spec, {
           })
         )
         .describe('List of expenses'),
+      rawResponse: z.any().optional().describe('Complete provider response'),
       total: z.number().optional().describe('Total number of expenses'),
       page: z.number().optional().describe('Current page number'),
       totalPages: z.number().optional().describe('Total number of pages')
@@ -50,32 +59,27 @@ export let listExpenses = SlateTool.create(spec, {
       per_page: ctx.input.perPage
     });
 
-    let rawExpenses = result?.data ?? result?.expenses ?? result ?? [];
-    let expensesArray = Array.isArray(rawExpenses) ? rawExpenses : [];
-
-    let expenses = expensesArray.map((e: any) => ({
-      expenseId: String(e.id),
-      date: e.date,
-      amount: e.amount ?? e.price,
-      currency: e.currency,
-      sellerName: e.seller_name ?? e.seller,
-      description: e.description,
-      category: e.category,
-      createdAt: e.created_at
+    let expenses = readList(result, 'expenses').map(e => ({
+      expenseId: requireId(e.id, 'expense ID'),
+      ...pickDefined({
+        date: optionalString(e.date, 'expense date'),
+        amount: optionalNumber(e.total ?? e.amount ?? e.price, 'expense amount'),
+        currency: optionalString(e.currency, 'expense currency'),
+        sellerName: optionalString(e.seller ?? e.seller_name, 'expense seller'),
+        description: optionalString(e.description, 'expense description'),
+        category: optionalString(e.category, 'expense category'),
+        createdAt: optionalTimestamp(e.created_at, 'expense creation time')
+      })
     }));
 
-    let total = result?.total ?? result?.meta?.total;
-    let page = result?.page ?? result?.meta?.current_page ?? ctx.input.page;
-    let totalPages = result?.total_pages ?? result?.meta?.last_page;
-
+    let metadata = pagination(result);
     return {
       output: {
         expenses,
-        total,
-        page,
-        totalPages
+        ...metadata,
+        rawResponse: result
       },
-      message: `Found **${expenses.length}** expense(s)${total ? ` out of ${total} total` : ''}.`
+      message: `Found **${expenses.length}** expense(s)${metadata.total !== undefined ? ` out of ${metadata.total} total` : ''}.`
     };
   })
   .build();

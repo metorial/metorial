@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteMessages = SlateTool.create(spec, {
   name: 'Delete Messages',
   key: 'delete_messages',
-  description: `Delete one or more messages from a Revolt channel. Provide a single message ID or an array of message IDs for bulk deletion. Requires appropriate permissions.`,
+  description: `Delete one or more messages from a Stoat channel. Provide a single message ID or an array of message IDs for bulk deletion. Requires appropriate permissions.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -24,6 +24,9 @@ export let deleteMessages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.messageIds.length > 100) {
+      throw createApiServiceError('Delete at most 100 messages per request.');
+    }
     let client = createClient(ctx);
 
     if (ctx.input.messageIds.length === 1) {

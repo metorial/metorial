@@ -5,19 +5,25 @@ import {
   createProduct,
   deleteCustomer,
   deleteProduct,
+  getCategory,
   getCustomer,
   getOrder,
   getProduct,
+  getVariant,
   listCategories,
+  listCustomerGroups,
   listCustomers,
   listOrders,
   listProducts,
+  listVariants,
+  listVendors,
   manageCategory,
   updateCustomer,
   updateInventory,
   updateOrder,
   updateProduct
 } from './tools';
+
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,7 +42,12 @@ export let provider = Slate.create({
     deleteCustomer,
     listCategories,
     manageCategory,
-    updateInventory
+    updateInventory,
+    getCategory,
+    listVendors,
+    listCustomerGroups,
+    listVariants,
+    getVariant
   ],
   triggers: []
 });

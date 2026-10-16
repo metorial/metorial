@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let http = createAxios({
-  baseURL: 'https://app-sorteos.com/api/v2'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,6 +18,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      new Client({ token: ctx.input.token });
       return {
         output: {
           token: ctx.input.token
@@ -29,18 +27,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await http.get('/users/me', {
-        headers: {
-          'X-API-KEY': ctx.output.token
-        }
-      });
-
-      let user = response.data;
+      let user = await new Client(ctx.output).getUser();
 
       return {
         profile: {
-          id: user.id?.toString(),
-          name: user.name || user.username,
+          id: user.id.toString(),
+          name: user.name,
           email: user.email
         }
       };

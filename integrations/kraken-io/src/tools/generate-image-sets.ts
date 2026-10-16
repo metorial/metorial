@@ -1,9 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { downloadOptimizedFile } from '../lib/files';
+import {
+  additionalResizeFields,
+  s3StoreSchema,
+  validateAdditionalResize
+} from '../lib/schemas';
+import type { KrakenImageSetResponse } from '../lib/types';
 import { spec } from '../spec';
 
 let sizeItemSchema = z.object({
+  ...additionalResizeFields,
   sizeId: z
     .string()
     .describe(
@@ -16,6 +24,14 @@ let sizeItemSchema = z.object({
     ),
   width: z.number().optional().describe('Target width in pixels'),
   height: z.number().optional().describe('Target height in pixels'),
+  cropMode: z
+    .string()
+    .optional()
+    .describe('Crop gravity for crop or fit, such as c, n, sw, or br'),
+  background: z
+    .string()
+    .optional()
+    .describe('Background color for the fill strategy (HEX, RGB, or RGBA)'),
   enhance: z.boolean().optional().describe('Improve sharpness when downsizing significantly'),
   lossy: z.boolean().optional().describe('Override global lossy setting for this size'),
   quality: z
@@ -44,7 +60,15 @@ let imageSetResultSchema = z.object({
   originalWidth: z.number().describe('Original image width in pixels'),
   originalHeight: z.number().describe('Original image height in pixels'),
   optimizedWidth: z.number().describe('Optimized image width in pixels'),
-  optimizedHeight: z.number().describe('Optimized image height in pixels')
+  optimizedHeight: z.number().describe('Optimized image height in pixels'),
+  fileDeliveryError: z
+    .string()
+    .optional()
+    .describe('Why this completed variant could not be prepared for download'),
+  raw: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Complete provider result for this variant')
 });
 
 export let generateImageSetsTool = SlateTool.create(spec, {
@@ -96,7 +120,11 @@ Useful for creating responsive image variants (thumbnails, mobile, desktop, reti
           background: z
             .string()
             .optional()
-            .describe('Background color for transparency handling')
+            .describe('Background color for transparency handling'),
+          keepExtension: z
+            .boolean()
+            .optional()
+            .describe('Keep the original filename extension after conversion')
         })
         .optional()
         .describe('Convert all sizes to a different format'),
@@ -108,6 +136,7 @@ Useful for creating responsive image variants (thumbnails, mobile, desktop, reti
         .boolean()
         .optional()
         .describe('Automatically correct orientation based on EXIF data'),
+      s3Store: s3StoreSchema,
       callbackUrl: z
         .string()
         .optional()
@@ -122,10 +151,22 @@ Useful for creating responsive image variants (thumbnails, mobile, desktop, reti
         .optional()
         .describe('Optimization results for each requested size'),
       requestId: z.string().optional().describe('Request ID when using callback URL mode'),
-      errorMessage: z.string().optional().describe('Error message if the operation failed')
+      errorMessage: z.string().optional().describe('Error message if the operation failed'),
+      fileName: z.string().optional().describe('Source filename reported by Kraken.io'),
+      timestamp: z.number().optional().describe('Provider result timestamp'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete image set or callback acknowledgment response')
     })
   )
   .handleInvocation(async ctx => {
+    for (let size of ctx.input.sizes) validateAdditionalResize(size);
+    if (ctx.input.s3Store && ctx.input.sizes.some(size => !size.storagePath)) {
+      throw createApiServiceError(
+        'Each size requires storagePath when storing an image set in Amazon S3.'
+      );
+    }
     let client = new Client({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -135,8 +176,11 @@ Useful for creating responsive image variants (thumbnails, mobile, desktop, reti
     let sizes = ctx.input.sizes.map(size => ({
       id: size.sizeId,
       strategy: size.strategy,
+      ...pickDefined({ size: size.size, x: size.x, y: size.y, scale: size.scale }),
       ...(size.width !== undefined && { width: size.width }),
       ...(size.height !== undefined && { height: size.height }),
+      ...(size.cropMode && { crop_mode: size.cropMode }),
+      ...(size.background && { background: size.background }),
       ...(size.enhance !== undefined && { enhance: size.enhance }),
       ...(size.lossy !== undefined && { lossy: size.lossy }),
       ...(size.quality !== undefined && { quality: size.quality }),
@@ -147,7 +191,10 @@ Useful for creating responsive image variants (thumbnails, mobile, desktop, reti
     let convertOptions = ctx.input.convert
       ? {
           format: ctx.input.convert.format,
-          ...(ctx.input.convert.background && { background: ctx.input.convert.background })
+          ...(ctx.input.convert.background && { background: ctx.input.convert.background }),
+          ...(ctx.input.convert.keepExtension !== undefined && {
+            keep_extension: ctx.input.convert.keepExtension
+          })
         }
       : undefined;
 
@@ -160,67 +207,73 @@ Useful for creating responsive image variants (thumbnails, mobile, desktop, reti
       convert: convertOptions,
       preserveMeta: ctx.input.preserveMeta,
       autoOrient: ctx.input.autoOrient,
+      s3Store: ctx.input.s3Store
+        ? {
+            key: ctx.input.s3Store.accessKey,
+            secret: ctx.input.s3Store.secretKey,
+            bucket: ctx.input.s3Store.bucket,
+            ...(ctx.input.s3Store.region && { region: ctx.input.s3Store.region }),
+            ...(ctx.input.s3Store.path && { path: ctx.input.s3Store.path }),
+            ...(ctx.input.s3Store.acl && { acl: ctx.input.s3Store.acl })
+          }
+        : undefined,
       callbackUrl: ctx.input.callbackUrl
     });
 
-    if ('id' in result && result.id) {
+    if (typeof result.id === 'string' && result.id) {
       return {
         output: {
           success: true,
-          requestId: result.id as string
+          requestId: result.id,
+          raw: result
         },
         message: `Image set generation request submitted. Results will be posted to the callback URL. Request ID: \`${result.id}\``
       };
     }
 
-    let setResult = result as {
-      success: boolean;
-      results?: Record<
-        string,
-        {
-          file_name: string;
-          original_size: number;
-          kraked_size: number;
-          saved_bytes: number;
-          kraked_url: string;
-          original_width: number;
-          original_height: number;
-          kraked_width: number;
-          kraked_height: number;
-        }
-      >;
-      message?: string;
-    };
+    let setResult = result as KrakenImageSetResponse;
 
-    if (!setResult.success) {
-      return {
-        output: {
-          success: false,
-          errorMessage: setResult.message
-        },
-        message: `Image set generation failed: ${setResult.message}`
-      };
+    let results: z.infer<typeof imageSetResultSchema>[] = [];
+    for (let [sizeId, r] of Object.entries(setResult.results ?? {})) {
+      let fileDeliveryError: string | undefined;
+      try {
+        await ctx.addAttachment({
+          type: 'content',
+          content: await downloadOptimizedFile(r.kraked_url),
+          filename: r.file_name
+        });
+      } catch {
+        fileDeliveryError =
+          'The variant was generated, but its file could not be prepared for download. Retrieve optimizedUrl directly; files hosted by Kraken.io are retained for one hour.';
+      }
+      results.push({
+        sizeId,
+        fileName: r.file_name,
+        originalSize: r.original_size,
+        optimizedSize: r.kraked_size,
+        savedBytes: r.saved_bytes,
+        optimizedUrl: r.kraked_url,
+        originalWidth: r.original_width,
+        originalHeight: r.original_height,
+        optimizedWidth: r.kraked_width,
+        optimizedHeight: r.kraked_height,
+        fileDeliveryError,
+        raw: r
+      });
     }
-
-    let results = Object.entries(setResult.results ?? {}).map(([sizeId, r]) => ({
-      sizeId,
-      fileName: r.file_name,
-      originalSize: r.original_size,
-      optimizedSize: r.kraked_size,
-      savedBytes: r.saved_bytes,
-      optimizedUrl: r.kraked_url,
-      originalWidth: r.original_width,
-      originalHeight: r.original_height,
-      optimizedWidth: r.kraked_width,
-      optimizedHeight: r.kraked_height
-    }));
+    let failedDownloads = results
+      .filter(result => result.fileDeliveryError)
+      .map(result => result.sizeId);
 
     return {
       output: {
         success: true,
-        results
+        results,
+        fileName: typeof setResult.file_name === 'string' ? setResult.file_name : undefined,
+        timestamp: setResult.timestamp,
+        raw: result
       },
-      message: `Generated **${results.length}** image variants successfully.`
+      message: `Generated **${results.length}** image variants successfully.${failedDownloads.length ? ` Files could not be prepared for download for: ${failedDownloads.join(', ')}. Their optimization results and URLs are retained.` : ' The generated files were prepared for download.'}`
     };
   })
   .build();

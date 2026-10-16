@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 let commodityEnum = z.enum([
@@ -13,13 +14,14 @@ let commodityEnum = z.enum([
   'CORN',
   'COTTON',
   'SUGAR',
-  'COFFEE'
+  'COFFEE',
+  'ALL_COMMODITIES'
 ]);
 
 export let getCommodityPrice = SlateTool.create(spec, {
   name: 'Get Commodity Price',
   key: 'get_commodity_price',
-  description: `Retrieve price data for major commodities including crude oil (WTI, Brent), natural gas, copper, aluminum, wheat, corn, cotton, sugar, and coffee. Returns historical prices at daily or monthly intervals.`,
+  description: `Retrieve price data for major commodities including crude oil (WTI, Brent), natural gas, copper, aluminum, wheat, corn, cotton, sugar, and coffee. Energy commodities support daily, weekly, and monthly intervals. Other commodities and the global commodities index support monthly, quarterly, and annual intervals.`,
   tags: {
     readOnly: true
   }
@@ -28,7 +30,7 @@ export let getCommodityPrice = SlateTool.create(spec, {
     z.object({
       commodity: commodityEnum.describe('Commodity identifier'),
       interval: z
-        .enum(['daily', 'weekly', 'monthly'])
+        .enum(['daily', 'weekly', 'monthly', 'quarterly', 'annual'])
         .optional()
         .default('monthly')
         .describe('Data interval')
@@ -52,20 +54,27 @@ export let getCommodityPrice = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let { commodity, interval } = ctx.input;
 
+    let allowed = ['WTI', 'BRENT', 'NATURAL_GAS'].includes(commodity)
+      ? ['daily', 'weekly', 'monthly']
+      : ['monthly', 'quarterly', 'annual'];
+    if (!allowed.includes(interval))
+      throw createApiServiceError(
+        `${commodity} supports these intervals: ${allowed.join(', ')}.`
+      );
     let data = await client.commodity({ commodityFunction: commodity, interval });
-    let rawData: any[] = data.data || [];
+    let rawData: any[] = responseRows(data.data, 'data');
 
     let prices = rawData
       .filter((d: any) => d.value !== '.')
       .map((d: any) => ({
-        date: d.date || '',
-        value: d.value || ''
+        date: responseText(d.date, 'date'),
+        value: responseText(d.value, 'value')
       }));
 
     return {
       output: {
-        commodity: data.name || commodity,
-        unit: data.unit || '',
+        commodity: responseText(data.name, 'commodity name'),
+        unit: responseText(data.unit, 'unit'),
         prices
       },
       message: `Retrieved ${prices.length} ${interval} price data points for **${commodity}**.`

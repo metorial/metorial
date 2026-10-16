@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseString } from '../lib/response';
 import { spec } from '../spec';
 
 let denominationSchema = z.object({
@@ -10,7 +11,10 @@ let denominationSchema = z.object({
 
 let giftCardSchema = z.object({
   giftCardId: z.string().describe('Unique ID of the gift card brand'),
-  name: z.string().describe('Name of the gift card brand (e.g., Starbucks, Amazon)'),
+  name: z
+    .string()
+    .optional()
+    .describe('Name of the gift card brand (e.g., Starbucks, Amazon)'),
   imageUrl: z.string().optional().describe('URL of the gift card image'),
   denominations: z.array(denominationSchema).optional().describe('Available denominations')
 });
@@ -40,11 +44,16 @@ export let listGiftCards = SlateTool.create(spec, {
 
     let giftCards = rawCards.map((g: any) => ({
       giftCardId: String(g.id),
-      name: g.name ?? '',
+      name: responseString(g.name, 'gift card name', true),
       imageUrl: g.image ?? undefined,
       denominations: (g.denominations ?? []).map((d: any) => ({
         denominationId: String(d.id),
-        amount: d.amount != null ? String(d.amount) : undefined
+        amount:
+          d.nominal != null
+            ? String(d.nominal)
+            : d.amount != null
+              ? String(d.amount)
+              : undefined
       }))
     }));
 

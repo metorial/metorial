@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'cuttly',
   name: 'Cutt.ly',
-  description: undefined,
+  description:
+    'Create and manage short links and retrieve click analytics with the Cutt.ly Regular or Team API.',
   metadata: {},
   config,
   auth

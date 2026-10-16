@@ -13,6 +13,8 @@ export let getGames = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      home: z.string().optional().describe('Home team name'),
+      away: z.string().optional().describe('Away team name'),
       year: z.number().describe('Season year (required)'),
       seasonType: z
         .enum(['regular', 'postseason', 'both'])

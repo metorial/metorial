@@ -28,7 +28,7 @@ export let listFeatureRequestsTool = SlateTool.create(spec, {
         ),
       visible: z.boolean().optional().describe('Filter by visibility'),
       search: z.string().optional().describe('Search in title and content'),
-      maxResults: z.number().optional().describe('Max results per page'),
+      maxResults: z.number().optional().describe('Max results per page (1-10)'),
       page: z.number().optional().describe('Page number for pagination')
     })
   )

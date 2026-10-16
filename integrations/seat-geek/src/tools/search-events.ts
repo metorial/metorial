@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type QueryParams } from '../lib/client';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
@@ -21,7 +21,7 @@ let eventSchema = z.object({
       city: z.string().describe('Venue city'),
       state: z.string().describe('Venue state'),
       country: z.string().describe('Venue country'),
-      address: z.string().describe('Venue street address'),
+      address: z.string().optional().describe('Venue street address'),
       postalCode: z.string().describe('Venue postal code')
     })
     .describe('Venue where the event takes place'),
@@ -80,6 +80,20 @@ export let searchEvents = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Full-text search query (e.g., "yankees march", "taylor swift")'),
+      eventIds: z
+        .array(z.number())
+        .optional()
+        .describe('Retrieve known event IDs; combine only with sort, page, and perPage'),
+      performerRole: z
+        .enum(['any', 'primary', 'home_team', 'away_team'])
+        .optional()
+        .describe('Role required of the selected performers'),
+      listingCountMin: z
+        .number()
+        .optional()
+        .describe(
+          'Minimum number of ticket listings; use 1 for events with available tickets'
+        ),
       performerIds: z.array(z.number()).optional().describe('Filter by performer IDs'),
       performerSlugs: z.array(z.string()).optional().describe('Filter by performer slugs'),
       venueId: z.number().optional().describe('Filter by venue ID'),
@@ -115,7 +129,7 @@ export let searchEvents = SlateTool.create(spec, {
       geoIp: z
         .string()
         .optional()
-        .describe('Filter by IP address, or "true" to use client IP'),
+        .describe('Filter by IP address, or "true" to use the requesting server IP'),
       range: z
         .string()
         .optional()
@@ -126,6 +140,8 @@ export let searchEvents = SlateTool.create(spec, {
       averagePriceMax: z.number().optional().describe('Maximum average ticket price filter'),
       sort: z
         .enum([
+          'datetime_utc.asc',
+          'datetime_utc.desc',
           'datetime_local.asc',
           'datetime_local.desc',
           'score.asc',
@@ -143,6 +159,7 @@ export let searchEvents = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       events: z.array(eventSchema).describe('List of matching events'),
       total: z.number().describe('Total number of matching events'),
       page: z.number().describe('Current page number'),
@@ -157,37 +174,44 @@ export let searchEvents = SlateTool.create(spec, {
       referralId: ctx.config.referralId
     });
 
-    let params: Record<string, string> = {};
+    let params: QueryParams = {};
+    if (ctx.input.eventIds?.length) params.id = ctx.input.eventIds.join(',');
+    if (ctx.input.listingCountMin !== undefined)
+      params['listing_count.gte'] = String(ctx.input.listingCountMin);
+    let performerPrefix = ctx.input.performerRole
+      ? `performers[${ctx.input.performerRole}]`
+      : 'performers';
 
     if (ctx.input.query) params.q = ctx.input.query;
     if (ctx.input.performerIds?.length)
-      params['performers.id'] = ctx.input.performerIds.join(',');
+      params[`${performerPrefix}.id`] = ctx.input.performerIds.join(',');
     if (ctx.input.performerSlugs?.length)
-      params['performers.slug'] = ctx.input.performerSlugs.join(',');
-    if (ctx.input.venueId) params['venue.id'] = String(ctx.input.venueId);
+      params[`${performerPrefix}.slug`] = ctx.input.performerSlugs;
+    if (ctx.input.venueId !== undefined) params['venue.id'] = String(ctx.input.venueId);
     if (ctx.input.venueCity) params['venue.city'] = ctx.input.venueCity;
     if (ctx.input.venueState) params['venue.state'] = ctx.input.venueState;
     if (ctx.input.venueCountry) params['venue.country'] = ctx.input.venueCountry;
     if (ctx.input.taxonomyName) params['taxonomies.name'] = ctx.input.taxonomyName;
-    if (ctx.input.taxonomyId) params['taxonomies.id'] = String(ctx.input.taxonomyId);
+    if (ctx.input.taxonomyId !== undefined)
+      params['taxonomies.id'] = String(ctx.input.taxonomyId);
     if (ctx.input.dateFrom) params['datetime_utc.gte'] = ctx.input.dateFrom;
     if (ctx.input.dateTo) params['datetime_utc.lte'] = ctx.input.dateTo;
     if (ctx.input.postalCode) params.postal_code = ctx.input.postalCode;
-    if (ctx.input.latitude) params.lat = String(ctx.input.latitude);
-    if (ctx.input.longitude) params.lon = String(ctx.input.longitude);
+    if (ctx.input.latitude !== undefined) params.lat = String(ctx.input.latitude);
+    if (ctx.input.longitude !== undefined) params.lon = String(ctx.input.longitude);
     if (ctx.input.geoIp) params.geoip = ctx.input.geoIp;
     if (ctx.input.range) params.range = ctx.input.range;
-    if (ctx.input.lowestPriceMin)
+    if (ctx.input.lowestPriceMin !== undefined)
       params['lowest_price.gte'] = String(ctx.input.lowestPriceMin);
-    if (ctx.input.lowestPriceMax)
+    if (ctx.input.lowestPriceMax !== undefined)
       params['lowest_price.lte'] = String(ctx.input.lowestPriceMax);
-    if (ctx.input.averagePriceMin)
+    if (ctx.input.averagePriceMin !== undefined)
       params['average_price.gte'] = String(ctx.input.averagePriceMin);
-    if (ctx.input.averagePriceMax)
+    if (ctx.input.averagePriceMax !== undefined)
       params['average_price.lte'] = String(ctx.input.averagePriceMax);
     if (ctx.input.sort) params.sort = ctx.input.sort;
-    if (ctx.input.page) params.page = String(ctx.input.page);
-    if (ctx.input.perPage) params.per_page = String(ctx.input.perPage);
+    if (ctx.input.page !== undefined) params.page = String(ctx.input.page);
+    if (ctx.input.perPage !== undefined) params.per_page = String(ctx.input.perPage);
 
     let response = await client.searchEvents(params);
 
@@ -208,7 +232,7 @@ export let searchEvents = SlateTool.create(spec, {
         city: e.venue.city,
         state: e.venue.state,
         country: e.venue.country,
-        address: e.venue.address,
+        address: e.venue.address ?? undefined,
         postalCode: e.venue.postal_code
       },
       performers: e.performers.map(p => ({
@@ -230,7 +254,7 @@ export let searchEvents = SlateTool.create(spec, {
         averagePrice: e.stats.average_price,
         lowestPrice: e.stats.lowest_price,
         highestPrice: e.stats.highest_price,
-        medianPrice: e.stats.median_price
+        medianPrice: e.stats.median_price ?? null
       }
     }));
 
@@ -252,7 +276,7 @@ export let searchEvents = SlateTool.create(spec, {
     }
 
     return {
-      output: { events, total, page, perPage },
+      output: { raw: response, events, total, page, perPage },
       message: summaryParts.join('\n')
     };
   })

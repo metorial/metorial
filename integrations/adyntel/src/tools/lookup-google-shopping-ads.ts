@@ -1,32 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { googleShoppingAdSchema, mapShoppingAds, shoppingRequestId } from '../lib/shopping';
 import { spec } from '../spec';
-
-let googleShoppingAdSchema = z
-  .object({
-    advertiserId: z.string().optional(),
-    creativeId: z.string().optional(),
-    firstShown: z.string().optional(),
-    lastShown: z.string().optional(),
-    format: z.string().optional(),
-    title: z.string().optional(),
-    type: z.string().optional(),
-    url: z.string().optional(),
-    verified: z.boolean().optional(),
-    rankAbsolute: z.number().optional(),
-    rankGroup: z.number().optional(),
-    previewImage: z
-      .object({
-        height: z.number().optional(),
-        width: z.number().optional(),
-        url: z.string().optional()
-      })
-      .passthrough()
-      .optional(),
-    previewUrl: z.string().nullable().optional()
-  })
-  .passthrough();
 
 export let lookupGoogleShoppingAds = SlateTool.create(spec, {
   name: 'Lookup Google Shopping Ads',
@@ -55,7 +31,11 @@ export let lookupGoogleShoppingAds = SlateTool.create(spec, {
   .output(
     z.object({
       requestId: z.string().optional().describe('The async request ID for reference'),
-      ads: z.array(googleShoppingAdSchema).optional()
+      ads: z.array(googleShoppingAdSchema).optional(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Latest provider status response, including original fields and null values')
     })
   )
   .handleInvocation(async ctx => {
@@ -70,41 +50,35 @@ export let lookupGoogleShoppingAds = SlateTool.create(spec, {
       companyDomain: ctx.input.companyDomain
     });
 
-    let requestId = submitResponse?.id;
-    if (!requestId) {
-      return {
-        output: {
-          requestId: undefined,
-          ads: []
-        },
-        message: `No results found for Google Shopping ads for **${ctx.input.companyDomain}**.`
-      };
-    }
+    let requestId = shoppingRequestId(submitResponse);
 
     ctx.progress('Polling for Google Shopping results...');
 
     let maxAttempts = 10;
     let delayMs = 3000;
-    let statusResponse: any = null;
+    let statusResponse: Record<string, unknown> | undefined;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise(resolve => setTimeout(resolve, delayMs));
 
       statusResponse = await client.getGoogleShoppingStatus({ requestId });
 
-      if (statusResponse?.ads && statusResponse.ads.length > 0) {
+      if (Array.isArray(statusResponse?.ads)) {
         break;
       }
     }
 
-    let ads = statusResponse?.ads ?? [];
+    let ads = mapShoppingAds(statusResponse?.ads);
 
     return {
       output: {
         requestId,
-        ads
+        ads,
+        rawResponse: statusResponse
       },
-      message: `Found **${ads.length}** Google Shopping ads for **${ctx.input.companyDomain}**.`
+      message: ads
+        ? `Retrieved **${ads.length}** Google Shopping ads for **${ctx.input.companyDomain}**.`
+        : `Google Shopping results are not available yet. Call Get Google Shopping Status with request ID **${requestId}** to check again without starting another search.`
     };
   })
   .build();

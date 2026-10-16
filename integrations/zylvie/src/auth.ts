@@ -1,5 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { requireText } from './lib/validation';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +21,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      requireText(ctx.input.token, 'API key');
       return {
         output: {
           token: ctx.input.token
@@ -27,19 +30,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.zylvie.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await client.get('/me');
+      let account = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {
-          email: response.data.email,
-          name: response.data.brand
+          email: account.email,
+          name: account.brand
         }
       };
     }

@@ -1,7 +1,14 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let apiAxios = createAxios({
-  baseURL: 'https://api.spotlightr.com'
+let apiAxios = createAuthenticatedAxios({
+  baseURL: 'https://api.spotlightr.com',
+  contentType: false,
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Spotlightr',
+      reason: 'spotlightr_api_error',
+      extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+    })
 });
 
 export interface Video {
@@ -63,6 +70,7 @@ export class Client {
     playerSettings?: string;
     videoGroup?: string;
     hls?: boolean;
+    customS3?: number;
   }): Promise<any> {
     let formData: Record<string, any> = {
       vooKey: this.config.token,
@@ -80,6 +88,9 @@ export class Client {
     }
     if (params.hls !== undefined) {
       formData.hls = params.hls ? 1 : 0;
+    }
+    if (params.customS3 !== undefined) {
+      formData.customS3 = params.customS3;
     }
 
     let response = await apiAxios.post('/api/createVideo', formData, {
@@ -134,8 +145,8 @@ export class Client {
     let response = await apiAxios.get('/api/getTopVideos', {
       params: {
         ...this.authParams,
-        ...(params?.days ? { days: params.days } : {}),
-        ...(params?.total ? { total: params.total } : {})
+        ...(params?.days !== undefined ? { days: params.days } : {}),
+        ...(params?.total !== undefined ? { total: params.total } : {})
       }
     });
     return response.data;
@@ -209,16 +220,34 @@ export class Client {
     return response.data;
   }
 
-  async globalSearch(query: string): Promise<any> {
+  async globalSearch(query?: string): Promise<unknown> {
     let response = await apiAxios.post(
       '/search/global',
       {
         vooKey: this.config.token,
-        query
+        ...(query !== undefined ? { query } : {})
       },
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       }
+    );
+    return response.data;
+  }
+
+  async expireAccess(accessId: number): Promise<unknown> {
+    let response = await apiAxios.post(
+      '/access',
+      { ...this.authParams, id: accessId, expire: 1 },
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    return response.data;
+  }
+
+  async expireAccessCode(codeId: number): Promise<unknown> {
+    let response = await apiAxios.post(
+      '/spotlight/updateCode',
+      { ...this.authParams, id: codeId, expires: 1 },
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     return response.data;
   }

@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Fraud Labs Pro
 
-Screen online transactions for payment fraud by analyzing IP geolocation, email validity, billing/shipping details, credit card info, proxy/VPN usage, blacklists, and transaction velocity. Receive a fraud risk score to approve, review, or reject orders. Update transaction statuses with feedback (approve, reject, or reject & blacklist) to improve fraud detection accuracy. Retrieve existing transaction screening results. Send SMS-based OTP verification codes to authenticate customer identities.
+Screen online transactions for payment fraud by analyzing IP geolocation, email validity, billing/shipping details, credit card info, proxy/VPN usage, blacklists, and transaction velocity. Receive a fraud risk score to approve, review, or reject orders. Update transaction statuses with feedback (approve, reject, or reject & blacklist) to improve fraud detection accuracy. Retrieve existing transaction screening results. Send SMS-based OTP verification codes to authenticate customer identities. Submit payment gateway outcomes and include item-level details in order screening.
 
 ## License
 

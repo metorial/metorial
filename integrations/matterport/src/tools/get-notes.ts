@@ -57,7 +57,7 @@ export let getNotes = SlateTool.create(spec, {
 
     let notes = await client.getNotes(ctx.input.modelId);
 
-    let mappedNotes = (notes || []).map((n: any) => ({
+    let mappedNotes = notes.map((n: any) => ({
       noteId: n.id,
       created: n.created,
       modified: n.modified,
@@ -65,15 +65,15 @@ export let getNotes = SlateTool.create(spec, {
       enabled: n.enabled,
       createdBy: n.createdBy
         ? {
-            userId: n.createdBy.id || null,
-            firstName: n.createdBy.firstName || null,
-            lastName: n.createdBy.lastName || null,
-            email: n.createdBy.email || null
+            userId: n.createdBy.id ?? null,
+            firstName: n.createdBy.firstName ?? null,
+            lastName: n.createdBy.lastName ?? null,
+            email: n.createdBy.email ?? null
           }
         : null,
       resolution: n.resolution,
       color: n.color,
-      anchorPosition: n.anchorPosition || null,
+      anchorPosition: n.anchorPosition ?? null,
       totalComments: n.totalComments
     }));
 

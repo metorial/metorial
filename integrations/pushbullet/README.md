@@ -1,6 +1,6 @@
-# <img src="logo.png" height="20"> Pushbullet
+# <img src="logo.svg" height="20"> Pushbullet
 
-Send push notifications, links, and files across devices. Send and receive SMS/MMS messages through connected Android phones. Mirror phone notifications to other devices, sync clipboard content across devices, and manage device registrations. Create and subscribe to channels for broadcasting pushes to multiple users. Manage chats with other Pushbullet users, upload files, and receive real-time events via WebSocket stream.
+Send notes, links, and files to connected devices, contacts, or channel subscribers. Discover the connected account, manage devices and chats, create channels and manage subscriptions, send SMS/MMS through Android phones, and share clipboard text. Request file-upload URLs for files sent through Pushbullet.
 
 ## License
 

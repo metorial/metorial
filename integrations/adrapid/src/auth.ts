@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,22 +25,13 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.adrapid.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await axios.get('/me');
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getAccount();
 
       return {
         profile: {
-          id: user.id || user._id,
+          id: user.userId,
           email: user.email,
-          name: user.name || user.username
+          name: user.name
         }
       };
     }

@@ -14,7 +14,9 @@ export let createProduct = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Product name'),
-      categoryId: z.string().describe('ID of the category to assign the product to'),
+      categoryId: z
+        .string()
+        .describe('Category ID from list_categories to assign the product to'),
       description: z.string().optional().describe('Product description (HTML supported)'),
       urlHandle: z.string().optional().describe('URL-friendly slug for the product'),
       seoTitle: z.string().optional().describe('SEO title for the product page'),
@@ -27,11 +29,12 @@ export let createProduct = SlateTool.create(spec, {
       shipping: z.boolean().optional().describe('Whether the product requires shipping'),
       sale: z.boolean().optional().describe('Whether the product is on sale'),
       featured: z.boolean().optional().describe('Whether the product is featured'),
-      vendorId: z.string().optional().describe('ID of the vendor for this product')
+      vendorId: z.string().optional().describe('Vendor ID from list_vendors for this product')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       productId: z.string(),
       name: z.string().optional(),
       dateAdded: z.string().optional()
@@ -72,9 +75,10 @@ export let createProduct = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: res,
         productId: p.id,
-        name: p.attributes.name,
-        dateAdded: p.attributes.date_added
+        name: p.attributes.name ?? undefined,
+        dateAdded: p.attributes.date_added ?? undefined
       },
       message: `Created product **${p.attributes.name}** (ID: ${p.id}).`
     };

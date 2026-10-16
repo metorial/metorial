@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { validateDate, validateInteger } from './validation';
 
 export class OpenWeatherClient {
   private apiKey: string;
@@ -7,11 +8,31 @@ export class OpenWeatherClient {
   private axios;
 
   constructor(config: { apiKey: string; units?: string; lang?: string }) {
+    if (typeof config.apiKey !== 'string' || !config.apiKey.trim()) {
+      throw createApiServiceError(
+        'An OpenWeather API key is required. Reconnect with a valid API key.'
+      );
+    }
     this.apiKey = config.apiKey;
     this.units = config.units || 'metric';
     this.lang = config.lang || 'en';
-    this.axios = createAxios({
-      baseURL: 'https://api.openweathermap.org'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.openweathermap.org',
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'OpenWeather',
+          reason: 'openweather_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          extractUpstreamCode: (_error, response, helpers) => {
+            let body = response?.data;
+            if (!helpers.isRecord(body)) return undefined;
+            let code = body.cod;
+            return typeof code === 'string' || typeof code === 'number'
+              ? String(code)
+              : undefined;
+          }
+        })
     });
   }
 
@@ -39,7 +60,8 @@ export class OpenWeatherClient {
   // --- 5-Day / 3-Hour Forecast ---
 
   async getForecast(lat: number, lon: number, count?: number) {
-    let params: Record<string, any> = {
+    if (count !== undefined) validateInteger(count, 'count', 1, 40);
+    let params: Record<string, string | number> = {
       lat,
       lon,
       ...this.baseParams()
@@ -54,7 +76,7 @@ export class OpenWeatherClient {
   // --- One Call API 3.0 ---
 
   async getOneCall(lat: number, lon: number, exclude?: string[]) {
-    let params: Record<string, any> = {
+    let params: Record<string, string | number> = {
       lat,
       lon,
       ...this.baseParams()
@@ -67,6 +89,12 @@ export class OpenWeatherClient {
   }
 
   async getOneCallTimemachine(lat: number, lon: number, dt: number) {
+    validateInteger(
+      dt,
+      'unixTimestamp',
+      283_996_800,
+      Math.floor(Date.now() / 1000) + 4 * 86_400
+    );
     let response = await this.axios.get('/data/3.0/onecall/timemachine', {
       params: {
         lat,
@@ -79,6 +107,10 @@ export class OpenWeatherClient {
   }
 
   async getOneCallDaySummary(lat: number, lon: number, date: string) {
+    validateDate(date, 'date');
+    if (date < '1979-01-02') {
+      throw createApiServiceError('Day summaries are available from 1979-01-02.');
+    }
     let response = await this.axios.get('/data/3.0/onecall/day_summary', {
       params: {
         lat,
@@ -91,10 +123,12 @@ export class OpenWeatherClient {
   }
 
   async getOneCallOverview(lat: number, lon: number, date?: string) {
-    let params: Record<string, any> = {
+    if (date !== undefined) validateDate(date, 'date');
+    let params: Record<string, string | number> = {
       lat,
       lon,
-      ...this.baseParams()
+      appid: this.apiKey,
+      units: this.units
     };
     if (date) {
       params.date = date;
@@ -120,6 +154,11 @@ export class OpenWeatherClient {
   }
 
   async getAirPollutionHistory(lat: number, lon: number, start: number, end: number) {
+    validateInteger(start, 'startTimestamp', 1_606_435_200);
+    validateInteger(end, 'endTimestamp', 1_606_435_200);
+    if (start >= end) {
+      throw createApiServiceError('startTimestamp must be earlier than endTimestamp.');
+    }
     let response = await this.axios.get('/data/2.5/air_pollution/history', {
       params: { lat, lon, start, end, appid: this.apiKey }
     });
@@ -129,10 +168,11 @@ export class OpenWeatherClient {
   // --- Geocoding ---
 
   async geocodeDirect(query: string, limit?: number) {
+    if (limit !== undefined) validateInteger(limit, 'limit', 1, 5);
     let response = await this.axios.get('/geo/1.0/direct', {
       params: {
         q: query,
-        limit: limit || 5,
+        limit: limit ?? 5,
         appid: this.apiKey
       }
     });
@@ -150,11 +190,12 @@ export class OpenWeatherClient {
   }
 
   async geocodeReverse(lat: number, lon: number, limit?: number) {
+    if (limit !== undefined) validateInteger(limit, 'limit', 1, 5);
     let response = await this.axios.get('/geo/1.0/reverse', {
       params: {
         lat,
         lon,
-        limit: limit || 5,
+        limit: limit ?? 5,
         appid: this.apiKey
       }
     });
@@ -164,6 +205,10 @@ export class OpenWeatherClient {
   // --- Weather Maps ---
 
   getWeatherMapTileUrl(layer: string, z: number, x: number, y: number) {
-    return `https://tile.openweathermap.org/map/${layer}/${z}/${x}/${y}.png?appid=${this.apiKey}`;
+    validateInteger(z, 'zoom', 0, 18);
+    let maxCoordinate = 2 ** z - 1;
+    validateInteger(x, 'tileX', 0, maxCoordinate);
+    validateInteger(y, 'tileY', 0, maxCoordinate);
+    return `https://tile.openweathermap.org/map/${layer}/${z}/${x}/${y}.png`;
   }
 }

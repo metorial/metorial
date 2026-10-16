@@ -1,81 +1,56 @@
-Now I have enough information to write the specification.
+# Nasdaq
 
-# Slates Specification for Nasdaq
+## API families and authentication
 
-## Overview
+- **Nasdaq Data Link** uses `https://data.nasdaq.com/api/v3` and the `api_key` query parameter. It covers tables, time-series datasets, catalog search, database metadata and ZIP exports.
+- **Nasdaq Cloud REST** uses the API base URL supplied by Nasdaq. Authenticate by posting a JSON object containing `client_id` and `client_secret` to the supplied token endpoint, normally `/v1/auth/token`. Persist the returned bearer token and `expires_in` expiry; renew with the same client credentials. No refresh token or user OAuth redirect is involved.
 
-Nasdaq Data Link (formerly Quandl) is a financial data platform that provides access to a large catalog of free and premium datasets covering equities, options, futures, economics, FX, and alternative data. Data is delivered through three API channels: a Streaming API for real-time market data, a REST API for real-time/delayed quotes, and a Tables REST API for historical and reference datasets.
+The API families have separate tool categories and authentication methods. Global configuration is empty. Credentials and API URLs belong to the connection. Neither documented API provides a current-user/profile endpoint suitable for an identity tool.
 
-## Authentication
+## Data Link tools
 
-Nasdaq Data Link uses two different authentication methods depending on which API is being accessed:
+| Tool | Provider operation |
+| --- | --- |
+| `query_table` | `GET /datatables/{PUBLISHER}/{TABLE}.json`, column filters, `qopts.columns`, `qopts.per_page`, `qopts.cursor_id` |
+| `get_table_metadata` | `GET /datatables/{PUBLISHER}/{TABLE}/metadata.json` |
+| `get_time_series` | `GET /datasets/{database}/{dataset}/data.json`, date, order, collapse, transform, limit and column selection |
+| `get_dataset_info` | `GET /datasets/{database}/{dataset}.json`, limited to the ten latest rows |
+| `search_datasets` | `GET /datasets.json`, query, database filter and page pagination |
+| `list_databases` | `GET /databases.json`, page pagination |
+| `get_database_info` | `GET /databases/{database}.json` |
+| `export_table` | `GET /datatables/{PUBLISHER}/{TABLE}.json?qopts.export=true`; optional row filters; provider ZIP URL when status is `fresh` |
+| `export_database` | Authenticated `GET /databases/{database}/data?download_type=complete|partial` for supported time-series databases |
 
-### 1. API Key (Tables API)
+Column filters cannot override credentials or dedicated query options. Numeric pagination and row/column inputs are validated as whole numbers at invocation time while preserving the public numeric schemas. Dates use `YYYY-MM-DD`; start must not follow end. Missing or malformed required response fields are errors. Table export timestamps and links may be omitted by the provider; they are omitted from summaries and retained in original response metadata.
 
-To use the Tables API, you must have an API key for Nasdaq Data Link. To get an API key, sign up for a free Nasdaq Data Link account. You can then find your API key on your account settings page.
+## Cloud REST tools
 
-Include your API key in every request using the `api_key` query parameter.
+| Tool | Provider operation |
+| --- | --- |
+| `get_last_sale` | `GET /v1/{source}/{offset}/equities/{lastsale|lasttrade|lastquote}/{symbols}` |
+| `get_snapshot` | `GET /v1/{source}/{offset}/equities/snapshot/{symbols}` and optional `/equities/trends` |
+| `get_bars` | `GET /v2/{source}/{offset}/equities/bars/{symbols}/{precision}/false/{date-range}` |
+| `get_options_chain` | `GET /v1/nasdaq/{offset}/options/chain/{symbol}`; optional per-contract Greeks calls |
+| `list_symbols` | `GET /v1/reference/symbols` |
+| `get_symbol` | `GET /v1/reference/symbol/{symbol}` |
+| `list_indexes` | `GET /v1/reference/indexes` |
+| `get_index_data` | `GET /v1/nasdaq/{offset}/indexes/{value|snapshot}/{instruments}` |
+| `get_option_greeks` | `GET /v1/nasdaq/realtime/greeksandvolsus/{identifier}` |
 
-Example: `https://data.nasdaq.com/api/v3/datatables/ZACKS/FC?ticker=AAPL&api_key=YOUR_API_KEY`
+Source defaults to Nasdaq and offset defaults to realtime. Bars default to daily bars over one month; only unadjusted prices are currently documented. Supported date-range/precision pairs follow the provider's matrix. Existing bar output retains the original symbol-keyed response object inside its record array. Quotes, snapshots, chains and Greeks retain provider fields. Options Greeks use exact contract identifiers, including internal spaces, rather than underlying ticker symbols. `includeGreeks` requests each returned contract in batches of four and can take longer for large chains. Delayed Greeks are currently unavailable.
 
-### 2. OAuth 2.0 (Streaming API and Real-Time/Delayed REST API)
+## Downloads and errors
 
-Access to the API is granted by providing your `client_id` and `client_secret` using OAuth 2.0 authentication.
+Table ZIP exports use the provider's ready file URL. Renewal reissues the same documented export with its table and filters; a pending export is an error during renewal. If the URL exposes a signed expiry, renew one minute before it; otherwise renew at download time. This is a renewal policy and does not assume a provider URL lifetime. Database ZIP downloads use a stable authenticated endpoint.
 
-For the **Streaming API**, credentials are provided by the Nasdaq sales team upon subscription and include: `client_id`, `client_secret`, `token_endpoint`, and `bootstrap_servers` (for Kafka-based streaming).
+HTTP errors preserve provider status, nested `quandl_error` code/message, and supported response-body details. Timeouts, missing credentials, invalid parameter combinations and malformed required responses produce user-facing service errors.
 
-For the **Real-Time/Delayed REST API**, credentials include: `client_id`, `client_secret`, and `base_URL`. These are also provisioned by the Nasdaq sales team upon subscription.
+## Sources
 
-Both OAuth-based APIs require you to exchange your `client_id` and `client_secret` for an access token, which is then used to authenticate subsequent requests.
+- [Nasdaq Cloud REST API](https://github.com/Nasdaq/NasdaqCloudDataService-REST-API)
+- [Cloud authentication](https://github.com/Nasdaq/NasdaqCloudDataService-REST-API/blob/main/restapi/authenticate.md)
+- [Nasdaq Data Link Python SDK detailed guide](https://github.com/Nasdaq/data-link-python/blob/main/FOR_DEVELOPERS.md)
+- [Data Link table model and export flow](https://github.com/Nasdaq/data-link-python/blob/main/nasdaqdatalink/model/datatable.py)
+- [Data Link database model](https://github.com/Nasdaq/data-link-python/blob/main/nasdaqdatalink/model/database.py)
 
-## Features
-
-### Tables Data (Historical and Reference Data)
-
-Nasdaq Data Link provides data in two primary formats: Time-Series and Tables (formerly called "Datatables"). The Tables API gives access to a broad catalog of datasets including:
-
-- **Equity Prices**: End-of-day US stock prices, Chinese stock prices, and other equity pricing data.
-- **Equity Fundamentals**: Company financial statements, balance sheets, and fundamental metrics from providers like Sharadar, Zacks, and Mergent.
-- **Earnings, Estimates, and Analyst Ratings**: Earnings announcements, earnings estimates, and analyst target prices.
-- **Options and Futures**: Options implied volatility, options settlement prices, futures options data, and CFTC Commitment of Traders data.
-- **Economics, FX, and Rates**: Foreign exchange rates, FX volumes, and macroeconomic data.
-
-Data can be filtered by date range, column selection, and row-level criteria. Files are available in CSV, JSON, and XML formats. Most datasets are premium and can only be accessed with a subscription. Subscriptions are à la carte: you can subscribe to the individual premium datasets you need and nothing more.
-
-### Real-Time and Delayed Market Data (REST API)
-
-The latest transaction that is last sale eligible based on market rules. Last Sale provides real-time or delayed pricing information on different stock exchanges for one or multiple securities.
-
-Available products include:
-
-- **Nasdaq Basic / Last Sale+**: Best bid/offer and last sale data for US exchange-listed stocks.
-- **BX/PSX BBO and Last Sale**: Quote and trade data from Nasdaq's BX and PSX exchanges.
-- **Global Index Data Service**: Real-time index values.
-- **Nasdaq Smart Options**: Options trade and volume data.
-
-The Bars endpoint provides the ability to create real-time, delayed and historical charts for all US-listed and OTCBB securities, with 10+ years of history and OHLCV data based on different date ranges and intervals.
-
-### Real-Time Streaming Data
-
-The Streaming API (Kafka-based) provides continuous real-time feeds for:
-
-- Nasdaq Basic and Last Sale+
-- Nasdaq TotalView (full order book depth)
-- Consolidated Quotes and Trades
-- BX/PSX BBO and Last Sale
-- Nasdaq Canada Basic
-- Global Index Data Service
-- Nasdaq Smart Options
-- Benzinga Market Newswires
-
-### Data Search and Metadata
-
-The API can also be used to search and provide metadata or to programmatically retrieve data. You can browse available datasets, retrieve dataset metadata (descriptions, column definitions, update frequencies), and discover new data products.
-
-### Bulk Downloads
-
-Large datasets can be exported as bulk zip downloads for offline analysis, available for both Tables and Time-Series data products.
-
-## Events
-
-The provider does not support webhooks or event subscriptions. The Streaming API provides real-time market data via a Kafka-based stream, but this is a continuous data feed rather than an event/webhook subscription mechanism.
+Streaming/Kafka, administrative operations, news, ETPs, and webhook delivery are not implemented. Product subscriptions govern data availability. No live market-data or authenticated endpoint was queried during this refresh.

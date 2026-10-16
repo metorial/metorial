@@ -1,0 +1,134 @@
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "imageUrl": {
+        "description": "URL of the image to blur",
+        "type": "string"
+      },
+      "imageBase64": {
+        "description": "Base64-encoded image data",
+        "type": "string"
+      },
+      "platesIntensity": {
+        "description": "Blur intensity for license plates (1-10)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 10
+      },
+      "facesIntensity": {
+        "description": "Blur intensity for faces (1-10)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 10
+      },
+      "regions": {
+        "description": "Region codes to improve plate detection accuracy",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cameraId": {
+        "description": "Unique camera identifier",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "blurredImageBase64": {
+        "type": "string",
+        "description": "Base64-encoded blurred image"
+      },
+      "blurredImageFilename": {
+        "type": "string",
+        "description": "Filename of the blurred image"
+      },
+      "blurredImageContentType": {
+        "type": "string",
+        "description": "Content type of the blurred image"
+      },
+      "plates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "box": {
+              "description": "Bounding box of the detected plate",
+              "type": "object",
+              "properties": {
+                "xmin": {
+                  "type": "number"
+                },
+                "ymin": {
+                  "type": "number"
+                },
+                "xmax": {
+                  "type": "number"
+                },
+                "ymax": {
+                  "type": "number"
+                }
+              },
+              "required": ["xmin", "ymin", "xmax", "ymax"],
+              "additionalProperties": false
+            },
+            "score": {
+              "description": "Detection confidence",
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Detected license plates"
+      },
+      "faces": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "box": {
+              "description": "Bounding box of the detected face",
+              "type": "object",
+              "properties": {
+                "xmin": {
+                  "type": "number"
+                },
+                "ymin": {
+                  "type": "number"
+                },
+                "xmax": {
+                  "type": "number"
+                },
+                "ymax": {
+                  "type": "number"
+                }
+              },
+              "required": ["xmin", "ymin", "xmax", "ymax"],
+              "additionalProperties": false
+            },
+            "score": {
+              "description": "Detection confidence",
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Detected faces"
+      }
+    },
+    "required": [
+      "blurredImageBase64",
+      "blurredImageFilename",
+      "blurredImageContentType",
+      "plates",
+      "faces"
+    ],
+    "additionalProperties": false
+  }
+}

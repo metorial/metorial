@@ -17,6 +17,7 @@ export let getIntradayPrices = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      afterHours: z.boolean().optional().describe('Include pre-market and after-hours data.'),
       symbols: z.string().describe('Comma-separated ticker symbols (e.g. "AAPL,MSFT")'),
       interval: z
         .enum([
@@ -50,6 +51,7 @@ export let getIntradayPrices = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
         limit: z.number(),
         offset: z.number(),
@@ -77,6 +79,9 @@ export let getIntradayPrices = SlateTool.create(spec, {
     let result = ctx.input.latest
       ? await client.getIntradayLatest({
           symbols: ctx.input.symbols,
+          interval: ctx.input.interval,
+          afterHours: ctx.input.afterHours,
+          sort: ctx.input.sort,
           exchange: ctx.input.exchange,
           limit: ctx.input.limit,
           offset: ctx.input.offset
@@ -84,6 +89,7 @@ export let getIntradayPrices = SlateTool.create(spec, {
       : await client.getIntraday({
           symbols: ctx.input.symbols,
           interval: ctx.input.interval,
+          afterHours: ctx.input.afterHours,
           dateFrom: ctx.input.dateFrom,
           dateTo: ctx.input.dateTo,
           exchange: ctx.input.exchange,
@@ -107,9 +113,10 @@ export let getIntradayPrices = SlateTool.create(spec, {
     return {
       output: {
         pagination: result.pagination,
+        raw: result.raw,
         prices
       },
-      message: `Retrieved ${prices.length} intraday price records for **${ctx.input.symbols}**${ctx.input.interval ? ` at ${ctx.input.interval} intervals` : ''}. Total available: ${result.pagination.total}.`
+      message: `Retrieved ${prices.length} intraday price records for **${ctx.input.symbols}**${ctx.input.interval ? ` at ${ctx.input.interval} intervals` : ''}.`
     };
   })
   .build();

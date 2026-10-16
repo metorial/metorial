@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'cincopa',
   name: 'Cincopa',
   description:
-    'Multimedia hosting and management platform for video, audio, images, and digital media with galleries, portals, live streaming, and analytics.',
+    'Manage Cincopa media assets, galleries, uploads, portal settings, and live streams.',
   metadata: {},
   config,
   auth

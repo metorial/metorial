@@ -53,7 +53,19 @@ For **social unlocks**, unlock data shows how many fans completed the required a
       unlockTimeSeries: z
         .array(z.record(z.string(), z.any()))
         .optional()
-        .describe('Time-series unlock data')
+        .describe('Time-series unlock data'),
+      rawEntryTotals: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Original provider entry totals'),
+      rawUnlockTotals: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Original provider unlock totals'),
+      rawPlatformBreakdown: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Original provider unlock platform data')
     })
   )
   .handleInvocation(async ctx => {
@@ -67,6 +79,9 @@ For **social unlocks**, unlock data shows how many fans completed the required a
     ]);
 
     let output: any = {
+      rawEntryTotals: entryTotals,
+      rawUnlockTotals: unlockTotals,
+      rawPlatformBreakdown: platforms,
       entryTotals: {
         lastDay: entryTotals?.last_day,
         lastWeek: entryTotals?.last_week,
@@ -102,7 +117,7 @@ For **social unlocks**, unlock data shows how many fans completed the required a
 
     return {
       output,
-      message: `Attachment **${attachmentId}** insights: ${entryTotals?.total ?? 0} total entries, ${unlockTotals?.total ?? 0} total unlocks across ${(platforms || []).length} platform(s).`
+      message: `Attachment **${attachmentId}** insights: ${entryTotals?.total ?? 'N/A'} total entries, ${unlockTotals?.total ?? 'N/A'} total unlocks across ${(platforms || []).length} platform(s).`
     };
   })
   .build();

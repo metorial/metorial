@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Your PageXCRM customer/account identifier. If provided, it will be used as the default customer ID for lead submissions.'
+        'Optional default external customer identifier for submitted leads. Each lead can override this value.'
       )
   })
 );

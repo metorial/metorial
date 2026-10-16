@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let membershipOutputSchema = z.object({
@@ -53,12 +53,15 @@ export let enrollUser = SlateTool.create(spec, {
         .optional()
         .describe('Course role to assign (defaults to Student)'),
       available: z.enum(['Yes', 'No']).optional().describe('Whether the enrollment is active'),
-      dataSourceId: z.string().optional().describe('Data source ID')
+      dataSourceId: z
+        .string()
+        .optional()
+        .describe('Data source ID. Call list_data_sources to discover IDs.')
     })
   )
   .output(membershipOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let membership = await client.createCourseMembership(
       ctx.input.courseId,
@@ -95,7 +98,7 @@ export let unenrollUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     await client.deleteCourseMembership(ctx.input.courseId, ctx.input.userId);
 
     return {
@@ -130,10 +133,10 @@ export let listEnrollments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     if (!ctx.input.courseId && !ctx.input.userId) {
-      throw new Error('Either courseId or userId must be provided.');
+      throw createApiServiceError('Either courseId or userId must be provided.');
     }
 
     let result: any;
@@ -173,7 +176,7 @@ export let getEnrollment = SlateTool.create(spec, {
   )
   .output(membershipOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let membership = await client.getCourseMembership(ctx.input.courseId, ctx.input.userId);
 
     return {
@@ -206,12 +209,15 @@ export let updateEnrollment = SlateTool.create(spec, {
         .optional()
         .describe('New course role'),
       available: z.enum(['Yes', 'No']).optional().describe('Whether the enrollment is active'),
-      dataSourceId: z.string().optional().describe('Data source ID')
+      dataSourceId: z
+        .string()
+        .optional()
+        .describe('Data source ID. Call list_data_sources to discover IDs.')
     })
   )
   .output(membershipOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let membership = await client.updateCourseMembership(
       ctx.input.courseId,

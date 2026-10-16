@@ -6,12 +6,16 @@ import { spec } from '../spec';
 export let getAccount = SlateTool.create(spec, {
   name: 'Get Account',
   key: 'get_account',
-  description: `Retrieve information about the current Faraday account, including account name, status, and billing details.`,
+  description: `Retrieve information about the current Faraday account, including the identity, name, and status associated with the API key.`,
   tags: { readOnly: true, destructive: false }
 })
   .input(z.object({}))
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Account metadata excluding the API key'),
       accountId: z.string().describe('Unique identifier of the account'),
       name: z.string().describe('Account display name'),
       status: z.string().optional().describe('Current account status'),
@@ -23,8 +27,11 @@ export let getAccount = SlateTool.create(spec, {
     let client = new FaradayClient({ token: ctx.auth.token });
     let account = await client.getCurrentAccount();
 
+    let { api_key: _apiKey, ...raw } = account;
+
     return {
       output: {
+        raw,
         accountId: account.id,
         name: account.name,
         status: account.status,

@@ -1,13 +1,27 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  pickDefined,
+  requestAxios
+} from 'slates';
 
 let apiAxios = createAxios({
-  baseURL: 'https://api.airvisual.com/v2'
+  baseURL: 'https://api.airvisual.com/v2',
+  timeout: 30_000,
+  headers: { Accept: 'application/json' }
 });
 
 export class Client {
   private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide an IQAir AirVisual API key and reconnect.', {
+        reason: 'iqair_missing_api_key'
+      });
+    }
     this.token = config.token;
   }
 
@@ -15,35 +29,134 @@ export class Client {
     path: string,
     params: Record<string, string | number | undefined> = {}
   ): Promise<T> {
-    let filteredParams: Record<string, string | number> = { key: this.token };
-    for (let [k, v] of Object.entries(params)) {
-      if (v !== undefined) {
-        filteredParams[k] = v;
+    let response = await requestAxios<unknown>(
+      path,
+      () => apiAxios.get(path, { params: { ...pickDefined(params), key: this.token } }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'IQAir AirVisual',
+          reason: 'iqair_api_error',
+          operation,
+          nestedKeys: ['data', 'errors'],
+          extractResponse: (value, helpers) => helpers.getResponseWithBody(value)
+        })
+    );
+    let body = response.data;
+
+    if (!isApiErrorRecord(body) || body.status !== 'success' || !('data' in body)) {
+      throw buildApiServiceError(
+        { response: { status: response.status, data: body } },
+        {
+          providerLabel: 'IQAir AirVisual',
+          reason: 'iqair_api_error',
+          operation: path,
+          nestedKeys: ['data', 'errors'],
+          fallbackMessage: 'The API did not return a successful data response.'
+        }
+      );
+    }
+
+    return body.data as T;
+  }
+
+  private validateNames(names: Record<string, string>) {
+    for (let [field, value] of Object.entries(names)) {
+      if (!value.trim()) {
+        throw createApiServiceError(`Provide a non-empty ${field} name from List Locations.`, {
+          reason: 'iqair_invalid_location'
+        });
       }
     }
+  }
 
-    let response = await apiAxios.get(path, { params: filteredParams });
-    let body = response.data as { status: string; data: T };
-
-    if (body.status !== 'success') {
-      let errorData = body.data as any;
-      let message = errorData?.message || 'Unknown API error';
-      throw new Error(`IQAir API error: ${message}`);
+  private validateCoordinates(lat?: number, lon?: number) {
+    if ((lat === undefined) !== (lon === undefined)) {
+      throw createApiServiceError(
+        'Provide both latitude and longitude, or omit both for IP geolocation.',
+        { reason: 'iqair_incomplete_coordinates' }
+      );
     }
+    if (
+      (lat !== undefined && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
+      (lon !== undefined && (!Number.isFinite(lon) || lon < -180 || lon > 180))
+    ) {
+      throw createApiServiceError(
+        'Latitude must be between -90 and 90; longitude must be between -180 and 180.',
+        { reason: 'iqair_invalid_coordinates' }
+      );
+    }
+  }
 
-    return body.data;
+  private async list<T>(path: string, field: string, params?: Record<string, string>) {
+    let data = await this.get<unknown>(path, params);
+    if (
+      !Array.isArray(data) ||
+      data.some(entry => !isApiErrorRecord(entry) || typeof entry[field] !== 'string')
+    ) {
+      throw createApiServiceError('IQAir AirVisual returned an invalid location directory.', {
+        reason: 'iqair_invalid_response'
+      });
+    }
+    return data as T[];
+  }
+
+  private async getObservation<T extends CityData>(
+    path: string,
+    params: Record<string, string | number | undefined>
+  ): Promise<T> {
+    let data = await this.get<unknown>(path, params);
+    if (
+      !isApiErrorRecord(data) ||
+      !isApiErrorRecord(data.location) ||
+      !Array.isArray(data.location.coordinates) ||
+      data.location.coordinates.length < 2 ||
+      !data.location.coordinates.slice(0, 2).every(value => typeof value === 'number') ||
+      !['city', 'state', 'country'].every(field => typeof data[field] === 'string')
+    ) {
+      throw createApiServiceError(
+        'IQAir AirVisual returned an invalid location observation.',
+        {
+          reason: 'iqair_invalid_response'
+        }
+      );
+    }
+    if (
+      !isApiErrorRecord(data.current) ||
+      !isApiErrorRecord(data.current.pollution) ||
+      !isApiErrorRecord(data.current.weather)
+    ) {
+      throw createApiServiceError(
+        'Current air quality or weather data is unavailable for this location. Try another location or retry after the next hourly update.',
+        { reason: 'iqair_observation_unavailable' }
+      );
+    }
+    let { pollution, weather } = data.current;
+    if (
+      !['ts', 'mainus', 'maincn'].every(field => typeof pollution[field] === 'string') ||
+      !['aqius', 'aqicn'].every(field => typeof pollution[field] === 'number') ||
+      !['ts', 'ic'].every(field => typeof weather[field] === 'string') ||
+      !['tp', 'pr', 'hu', 'ws', 'wd'].every(field => typeof weather[field] === 'number')
+    ) {
+      throw createApiServiceError(
+        'IQAir AirVisual returned incomplete current air quality or weather measurements. Try another location or retry later.',
+        { reason: 'iqair_observation_unavailable' }
+      );
+    }
+    return data as unknown as T;
   }
 
   async listCountries(): Promise<Array<{ country: string }>> {
-    return this.get('/countries');
+    return this.list('/countries', 'country');
   }
 
   async listStates(country: string): Promise<Array<{ state: string }>> {
-    return this.get('/states', { country });
+    this.validateNames({ country });
+    return this.list('/states', 'state', { country });
   }
 
   async listCities(country: string, state: string): Promise<Array<{ city: string }>> {
-    return this.get('/cities', { state, country });
+    this.validateNames({ country, state });
+    return this.list('/cities', 'city', { state, country });
   }
 
   async listStations(
@@ -51,25 +164,23 @@ export class Client {
     state: string,
     city: string
   ): Promise<Array<{ station: string }>> {
-    return this.get('/stations', { city, state, country });
+    this.validateNames({ country, state, city });
+    return this.list('/stations', 'station', { city, state, country });
   }
 
   async getCityData(country: string, state: string, city: string): Promise<CityData> {
-    return this.get('/city', { city, state, country });
+    this.validateNames({ country, state, city });
+    return this.getObservation('/city', { city, state, country });
   }
 
   async getNearestCity(lat?: number, lon?: number): Promise<CityData> {
-    return this.get('/nearest_city', {
-      lat: lat !== undefined ? lat : undefined,
-      lon: lon !== undefined ? lon : undefined
-    });
+    this.validateCoordinates(lat, lon);
+    return this.getObservation('/nearest_city', { lat, lon });
   }
 
   async getNearestStation(lat?: number, lon?: number): Promise<StationData> {
-    return this.get('/nearest_station', {
-      lat: lat !== undefined ? lat : undefined,
-      lon: lon !== undefined ? lon : undefined
-    });
+    this.validateCoordinates(lat, lon);
+    return this.getObservation('/nearest_station', { lat, lon });
   }
 
   async getStationData(
@@ -78,11 +189,28 @@ export class Client {
     city: string,
     station: string
   ): Promise<StationData> {
-    return this.get('/station', { station, city, state, country });
+    this.validateNames({ country, state, city, station });
+    return this.getObservation('/station', { station, city, state, country });
   }
 
   async getCityRanking(): Promise<CityRankingEntry[]> {
-    return this.get('/city_ranking');
+    let data = await this.get<unknown>('/city_ranking');
+    if (
+      !Array.isArray(data) ||
+      data.some(
+        entry =>
+          !isApiErrorRecord(entry) ||
+          !['city', 'state', 'country'].every(field => typeof entry[field] === 'string') ||
+          !isApiErrorRecord(entry.ranking) ||
+          typeof entry.ranking.current_aqi !== 'number' ||
+          typeof entry.ranking.current_aqi_cn !== 'number'
+      )
+    ) {
+      throw createApiServiceError('IQAir AirVisual returned an invalid city ranking.', {
+        reason: 'iqair_invalid_response'
+      });
+    }
+    return data as CityRankingEntry[];
   }
 }
 
@@ -94,6 +222,7 @@ export interface WeatherData {
   ws: number;
   wd: number;
   ic: string;
+  heatIndex?: number;
 }
 
 export interface PollutantDetail {
@@ -130,14 +259,17 @@ export interface CityData {
     weather: WeatherData;
     pollution: PollutionData;
   };
-  forecasts?: Record<string, any>[];
+  units?: Record<string, string>;
+  forecasts?: Record<string, unknown>[];
+  forecasts_daily?: Record<string, unknown>[];
   history?: {
-    weather?: Record<string, any>[];
-    pollution?: Record<string, any>[];
+    weather?: Record<string, unknown>[];
+    pollution?: Record<string, unknown>[];
   };
 }
 
 export interface StationData extends CityData {
+  name?: string;
   station?: string;
 }
 

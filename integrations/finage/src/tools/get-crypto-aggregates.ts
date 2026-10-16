@@ -1,6 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import {
+  finageBar,
+  finageNumber,
+  finageRecord,
+  finageRecords,
+  finageSymbol,
+  validateFinageLimit,
+  validateFinageRange
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getCryptoAggregates = SlateTool.create(spec, {
@@ -28,6 +37,7 @@ export let getCryptoAggregates = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       symbol: z.string().describe('Crypto pair symbol'),
       totalResults: z.number().optional().describe('Total number of results'),
       bars: z
@@ -46,33 +56,24 @@ export let getCryptoAggregates = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-    let symbol = ctx.input.symbol.toUpperCase();
-
+    let symbol = finageSymbol(ctx.input.symbol);
+    validateFinageRange(ctx.input.from, ctx.input.to);
+    validateFinageLimit(ctx.input.limit, 'Limit', 50000);
+    validateFinageLimit(ctx.input.multiplier, 'Multiplier');
+    if (![1, 3, 5, 15, 30].includes(ctx.input.multiplier))
+      throw createApiServiceError('Crypto multipliers must be 1, 3, 5, 15, or 30.');
     let data = await client.getCryptoAggregates({
-      symbol,
-      multiplier: ctx.input.multiplier,
-      timespan: ctx.input.timespan,
-      from: ctx.input.from,
-      to: ctx.input.to,
-      limit: ctx.input.limit,
-      sort: ctx.input.sort
+      ...ctx.input,
+      symbol
     });
-
-    let results = data.results || [];
-    let bars = results.map((r: any) => ({
-      open: r.o,
-      high: r.h,
-      low: r.l,
-      close: r.c,
-      volume: r.v,
-      timestamp: r.t
-    }));
-
+    let response = finageRecord(data);
+    let bars = finageRecords(data, ['results']).map(finageBar);
     return {
       output: {
         symbol,
-        totalResults: data.totalResults ?? bars.length,
-        bars
+        totalResults: finageNumber(response.totalResults),
+        bars,
+        raw: data
       },
       message: `Retrieved **${bars.length}** ${ctx.input.timespan} bars for **${symbol}** from ${ctx.input.from} to ${ctx.input.to}.`
     };

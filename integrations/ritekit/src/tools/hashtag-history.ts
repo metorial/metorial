@@ -31,6 +31,7 @@ Use this to analyze a hashtag's performance trajectory and identify patterns ove
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       history: z
         .array(historyEntrySchema)
         .describe('Daily historical stats for the past 30 days')
@@ -43,7 +44,7 @@ Use this to analyze a hashtag's performance trajectory and identify patterns ove
     let history = result.data || [];
 
     return {
-      output: { history },
+      output: { history, raw: { ...result } },
       message: `Retrieved **${history.length}** days of history for #${ctx.input.hashtag}.`
     };
   })

@@ -1,12 +1,12 @@
 {
   "name": "@metorial/linguapop",
-  "description": "Send CEFR-aligned language placement tests to candidates and receive detailed proficiency results. Fetch available test languages, create and send test invitations with customizable options (reading/listening sections, kiosk mode, email delivery), and receive webhook callbacks with granular CEFR level results including numeric ratings, sub-level codes, and score breakdowns.",
+  "description": "Discover available languages and create CEFR-aligned placement test invitations with email, kiosk, reading, listening, and completion callback options.",
   "categories": ["education-and-learning", "hr-and-recruiting"],
   "skills": [
     "fetch available test languages",
     "send placement test invitations",
     "configure test skill sections",
-    "retrieve CEFR proficiency levels",
+    "configure completion callbacks",
     "generate kiosk test codes",
     "map candidates to external IDs",
     "customize test delivery options"

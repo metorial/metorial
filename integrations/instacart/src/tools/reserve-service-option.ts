@@ -6,15 +6,17 @@ import { spec } from '../spec';
 export let reserveServiceOption = SlateTool.create(spec, {
   name: 'Reserve Service Option',
   key: 'reserve_service_option',
-  description: `Reserve a delivery or pickup time slot for a Connect user. The reservation holds the time slot for 10 minutes. Use the returned serviceOptionHoldId when creating an order. A user can only have one active reservation at a time.
+  description: `DEPRECATED — use \`reserve_time_slot\` instead. Reserve a delivery or pickup time slot for a Connect user. The reservation holds the time slot for 10 minutes. Use the returned serviceOptionHoldId when creating an order. A user can only have one active reservation at a time.
 
 Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope.`,
   instructions: [
+    'Use reserve_time_slot for the current reservation API after listing the completed cart.',
     'Use "List Cart Service Options" to get available serviceOptionIds first.',
     'Reservations expire after 10 minutes — send the reservation request near the end of checkout.',
     'A new reservation for the same user cancels any previous reservation.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

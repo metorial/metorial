@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { programIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
-let transactionSchema = z.object({
+export let transactionSchema = z.object({
+  raw: z.record(z.string(), z.any()).optional().describe('Complete provider resource'),
   transactionId: z.string().describe('Unique identifier of the transaction'),
   programId: z.string().optional().describe('ID of the program'),
   cardId: z.string().optional().describe('Token ID of the card used'),
@@ -49,7 +51,7 @@ export let getTransaction = SlateTool.create(spec, {
   .input(
     z.object({
       transactionId: z.string().describe('ID of the transaction to retrieve'),
-      programId: z.string().describe('ID of the program the transaction belongs to')
+      programId: programIdInput
     })
   )
   .output(transactionSchema)
@@ -59,6 +61,7 @@ export let getTransaction = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: tx,
         transactionId: tx.id,
         programId: tx.programId,
         cardId: tx.cardId ?? tx.card?.id,
@@ -67,14 +70,14 @@ export let getTransaction = SlateTool.create(spec, {
         accountId: tx.accountId,
         amount: tx.amount,
         currency: tx.currency,
-        scheme: tx.scheme,
+        scheme: tx.scheme ?? tx.card?.scheme,
         lastNumbers: tx.lastNumbers ?? tx.card?.lastNumbers,
         firstNumbers: tx.firstNumbers ?? tx.card?.firstNumbers,
         auth: tx.auth,
         cleared: tx.cleared,
         live: tx.live,
         merchantId: tx.identifiers?.MID ?? tx.merchantId,
-        merchantName: tx.merchantName ?? tx.location?.address,
+        merchantName: tx.merchantName ?? tx.descriptor?.merchantName,
         wallet: tx.wallet,
         created: tx.created,
         updated: tx.updated,
@@ -97,13 +100,18 @@ export let listTransactions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('ID of the program to list transactions for'),
+      programId: programIdInput,
       cardId: z
         .string()
         .optional()
         .describe('Optional card ID to filter transactions for a specific card'),
       from: z.string().optional().describe('Start date for filtering (ISO 8601 format)'),
       to: z.string().optional().describe('End date for filtering (ISO 8601 format)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('JSON.stringify(last) from the previous page. Do not URL-encode it.'),
+      order: z.enum(['asc', 'desc']).optional().describe('Sort by creation date'),
       start: z.number().optional().describe('Offset for pagination'),
       limit: z.number().optional().describe('Maximum number of transactions to return')
     })
@@ -111,7 +119,12 @@ export let listTransactions = SlateTool.create(spec, {
   .output(
     z.object({
       transactions: z.array(transactionSchema).describe('List of transactions'),
-      count: z.number().optional().describe('Total number of transactions')
+      last: z
+        .any()
+        .optional()
+        .describe('Provider continuation key; serialize it as JSON for cursor'),
+      raw: z.record(z.string(), z.any()).optional().describe('Complete provider response'),
+      count: z.number().optional().describe('Number of returned transactions')
     })
   )
   .handleInvocation(async ctx => {
@@ -123,6 +136,8 @@ export let listTransactions = SlateTool.create(spec, {
         from: ctx.input.from,
         to: ctx.input.to,
         start: ctx.input.start,
+        cursor: ctx.input.cursor,
+        order: ctx.input.order,
         limit: ctx.input.limit
       });
     } else {
@@ -130,12 +145,15 @@ export let listTransactions = SlateTool.create(spec, {
         from: ctx.input.from,
         to: ctx.input.to,
         start: ctx.input.start,
+        cursor: ctx.input.cursor,
+        order: ctx.input.order,
         limit: ctx.input.limit
       });
     }
 
     let items = data?.items ?? [];
     let transactions = items.map((tx: any) => ({
+      raw: tx,
       transactionId: tx.id,
       programId: tx.programId,
       cardId: tx.cardId ?? tx.card?.id,
@@ -144,14 +162,14 @@ export let listTransactions = SlateTool.create(spec, {
       accountId: tx.accountId,
       amount: tx.amount,
       currency: tx.currency,
-      scheme: tx.scheme,
+      scheme: tx.scheme ?? tx.card?.scheme,
       lastNumbers: tx.lastNumbers ?? tx.card?.lastNumbers,
       firstNumbers: tx.firstNumbers ?? tx.card?.firstNumbers,
       auth: tx.auth,
       cleared: tx.cleared,
       live: tx.live,
       merchantId: tx.identifiers?.MID ?? tx.merchantId,
-      merchantName: tx.merchantName ?? tx.location?.address,
+      merchantName: tx.merchantName ?? tx.descriptor?.merchantName,
       wallet: tx.wallet,
       created: tx.created,
       updated: tx.updated,
@@ -162,7 +180,9 @@ export let listTransactions = SlateTool.create(spec, {
     return {
       output: {
         transactions,
-        count: data?.resource?.total ?? transactions.length
+        count: data?.count,
+        last: data?.last,
+        raw: data.rawResponse ?? data
       },
       message: `Found **${transactions.length}** transaction(s)${ctx.input.cardId ? ` for card \`${ctx.input.cardId}\`` : ''}.`
     };
@@ -181,13 +201,17 @@ export let createTestTransaction = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      programId: z.string().describe('ID of the program'),
+      programId: programIdInput,
       cardId: z.string().describe('ID of the card to simulate a transaction for'),
       locationId: z
         .string()
         .describe('ID of the location where the simulated transaction occurs'),
       amount: z.number().describe('Transaction amount'),
-      currency: z.string().describe('ISO 4217 currency code (e.g., GBP, USD, EUR)')
+      currency: z
+        .string()
+        .describe(
+          'Legacy currency context; Fidel derives the simulated transaction currency from the location'
+        )
     })
   )
   .output(transactionSchema)
@@ -202,6 +226,7 @@ export let createTestTransaction = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: tx,
         transactionId: tx.id,
         programId: tx.programId,
         cardId: tx.cardId ?? tx.card?.id,
@@ -210,14 +235,14 @@ export let createTestTransaction = SlateTool.create(spec, {
         accountId: tx.accountId,
         amount: tx.amount,
         currency: tx.currency,
-        scheme: tx.scheme,
+        scheme: tx.scheme ?? tx.card?.scheme,
         lastNumbers: tx.lastNumbers ?? tx.card?.lastNumbers,
         firstNumbers: tx.firstNumbers ?? tx.card?.firstNumbers,
         auth: tx.auth,
         cleared: tx.cleared,
         live: tx.live,
         merchantId: tx.identifiers?.MID ?? tx.merchantId,
-        merchantName: tx.merchantName,
+        merchantName: tx.merchantName ?? tx.descriptor?.merchantName,
         wallet: tx.wallet,
         created: tx.created,
         updated: tx.updated,

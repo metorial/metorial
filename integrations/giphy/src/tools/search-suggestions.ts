@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requestContextFields, responseMetadataFields } from '../lib/types';
 import { spec } from '../spec';
 
 export let searchSuggestions = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let searchSuggestions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: requestContextFields.customerId,
       mode: z
         .enum(['trending', 'related', 'autocomplete', 'categories'])
         .describe(
@@ -39,6 +41,7 @@ export let searchSuggestions = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       trendingTerms: z
         .array(z.string())
         .optional()
@@ -69,30 +72,30 @@ export let searchSuggestions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
 
     if (ctx.input.mode === 'trending') {
       let result = await client.trendingSearchTerms();
       return {
-        output: { trendingTerms: result.terms },
+        output: { raw: result.raw, trendingTerms: result.terms },
         message: `Found ${result.terms.length} trending search terms.`
       };
     }
 
     if (ctx.input.mode === 'related') {
       if (!ctx.input.query) {
-        throw new Error('A query is required for "related" mode.');
+        throw createApiServiceError('A query is required for "related" mode.');
       }
       let result = await client.searchSuggestions(ctx.input.query);
       return {
-        output: { relatedTerms: result.suggestions },
+        output: { raw: result.raw, relatedTerms: result.suggestions },
         message: `Found ${result.suggestions.length} related terms for "${ctx.input.query}".`
       };
     }
 
     if (ctx.input.mode === 'autocomplete') {
       if (!ctx.input.query) {
-        throw new Error('A query is required for "autocomplete" mode.');
+        throw createApiServiceError('A query is required for "autocomplete" mode.');
       }
       let result = await client.autocomplete({
         query: ctx.input.query,
@@ -100,7 +103,7 @@ export let searchSuggestions = SlateTool.create(spec, {
         offset: ctx.input.offset
       });
       return {
-        output: { autocompleteTags: result.tags },
+        output: { raw: result.raw, autocompleteTags: result.tags },
         message: `Found ${result.tags.length} autocomplete suggestions for "${ctx.input.query}".`
       };
     }
@@ -108,7 +111,7 @@ export let searchSuggestions = SlateTool.create(spec, {
     // categories mode
     let result = await client.getCategories();
     return {
-      output: { categories: result.categories },
+      output: { raw: result.raw, categories: result.categories },
       message: `Found ${result.categories.length} content categories.`
     };
   })

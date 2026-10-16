@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MonitoringClient } from '../lib/client';
+import { minerstatHistoryEntries } from '../lib/response';
 import { spec } from '../spec';
 
 export let getWorkerHistoryTool = SlateTool.create(spec, {
@@ -32,6 +33,7 @@ export let getWorkerHistoryTool = SlateTool.create(spec, {
     z.object({
       workerName: z.string().describe('Name of the queried worker'),
       dataType: z.string().describe('Type of data returned'),
+      response: z.any().optional().describe('Original API response'),
       entries: z.array(z.record(z.string(), z.any())).describe('Historical data entries')
     })
   )
@@ -52,21 +54,18 @@ export let getWorkerHistoryTool = SlateTool.create(spec, {
         result = await client.getWorkerStatistics(ctx.input.workerName, params);
         break;
       case 'activity':
-        result = await client.getWorkerActivity(ctx.input.workerName);
+        result = await client.getWorkerActivity(ctx.input.workerName, params);
         break;
     }
 
-    let entries = Array.isArray(result)
-      ? result
-      : typeof result === 'object'
-        ? Object.values(result)
-        : [];
+    let entries = minerstatHistoryEntries(result);
 
     return {
       output: {
         workerName: ctx.input.workerName,
         dataType: ctx.input.dataType,
-        entries: entries as any[]
+        entries,
+        response: result
       },
       message: `Retrieved **${entries.length}** ${ctx.input.dataType} entries for worker **${ctx.input.workerName}**.`
     };

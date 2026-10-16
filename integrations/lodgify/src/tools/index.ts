@@ -7,6 +7,7 @@ export * from './get-enquiry';
 export * from './get-message-thread';
 export * from './get-property';
 export * from './get-quote';
+export * from './get-rate-settings';
 export * from './get-rates';
 export * from './list-bookings';
 export * from './list-deleted-properties';

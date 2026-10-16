@@ -39,7 +39,7 @@ export let listUsers = SlateTool.create(spec, {
       output: {
         users: users.map(user => ({
           userId: user.id,
-          fullName: user.full_name ?? null,
+          fullName: user.full_name,
           accessLevel: user.access_level
         }))
       },

@@ -34,7 +34,7 @@ export let getTemplate = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let template = await client.getTemplate(ctx.input.templateId);
-    let urlResult = await client.getTemplateUrl(ctx.input.templateId).catch(() => null);
+    let urlResult = await client.getTemplateUrl(ctx.input.templateId);
 
     return {
       output: {

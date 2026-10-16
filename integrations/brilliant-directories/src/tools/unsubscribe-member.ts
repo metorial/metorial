@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,8 @@ export let unsubscribeMember = SlateTool.create(spec, {
   name: 'Unsubscribe From Emails',
   key: 'unsubscribe_from_emails',
   description: `Unsubscribe a member from receiving email campaigns. Only one member can be unsubscribed at a time.
-Can also retrieve or manage unsubscribe records.`,
+Can also retrieve or manage unsubscribe records. Deleting a record re-enables marketing emails to that address.`,
+  tags: { destructive: true },
   constraints: ['Only one member can be unsubscribed at a time.']
 })
   .input(
@@ -32,6 +33,10 @@ Can also retrieve or manage unsubscribe records.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       unsubscribeRecord: z.any().describe('The unsubscribe record or confirmation message.')
     })
   )
@@ -45,7 +50,7 @@ Can also retrieve or manage unsubscribe records.`,
     switch (ctx.input.action) {
       case 'get':
         if (!ctx.input.unsubscribeId)
-          throw new Error('unsubscribeId is required for get action.');
+          throw createApiServiceError('unsubscribeId is required for get action.');
         result = await client.getUnsubscribe(ctx.input.unsubscribeId);
         break;
       case 'create': {
@@ -56,13 +61,14 @@ Can also retrieve or manage unsubscribe records.`,
             data[key] = value;
           }
         }
+        if (!data.email) throw createApiServiceError('email is required for create action.');
         result = await client.createUnsubscribe(data);
         break;
       }
       case 'update': {
         if (!ctx.input.unsubscribeId)
-          throw new Error('unsubscribeId is required for update action.');
-        let data: Record<string, any> = { unsub_id: ctx.input.unsubscribeId };
+          throw createApiServiceError('unsubscribeId is required for update action.');
+        let data: Record<string, any> = { id: ctx.input.unsubscribeId };
         if (ctx.input.email) data.email = ctx.input.email;
         if (ctx.input.additionalFields) {
           for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
@@ -74,7 +80,7 @@ Can also retrieve or manage unsubscribe records.`,
       }
       case 'delete':
         if (!ctx.input.unsubscribeId)
-          throw new Error('unsubscribeId is required for delete action.');
+          throw createApiServiceError('unsubscribeId is required for delete action.');
         result = await client.deleteUnsubscribe(ctx.input.unsubscribeId);
         break;
     }
@@ -82,6 +88,7 @@ Can also retrieve or manage unsubscribe records.`,
     return {
       output: {
         status: result.status,
+        raw: result,
         unsubscribeRecord: result.message
       },
       message: `Completed unsubscribe ${ctx.input.action} action.`

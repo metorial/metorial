@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CrowTerminalClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ Use **action: list** to see existing slots, **create** to add new ones, **toggle
     'Use "delete" to permanently remove a schedule slot.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -105,7 +105,7 @@ Use **action: list** to see existing slots, **create** to add new ones, **toggle
         !ctx.input.platform ||
         !ctx.input.accountId
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'dayOfWeek, time, platform, and accountId are required to create a schedule slot.'
         );
       }
@@ -133,7 +133,7 @@ Use **action: list** to see existing slots, **create** to add new ones, **toggle
 
     if (action === 'toggle') {
       if (!ctx.input.slotId) {
-        throw new Error('slotId is required to toggle a schedule slot.');
+        throw createApiServiceError('slotId is required to toggle a schedule slot.');
       }
       let enabled = ctx.input.enabled !== undefined ? ctx.input.enabled : true;
       let slot = await client.toggleScheduleSlot(ctx.input.slotId, enabled);
@@ -155,7 +155,7 @@ Use **action: list** to see existing slots, **create** to add new ones, **toggle
 
     if (action === 'delete') {
       if (!ctx.input.slotId) {
-        throw new Error('slotId is required to delete a schedule slot.');
+        throw createApiServiceError('slotId is required to delete a schedule slot.');
       }
       await client.deleteScheduleSlot(ctx.input.slotId);
 
@@ -165,6 +165,6 @@ Use **action: list** to see existing slots, **create** to add new ones, **toggle
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

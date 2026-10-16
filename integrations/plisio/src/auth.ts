@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { requireText } from './lib/response';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,6 +18,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      requireText(ctx.input.token, 'API key');
       return {
         output: {
           token: ctx.input.token

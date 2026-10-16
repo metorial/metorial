@@ -1,6 +1,6 @@
 {
   "name": "@metorial/veriphone",
-  "description": "Validate, format, and enrich phone numbers worldwide. Verify if a phone number is valid and retrieve metadata including country, region, carrier, line type (mobile, landline, toll-free, etc.), and formatted representations (international, local, E.164). Generate example phone numbers for any country and phone type combination for testing purposes.",
+  "description": "Validate and format phone numbers, retrieve original or current carrier information, generate example numbers, check account credits and carrier coverage, and verify CSV lists with downloadable results.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
   "skills": [
     "validate phone numbers",
@@ -9,6 +9,9 @@
     "format phone numbers",
     "identify phone country and region",
     "generate example phone numbers",
-    "enrich contact data"
+    "enrich contact data",
+    "lookup current carriers",
+    "check verification credits",
+    "verify phone numbers in CSV files"
   ]
 }

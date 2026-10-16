@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -48,6 +48,18 @@ export let manageValetOrderTool = SlateTool.create(spec, {
     });
 
     let { action, orderId } = ctx.input;
+
+    if (
+      action === 'update' &&
+      !Object.values(ctx.input.updateFields ?? {}).some(value => value !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide at least one updateFields value for the update action.'
+      );
+    }
+    if (action === 'complete_step' && !ctx.input.stepId?.trim()) {
+      throw createApiServiceError('stepId is required for the complete_step action.');
+    }
 
     if (action === 'update') {
       let valetOrder = await client.updateValetOrder(orderId, ctx.input.updateFields || {});

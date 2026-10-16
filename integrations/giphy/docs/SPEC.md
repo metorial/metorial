@@ -1,87 +1,44 @@
-# Slates Specification for Giphy
+# GIPHY integration
 
-## Overview
+Search and discover GIFs, stickers, channels, animated emoji, and related search terms. Retrieve media metadata by ID, upload remote media, create anonymous end-user identifiers, and register real content interactions.
 
-GIPHY is a GIF search engine and hosting platform that provides access to a library of millions of GIFs, stickers, clips, and animated emoji. The GIPHY API is a set of endpoints for fetching and displaying GIFs, Stickers, and other GIPHY content in your app. It also supports uploading GIF and video content to GIPHY channels.
+## Authentication and defaults
 
-## Authentication
+Use a GIPHY Developer Dashboard API key. API requests send `api_key`; remote uploads send the key and upload parameters in the JSON request body, matching the [official upload example](https://developers.giphy.com/docs/resource/). No OAuth refresh or account identity endpoint is documented for this API. Creator metadata on GIFs and channels describes the content owner; it does not identify the API-key owner. A random ID identifies an anonymous end user, not the connected account.
 
-GIPHY uses **API Key** authentication. The Giphy API requires API key authentication for all requests. You can pass your API key as a query parameter in your API requests, or you can include it in the request headers.
+Optional connection defaults select the rating and search language. Existing explicit tool inputs take precedence through the established truthy fallback; absent parameters retain provider defaults. No opaque resource ID is required in connection configuration.
 
-To obtain an API key:
+Beta keys allow 100 API calls per hour. Uploads with rate-limited keys are limited to 10 per day and cannot specify a channel username; approved production upload keys use the assigned username. Media uploads accept GIFs or video up to 100 MB. If an upload response lacks the required GIF ID, the tool reports that uncertainty and advises checking the channel before retrying; it never invents an ID.
 
-1. Create a GIPHY API Key by clicking "Create an API Key" on the Developer Dashboard (you need to create an account first).
-2. The API key is passed as a query parameter `api_key` on each request. For example: `https://api.giphy.com/v1/gifs/trending?api_key=YOUR_API_KEY`
-3. Create separate keys for each platform (iOS, Android, Web) and section. If you're using a GIPHY integration in different sections of your app, GIPHY requires that each use of our service be delineated by a different key for each section per platform.
+## Tool coverage
 
-All keys start as beta keys. If you need more than 100 API calls per hour you will need to upgrade your API Key to production status via your dashboard.
+All paths below use `https://api.giphy.com`, except uploads and analytics.
 
-## Features
+| Tool | Documented operations |
+| --- | --- |
+| `search_gifs` | `GET /v1/gifs/search` or `/v1/stickers/search`; query, pagination, rating, language, rendition bundle, channel IDs, contrast filter |
+| `trending_content` | `GET /v1/gifs/trending` or `/v1/stickers/trending`; pagination, rating, rendition bundle, contrast filter |
+| `translate_to_gif` | `GET /v1/gifs/translate` or `/v1/stickers/translate` using `s` |
+| `random_gif` | `GET /v1/gifs/random` or `/v1/stickers/random` using optional `tag` |
+| `get_gifs` | `GET /v1/gifs/{gif_id}` for one ID, or `/v1/gifs?ids=...` for up to 100 IDs |
+| `animated_emoji` | `GET /v2/emoji` or `/v2/emoji/{gif_id}/variations` |
+| `search_suggestions` | `GET /v1/trending/searches`, `/v1/tags/related/{term}`, `/v1/gifs/search/tags`, or `/v1/gifs/categories` |
+| `search_channels` | `GET /v1/channels/search` |
+| `upload_gif` | `POST https://upload.giphy.com/v1/gifs` with remote URL, tags, source link, and optional assigned username |
+| `create_random_id` | `GET /v1/randomid`; retain the actual returned identifier as `customerId` for the same user |
+| `register_action` | `GET` to the corresponding provider-returned analytics URL; append actual interaction timestamp `ts` and stable end-user `customer_id` |
 
-### GIF and Sticker Search
+Documented endpoints accept optional `customer_id`. GIF search, trending, translation, random, retrieval, and upload additionally accept the end user's country and region. Search accepts up to five channel IDs. Provider pagination bounds include a maximum search offset of 4999 and trending offset of 499. Existing schemas remain compatible; the provider validates its request limits.
 
-Search GIPHY's library of millions of GIFs and stickers by entering a word or phrase. GIPHY Search gives you instant access to our library of millions of GIFs and Stickers by entering a word or phrase. With our unparalleled search algorithm, users can easily express themselves and animate their conversations.
+Complete provider responses are available in `raw`. GIFs also expose original raw metadata, analytics URLs, alt text, variation count, and unchanged rendition URLs. No search or discovery call automatically registers an analytics event. Analytics requests are restricted to the documented HTTPS host and path, do not follow redirects, and never receive the API key.
 
-- Supports filtering by content rating (g, pg, pg-13, r).
-- Supports language parameter for multilingual search.
-- Returns multiple renditions of each result in various sizes and formats (MP4, WEBP, GIF).
+## Display and delivery requirements
 
-### Trending Content
+GIPHY requires attribution and direct client API/media requests. Keep media URLs unchanged, including query parameters. Media caching and proxying require explicit approval from GIPHY; this integration exposes metadata and does not add media downloads. Deployment must satisfy the provider's client-request policy. Clips require separate provider approval and are not included. This package uses one GIPHY content API product; GIF, sticker, emoji, upload, and discovery operations do not require separate product categories. No webhook API is documented.
 
-GIPHY Trending returns a list of the most relevant and engaging content each and every day. Our feed of trending content is continuously updated, so you always have the latest and greatest at your fingertips.
+## Official references
 
-- Available for both GIFs and stickers.
-- Can be filtered by content rating.
-
-### Translate (Word-to-GIF)
-
-GIPHY Translate converts words and phrases to the perfect GIF or Sticker using GIPHY's special sauce algorithm. This feature is best exhibited in GIPHY's Slack integration.
-
-- Returns a single GIF or sticker that best matches the input text.
-
-### Random GIF
-
-GIPHY Random lets you add some weirdness to the conversation by returning a single random GIF or Sticker related to the word or phrase entered. If no tag is specified, the GIF or Sticker returned is completely random.
-
-### Retrieve GIFs by ID
-
-Fetch specific GIF or sticker objects by their unique GIPHY ID. Supports fetching a single GIF or multiple GIFs by providing an array of IDs.
-
-### Animated Emoji
-
-GIPHY has released a feature across all GIPHY apps and platforms that makes GIPHY's uniquely diverse emoji library more accessible than ever. Pairing custom artwork with a purpose-built API endpoint, GIPHY emojis allow you to bring animated reaction emojis to your users with style and ease.
-
-- If the `variation_count` value is populated with a number greater than 0, it indicates that the emoji has some number of variations. These variations represent different stylings or skin tones for that emoji.
-
-### Search Discovery Tools
-
-- **Trending Searches**: Returns a set of search terms that are "trending" across the GIPHY network. These results are updated hourly, and are sourced from both humans and algorithms.
-- **Search Suggestions**: Returns a set of related search queries for a given query.
-- **Autocomplete**: Returns a list of searches matching a given string of characters. While there are many ways to utilize this endpoint, one of the most useful means is for search query autocomplete.
-- **Categories**: Returns the list of high-level content categories and their respective subcategories, which we use to classify our GIF content.
-
-### Upload
-
-The documentation describes how to upload animated GIFs or videos to Giphy.com using the API. You can use the endpoint to upload your content, attach tags and other meta tag in a single HTTP or HTTPS POST request.
-
-- Accepts a local file or a source URL.
-- Supports tagging content and specifying a source URL.
-- Production Upload keys require a Giphy Channel Username to upload, host, and post content to.
-- Files up to 100MB are supported.
-
-### Clips (GIFs with Sound)
-
-Access to Clips endpoints is only available upon approval. Please reach out to clips@giphy.com to request permission.
-
-- Supports search and trending for short video clips with audio.
-- Can be filtered by content rating and rendition bundles.
-
-### Analytics / Action Register
-
-The GIPHY Action Register endpoint registers each time a user views, clicks, or sends a GIF or Sticker, helping GIPHY improve your users' search results.
-
-- Tracks user interactions (view, click, send) to personalize future results.
-
-## Events
-
-The provider does not support events. GIPHY's API is read-oriented (search, trending, random) and write-oriented (upload, analytics) but does not offer webhooks or event subscription mechanisms.
+- [Endpoints and parameters](https://developers.giphy.com/docs/api/endpoint/)
+- [GIF, rendition, pagination, analytics, emoji, and channel schemas](https://developers.giphy.com/docs/api/schema/)
+- [Authentication, rate limits, attribution, and delivery requirements](https://developers.giphy.com/docs/api/)
+- [Remote-upload request example](https://developers.giphy.com/docs/resource/)

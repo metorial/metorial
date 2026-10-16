@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,8 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Listen Notes API key from your API Dashboard')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('Enter a Listen Notes API key from your API Dashboard.');
       return {
         output: {
           token: ctx.input.token

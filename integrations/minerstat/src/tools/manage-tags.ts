@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,7 @@ export let manageTagsTool = SlateTool.create(spec, {
   ],
   constraints: ['Requires a Bearer token (private API)'],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -48,8 +48,18 @@ export let manageTagsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.token) {
-      throw new Error(
+      throw createApiServiceError(
         'Bearer token is required for tag management. Use the "API Credentials" authentication method.'
+      );
+    }
+
+    if (
+      ctx.input.action !== 'list' &&
+      ctx.input.tagName &&
+      !/^(POOL:|WALLET:).+/.test(ctx.input.tagName)
+    ) {
+      throw createApiServiceError(
+        'tagName must start with POOL: or WALLET: followed by the tag name.'
       );
     }
 
@@ -67,7 +77,7 @@ export let manageTagsTool = SlateTool.create(spec, {
       }
       case 'create': {
         if (!ctx.input.tagName || !ctx.input.address) {
-          throw new Error('tagName and address are required to create a tag.');
+          throw createApiServiceError('tagName and address are required to create a tag.');
         }
         ctx.progress(`Creating tag ${ctx.input.tagName}...`);
         result = await client.createTag({
@@ -79,7 +89,7 @@ export let manageTagsTool = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.tagName || !ctx.input.address) {
-          throw new Error('tagName and address are required to update a tag.');
+          throw createApiServiceError('tagName and address are required to update a tag.');
         }
         ctx.progress(`Updating tag ${ctx.input.tagName}...`);
         result = await client.updateTag({
@@ -91,7 +101,7 @@ export let manageTagsTool = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.tagName) {
-          throw new Error('tagName is required to delete a tag.');
+          throw createApiServiceError('tagName is required to delete a tag.');
         }
         ctx.progress(`Deleting tag ${ctx.input.tagName}...`);
         result = await client.deleteTag({

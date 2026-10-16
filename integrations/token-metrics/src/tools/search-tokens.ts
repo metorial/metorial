@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchTokens = SlateTool.create(spec, {
@@ -43,6 +43,10 @@ export let searchTokens = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       tokens: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of token objects with details')
@@ -65,10 +69,10 @@ export let searchTokens = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let tokens = result?.data ?? [];
+    let tokens = getRecords(result);
 
     return {
-      output: { tokens },
+      output: { tokens, raw: result },
       message: `Found **${tokens.length}** token(s).`
     };
   })

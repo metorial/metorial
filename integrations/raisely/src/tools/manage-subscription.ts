@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RaiselyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -58,7 +58,7 @@ export let manageSubscription = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.campaignUuid) {
-        throw new Error('campaignUuid is required for creating a subscription');
+        throw createApiServiceError('campaignUuid is required for creating a subscription');
       }
       let data: Record<string, any> = {};
       if (ctx.input.amount !== undefined) data.amount = ctx.input.amount;
@@ -74,12 +74,12 @@ export let manageSubscription = SlateTool.create(spec, {
       let subscription = result.data || result;
       return {
         output: { subscription },
-        message: `Created recurring subscription of **${ctx.input.amount}** (smallest unit) ${ctx.input.frequency || 'MONTHLY'}.`
+        message: 'Created recurring subscription.'
       };
     }
 
     if (!ctx.input.subscriptionUuid) {
-      throw new Error('subscriptionUuid is required for updating a subscription');
+      throw createApiServiceError('subscriptionUuid is required for updating a subscription');
     }
     let data: Record<string, any> = {};
     if (ctx.input.amount !== undefined) data.amount = ctx.input.amount;

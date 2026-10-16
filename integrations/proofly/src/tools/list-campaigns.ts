@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prooflyBoolean, prooflyId, prooflyString } from '../lib/response';
 import { spec } from '../spec';
 
 export let listCampaigns = SlateTool.create(spec, {
@@ -24,7 +25,12 @@ export let listCampaigns = SlateTool.create(spec, {
             enabled: z
               .boolean()
               .optional()
-              .describe('Whether the campaign is currently active')
+              .describe('Whether the campaign is currently active'),
+            includeSubdomains: z
+              .boolean()
+              .optional()
+              .describe('Whether subdomains are included'),
+            createdAt: z.string().optional().describe('Campaign creation timestamp')
           })
         )
         .describe('List of campaigns in the account')
@@ -32,18 +38,21 @@ export let listCampaigns = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data = await client.listCampaigns();
-
-    let campaigns = Array.isArray(data) ? data : (data.campaigns ?? []);
+    let campaigns = await client.listCampaigns();
 
     return {
       output: {
-        campaigns: campaigns.map((c: any) => ({
-          campaignId: String(c.id ?? c._id ?? c.campaignId),
-          name: c.name ?? c.title,
-          domain: c.domain ?? c.website ?? c.url,
-          enabled: c.enabled ?? c.active ?? c.is_enabled
-        }))
+        campaigns: campaigns.map(c => {
+          let domain = isApiErrorRecord(c.domain) ? c.domain : {};
+          return {
+            campaignId: prooflyId(c.id ?? c._id ?? c.campaignId, 'campaign'),
+            name: prooflyString(c.name, c.title),
+            domain: prooflyString(domain.domain, c.domain, c.website, c.url),
+            enabled: prooflyBoolean(c.enabled, c.active, c.is_enabled),
+            includeSubdomains: prooflyBoolean(domain.subdomains),
+            createdAt: prooflyString(c.created)
+          };
+        })
       },
       message: `Found **${campaigns.length}** campaign(s).`
     };

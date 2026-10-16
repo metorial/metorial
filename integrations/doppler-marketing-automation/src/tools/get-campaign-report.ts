@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, rawSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCampaignReport = SlateTool.create(spec, {
@@ -20,11 +20,19 @@ Only available for campaigns that have been sent.`,
   )
   .output(
     z.object({
+      raw: rawSchema
+        .optional()
+        .describe('Original provider response, with credentials removed'),
       campaignId: z.number().describe('Campaign ID'),
       campaignName: z.string().describe('Campaign name'),
       campaignSubject: z.string().describe('Campaign subject line'),
       campaignStatus: z.string().describe('Campaign status'),
-      deliveryRate: z.number().describe('Percentage of emails successfully delivered'),
+      deliveryRate: z
+        .number()
+        .optional()
+        .describe(
+          'Successful deliveries divided by total recipients, as a percentage. Omitted when there are no recipients.'
+        ),
       totalShipped: z.number().describe('Total number of emails sent'),
       uniqueOpens: z.number().describe('Number of unique opens'),
       totalOpens: z.number().describe('Total number of opens (including repeats)'),
@@ -50,6 +58,7 @@ Only available for campaigns that have been sent.`,
 
     return {
       output: {
+        raw: report.raw,
         campaignId: report.campaignId,
         campaignName: report.campaignName,
         campaignSubject: report.campaignSubject,
@@ -67,7 +76,7 @@ Only available for campaigns that have been sent.`,
         softBounces: report.softBounces,
         totalUnsubscribes: report.totalUnsubscribes
       },
-      message: `Campaign **${report.campaignName}**: ${report.deliveryRate}% delivery rate, ${report.uniqueOpens} unique opens, ${report.uniqueClicks} unique clicks, ${report.hardBounces + report.softBounces} bounces.`
+      message: `Campaign **${report.campaignName}**: ${report.uniqueOpens} unique opens, ${report.uniqueClicks} unique clicks, ${report.hardBounces + report.softBounces} bounces.`
     };
   })
   .build();

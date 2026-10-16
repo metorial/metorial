@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createRole = SlateTool.create(spec, {
   name: 'Create Role',
   key: 'create_role',
-  description: `Create a new role in a Revolt server with a name and optional rank for hierarchy ordering.`,
+  description: `Create a new role in a Stoat server. Legacy rank is accepted but ignored by current servers.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -16,7 +16,12 @@ export let createRole = SlateTool.create(spec, {
     z.object({
       serverId: z.string().describe('ID of the server to create the role in'),
       name: z.string().describe('Name for the new role'),
-      rank: z.number().optional().describe('Rank for role hierarchy (lower = higher priority)')
+      rank: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy role rank; current servers ignore this field. Use role ordering in the client.'
+        )
     })
   )
   .output(
@@ -36,7 +41,7 @@ export let createRole = SlateTool.create(spec, {
     return {
       output: {
         roleId: result.id,
-        name: ctx.input.name
+        name: result.role.name
       },
       message: `Created role **${ctx.input.name}** (\`${result.id}\`) in server \`${ctx.input.serverId}\``
     };
@@ -46,7 +51,7 @@ export let createRole = SlateTool.create(spec, {
 export let editRole = SlateTool.create(spec, {
   name: 'Edit Role',
   key: 'edit_role',
-  description: `Edit a role's properties in a Revolt server including name, colour, hoist status, and rank. Only fields provided will be updated.`,
+  description: `Edit a role's properties in a Stoat server including name, colour, and hoist status. Legacy rank is accepted but ignored by current servers. Only fields provided will be updated.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -65,7 +70,12 @@ export let editRole = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Whether the role should be displayed separately in the member list'),
-      rank: z.number().optional().describe('Role hierarchy rank (lower = higher priority)'),
+      rank: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy role rank; current servers ignore this field. Use role ordering in the client.'
+        ),
       removeFields: z
         .array(z.enum(['Colour']))
         .optional()
@@ -91,7 +101,7 @@ export let editRole = SlateTool.create(spec, {
 
     return {
       output: {
-        roleId: ctx.input.roleId,
+        roleId: result._id,
         name: result.name
       },
       message: `Updated role **${result.name}** (\`${ctx.input.roleId}\`) in server \`${ctx.input.serverId}\``
@@ -102,7 +112,7 @@ export let editRole = SlateTool.create(spec, {
 export let deleteRole = SlateTool.create(spec, {
   name: 'Delete Role',
   key: 'delete_role',
-  description: `Delete a role from a Revolt server. Members with this role will lose it.`,
+  description: `Delete a role from a Stoat server. Members with this role will lose it.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -127,6 +137,39 @@ export let deleteRole = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Deleted role \`${ctx.input.roleId}\` from server \`${ctx.input.serverId}\``
+    };
+  })
+  .build();
+
+export let fetchRole = SlateTool.create(spec, {
+  name: 'Fetch Role',
+  key: 'fetch_role',
+  description: 'Fetch a server role, including its permission overrides and current rank.',
+  tags: { readOnly: true }
+})
+  .input(z.object({ serverId: z.string(), roleId: z.string() }))
+  .output(
+    z.object({
+      roleId: z.string(),
+      name: z.string(),
+      permissions: z.object({ a: z.number(), d: z.number() }),
+      colour: z.string().optional(),
+      hoist: z.boolean().optional(),
+      rank: z.number().optional()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let role = await createClient(ctx).fetchRole(ctx.input.serverId, ctx.input.roleId);
+    return {
+      output: {
+        roleId: role._id,
+        name: role.name,
+        permissions: role.permissions,
+        colour: role.colour ?? undefined,
+        hoist: role.hoist ?? undefined,
+        rank: role.rank ?? undefined
+      },
+      message: `Fetched role **${role.name}**.`
     };
   })
   .build();

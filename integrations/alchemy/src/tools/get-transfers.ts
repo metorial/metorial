@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlchemyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -53,6 +53,7 @@ Use this to look up transaction history, track asset movements, or audit token f
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Provider transfer response'),
       transfers: z
         .array(
           z.object({
@@ -90,6 +91,17 @@ Use this to look up transaction history, track asset movements, or audit token f
       network: ctx.config.network
     });
 
+    if (ctx.input.category.length === 0)
+      throw createApiServiceError('Select at least one transfer category.');
+    if (
+      ctx.input.maxCount !== undefined &&
+      (!/^0x[0-9a-f]+$/i.test(ctx.input.maxCount) ||
+        BigInt(ctx.input.maxCount) < 1n ||
+        BigInt(ctx.input.maxCount) > 1000n)
+    ) {
+      throw createApiServiceError('maxCount must be a hex integer between 0x1 and 0x3e8.');
+    }
+
     let result = await client.getAssetTransfers({
       fromAddress: ctx.input.fromAddress,
       toAddress: ctx.input.toAddress,
@@ -104,15 +116,15 @@ Use this to look up transaction history, track asset movements, or audit token f
       pageKey: ctx.input.pageKey
     });
 
-    let transfers = (result.transfers || []).map((t: any) => ({
+    let transfers = result.transfers.map(t => ({
       from: t.from,
       to: t.to,
       value: t.value,
       asset: t.asset,
       category: t.category,
       blockNum: t.blockNum,
-      transactionHash: t.hash || t.uniqueId,
-      tokenId: t.tokenId || null,
+      transactionHash: t.hash,
+      tokenId: t.tokenId,
       rawContract: t.rawContract
         ? {
             address: t.rawContract.address,
@@ -130,8 +142,9 @@ Use this to look up transaction history, track asset movements, or audit token f
     let address = ctx.input.fromAddress || ctx.input.toAddress || 'specified address';
     return {
       output: {
+        raw: result,
         transfers,
-        pageKey: result.pageKey || undefined
+        pageKey: result.pageKey ?? undefined
       },
       message: `Found **${transfers.length}** transfer(s) for \`${address}\`. Categories: ${ctx.input.category.join(', ')}.${result.pageKey ? ' More results available with pagination.' : ''}`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let managePod = SlateTool.create(spec, {
     'You cannot delete a pod that still has inboxes or domains. Remove them first.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -50,7 +50,7 @@ export let managePod = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.podId) throw new Error('podId is required for delete action');
+    if (!ctx.input.podId) throw createApiServiceError('podId is required for delete action');
     await client.deletePod(ctx.input.podId);
 
     return {

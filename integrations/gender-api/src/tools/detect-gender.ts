@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,8 +23,11 @@ let localizationSchema = z.object({
 let detailsSchema = z.object({
   creditsUsed: z.number().describe('Number of API credits consumed by this request'),
   samples: z.number().describe('Number of matching records found in the database'),
-  country: z.string().nullable().describe('Country used for localization, if any'),
-  firstNameSanitized: z.string().describe('Normalized lowercase version of the first name'),
+  country: z.string().nullable().optional().describe('Country used for localization, if any'),
+  firstNameSanitized: z
+    .string()
+    .optional()
+    .describe('Normalized lowercase version of the first name'),
   duration: z.string().describe('Server-side processing time')
 });
 
@@ -35,7 +38,7 @@ export let detectGender = SlateTool.create(spec, {
   instructions: [
     'Provide exactly one of: firstName, fullName, or email.',
     "Use the country parameter with an ISO 3166-1 alpha-2 code for best accuracy when the person's country is known.",
-    'When using fullName, enable strict mode if you want the API to only extract a last name when it can be confidently identified.'
+    'The legacy strict option is forwarded for fullName queries. Current documentation only guarantees strict surname handling on API v1.'
   ],
   tags: {
     readOnly: true
@@ -59,7 +62,7 @@ export let detectGender = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe(
-          'When using fullName, if true the API will not guess the last name when uncertain'
+          'Legacy full-name option, forwarded unchanged; current documentation only guarantees strict mode on API v1'
         ),
       country: localizationSchema.shape.country,
       locale: localizationSchema.shape.locale,
@@ -76,7 +79,8 @@ export let detectGender = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('The extracted last name (only for full name or email queries)'),
-      details: detailsSchema
+      details: detailsSchema,
+      raw: z.record(z.string(), z.unknown()).describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -96,7 +100,8 @@ export let detectGender = SlateTool.create(spec, {
           probability: result.probability,
           resultFound: result.resultFound,
           firstName: result.firstName,
-          details: result.details
+          details: result.details,
+          raw: result.raw
         },
         message: `**${result.firstName}** is predicted as **${result.gender}** with ${Math.round(result.probability * 100)}% probability (${result.details.samples} samples).`
       };
@@ -118,7 +123,8 @@ export let detectGender = SlateTool.create(spec, {
           resultFound: result.resultFound,
           firstName: result.firstName,
           lastName: result.lastName,
-          details: result.details
+          details: result.details,
+          raw: result.raw
         },
         message: `**${result.firstName}${result.lastName ? ` ${result.lastName}` : ''}** is predicted as **${result.gender}** with ${Math.round(result.probability * 100)}% probability (${result.details.samples} samples).`
       };
@@ -139,12 +145,13 @@ export let detectGender = SlateTool.create(spec, {
           resultFound: result.resultFound,
           firstName: result.firstName,
           lastName: result.lastName,
-          details: result.details
+          details: result.details,
+          raw: result.raw
         },
         message: `Email **${ctx.input.email}** resolved to **${result.firstName}${result.lastName ? ` ${result.lastName}` : ''}**, predicted as **${result.gender}** with ${Math.round(result.probability * 100)}% probability.`
       };
     }
 
-    throw new Error('Provide one of: firstName, fullName, or email.');
+    throw createApiServiceError('Provide one of: firstName, fullName, or email.');
   })
   .build();

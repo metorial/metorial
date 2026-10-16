@@ -1,4 +1,19 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+export let eodhdArray = (data: unknown, operation: string, field?: string) => {
+  let records = field && isApiErrorRecord(data) ? data[field] : data;
+  if (!Array.isArray(records)) {
+    throw createApiServiceError(`EODHD returned an unexpected response for ${operation}.`, {
+      reason: 'invalid_response'
+    });
+  }
+  return records;
+};
 
 export class EodhdClient {
   private token: string;
@@ -6,8 +21,37 @@ export class EodhdClient {
 
   constructor(config: { token: string }) {
     this.token = config.token;
-    this.http = createAxios({
-      baseURL: 'https://eodhd.com/api'
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://eodhd.com/api',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'EODHD',
+          reason: 'api_request_failed',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      let data = response.data;
+      if (
+        isApiErrorRecord(data) &&
+        (data.error || (typeof data.status === 'number' && data.status >= 400))
+      ) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'EODHD',
+            reason: 'api_request_failed',
+            extractStatus: () =>
+              typeof data.status === 'number' ? data.status : response.status
+          }
+        );
+      }
+      if (typeof data === 'string' && /^\s*(?:<!doctype\s+html|<html)\b/i.test(data)) {
+        throw createApiServiceError('EODHD returned an HTML page instead of financial data.', {
+          reason: 'invalid_response'
+        });
+      }
+      return response;
     });
   }
 
@@ -26,7 +70,7 @@ export class EodhdClient {
       order?: string;
     }
   ) {
-    let response = await this.http.get(`/eod/${symbol}`, {
+    let response = await this.http.get(`/eod/${encodeURIComponent(symbol)}`, {
       params: this.params({
         from: options?.from,
         to: options?.to,
@@ -47,9 +91,9 @@ export class EodhdClient {
       to?: number;
     }
   ) {
-    let response = await this.http.get(`/intraday/${symbol}`, {
+    let response = await this.http.get(`/intraday/${encodeURIComponent(symbol)}`, {
       params: this.params({
-        interval: options?.interval,
+        interval: options?.interval ?? '5m',
         from: options?.from,
         to: options?.to
       })
@@ -60,7 +104,7 @@ export class EodhdClient {
   // ─── Live / Real-Time Prices ───────────────────────────────────────
 
   async getLivePrices(symbol: string, additionalSymbols?: string[]) {
-    let response = await this.http.get(`/real-time/${symbol}`, {
+    let response = await this.http.get(`/real-time/${encodeURIComponent(symbol)}`, {
       params: this.params({
         s: additionalSymbols?.join(',')
       })
@@ -76,7 +120,7 @@ export class EodhdClient {
       filter?: string;
     }
   ) {
-    let response = await this.http.get(`/fundamentals/${symbol}`, {
+    let response = await this.http.get(`/fundamentals/${encodeURIComponent(symbol)}`, {
       params: this.params({
         filter: options?.filter
       })
@@ -95,7 +139,7 @@ export class EodhdClient {
       bondsOnly?: number;
     }
   ) {
-    let response = await this.http.get(`/search/${query}`, {
+    let response = await this.http.get(`/search/${encodeURIComponent(query)}`, {
       params: this.params({
         limit: options?.limit,
         type: options?.type,
@@ -182,7 +226,7 @@ export class EodhdClient {
       splitAdjustedOnly?: number;
     }
   ) {
-    let response = await this.http.get(`/technical/${symbol}`, {
+    let response = await this.http.get(`/technical/${encodeURIComponent(symbol)}`, {
       params: this.params({
         function: options.function,
         period: options.period,
@@ -238,7 +282,7 @@ export class EodhdClient {
       to?: string;
     }
   ) {
-    let response = await this.http.get(`/div/${symbol}`, {
+    let response = await this.http.get(`/div/${encodeURIComponent(symbol)}`, {
       params: this.params({
         from: options?.from,
         to: options?.to
@@ -254,7 +298,7 @@ export class EodhdClient {
       to?: string;
     }
   ) {
-    let response = await this.http.get(`/splits/${symbol}`, {
+    let response = await this.http.get(`/splits/${encodeURIComponent(symbol)}`, {
       params: this.params({
         from: options?.from,
         to: options?.to
@@ -294,7 +338,7 @@ export class EodhdClient {
       contractName?: string;
     }
   ) {
-    let response = await this.http.get(`/options/${symbol}`, {
+    let response = await this.http.get(`/options/${encodeURIComponent(symbol)}`, {
       params: this.params({
         from: options?.from,
         to: options?.to,
@@ -314,7 +358,7 @@ export class EodhdClient {
       indicator?: string;
     }
   ) {
-    let response = await this.http.get(`/macro-indicator/${country}`, {
+    let response = await this.http.get(`/macro-indicator/${encodeURIComponent(country)}`, {
       params: this.params({
         indicator: options?.indicator
       })
@@ -338,12 +382,15 @@ export class EodhdClient {
       delisted?: number;
     }
   ) {
-    let response = await this.http.get(`/exchange-symbol-list/${exchangeCode}`, {
-      params: this.params({
-        type: options?.type,
-        delisted: options?.delisted
-      })
-    });
+    let response = await this.http.get(
+      `/exchange-symbol-list/${encodeURIComponent(exchangeCode)}`,
+      {
+        params: this.params({
+          type: options?.type,
+          delisted: options?.delisted
+        })
+      }
+    );
     return response.data;
   }
 
@@ -358,15 +405,44 @@ export class EodhdClient {
       filter?: string;
     }
   ) {
-    let response = await this.http.get(`/eod-bulk-last-day/${exchangeCode}`, {
-      params: this.params({
-        type: options?.type,
-        date: options?.date,
-        symbols: options?.symbols,
-        filter: options?.filter
-      })
-    });
+    let response = await this.http.get(
+      `/eod-bulk-last-day/${encodeURIComponent(exchangeCode)}`,
+      {
+        params: this.params({
+          type: options?.type,
+          date: options?.date,
+          symbols: options?.symbols,
+          filter: options?.filter
+        })
+      }
+    );
     return response.data;
+  }
+
+  async getEconomicEvents(options: {
+    type?: string;
+    from?: string;
+    to?: string;
+    country?: string;
+    comparison?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    let response = await this.http.get('/economic-events', { params: this.params(options) });
+    return eodhdArray(response.data, 'economic events');
+  }
+
+  async getExchangeDetails(exchangeCode?: string) {
+    let path = exchangeCode
+      ? `/v2/exchange-details/${encodeURIComponent(exchangeCode)}`
+      : '/v2/exchange-details';
+    let response = await this.http.get(path, { params: this.params() });
+    if (!isApiErrorRecord(response.data)) {
+      throw createApiServiceError('EODHD returned invalid exchange details.', {
+        reason: 'invalid_response'
+      });
+    }
+    return response.data.data;
   }
 
   // ─── User ──────────────────────────────────────────────────────────
@@ -375,6 +451,11 @@ export class EodhdClient {
     let response = await this.http.get('/user', {
       params: this.params()
     });
+    if (!isApiErrorRecord(response.data)) {
+      throw createApiServiceError('EODHD returned invalid account details.', {
+        reason: 'invalid_response'
+      });
+    }
     return response.data;
   }
 }

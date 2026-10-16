@@ -49,6 +49,7 @@ Use this to extract specific information, summarize content, or answer questions
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       answer: z
         .unknown()
         .describe(
@@ -77,16 +78,19 @@ Use this to extract specific information, summarize content, or answer questions
       useSuperior: ctx.input.useSuperior
     });
 
-    let answerPreview =
+    let answerText =
       typeof result.answer === 'string'
-        ? result.answer.substring(0, 150)
-        : JSON.stringify(result.answer).substring(0, 150);
+        ? result.answer
+        : (JSON.stringify(result.answer) ?? 'No answer content returned.');
+    let answerPreview = answerText.substring(0, 150);
 
     return {
       output: {
+        raw: result,
         answer: result.answer,
         requestInfo: result.requestInfo
       },
-      message: `Queried \`${ctx.input.url}\` with: "${ctx.input.query}"\n\nAnswer: ${answerPreview}${answerPreview.length >= 150 ? '...' : ''}`
+      message: `Queried \`${ctx.input.url}\` with: "${ctx.input.query}"\n\nAnswer: ${answerPreview}${answerText.length > 150 ? '...' : ''}`
     };
-  });
+  })
+  .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRecord, responseSeries, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCryptoPrice = SlateTool.create(spec, {
@@ -31,6 +32,7 @@ export let getCryptoPrice = SlateTool.create(spec, {
       symbol: z.string().describe('Cryptocurrency symbol'),
       market: z.string().describe('Market currency'),
       lastRefreshed: z.string().describe('Timestamp of the latest data point'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       prices: z
         .array(
           z.object({
@@ -40,7 +42,7 @@ export let getCryptoPrice = SlateTool.create(spec, {
             low: z.string().describe('Lowest price'),
             close: z.string().describe('Closing price'),
             volume: z.string().describe('Trading volume'),
-            marketCap: z.string().describe('Market capitalization')
+            marketCap: z.string().describe('Market capitalization in USD')
           })
         )
         .describe('Price data points, most recent first')
@@ -59,24 +61,35 @@ export let getCryptoPrice = SlateTool.create(spec, {
       data = await client.cryptoMonthly({ symbol, market });
     }
 
-    let metaData = data['Meta Data'] || {};
-    let lastRefreshed = metaData['6. Last Refreshed'] || '';
+    let metaData = responseRecord(data['Meta Data'], 'metadata');
+    let lastRefreshed = responseText(metaData['6. Last Refreshed'], ' Last Refreshed');
 
-    let timeSeriesKey = Object.keys(data).find(k => k !== 'Meta Data') || '';
-    let timeSeries = data[timeSeriesKey] || {};
+    let timeSeries = responseSeries(data);
 
     let prices = Object.entries(timeSeries).map(([date, values]: [string, any]) => ({
       date,
-      open: values['1a. open (USD)'] || values['1. open'] || '',
-      high: values['2a. high (USD)'] || values['2. high'] || '',
-      low: values['3a. low (USD)'] || values['3. low'] || '',
-      close: values['4a. close (USD)'] || values['4. close'] || '',
-      volume: values['5. volume'] || '',
-      marketCap: values['6. market cap (USD)'] || ''
+      open: responseText(
+        values[`1a. open (${market.toUpperCase()})`] ?? values[`1. open`],
+        'open in requested market currency'
+      ),
+      high: responseText(
+        values[`2a. high (${market.toUpperCase()})`] ?? values[`2. high`],
+        'high in requested market currency'
+      ),
+      low: responseText(
+        values[`3a. low (${market.toUpperCase()})`] ?? values[`3. low`],
+        'low in requested market currency'
+      ),
+      close: responseText(
+        values[`4a. close (${market.toUpperCase()})`] ?? values[`4. close`],
+        'close in requested market currency'
+      ),
+      volume: responseText(values['5. volume'], ' volume'),
+      marketCap: responseText(values['6. market cap (USD)'], 'market cap (USD)')
     }));
 
     return {
-      output: { symbol, market, lastRefreshed, prices },
+      output: { symbol, market, lastRefreshed, prices, raw: data },
       message: `Retrieved ${prices.length} ${resolution} price data points for **${symbol}** in ${market}.`
     };
   })

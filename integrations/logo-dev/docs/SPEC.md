@@ -1,56 +1,39 @@
-# Slates Specification for Logo.dev
-
-## Overview
-
-Logo.dev is an API service that provides access to company logos from a database of tens of millions of companies. It provides company logos, brand colors, social links, and brand data from domains. It supports looking up logos by domain, stock ticker, crypto symbol, ISIN, and company name, as well as searching for domains by brand name.
+# Logo.dev specification
 
 ## Authentication
 
-Logo.dev uses API key authentication with two types of keys:
+Configure a secret key (`sk_...`) for API requests. It is sent server-side as an `Authorization: Bearer` header to `api.logo.dev`. Configure the optional publishable key (`pk_...`) to use `get_logo_url`; this key belongs in the CDN URL's `token` parameter and is safe to embed in a website or application. Each key works only on its own host.
 
-- **Publishable Key** (prefixed `pk_...`): Publishable keys are automatically secured for safe client-side use. They can be used anywhere — browsers, mobile apps, client-side code. They only work with the `img.logo.dev` image CDN. The publishable key is passed as a `token` query parameter on image URLs:
+The publishable key can be omitted for search, profiles, and image downloads. CDN display URLs require it. If domain restrictions are enabled, the displaying application must send an allowed `Referer` header. API keys do not use OAuth or token refresh. There are no connection-level resource IDs.
 
-  ```
-  https://img.logo.dev/shopify.com?token=YOUR_PUBLISHABLE_KEY
-  ```
+## Tools
 
-- **Secret Key** (prefixed `sk_...`): Required server-side only for search, describe, and other API endpoints. Never expose this key. The secret key is passed as a Bearer token in the `Authorization` header:
-  ```
-  Authorization: Bearer YOUR_SECRET_KEY
-  ```
+| Tool | API and behavior |
+| --- | --- |
+| `get_logo_url` | Builds an `img.logo.dev` display URL by domain, ticker, crypto symbol, ISIN, or company name. Supports JPG, PNG, WebP, size, width, height, light/dark theme, greyscale, retina, monogram/404 fallback, and redirect handling. Requires the publishable key. |
+| `search_brands` | Calls `GET /v2/search`, returning names, domains, and display URLs. Existing `strategy` maps to the provider's `method`; the existing typeahead default is retained. Optional `limit` accepts 1–25, default 10. |
+| `lookup_brand` | Calls `GET /v2/brands` with exactly one identifier, or `GET /v2/brands/{id}` for a stable brand ID. Returns the profile, colors, socials, logo/brandmark/banner metadata, and request metadata. Uses `nosubscribe=true` to avoid automatically creating a webhook subscription. |
+| `download_brand_image` | Calls `GET /v2/brands/logo` or `/v2/brands/brandmark`, then provides the signed file for download with its actual metadata. Supports JPG, PNG, WebP, size, and light/dark theme; PNG is the download default. |
+| `describe_brand` | Deprecated legacy `GET /describe/{domain}`. Retains its original input/output contract and invocation handler for accounts already enabled for Describe. Use `lookup_brand` for current profiles. Missing data needed by its legacy output is reported as an error. |
 
-Both keys can be viewed and managed in the Logo.dev dashboard at `https://www.logo.dev/dashboard`. To rotate keys, contact support@logo.dev to have new keys generated.
+Tool groups separate Logo CDN, Brand API, and Search API. Search and brand requests consume API credits. Legacy Describe is restricted to enabled accounts. No suitable public account/profile/self endpoint is documented, so the integration does not invent an identity tool.
 
-## Features
+## Images and status handling
 
-### Logo Image Retrieval
+CDN URLs are for displaying images. Use `download_brand_image` when a file is needed for storage, documents, email, or processing. CDN images are not downloaded to build a separate copy.
 
-Retrieve company logo images via a CDN-based image URL. Logos can be looked up by domain (e.g., `shopify.com`), stock ticker (e.g., `AAPL`), cryptocurrency symbol (e.g., `BTC`), ISIN (e.g., `US0378331005`), or company name.
+A download uses the provider's signed asset URL, with the selected rendering parameters. Signed URLs expire at the actual provider `expires_at` value. Download links are renewed before expiry using the returned stable brand ID, image kind, and rendering options; credentials are never stored in the renewal reference. New download outputs contain image metadata rather than a signed URL or file contents. The legacy Describe logo URL remains unchanged for compatibility.
 
-- **Format**: Supports `jpg` (default), `png`, and `webp`. SVG is available on Enterprise plans only.
-- **Size**: Configurable via a `size` parameter (default 128px, max 800px).
-- **Theme**: A `theme` parameter (`dark` or `light`) adjusts logo colors for visibility on different backgrounds.
-- **Greyscale**: A `greyscale` parameter desaturates logos, useful for normalizing colors on landing pages.
-- **Retina**: A `retina=true` parameter doubles image resolution for high-density displays.
-- **Fallback**: When no logo is found, returns a monogram by default. Can be set to `fallback=404` to return a 404 instead.
+A ready v2 response returns its actual profile or image. A `202` returns `not_indexed` with retry guidance. Retry after `metadata.pending.retry_after_seconds` and stop after `expires_in_seconds`. A documented `404` lookup miss returns `not_found`; image misses can also mean the brand lacks a logo or brandmark. Other API errors retain provider messages and error codes. Malformed required response data is an error, without invented IDs, statuses, descriptions, or timestamps.
 
-### Brand Search
+CDN sizing uses whole pixels up to 800; retina doubles the rendered resolution. The dark theme requires PNG or WebP. Commercial use on the free plan may require Logo.dev attribution. The provider exposes webhook management and a separate private-beta Transaction API; neither is implemented here.
 
-Search for company domains by brand name with autocomplete support. Returns up to 10 results sorted by popularity.
+## Official references
 
-- **Query**: The brand name to search for.
-- **Strategy**: `typeahead` (default, prefix-forward matching for autocomplete UX) or `match` (exact/near-exact name matching).
-- Requires a secret key. Returns an array of objects containing company name and domain.
-
-### Brand Describe (Enrichment)
-
-Retrieve comprehensive brand data for a given domain, including company name, description, logo URL, brand colors, blurhash placeholder, and social media links.
-
-- Supported social sites include Facebook, GitHub, Instagram, LinkedIn, Pinterest, Reddit, Snapchat, Telegram, Tumblr, Twitter/X, WeChat, WhatsApp, and YouTube.
-- Returns prominent brand colors as RGB and hex values.
-- Returns a blurhash string for generating blurred placeholder images while logos load.
-- Requires a secret key and is available on paid plans only.
-
-## Events
-
-The provider does not support events.
+- [Documentation index](https://www.logo.dev/docs/llms.txt)
+- [Current OpenAPI](https://www.logo.dev/docs/openapi.json) and [retired v1 OpenAPI](https://www.logo.dev/docs/openapi-v1.json)
+- [API keys](https://www.logo.dev/docs/platform/api-keys)
+- [Brand profiles](https://www.logo.dev/docs/brand/introduction)
+- [Search](https://www.logo.dev/docs/brand-search/introduction)
+- [Logo downloads](https://www.logo.dev/docs/api-reference/logos/get-a-logo) and [brandmark downloads](https://www.logo.dev/docs/api-reference/logos/get-a-brandmark)
+- [Self-hosting](https://www.logo.dev/docs/platform/self-hosting) and [errors/status codes](https://www.logo.dev/docs/platform/errors)

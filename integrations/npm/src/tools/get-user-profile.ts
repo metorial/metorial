@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NpmRegistryClient } from '../lib/client';
+import { record, text } from '../lib/response';
 import { spec } from '../spec';
 
 export let getUserProfile = SlateTool.create(spec, {
@@ -23,16 +24,18 @@ export let getUserProfile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new NpmRegistryClient({ token: ctx.auth.token });
-    let profile = await client.getUserProfile();
+    let profile = record(await client.getUserProfile(), 'user profile');
+    let username = text(profile.name, 'username');
+    let email = text(profile.email, 'profile email');
 
     return {
       output: {
-        username: profile.name,
-        email: profile.email,
-        tfa: profile.tfa,
-        ...profile
+        ...profile,
+        username,
+        email,
+        tfa: profile.tfa
       },
-      message: `Retrieved profile for **${profile.name || 'unknown user'}**.`
+      message: `Retrieved profile for **${username}**.`
     };
   })
   .build();

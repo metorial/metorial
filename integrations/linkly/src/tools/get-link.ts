@@ -95,7 +95,7 @@ export let getLink = SlateTool.create(spec, {
         expiryClicks: link.expiry_clicks,
         rules: link.rules
       },
-      message: `Retrieved link **${link.full_url || link.id}** → ${link.url} (${link.clicks_total ?? 0} total clicks)`
+      message: `Retrieved link **${link.full_url || link.id}** → ${link.url}${typeof link.clicks_total === 'number' ? ` (${link.clicks_total} total clicks)` : ''}`
     };
   })
   .build();

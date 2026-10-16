@@ -18,12 +18,16 @@ let apodItemSchema = z.object({
 export let getApod = SlateTool.create(spec, {
   name: 'Get Astronomy Picture of the Day',
   key: 'get_apod',
-  description: `Retrieve NASA's Astronomy Picture of the Day (APOD). Get a single day's featured astronomical image or video along with its title, explanation, and metadata. Supports fetching by specific date, date range, or random selection.`,
+  description: `DEPRECATED — use get_apod_entries instead. Retrieve NASA's Astronomy Picture of the Day (APOD). Get a single day's featured astronomical image or video along with its title, explanation, and metadata. Supports fetching by specific date, date range, or random selection.`,
+  instructions: [
+    'Use get_apod_entries for the current NASA article permalink and separately identified media URLs.'
+  ],
   constraints: [
     'Date range queries are limited to a maximum span of about 100 days.',
     'When using count, date/startDate/endDate cannot be specified.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

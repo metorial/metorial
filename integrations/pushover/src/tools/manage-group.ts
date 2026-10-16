@@ -1,14 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PushoverClient } from '../lib/client';
+import { groupKeySchema, groupMemberSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let groupMemberSchema = z.object({
-  userKey: z.string().describe('Pushover user key of the group member'),
-  device: z.string().describe('Device restriction (empty if none)'),
-  memo: z.string().describe('Free-text memo about the member'),
-  disabled: z.boolean().describe('Whether the member is temporarily disabled')
-});
 
 export let manageGroup = SlateTool.create(spec, {
   name: 'Manage Group',
@@ -30,10 +24,7 @@ export let manageGroup = SlateTool.create(spec, {
       action: z
         .enum(['list', 'create', 'get', 'rename'])
         .describe('The group operation to perform'),
-      groupKey: z
-        .string()
-        .optional()
-        .describe('Group key (required for get and rename actions)'),
+      groupKey: groupKeySchema.optional(),
       name: z
         .string()
         .optional()
@@ -83,7 +74,7 @@ export let manageGroup = SlateTool.create(spec, {
       }
 
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for create action');
+        if (!ctx.input.name) throw createApiServiceError('name is required for create action');
         let result = await client.createGroup(ctx.input.name);
         return {
           output: {
@@ -94,7 +85,8 @@ export let manageGroup = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.groupKey) throw new Error('groupKey is required for get action');
+        if (!ctx.input.groupKey)
+          throw createApiServiceError('groupKey is required for get action');
         let result = await client.getGroup(ctx.input.groupKey);
         return {
           output: {
@@ -102,9 +94,11 @@ export let manageGroup = SlateTool.create(spec, {
             groupName: result.name,
             members: result.users.map(u => ({
               userKey: u.user,
-              device: u.device,
-              memo: u.memo,
-              disabled: u.disabled
+              device: u.device ?? '',
+              memo: u.memo ?? '',
+              disabled: u.disabled,
+              name: u.name,
+              email: u.email
             }))
           },
           message: `Group "${result.name}" has **${result.users.length}** member(s).`
@@ -112,8 +106,9 @@ export let manageGroup = SlateTool.create(spec, {
       }
 
       case 'rename': {
-        if (!ctx.input.groupKey) throw new Error('groupKey is required for rename action');
-        if (!ctx.input.name) throw new Error('name is required for rename action');
+        if (!ctx.input.groupKey)
+          throw createApiServiceError('groupKey is required for rename action');
+        if (!ctx.input.name) throw createApiServiceError('name is required for rename action');
         await client.renameGroup(ctx.input.groupKey, ctx.input.name);
         return {
           output: {

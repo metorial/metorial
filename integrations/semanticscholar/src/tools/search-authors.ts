@@ -49,7 +49,7 @@ Use the **fields** parameter to control which author metadata is returned.`,
   )
   .output(
     z.object({
-      total: z.number().describe('Total number of matching authors'),
+      total: z.number().describe('Approximate total number of matching authors'),
       offset: z.number().optional().describe('Current pagination offset'),
       next: z.number().optional().describe('Next offset value for pagination'),
       authors: z.array(authorSchema).describe('List of matching authors')
@@ -64,16 +64,16 @@ Use the **fields** parameter to control which author metadata is returned.`,
       limit: ctx.input.limit
     });
 
-    let authors = result.data || [];
+    let authors = result.data;
 
     return {
       output: {
-        total: result.total ?? 0,
+        total: result.total,
         offset: result.offset,
         next: result.next,
         authors
       },
-      message: `Found **${result.total ?? 0}** authors matching "${ctx.input.query}". Returned **${authors.length}** in this page.`
+      message: `Found approximately **${result.total}** authors matching "${ctx.input.query}". Returned **${authors.length}** in this page.`
     };
   })
   .build();

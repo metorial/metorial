@@ -20,8 +20,22 @@ export let getGroup = SlateTool.create(spec, {
     z.object({
       groupId: z.string().describe('ID of the group'),
       name: z.string().describe('Name of the group'),
-      certificateDesignId: z.string().nullable().describe('Certificate design ID'),
-      badgeDesignId: z.string().nullable().describe('Badge design ID'),
+      designIds: z
+        .array(z.string())
+        .optional()
+        .describe('Ordered design IDs associated with this credential template'),
+      certificateDesignId: z
+        .string()
+        .nullable()
+        .describe(
+          'Legacy certificate design ID when returned by Certifier; otherwise null. Use designIds for the ordered designs.'
+        ),
+      badgeDesignId: z
+        .string()
+        .nullable()
+        .describe(
+          'Legacy badge design ID when returned by Certifier; otherwise null. Use designIds for the ordered designs.'
+        ),
       learningEventUrl: z.string().nullable().describe('Learning event URL'),
       createdAt: z.string().describe('Creation timestamp'),
       updatedAt: z.string().describe('Last update timestamp')
@@ -34,9 +48,10 @@ export let getGroup = SlateTool.create(spec, {
     return {
       output: {
         groupId: group.id,
+        designIds: group.designIds,
         name: group.name,
-        certificateDesignId: group.certificateDesignId,
-        badgeDesignId: group.badgeDesignId,
+        certificateDesignId: group.certificateDesignId ?? null,
+        badgeDesignId: group.badgeDesignId ?? null,
         learningEventUrl: group.learningEventUrl,
         createdAt: group.createdAt,
         updatedAt: group.updatedAt

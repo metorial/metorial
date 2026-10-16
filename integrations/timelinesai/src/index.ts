@@ -2,8 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getChats,
+  getFileUrl,
   getMessages,
+  getWorkspace,
   getWorkspaceInfo,
+  listChatLabels,
   listWhatsAppAccounts,
   manageChat,
   manageFiles,
@@ -14,6 +17,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getFileUrl,
+    getWorkspace,
+    listChatLabels,
     sendMessage,
     getChats,
     getMessages,

@@ -1,66 +1,19 @@
-Now let me check the OpenAPI spec for more details on features and webhooks:I now have enough information to write the specification.
+# Sensibo integration specification
 
-# Slates Specification for Sensibo
+The integration uses the [Sensibo HTTP API](https://support.sensibo.com/api/) with a query API key created in account settings. Requests enable gzip compression. API keys are owned only by authentication; no device ID or account ID is required in connection configuration. API-key rotation is managed in Sensibo account settings; commercial OAuth is not implemented because its endpoints and scopes are not public.
 
-## Overview
+`list_devices` discovers authorized devices. `get_device` returns the current state, measurements, supported modes, current-mode capabilities, and complete device data with credentials redacted. The temperature range uses the device's actual current temperature unit. `get_ac_states` reads up to 20 recent state records. `set_ac_state` validates requested values against the device's reported capabilities and includes the current state for single-property updates.
 
-Sensibo is a smart climate control platform that provides IoT devices (Sky, Air, Air Pro, Pure, Elements, Room Sensor, Door/Window Sensor) for remote control and monitoring of air conditioners and air purifiers. The API allows programmatic control of AC states, access to environmental sensor data, scheduling, and automation features. Sensibo also offers Airbend, a commercial/enterprise platform for managing devices across organizations in bulk.
+`get_measurements` reads historical temperature and humidity. `get_device_events` maps the documented event identifiers, kind, description, and timestamp. The existing history inputs accept 1–7 whole days; the provider controls actual history availability. No seven-day retention guarantee is made.
 
-## Authentication
+Timers and the current schedule tool use the [official OpenAPI's API v1 server overrides](https://raw.githubusercontent.com/Sensibo/sensibo.github.io2/master/sensibo.openapi.yaml). `manage_recurring_schedule` supports list, get, create, set_enabled, and delete. Creation requires `targetTimeLocal`, an explicit IANA `timezone`, `acState`, and lowercase weekdays in `recurOnDaysOfWeek`. An empty weekday list means no recurrence. The documented schedule PUT operation only accepts `isEnabled`; modifying other settings requires creating a replacement and deleting the original after review.
 
-### API Key
+`manage_schedule` is deprecated because its creation input cannot express the required timezone and uses a different time field. Its original handler, schemas, v2 paths, and payloads are preserved. This does not claim Sensibo retired those paths. The legacy broader update payload is retained; provider acceptance has not been verified.
 
-The primary authentication method. API keys are passed as a query parameter on every request.
+Climate React uses `/pods/{device_id}/smartmode` for get, toggle, and configuration. Existing trigger values and optional rule fields remain available. Threshold states are checked against actual device capabilities. Required enabled state must come from the response rather than an assumed value.
 
-- **Generate keys** at [https://home.sensibo.com/me/api](https://home.sensibo.com/me/api)
-- **Usage**: Append `?apiKey={your_api_key}` to every API request
-- Keys can be deleted and rotated from the same settings page
-- Base URL: `https://home.sensibo.com/api/v2`
+`get_door_sensor_history` uses the documented `/doorSensors/{sensor_id}/events` endpoint with an actual `ds_` sensor ID and returns `opened`/`closed` states. The public API does not document a dedicated sensor discovery endpoint. The deprecated `get_door_sensor_events` retains its original device-ID input, device-based route, handler, and schemas; these cannot faithfully represent the documented sensor-ID operation.
 
-### OAuth2
+No public account/self identity endpoint suitable for API-key authentication is documented. `/users/me/pods` discovers devices; it is not an account profile endpoint. Airbend organization and administrative operations, commercial OAuth, and webhook registrations are not included. Current documentation exposes historical event reads rather than a documented webhook registration lifecycle.
 
-Available for commercial users only. To obtain OAuth2 access, contact `support@sensibo.com` with specific details about your use case. No public documentation is available for scopes or endpoints; these are provided upon approval.
-
-## Features
-
-### Device Management
-
-Retrieve a list of all Sensibo devices associated with your account, or get detailed information about a specific device. Device info includes current AC state, sensor readings, device capabilities, and configuration. A `fields` parameter allows selecting which data fields to retrieve, including `fields=*` for all available fields.
-
-### AC State Control
-
-Set or modify the air conditioner state, including power (on/off), mode (cool, heat, fan, dry, auto), target temperature, fan level, swing mode, horizontal swing mode, light, and temperature unit. You can either set the full AC state at once or change a single property without affecting the others.
-
-- Available modes, fan levels, swing options, and temperature ranges depend on the specific AC model paired with the device.
-
-### Environmental Measurements
-
-Read current temperature and humidity from Sensibo devices, as well as historical measurements for up to 7 days in the past. Sensibo Air Pro and Elements devices also provide air quality data.
-
-### Scheduling & Timers
-
-Create, retrieve, update, and delete schedules and timers for devices. Timers turn the AC on or off after a specified duration. Schedules allow recurring AC state changes based on day-of-week and time-of-day configurations.
-
-### Climate React
-
-Configure and manage Sensibo's Climate React automation feature, which automatically adjusts AC state when temperature or humidity crosses defined thresholds. Climate React can be toggled on/off and can be further controlled by geofence state, schedules, or motion detection.
-
-- Configurable trigger types: temperature, feels-like temperature, or humidity.
-- Separate AC states can be defined for above-high-threshold and below-low-threshold conditions.
-
-### Door/Window Sensor Events
-
-Retrieve open/close events from Sensibo Door/Window Sensors, including timestamps and state transitions.
-
-### Airbend (Commercial/Enterprise)
-
-Manage devices, users, and permissions within an Airbend organization. Includes bulk operations for setting AC states across multiple devices simultaneously, retrieving bulk historical measurements, bulk device events, and bulk door sensor events. Admin users can manage organization members and reset devices in bulk.
-
-- Requires Airbend commercial account.
-- Some operations (user management, device reset) require admin privileges.
-
-## Events
-
-The provider does not support webhooks or purpose-built push event subscriptions. Device events (such as AC state changes, schedule changes, Climate React triggers, geofence events, motion detection events, door sensor state changes, and location/user geofence events) are available via a polling-based event retrieval endpoint that returns historical events up to a configurable number of days backwards. This is a standard API query, not a webhook or streaming mechanism.
-
-The provider does not support events.
+No tools produce files. Provider errors are normalized to service errors with upstream response details, known credentials removed, and no raw request/error parent retained. Model-specific response shapes and mutation acceptance still require live verification.

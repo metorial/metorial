@@ -1,9 +1,15 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  countRecords,
+  createBase,
   createRecords,
   createTable,
+  deleteBase,
   deleteRecords,
+  deleteTable,
+  getBase,
+  getField,
   getRecord,
   getTable,
   linkRecords,
@@ -13,11 +19,21 @@ import {
   listViews,
   manageField,
   manageWebhook,
-  updateRecords
+  updateBase,
+  updateRecords,
+  updateTable
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    countRecords,
+    createBase,
+    deleteBase,
+    getBase,
+    updateBase,
+    updateTable,
+    deleteTable,
+    getField,
     listRecords,
     getRecord,
     createRecords,

@@ -37,6 +37,15 @@ export let listPostsTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Retrieve all posts, ignoring segmentation'),
+      filterByUserId: z
+        .boolean()
+        .optional()
+        .describe('Include single-user posts matching userId'),
+      userId: z.string().optional().describe('User ID for single-user posts and analytics'),
+      userEmail: z.string().optional().describe('User email for analytics'),
+      userFirstName: z.string().optional().describe('User first name for analytics'),
+      userLastName: z.string().optional().describe('User last name for analytics'),
+      traceableLinks: z.boolean().optional().describe('Return tracked links'),
       maxResults: z.number().optional().describe('Max results per page (max 10)'),
       page: z.number().optional().describe('Page number for pagination')
     })
@@ -49,6 +58,12 @@ export let listPostsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let posts = await client.listPosts({
+      filterByUserId: ctx.input.filterByUserId,
+      userId: ctx.input.userId,
+      userEmail: ctx.input.userEmail,
+      userFirstName: ctx.input.userFirstName,
+      userLastName: ctx.input.userLastName,
+      traceableLinks: ctx.input.traceableLinks,
       filter: ctx.input.filter,
       forceFilter: ctx.input.forceFilter,
       filterUrl: ctx.input.filterUrl,

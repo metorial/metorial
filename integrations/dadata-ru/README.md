@@ -1,6 +1,12 @@
-# Da Data.ru
+# DaData.ru
 
-Standardize, validate, enrich, and autocomplete Russian contact and business data. Clean and normalize addresses, phone numbers, emails, personal names, passport numbers, birthdates, and vehicle identifiers. Provide type-ahead address suggestions with regional constraints and granularity controls. Geocode addresses to coordinates and reverse-geocode coordinates to addresses. Detect user location by IP address. Look up companies and individual entrepreneurs by INN, KPP, or OGRN, returning details on founders, executives, financials, licenses, and affiliations. Identify organizations by corporate email domain. Look up banks by BIK, SWIFT, or INN. Search Russian government reference directories including tax offices, postal offices, metro stations, OKVED codes, and delivery service IDs. Access company directories for Belarus and Kazakhstan. Anonymize personal data for testing and analytics. Retrieve account balance, usage statistics, and data freshness versions.
+Standardize and enrich Russian addresses and contact data; autocomplete addresses, companies, banks, personal names, and email addresses; look up organizations and banks by identifier; find affiliated companies; identify companies by corporate email; reverse-geocode coordinates and locate cities by IP; search government reference directories; and find nearby Russian Post offices. Account tools expose balance, daily usage, and reference-data versions.
+
+Use an API key for Suggestions, search, and geolocation. Standardization, Company by Email, and account information also require the secret key from the [DaData profile](https://dadata.ru/profile/). Existing full-credential connections remain supported, and a separate API-key-only connection is available for Suggestions.
+
+Tools are grouped into DaData Suggestions, Standardization, and Company by Email. Account utilities apply across products. Responses preserve the full provider data alongside convenient named fields; subscription-dependent or unavailable information is never invented.
+
+See the [API overview](https://dadata.ru/api/) and [operation reference](docs/SPEC.md).
 
 ## License
 

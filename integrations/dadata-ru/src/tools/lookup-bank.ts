@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let bankDetailSchema = z.object({
-  value: z.string().describe('Bank name'),
+  value: z.string().optional().describe('Bank name'),
   bic: z.string().nullable().describe('BIK'),
   swift: z.string().nullable().describe('SWIFT code'),
   inn: z.string().nullable().describe('INN'),
@@ -31,6 +32,7 @@ Returns full bank details including correspondent account, address, and status. 
 })
   .input(
     z.object({
+      count: z.number().optional().describe('Number of matched banks (max 20, default 10)'),
       query: z.string().describe('BIK, SWIFT code, INN, INN+KPP, or registration number'),
       kpp: z
         .string()
@@ -40,6 +42,7 @@ Returns full bank details including correspondent account, address, and status. 
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       banks: z.array(bankDetailSchema).describe('List of matched banks')
     })
   )
@@ -51,11 +54,12 @@ Returns full bank details including correspondent account, address, and status. 
 
     let data = await client.findById('bank', {
       query: ctx.input.query,
-      kpp: ctx.input.kpp
+      kpp: ctx.input.kpp,
+      count: ctx.input.count
     });
 
-    let banks = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
+    let banks = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
       bic: s.data?.bic ?? null,
       swift: s.data?.swift ?? null,
       inn: s.data?.inn ?? null,
@@ -72,7 +76,10 @@ Returns full bank details including correspondent account, address, and status. 
     }));
 
     return {
-      output: { banks },
+      output: {
+        rawData: data,
+        banks
+      },
       message:
         banks.length > 0
           ? `Found **${banks.length}** bank(s) for "${ctx.input.query}": ${banks.map((b: any) => b.value).join(', ')}`

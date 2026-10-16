@@ -10,12 +10,13 @@ let npsRatingSchema = z.object({
   ratingDelta: z.number().nullable().describe('Change from previous rating'),
   body: z.string().nullable().describe('Optional feedback text'),
   group: z.string().nullable().describe('NPS group (promoter, passive, detractor)'),
-  createdAt: z.string().describe('When the rating was submitted'),
-  updatedAt: z.string().describe('When the rating was last updated'),
+  createdAt: z.string().optional().describe('When the rating was submitted'),
+  updatedAt: z.string().optional().describe('When the rating was last updated'),
   links: z
     .record(z.string(), z.any())
     .optional()
-    .describe('Associated resource links (user, ticket)')
+    .describe('Associated resource links (user, ticket)'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listNpsRatings = SlateTool.create(spec, {
@@ -37,15 +38,16 @@ export let listNpsRatings = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      npsRatings: z.array(npsRatingSchema),
-      totalRecords: z.number().describe('Total number of NPS ratings'),
-      totalPages: z.number().describe('Total number of pages')
+      npsRatings: z.array(npsRatingSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of NPS ratings'),
+      totalPages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let result = await client.listNpsRatings({
@@ -55,25 +57,26 @@ export let listNpsRatings = SlateTool.create(spec, {
       updatedAfter: ctx.input.updatedAfter
     });
 
-    let npsRatings = result.npsRatings.map((r: any) => ({
+    let npsRatings = result.npsRatings?.map((r: any) => ({
       ratingId: r.id,
       rating: r.rating,
       previousRating: r.previous_rating ?? null,
       ratingDelta: r.rating_delta ?? null,
-      body: r.body || null,
-      group: r.group || null,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-      links: r.links
+      body: r.body ?? null,
+      group: r.group ?? null,
+      createdAt: r.created_at ?? undefined,
+      updatedAt: r.updated_at ?? undefined,
+      links: r.links,
+      raw: r
     }));
 
     return {
       output: {
         npsRatings,
-        totalRecords: result.pagination?.totalRecords || 0,
-        totalPages: result.pagination?.totalPages || 0
+        totalRecords: result.pagination?.totalRecords,
+        totalPages: result.pagination?.totalPages
       },
-      message: `Found **${npsRatings.length}** NPS ratings.`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

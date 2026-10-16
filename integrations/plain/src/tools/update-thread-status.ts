@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,12 +40,17 @@ export let updateThreadStatus = SlateTool.create(spec, {
       let res = await client.markThreadAsTodo(ctx.input.threadId);
       thread = res.thread;
     } else if (ctx.input.status === 'SNOOZED') {
-      if (!ctx.input.snoozeDurationSeconds) {
-        throw new Error('snoozeDurationSeconds is required when status is SNOOZED');
+      if (
+        !Number.isInteger(ctx.input.snoozeDurationSeconds) ||
+        (ctx.input.snoozeDurationSeconds ?? 0) <= 0
+      ) {
+        throw createApiServiceError(
+          'A positive whole snoozeDurationSeconds is required when status is SNOOZED'
+        );
       }
       let res = await client.snoozeThread(
         ctx.input.threadId,
-        ctx.input.snoozeDurationSeconds * 1000
+        ctx.input.snoozeDurationSeconds!
       );
       thread = res.thread;
     }

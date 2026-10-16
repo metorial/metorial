@@ -1,5 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { ToneDenClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -36,17 +43,34 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let axios = createAxios();
 
-      let response = await axios.post('https://www.toneden.io/auth/oauth2/token', {
-        grant_type: 'authorization_code',
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
+      let token = await requestAxiosData<{ access_token?: string }>(
+        'exchange authorization code',
+        () =>
+          axios.post('https://www.toneden.io/auth/oauth2/token', {
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }),
+        (error, operation) =>
+          buildApiServiceError(error, {
+            providerLabel: 'ToneDen',
+            reason: 'toneden_oauth_error',
+            operation,
+            extractResponse: (cause, helpers) => helpers.getResponseWithBody(cause)
+          })
+      );
+
+      if (typeof token.access_token !== 'string' || !token.access_token) {
+        throw createApiServiceError(
+          'ToneDen did not return an access token. Reauthorize the connection.'
+        );
+      }
 
       return {
         output: {
-          token: response.data.access_token
+          token: token.access_token
         }
       };
     },
@@ -56,15 +80,7 @@ export let auth = SlateAuth.create()
       input: Record<string, never>;
       scopes: string[];
     }) => {
-      let axios = createAxios({
-        baseURL: 'https://www.toneden.io/api/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/users/me');
-      let user = response.data.user;
+      let user = await new ToneDenClient({ token: ctx.output.token }).getMe();
 
       return {
         profile: {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NpmRegistryClient } from '../lib/client';
+import { array, optionalText, record, text } from '../lib/response';
 import { spec } from '../spec';
 
 let trustedPublisherSchema = z
@@ -58,6 +59,16 @@ export let manageTrustedPublishers = SlateTool.create(spec, {
         .describe(
           'Provider-specific claims for "add" (e.g. {"repository_owner": "owner", "repository": "repo", "environment": "production", "workflow_filename": "publish.yml"})'
         ),
+      permissions: z
+        .array(z.enum(['createPackage', 'createStagedPackage', 'manageDistTags']))
+        .optional()
+        .describe('Permissions granted to the publisher (required for add).'),
+      nativeClaims: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Provider-native claims object, including structured workflow_ref matching. Overrides claims when provided.'
+        ),
       configurationId: z
         .string()
         .optional()
@@ -71,6 +82,12 @@ export let manageTrustedPublishers = SlateTool.create(spec, {
         .optional()
         .describe('Trusted publisher configurations'),
       added: trustedPublisherSchema.optional().describe('Newly added configuration'),
+      rawConfigurations: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe(
+          'Unmodified provider configurations, including structured claims and permissions'
+        ),
       removed: z
         .boolean()
         .optional()
@@ -78,59 +95,83 @@ export let manageTrustedPublishers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.otp)
+      throw createApiServiceError(
+        'An OTP is required to manage trusted publishers. Obtain it from your configured 2FA method.'
+      );
     let client = new NpmRegistryClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let result = await client.getTrustedPublishers(ctx.input.packageName, ctx.input.otp);
-      let configurations = (Array.isArray(result) ? result : []).map((c: any) => ({
-        configurationId: c.uuid || c.id,
-        providerType: c.type,
-        claims: c.claims || c
-      }));
+      let result = array(
+        await client.getTrustedPublishers(ctx.input.packageName, ctx.input.otp),
+        'trusted publisher configurations'
+      );
+      let rawConfigurations = result.map(value =>
+        record(value, 'trusted publisher configuration')
+      );
+      let configurations = rawConfigurations.map(mapConfiguration);
       return {
-        output: { configurations },
+        output: { configurations, rawConfigurations },
         message: `Found **${configurations.length}** trusted publisher configuration(s) for **${ctx.input.packageName}**.`
       };
     }
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.providerType)
-        throw new Error('providerType is required for "add" action.');
-      if (!ctx.input.claims) throw new Error('claims are required for "add" action.');
-
-      let config = [
-        {
-          type: ctx.input.providerType,
-          ...ctx.input.claims
+        throw createApiServiceError('providerType is required for "add" action.');
+      if (!ctx.input.nativeClaims && !ctx.input.claims)
+        throw createApiServiceError('claims or nativeClaims is required for "add" action.');
+      if (!ctx.input.permissions?.length)
+        throw createApiServiceError(
+          'permissions is required for "add" action. Select the publisher permissions to grant.'
+        );
+      let claims: Record<string, unknown> = {
+        ...(ctx.input.nativeClaims ?? ctx.input.claims)
+      };
+      if (!ctx.input.nativeClaims && ctx.input.providerType === 'github') {
+        if (
+          typeof claims.repository_owner === 'string' &&
+          typeof claims.repository === 'string' &&
+          !claims.repository.includes('/')
+        ) {
+          claims.repository = `${claims.repository_owner}/${claims.repository}`;
         }
-      ];
-
-      let result = await client.addTrustedPublisher(
-        ctx.input.packageName,
-        config,
-        ctx.input.otp
-      );
-      let added =
-        Array.isArray(result) && result[0]
-          ? {
-              configurationId: result[0].uuid || result[0].id,
-              providerType: result[0].type || ctx.input.providerType,
-              claims: result[0].claims || ctx.input.claims
+        claims.repository_owner = undefined;
+        if (typeof claims.workflow_filename === 'string') {
+          claims.workflow_ref = { file: claims.workflow_filename };
+          claims.workflow_filename = undefined;
+        }
+      }
+      let result = array(
+        await client.addTrustedPublisher(
+          ctx.input.packageName,
+          [
+            {
+              type: ctx.input.providerType,
+              claims,
+              permissions: ctx.input.permissions
             }
-          : {
-              providerType: ctx.input.providerType,
-              claims: ctx.input.claims
-            };
-
+          ],
+          ctx.input.otp
+        ),
+        'created trusted publisher configurations'
+      );
+      if (result.length === 0)
+        throw createApiServiceError(
+          'npm did not confirm the trusted publisher configuration. Check package settings before retrying.'
+        );
+      let rawConfigurations = result.map(value =>
+        record(value, 'trusted publisher configuration')
+      );
       return {
-        output: { added },
+        output: { added: mapConfiguration(rawConfigurations[0]), rawConfigurations },
         message: `Added **${ctx.input.providerType}** trusted publisher configuration to **${ctx.input.packageName}**.`
       };
     }
 
     if (ctx.input.action === 'remove') {
       if (!ctx.input.configurationId)
-        throw new Error('configurationId is required for "remove" action.');
+        throw createApiServiceError('configurationId is required for "remove" action.');
 
       await client.deleteTrustedPublisher(
         ctx.input.packageName,
@@ -143,6 +184,21 @@ export let manageTrustedPublishers = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();
+
+function mapConfiguration(value: unknown) {
+  let configuration = record(value, 'trusted publisher configuration');
+  let claims = record(configuration.claims, 'trusted publisher claims');
+  // The original output is a string map. Native structured matching remains available verbatim.
+  return {
+    configurationId: optionalText(configuration.uuid ?? configuration.id, 'configuration ID'),
+    providerType: text(configuration.type, 'trusted publisher type'),
+    claims: Object.fromEntries(
+      Object.entries(claims).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    )
+  };
+}

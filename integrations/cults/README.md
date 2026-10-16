@@ -1,6 +1,8 @@
 # Cults
 
-Search, browse, and manage 3D printing designs on the Cults3D marketplace. Query the catalog with filters by category, price, date, trending status, and AI-made flag. Publish new designs and update existing ones with titles, descriptions, tags, images, and file URLs. Track sales and revenue with currency conversion, access order history and download links for purchased models, and retrieve account data including printlists, likes, followers, and engagement metrics. Query the platform's category structure with localized names.
+Search and browse 3D printing designs on Cults3D, inspect creation details, publish designs from hosted image and model URLs, and update design metadata. Read your profile, creations, liked designs, sales, purchase history, and printlists. Manage printlists and their contents, apply discounts, and notify previous downloaders. Discover category IDs and license codes before publishing.
+
+Connect with your Cults3D username and an API key from <https://cults3d.com/en/api/keys>. The API uses HTTP Basic authentication over HTTPS. Existing model-file and order-download links are returned as supplied by Cults3D; access depends on the provider's permissions.
 
 ## License
 

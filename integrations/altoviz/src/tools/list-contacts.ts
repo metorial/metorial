@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let contactSchema = z.object({
+  raw: z.record(z.string(), z.unknown()).optional(),
   contactId: z.number().describe('Altoviz contact ID'),
   firstName: z.string().nullable().optional(),
   lastName: z.string().nullable().optional(),
@@ -24,11 +25,13 @@ export let listContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageIndex: z.number().optional().describe('Page number (starts at 1)'),
-      pageSize: z
-        .number()
+      query: z.string().optional().describe('Full-text search query'),
+      orderBy: z
+        .string()
         .optional()
-        .describe('Number of results per page (1-100, default 10)')
+        .describe('Provider ordering expression, for example name desc'),
+      pageIndex: z.number().optional().describe('Page index (starts at 1)'),
+      pageSize: z.number().optional().describe('Number of results per page')
     })
   )
   .output(
@@ -40,11 +43,14 @@ export let listContacts = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let contacts = await client.listContacts({
+      query: ctx.input.query,
+      orderBy: ctx.input.orderBy,
       pageIndex: ctx.input.pageIndex,
       pageSize: ctx.input.pageSize
     });
 
     let mapped = contacts.map((c: any) => ({
+      raw: c,
       contactId: c.id,
       firstName: c.firstName,
       lastName: c.lastName,

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SkyfireClient } from '../lib/client';
+import { type DirectoryService, SkyfireClient } from '../lib/client';
 import { spec } from '../spec';
 
 let serviceSchema = z.object({
@@ -14,7 +14,17 @@ let serviceSchema = z.object({
   minimumTokenAmount: z.string().describe('Minimum token amount buyers must authorize'),
   sellerName: z.string().describe('Name of the seller'),
   sellerId: z.string().describe('UUID of the seller agent'),
-  acceptedTokens: z.array(z.string()).describe('Token types accepted (kya, pay, kya+pay)'),
+  acceptedTokens: z
+    .array(z.string())
+    .optional()
+    .describe('Token types explicitly configured by the seller'),
+  openApiSpecUrl: z.string().optional().describe('Service OpenAPI specification URL'),
+  websiteUrl: z.string().optional().describe('Service website URL'),
+  mcpServerUrl: z.string().optional().describe('Service MCP server URL'),
+  fetchAgentProfileUrl: z.string().optional().describe('Fetch.ai agent profile URL'),
+  humanIdentityRequirement: z.unknown().optional().describe('Provider identity requirements'),
+  seller: z.unknown().optional().describe('Complete provider seller identity'),
+  raw: z.unknown().optional().describe('Complete provider service record'),
   createdAt: z.string().describe('ISO 8601 creation timestamp'),
   updatedAt: z.string().describe('ISO 8601 last update timestamp')
 });
@@ -56,7 +66,8 @@ export let searchServices = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Available tags (when tagsOnly is true)'),
-      totalCount: z.number().optional().describe('Total number of services returned')
+      totalCount: z.number().optional().describe('Total number of services returned'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -67,6 +78,7 @@ export let searchServices = SlateTool.create(spec, {
       return {
         output: {
           availableTags: tagsResult.data,
+          raw: tagsResult,
           totalCount: tagsResult.data.length
         },
         message: `Found **${tagsResult.data.length}** available tags: ${tagsResult.data.join(', ')}.`
@@ -79,13 +91,14 @@ export let searchServices = SlateTool.create(spec, {
       return {
         output: {
           services: [mapped],
+          raw: service,
           totalCount: 1
         },
         message: `Found service **${service.name}** (${service.type}) by ${service.seller.name} — $${service.price} (${service.priceModel}).`
       };
     }
 
-    let result: any;
+    let result: { data: DirectoryService[] };
     if (ctx.input.tags && ctx.input.tags.length > 0) {
       result = await client.searchServicesByTags(ctx.input.tags);
     } else if (ctx.input.agentId) {
@@ -99,6 +112,7 @@ export let searchServices = SlateTool.create(spec, {
     return {
       output: {
         services,
+        raw: result,
         totalCount: services.length
       },
       message: `Found **${services.length}** service(s) in the marketplace.`
@@ -106,20 +120,7 @@ export let searchServices = SlateTool.create(spec, {
   })
   .build();
 
-let mapService = (s: {
-  id: string;
-  name: string;
-  description: string;
-  tags: string[];
-  type: string;
-  price: string;
-  priceModel: string;
-  minimumTokenAmount: string;
-  seller: { id: string; name: string };
-  acceptedTokens: string[];
-  createdAt: string;
-  updatedAt: string;
-}) => ({
+let mapService = (s: DirectoryService) => ({
   serviceId: s.id,
   name: s.name,
   description: s.description,
@@ -131,6 +132,13 @@ let mapService = (s: {
   sellerName: s.seller.name,
   sellerId: s.seller.id,
   acceptedTokens: s.acceptedTokens,
+  openApiSpecUrl: s.openApiSpecUrl,
+  websiteUrl: s.websiteUrl,
+  mcpServerUrl: s.mcpServerUrl,
+  fetchAgentProfileUrl: s.fetchAgentProfileUrl,
+  humanIdentityRequirement: s.humanIdentityRequirement,
+  seller: s.seller,
+  raw: s,
   createdAt: s.createdAt,
   updatedAt: s.updatedAt
 });

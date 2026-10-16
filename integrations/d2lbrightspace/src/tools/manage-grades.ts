@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { optionalId, richText } from '../lib/response';
 import { spec } from '../spec';
 
 let gradeObjectSchema = z.object({
@@ -21,7 +22,11 @@ export let listGradeItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       includeCategories: z
         .boolean()
         .optional()
@@ -50,12 +55,12 @@ export let listGradeItems = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : result?.Objects || [];
     let gradeObjects = items.map((g: any) => ({
       gradeObjectId: String(g.Id),
-      name: g.Name,
-      gradeType: g.GradeType,
-      maxPoints: g.MaxPoints,
-      weight: g.Weight,
+      name: g.Name ?? undefined,
+      gradeType: g.GradeType ?? undefined,
+      maxPoints: g.MaxPoints ?? undefined,
+      weight: g.Weight ?? undefined,
       categoryId: g.CategoryId ? String(g.CategoryId) : undefined,
-      description: g.Description?.Text || g.Description?.Content
+      description: richText(g.Description)
     }));
 
     let categories: any[] | undefined;
@@ -64,8 +69,8 @@ export let listGradeItems = SlateTool.create(spec, {
       let catItems = Array.isArray(catResult) ? catResult : [];
       categories = catItems.map((c: any) => ({
         categoryId: String(c.Id),
-        name: c.Name,
-        weight: c.Weight
+        name: c.Name ?? undefined,
+        weight: c.Weight ?? undefined
       }));
     }
 
@@ -84,7 +89,11 @@ export let getGradeValue = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       gradeObjectId: z.string().describe('Grade object/item ID'),
       userId: z
         .string()
@@ -122,11 +131,11 @@ export let getGradeValue = SlateTool.create(spec, {
           grades: [
             {
               userId: ctx.input.userId,
-              displayedGrade: grade.DisplayedGrade,
-              pointsNumerator: grade.PointsNumerator,
-              pointsDenominator: grade.PointsDenominator,
-              weightedNumerator: grade.WeightedNumerator,
-              weightedDenominator: grade.WeightedDenominator
+              displayedGrade: grade.DisplayedGrade ?? undefined,
+              pointsNumerator: grade.PointsNumerator ?? undefined,
+              pointsDenominator: grade.PointsDenominator ?? undefined,
+              weightedNumerator: grade.WeightedNumerator ?? undefined,
+              weightedDenominator: grade.WeightedDenominator ?? undefined
             }
           ]
         },
@@ -137,12 +146,13 @@ export let getGradeValue = SlateTool.create(spec, {
     let result = await client.getGradeValues(ctx.input.orgUnitId, ctx.input.gradeObjectId);
     let items = Array.isArray(result) ? result : result?.Objects || [];
     let grades = items.map((g: any) => ({
-      userId: String(g.User?.Identifier || g.UserId),
-      displayedGrade: g.DisplayedGrade,
-      pointsNumerator: g.PointsNumerator,
-      pointsDenominator: g.PointsDenominator,
-      weightedNumerator: g.WeightedNumerator,
-      weightedDenominator: g.WeightedDenominator
+      userId: optionalId(g.User?.Identifier ?? g.UserId),
+      displayedGrade: g.GradeValue?.DisplayedGrade ?? g.DisplayedGrade ?? undefined,
+      pointsNumerator: g.GradeValue?.PointsNumerator ?? g.PointsNumerator ?? undefined,
+      pointsDenominator: g.GradeValue?.PointsDenominator ?? g.PointsDenominator ?? undefined,
+      weightedNumerator: g.GradeValue?.WeightedNumerator ?? g.WeightedNumerator ?? undefined,
+      weightedDenominator:
+        g.GradeValue?.WeightedDenominator ?? g.WeightedDenominator ?? undefined
     }));
 
     return {
@@ -160,7 +170,11 @@ export let setGradeValue = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       gradeObjectId: z.string().describe('Grade object/item ID'),
       userId: z.string().describe('Student user ID'),
       pointsNumerator: z.number().describe('Points earned'),
@@ -186,10 +200,10 @@ export let setGradeValue = SlateTool.create(spec, {
       PointsNumerator: ctx.input.pointsNumerator
     };
 
-    if (ctx.input.comments) {
+    if (ctx.input.comments !== undefined) {
       gradeValue.Comments = { Content: ctx.input.comments, Type: 'Html' };
     }
-    if (ctx.input.privateComments) {
+    if (ctx.input.privateComments !== undefined) {
       gradeValue.PrivateComments = { Content: ctx.input.privateComments, Type: 'Html' };
     }
 
@@ -202,9 +216,9 @@ export let setGradeValue = SlateTool.create(spec, {
 
     return {
       output: {
-        displayedGrade: result.DisplayedGrade,
-        pointsNumerator: result.PointsNumerator,
-        pointsDenominator: result.PointsDenominator
+        displayedGrade: result.DisplayedGrade ?? undefined,
+        pointsNumerator: result.PointsNumerator ?? undefined,
+        pointsDenominator: result.PointsDenominator ?? undefined
       },
       message: `Set grade for user ${ctx.input.userId} on grade item ${ctx.input.gradeObjectId}: **${result.DisplayedGrade || ctx.input.pointsNumerator}**.`
     };
@@ -219,7 +233,11 @@ export let getFinalGrades = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID')
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        )
     })
   )
   .output(
@@ -242,10 +260,10 @@ export let getFinalGrades = SlateTool.create(spec, {
 
     let items = Array.isArray(result) ? result : result?.Objects || [];
     let grades = items.map((g: any) => ({
-      userId: String(g.User?.Identifier || g.UserId),
-      displayedGrade: g.DisplayedGrade,
-      pointsNumerator: g.PointsNumerator,
-      pointsDenominator: g.PointsDenominator
+      userId: optionalId(g.User?.Identifier ?? g.UserId),
+      displayedGrade: g.GradeValue?.DisplayedGrade ?? g.DisplayedGrade ?? undefined,
+      pointsNumerator: g.GradeValue?.PointsNumerator ?? g.PointsNumerator ?? undefined,
+      pointsDenominator: g.GradeValue?.PointsDenominator ?? g.PointsDenominator ?? undefined
     }));
 
     return {

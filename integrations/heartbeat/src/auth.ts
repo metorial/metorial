@@ -12,7 +12,7 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string().describe('Heartbeat API key from Settings > API Keys')
+      apiKey: z.string().describe('Heartbeat API key from Settings > System > API Keys')
     }),
     getOutput: async ctx => {
       return {

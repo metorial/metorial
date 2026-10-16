@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let checkStoreStock = SlateTool.create(spec, {
   key: 'check_store_stock',
   description: `Check in-store stock availability for a Target product at nearby stores. Returns up to 20 stores within 50 miles of the specified zipcode, with stock level and store details (address, phone, distance).`,
   instructions: [
-    'Provide exactly one product identifier: tcin, dpci, gtin, or url.',
+    'Provide a product identifier: tcin, dpci, gtin, or url.',
     'A storeStockZipcode is required to find nearby stores.'
   ],
   tags: {
@@ -46,6 +46,13 @@ export let checkStoreStock = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ![ctx.input.tcin, ctx.input.dpci, ctx.input.gtin, ctx.input.url].some(value =>
+        value?.trim()
+      )
+    ) {
+      throw createApiServiceError('Provide a TCIN, DPCI, GTIN, or Target product URL.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let params: Record<string, any> = {

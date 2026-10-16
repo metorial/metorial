@@ -1,0 +1,131 @@
+{
+  "key": "get_tiktok_ad_details",
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "adId": {
+        "type": "number",
+        "description": "The TikTok ad ID from search results"
+      }
+    },
+    "required": ["adId"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "ad": {
+        "type": "object",
+        "properties": {
+          "auditStatus": {
+            "type": "string"
+          },
+          "estimatedAudience": {
+            "type": "string"
+          },
+          "firstShownDate": {
+            "type": "number"
+          },
+          "adId": {
+            "type": "string"
+          },
+          "imageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "impression": {
+            "type": "number"
+          },
+          "lastShownDate": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "showMode": {
+            "type": "number"
+          },
+          "spent": {
+            "type": "string"
+          },
+          "type": {
+            "type": "number"
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "coverImg": {
+                  "type": "string"
+                },
+                "videoUrl": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": {}
+            }
+          }
+        },
+        "additionalProperties": {}
+      },
+      "advertiser": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "registryLocation": {
+            "type": "string"
+          },
+          "sponsor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ttUser": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "advBizIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": {}
+      },
+      "targeting": {
+        "type": "object",
+        "properties": {
+          "age": {},
+          "audience": {},
+          "gender": {},
+          "interest": {},
+          "location": {},
+          "targetAudienceSize": {},
+          "creatorInteractions": {},
+          "videoInteractions": {}
+        },
+        "additionalProperties": {}
+      }
+    },
+    "additionalProperties": false
+  }
+}

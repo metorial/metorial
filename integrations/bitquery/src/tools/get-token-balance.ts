@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BitqueryClient } from '../lib/client';
+import { BitqueryClient, toBitqueryNumber } from '../lib/client';
 import { spec } from '../spec';
 
 let balanceEntrySchema = z.object({
@@ -14,8 +14,11 @@ let balanceEntrySchema = z.object({
 export let getTokenBalance = SlateTool.create(spec, {
   name: 'Get Token Balances',
   key: 'get_token_balance',
-  description: `Retrieve token balances for a wallet address on EVM blockchains or Solana. Returns all token holdings including ERC-20, ERC-721, and SPL tokens with their current balances.
+  description: `Retrieve token balances for a wallet address on EVM blockchains or Solana. Returns current EVM token balances and the latest recently active Solana token-account balances.
 Use this to check portfolio holdings, verify wallet balances, or monitor address token positions.`,
+  instructions: [
+    'Solana uses V2 and only includes accounts with a balance update in the provider retention window (about 8 hours); an absent token does not prove a zero balance. Solana returns the latest token account per mint, so wallets holding the same mint in several token accounts need a custom query to combine them.'
+  ],
   tags: {
     readOnly: true
   }
@@ -56,7 +59,7 @@ Use this to check portfolio holdings, verify wallet balances, or monitor address
   .handleInvocation(async ctx => {
     let client = new BitqueryClient({
       token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion as 'v1' | 'v2'
+      apiVersion: ctx.auth.apiVersion
     });
 
     let { blockchain, walletAddress, limit } = ctx.input;
@@ -65,39 +68,35 @@ Use this to check portfolio holdings, verify wallet balances, or monitor address
     let balances: z.infer<typeof balanceEntrySchema>[] = [];
 
     if (blockchain === 'solana') {
+      client.requireV2('Solana convenience queries');
       let query = `query GetSolanaBalance($address: String!, $limit: Int!) {
-  Solana(dataset: combined) {
+  Solana(dataset: realtime) {
     BalanceUpdates(
       limit: {count: $limit}
-      orderBy: {descendingByField: "balance"}
-      where: {
-        BalanceUpdate: {
-          Account: {Address: {is: $address}}
-        }
-      }
+      limitBy: {by: BalanceUpdate_Currency_MintAddress, count: 1}
+      orderBy: [{descending: Block_Slot}, {descending: Transaction_Index}]
+      where: {BalanceUpdate: {Account: {Owner: {is: $address}}}}
     ) {
-      Currency {
-        Symbol
-        Name
-        MintAddress
+      BalanceUpdate {
+        PostBalance
+        Currency { Symbol Name MintAddress Decimals }
       }
-      balance: sum(of: BalanceUpdate_Amount, selectWhere: {gt: "0"})
     }
   }
 }`;
 
       let data = await client.query(query, { address: walletAddress, limit });
       let raw = data?.Solana?.BalanceUpdates || [];
-
       balances = raw
         .map((b: any) => ({
-          tokenSymbol: b.Currency?.Symbol,
-          tokenName: b.Currency?.Name,
-          tokenAddress: b.Currency?.MintAddress,
-          balance: Number.parseFloat(b.balance) || 0
+          tokenSymbol: b.BalanceUpdate?.Currency?.Symbol,
+          tokenName: b.BalanceUpdate?.Currency?.Name,
+          tokenAddress: b.BalanceUpdate?.Currency?.MintAddress,
+          tokenDecimals: b.BalanceUpdate?.Currency?.Decimals,
+          balance: toBitqueryNumber(b.BalanceUpdate?.PostBalance)
         }))
-        .filter((b: any) => b.balance > 0);
-    } else if (ctx.config.apiVersion === 'v1') {
+        .filter((b: any) => Number.isFinite(b.balance) && b.balance > 0);
+    } else if (ctx.auth.apiVersion === 'v1') {
       let query = `query GetBalance($network: EthereumNetwork!, $address: String!) {
   ethereum(network: $network) {
     address(address: {is: $address}) {
@@ -121,7 +120,7 @@ Use this to check portfolio holdings, verify wallet balances, or monitor address
         arbitrum: 'arbitrum',
         base: 'base',
         optimism: 'optimism',
-        avalanche: 'avalanche_c',
+        avalanche: 'avalanche',
         fantom: 'fantom',
         cronos: 'cronos'
       };
@@ -140,49 +139,37 @@ Use this to check portfolio holdings, verify wallet balances, or monitor address
           tokenName: b.currency?.name,
           tokenAddress: b.currency?.address,
           tokenDecimals: b.currency?.decimals,
-          balance: b.value
+          balance: toBitqueryNumber(b.value)
         }))
         .filter((b: any) => b.balance && b.balance > 0);
     } else {
       let query = `query GetBalance($network: evm_network!, $address: String!, $limit: Int!) {
   EVM(network: $network, dataset: combined) {
-    BalanceUpdates(
+    Balances(
       limit: {count: $limit}
-      orderBy: {descendingByField: "balance"}
-      where: {
-        BalanceUpdate: {
-          Address: {is: $address}
-        }
-      }
+      orderBy: {descending: Balance_AmountInUSD}
+      where: {Balance: {Address: {is: $address}}}
     ) {
-      Currency {
-        Symbol
-        Name
-        SmartContract
-        Decimals
-        Fungible
-      }
-      balance: sum(of: BalanceUpdate_Amount, selectWhere: {gt: "0"})
+      Currency { Symbol Name SmartContract Decimals }
+      Balance { Amount(selectWhere: {gt: "0"}) }
     }
   }
 }`;
-
       let data = await client.query(query, {
         network: blockchain,
         address: walletAddress,
         limit
       });
-      let raw = data?.EVM?.BalanceUpdates || [];
-
+      let raw = data?.EVM?.Balances || [];
       balances = raw
         .map((b: any) => ({
           tokenSymbol: b.Currency?.Symbol,
           tokenName: b.Currency?.Name,
           tokenAddress: b.Currency?.SmartContract,
           tokenDecimals: b.Currency?.Decimals,
-          balance: Number.parseFloat(b.balance) || 0
+          balance: toBitqueryNumber(b.Balance?.Amount)
         }))
-        .filter((b: any) => b.balance > 0);
+        .filter((b: any) => Number.isFinite(b.balance) && b.balance > 0);
     }
 
     return {

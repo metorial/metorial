@@ -1,10 +1,12 @@
 {
   "name": "@metorial/demio",
-  "description": "Manage webinar events, register participants, and track attendee engagement on Demio. List and retrieve details for live, series, and automated webinar events. Register participants programmatically and generate unique join links. Retrieve participant and attendance data for specific event dates.",
+  "description": "Discover Demio webinar events and sessions, register participants, and retrieve attendance reports. Find session schedules, generate unique join links, retrieve registration fields, and filter participants by attendance status.",
   "categories": ["crm-and-sales-tools", "scheduling-and-calendars"],
   "skills": [
     "list webinar events",
     "retrieve event details",
+    "retrieve event session details",
+    "verify API connection",
     "register participants",
     "generate join links",
     "retrieve attendee data",

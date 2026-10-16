@@ -3,7 +3,13 @@ import { spec } from './spec';
 import {
   addRevenue,
   addSessionNote,
+  createList,
+  deleteList,
   executeTrigger,
+  getConversions,
+  getCurrentUser,
+  getList,
+  getListRow,
   getListRows,
   getLists,
   getSession,
@@ -15,7 +21,13 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getConversions,
     getLists,
+    getList,
+    createList,
+    deleteList,
+    getListRow,
     getListRows,
     manageListRow,
     getSession,

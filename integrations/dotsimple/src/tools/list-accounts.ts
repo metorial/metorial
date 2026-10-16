@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DotSimpleClient } from '../lib/client';
+import { DotSimpleClient, getCollection } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listAccounts = SlateTool.create(spec, {
@@ -12,7 +13,7 @@ export let listAccounts = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ workspaceId }))
   .output(
     z.object({
       accounts: z
@@ -42,17 +43,17 @@ export let listAccounts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listAccounts();
-    let accounts = (result?.data ?? []).map((a: any) => ({
+    let accounts = getCollection(result).map((a: any) => ({
       accountId: a.id,
       accountUuid: a.uuid,
       name: a.name,
       username: a.username,
       provider: a.provider,
-      image: a.image,
+      image: a.image ?? undefined,
       authorized: a.authorized,
       createdAt: a.created_at
     }));

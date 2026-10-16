@@ -1,108 +1,201 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import { type ApiObject, object, objects, responseError } from './response';
+
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Browse AI',
+    reason: 'browseai_api_error',
+    extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+    detailKeys: ['message', 'messageCode', 'error', 'errors', 'detail'],
+    extractUpstreamCode: (_error, response) =>
+      isApiErrorRecord(response?.data) && typeof response.data.messageCode === 'string'
+        ? response.data.messageCode
+        : undefined
+  });
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.browse.ai/v2',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: apiError
     });
   }
 
-  // ── Robots ──────────────────────────────────────────────
-
-  async listRobots(): Promise<{ totalCount: number; items: any[] }> {
-    let response = await this.axios.get('/robots');
-    return response.data.result;
-  }
-
-  async getRobot(robotId: string): Promise<any> {
-    let response = await this.axios.get(`/robots/${robotId}`);
-    return response.data.result;
-  }
-
-  // ── Tasks ───────────────────────────────────────────────
-
-  async createTask(robotId: string, inputParameters: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/robots/${robotId}/tasks`, {
-      inputParameters
+  private async request(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    url: string,
+    data?: unknown,
+    params?: ApiObject
+  ): Promise<ApiObject> {
+    let response = await this.axios.request({
+      method,
+      url,
+      data,
+      params: params ? pickDefined(params) : undefined
     });
-    return response.data.result;
-  }
-
-  async getTask(robotId: string, taskId: string): Promise<any> {
-    let response = await this.axios.get(`/robots/${robotId}/tasks/${taskId}`);
-    return response.data.result;
-  }
-
-  async listTasks(
-    robotId: string,
-    params?: {
-      page?: number;
-      pageSize?: number;
-      status?: string;
-      fromDate?: number;
-      toDate?: number;
-      sort?: string;
-      robotBulkRunId?: string;
+    let body = object(response.data, 'response envelope');
+    if (
+      (typeof body.statusCode === 'number' && body.statusCode >= 400) ||
+      (typeof body.messageCode === 'string' && body.messageCode !== 'success')
+    ) {
+      throw apiError({ response: { status: body.statusCode ?? response.status, data: body } });
     }
-  ): Promise<{ totalCount: number; items: any[]; page: number; pageSize: number }> {
-    let response = await this.axios.get(`/robots/${robotId}/tasks`, { params });
-    return response.data.result;
+    return body;
   }
 
-  // ── Bulk Runs ───────────────────────────────────────────
-
-  async createBulkRun(
-    robotId: string,
-    title: string,
-    inputParametersList: Record<string, any>[]
-  ): Promise<any> {
-    let response = await this.axios.post(`/robots/${robotId}/bulk-runs`, {
-      title,
-      inputParameters: inputParametersList
-    });
-    return response.data.result;
+  private confirmed(body: ApiObject): ApiObject {
+    if (body.statusCode !== 200 || body.messageCode !== 'success')
+      responseError('operation confirmation');
+    return body;
   }
 
-  async getBulkRun(robotId: string, bulkRunId: string): Promise<any> {
-    let response = await this.axios.get(`/robots/${robotId}/bulk-runs/${bulkRunId}`);
-    return response.data.result;
+  private payload(body: ApiObject, key: string): ApiObject {
+    let result = isApiErrorRecord(body.result) ? body.result : undefined;
+    return object(body[key] ?? result?.[key] ?? body.result, key);
   }
 
-  // ── Cookies ─────────────────────────────────────────────
-
-  async updateCookies(robotId: string, cookies: Record<string, any>[]): Promise<any> {
-    let response = await this.axios.patch(`/robots/${robotId}/cookies`, cookies);
-    return response.data;
+  async listRobots() {
+    return this.payload(await this.request('GET', '/robots'), 'robots');
   }
-
-  // ── Webhooks ────────────────────────────────────────────
-
-  async createWebhook(robotId: string, hookUrl: string, eventType: string): Promise<any> {
-    let response = await this.axios.post(`/robots/${robotId}/webhooks`, {
-      hookUrl,
-      eventType
-    });
-    return response.data.result;
+  async getRobot(robotId: string) {
+    return this.payload(
+      await this.request('GET', `/robots/${encodeURIComponent(robotId)}`),
+      'robot'
+    );
   }
-
-  async listWebhooks(robotId: string): Promise<any[]> {
-    let response = await this.axios.get(`/robots/${robotId}/webhooks`);
-    return response.data.result?.items ?? response.data.result ?? [];
+  async createTask(robotId: string, inputParameters: ApiObject, recordVideo?: boolean) {
+    return this.payload(
+      await this.request(
+        'POST',
+        `/robots/${encodeURIComponent(robotId)}/tasks`,
+        pickDefined({ inputParameters, recordVideo })
+      ),
+      'task'
+    );
   }
-
-  async deleteWebhook(robotId: string, webhookId: string): Promise<void> {
-    await this.axios.delete(`/robots/${robotId}/webhooks/${webhookId}`);
+  async getTask(robotId: string, taskId: string) {
+    return this.payload(
+      await this.request(
+        'GET',
+        `/robots/${encodeURIComponent(robotId)}/tasks/${encodeURIComponent(taskId)}`
+      ),
+      'task'
+    );
   }
-
-  // ── Monitors ────────────────────────────────────────────
-
-  async deleteMonitor(robotId: string, monitorId: string): Promise<void> {
-    await this.axios.delete(`/robots/${robotId}/monitors/${monitorId}`);
+  async listTasks(robotId: string, params?: ApiObject) {
+    return this.payload(
+      await this.request(
+        'GET',
+        `/robots/${encodeURIComponent(robotId)}/tasks`,
+        undefined,
+        params
+      ),
+      'robotTasks'
+    );
+  }
+  async createBulkRun(robotId: string, title: string, inputParametersList: ApiObject[]) {
+    return this.payload(
+      await this.request('POST', `/robots/${encodeURIComponent(robotId)}/bulk-runs`, {
+        title,
+        inputParameters: inputParametersList
+      }),
+      'bulkRun'
+    );
+  }
+  async getBulkRun(robotId: string, bulkRunId: string, page?: number) {
+    return this.request(
+      'GET',
+      `/robots/${encodeURIComponent(robotId)}/bulk-runs/${encodeURIComponent(bulkRunId)}`,
+      undefined,
+      { page }
+    );
+  }
+  async listBulkRuns(robotId: string, page?: number) {
+    return this.payload(
+      await this.request(
+        'GET',
+        `/robots/${encodeURIComponent(robotId)}/bulk-runs`,
+        undefined,
+        { page }
+      ),
+      'bulkRuns'
+    );
+  }
+  async updateCookies(robotId: string, cookies: ApiObject[]) {
+    return this.confirmed(
+      await this.request('PATCH', `/robots/${encodeURIComponent(robotId)}/cookies`, cookies)
+    );
+  }
+  async createWebhook(robotId: string, hookUrl: string, eventType: string) {
+    return this.payload(
+      await this.request('POST', `/robots/${encodeURIComponent(robotId)}/webhooks`, {
+        hookUrl,
+        eventType
+      }),
+      'webhook'
+    );
+  }
+  async listWebhooks(robotId: string) {
+    let body = await this.request('GET', `/robots/${encodeURIComponent(robotId)}/webhooks`);
+    if (Array.isArray(body.result)) return objects(body.result, 'webhooks');
+    return objects(this.payload(body, 'webhooks').items, 'webhooks');
+  }
+  async deleteWebhook(robotId: string, webhookId: string) {
+    return this.confirmed(
+      await this.request(
+        'DELETE',
+        `/robots/${encodeURIComponent(robotId)}/webhooks/${encodeURIComponent(webhookId)}`
+      )
+    );
+  }
+  async listMonitors(robotId: string) {
+    return this.payload(
+      await this.request('GET', `/robots/${encodeURIComponent(robotId)}/monitors`),
+      'monitors'
+    );
+  }
+  async getMonitor(robotId: string, monitorId: string) {
+    return this.payload(
+      await this.request(
+        'GET',
+        `/robots/${encodeURIComponent(robotId)}/monitors/${encodeURIComponent(monitorId)}`
+      ),
+      'monitor'
+    );
+  }
+  async createMonitor(robotId: string, data: ApiObject) {
+    return this.payload(
+      await this.request('POST', `/robots/${encodeURIComponent(robotId)}/monitors`, data),
+      'monitor'
+    );
+  }
+  async updateMonitor(robotId: string, monitorId: string, data: ApiObject) {
+    return this.payload(
+      await this.request(
+        'PATCH',
+        `/robots/${encodeURIComponent(robotId)}/monitors/${encodeURIComponent(monitorId)}`,
+        data
+      ),
+      'monitor'
+    );
+  }
+  async deleteMonitor(robotId: string, monitorId: string) {
+    return this.confirmed(
+      await this.request(
+        'DELETE',
+        `/robots/${encodeURIComponent(robotId)}/monitors/${encodeURIComponent(monitorId)}`
+      )
+    );
+  }
+  async getSystemStatus() {
+    return this.request('GET', '/status');
   }
 }

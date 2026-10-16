@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,7 +28,8 @@ export let manageTeamMember = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      username: z.string().describe('Username of the member'),
+      username: z.string().optional().describe('Username of the member, when returned'),
+      userId: z.string().optional().describe('Stable ID of the member'),
       role: z.string().optional().describe('Current role (not returned on remove)'),
       removed: z.boolean().describe('Whether the member was removed')
     })
@@ -47,16 +48,17 @@ export let manageTeamMember = SlateTool.create(spec, {
       return {
         output: {
           username: member.user.username,
+          userId: member.user.id,
           role: member.role,
           removed: false
         },
-        message: `Added **${member.user.username}** to team \`${ctx.input.teamSlug}\` as **${member.role}**.`
+        message: `Added **${member.user.username || member.user.id}** to team \`${ctx.input.teamSlug}\` as **${member.role}**.`
       };
     }
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.role) {
-        throw new Error('role is required when updating a team member');
+        throw createApiServiceError('role is required when updating a team member');
       }
       let member = await client.updateTeamMember(ctx.input.teamSlug, ctx.input.username, {
         role: ctx.input.role
@@ -64,10 +66,11 @@ export let manageTeamMember = SlateTool.create(spec, {
       return {
         output: {
           username: member.user.username,
+          userId: member.user.id,
           role: member.role,
           removed: false
         },
-        message: `Updated **${member.user.username}** role to **${member.role}** in team \`${ctx.input.teamSlug}\`.`
+        message: `Updated **${member.user.username || member.user.id}** role to **${member.role}** in team \`${ctx.input.teamSlug}\`.`
       };
     }
 

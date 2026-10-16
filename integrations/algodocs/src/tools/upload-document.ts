@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type UploadResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let uploadDocument = SlateTool.create(spec, {
@@ -17,8 +17,10 @@ export let uploadDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      extractorId: z.string().describe('ID of the extractor to process the document with'),
-      folderId: z.string().describe('ID of the folder to upload the document into'),
+      extractorId: z
+        .string()
+        .describe('Extractor ID from list_extractors to process the document with'),
+      folderId: z.string().describe('Folder ID from list_folders to upload the document into'),
       url: z.string().optional().describe('Publicly accessible URL of the file to upload'),
       fileBase64: z
         .string()
@@ -35,7 +37,8 @@ export let uploadDocument = SlateTool.create(spec, {
       documentId: z.string().describe('Unique identifier of the uploaded document'),
       fileSize: z.number().describe('Size of the uploaded file in bytes'),
       fileMd5Checksum: z.string().describe('MD5 checksum of the uploaded file'),
-      uploadedAt: z.string().describe('Timestamp when the document was uploaded (ISO 8601)')
+      uploadedAt: z.string().describe('Timestamp when the document was uploaded (ISO 8601)'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete upload response')
     })
   )
   .handleInvocation(async ctx => {
@@ -46,7 +49,23 @@ export let uploadDocument = SlateTool.create(spec, {
 
     let { extractorId, folderId, url, fileBase64, filename } = ctx.input;
 
-    let result: any;
+    let hasUrl = url !== undefined;
+    let hasBase64 = fileBase64 !== undefined || filename !== undefined;
+    if (hasUrl === hasBase64) {
+      throw createApiServiceError(
+        'Provide either url or both fileBase64 and filename, using one upload method.'
+      );
+    }
+    if (url !== undefined) {
+      let parsed = z.url().safeParse(url);
+      if (!parsed.success || !/^https?:\/\//i.test(url)) {
+        throw createApiServiceError('url must be a publicly accessible HTTP or HTTPS URL.');
+      }
+    }
+    if (hasBase64 && (!fileBase64?.trim() || !filename?.trim())) {
+      throw createApiServiceError('Provide both non-empty fileBase64 and filename.');
+    }
+    let result: UploadResponse;
 
     if (url) {
       ctx.info('Uploading document from URL');
@@ -55,15 +74,16 @@ export let uploadDocument = SlateTool.create(spec, {
       ctx.info('Uploading base64-encoded document');
       result = await client.uploadDocumentBase64(extractorId, folderId, fileBase64, filename);
     } else {
-      throw new Error('Provide either a "url" or both "fileBase64" and "filename".');
+      throw createApiServiceError('Provide either url or both fileBase64 and filename.');
     }
 
     return {
       output: {
-        documentId: result.id,
+        documentId: String(result.id),
         fileSize: result.fileSize,
         fileMd5Checksum: result.fileMD5CheckSum,
-        uploadedAt: result.uploadedAt
+        uploadedAt: result.uploadedAt,
+        raw: result
       },
       message: `Document uploaded successfully with ID \`${result.id}\`. File size: ${result.fileSize} bytes.`
     };

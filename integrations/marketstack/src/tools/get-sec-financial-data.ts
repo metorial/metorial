@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let getSecFinancialData = SlateTool.create(spec, {
   key: 'get_sec_financial_data',
   description: `Retrieve XBRL financial data from SEC EDGAR filings. Supports two modes:
 - **Company facts**: Get specific financial metrics (e.g. US-GAAP accounts payable) for a company across all filings by CIK code.
-- **Frames**: Aggregate XBRL facts across all reporting entities for a given calendar period and concept.`,
+- **Frames**: Retained generalized frames request for existing clients. Use get_accounts_payable_frames for the current documented US-GAAP AccountsPayableCurrent frame API.`,
   constraints: ['Available on Business plan only'],
   tags: {
     readOnly: true
@@ -43,11 +43,12 @@ export let getSecFinancialData = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
-        limit: z.number(),
-        offset: z.number(),
-        count: z.number(),
-        total: z.number()
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+        count: z.number().optional(),
+        total: z.number().optional()
       }),
       facts: z.array(
         z.object({
@@ -57,7 +58,7 @@ export let getSecFinancialData = SlateTool.create(spec, {
           description: z.string().nullable(),
           unit: z.string(),
           value: z.number().nullable(),
-          start: z.string().nullable(),
+          start: z.string().nullable().optional(),
           end: z.string(),
           filed: z.string(),
           form: z.string(),
@@ -71,13 +72,7 @@ export let getSecFinancialData = SlateTool.create(spec, {
 
     if (ctx.input.mode === 'company_facts') {
       if (!ctx.input.cik) {
-        return {
-          output: {
-            pagination: { limit: 0, offset: 0, count: 0, total: 0 },
-            facts: []
-          },
-          message: 'CIK code is required for company_facts mode.'
-        };
+        throw createApiServiceError('cik is required for company_facts mode.');
       }
 
       let result = await client.getSecCompanyFacts({
@@ -103,18 +98,14 @@ export let getSecFinancialData = SlateTool.create(spec, {
       }));
 
       return {
-        output: { pagination: result.pagination, facts },
-        message: `Retrieved ${facts.length} financial facts for CIK **${ctx.input.cik}**. Total available: ${result.pagination.total}.`
+        output: { pagination: result.pagination, raw: result.raw, facts },
+        message: `Retrieved ${facts.length} financial facts for CIK **${ctx.input.cik}**.`
       };
     } else {
       if (!ctx.input.taxonomy || !ctx.input.tag || !ctx.input.unit || !ctx.input.period) {
-        return {
-          output: {
-            pagination: { limit: 0, offset: 0, count: 0, total: 0 },
-            facts: []
-          },
-          message: 'taxonomy, tag, unit, and period are all required for frames mode.'
-        };
+        throw createApiServiceError(
+          'taxonomy, tag, unit, and period are required for frames mode.'
+        );
       }
 
       let result = await client.getSecFrames({
@@ -141,8 +132,8 @@ export let getSecFinancialData = SlateTool.create(spec, {
       }));
 
       return {
-        output: { pagination: result.pagination, facts },
-        message: `Retrieved ${facts.length} XBRL frame entries for **${ctx.input.taxonomy}:${ctx.input.tag}** (${ctx.input.period}). Total available: ${result.pagination.total}.`
+        output: { pagination: result.pagination, raw: result.raw, facts },
+        message: `Retrieved ${facts.length} XBRL frame entries for **${ctx.input.taxonomy}:${ctx.input.tag}** (${ctx.input.period}).`
       };
     }
   })

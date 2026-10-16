@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type BoltResponse, Client } from '../lib/client';
+import { deviceName, rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getDeviceStatus = SlateTool.create(spec, {
@@ -11,9 +12,10 @@ export let getDeviceStatus = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ deviceName }))
   .output(
     z.object({
+      raw: rawResponse,
       isOnline: z.boolean().describe('Whether the device is currently online'),
       statusValue: z.string().describe('Raw status value from the device ("alive" or "dead")'),
       firmwareVersion: z.string().optional().describe('Firmware version of the device'),
@@ -23,7 +25,7 @@ export let getDeviceStatus = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      deviceName: ctx.auth.deviceName
+      deviceName: ctx.input.deviceName ?? ctx.auth.deviceName
     });
 
     let aliveResponse = await client.isAlive();
@@ -31,14 +33,16 @@ export let getDeviceStatus = SlateTool.create(spec, {
 
     let firmwareVersion: string | undefined;
     let hardwareVersion: string | undefined;
+    let versionResponse: BoltResponse | undefined;
 
     if (isOnline) {
       try {
-        let versionResponse = await client.getVersion();
+        versionResponse = await client.getVersion();
         if (versionResponse.success === '1') {
           let versionData = JSON.parse(versionResponse.value);
           firmwareVersion = versionData['Firmware Version'];
-          hardwareVersion = versionData['Bolt Version'];
+          hardwareVersion =
+            versionData['Bolt Version'] ?? versionData['Bolt Hardware Version'];
         }
       } catch {
         ctx.warn('Could not retrieve version information');
@@ -47,12 +51,13 @@ export let getDeviceStatus = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: { status: aliveResponse, version: versionResponse },
         isOnline,
         statusValue: aliveResponse.value,
         firmwareVersion,
         hardwareVersion
       },
-      message: `Device **${ctx.auth.deviceName}** is **${isOnline ? 'online' : 'offline'}**.${firmwareVersion ? ` Firmware: ${firmwareVersion}` : ''}${hardwareVersion ? `, Hardware: ${hardwareVersion}` : ''}`
+      message: `Device **${ctx.input.deviceName ?? ctx.auth.deviceName}** is **${isOnline ? 'online' : 'offline'}**.${firmwareVersion ? ` Firmware: ${firmwareVersion}` : ''}${hardwareVersion ? `, Hardware: ${hardwareVersion}` : ''}`
     };
   })
   .build();

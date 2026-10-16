@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -68,7 +68,8 @@ let plateResultSchema = z.object({
     .optional()
     .describe('Vehicle orientation predictions'),
   direction: z.number().optional().describe('Vehicle direction in degrees'),
-  directionScore: z.number().optional().describe('Direction prediction confidence')
+  directionScore: z.number().optional().describe('Direction prediction confidence'),
+  year: z.unknown().optional().describe('Provider vehicle year prediction')
 });
 
 export let recognizePlate = SlateTool.create(spec, {
@@ -77,10 +78,10 @@ export let recognizePlate = SlateTool.create(spec, {
   description: `Read license plates from an image. Submit an image URL or base64-encoded image to detect and decode up to 5 license plates, including vehicle type, make/model, color, and orientation.
 Optionally specify regions to improve accuracy, or enable vehicle detection mode to find vehicles without visible plates.`,
   instructions: [
-    'Provide either an imageUrl or imageBase64, not both.',
+    'Provide imageUrl or imageBase64. If both are supplied, imageUrl takes priority.',
     'Use region codes like "us-ca" (US California), "gb" (Great Britain), "fr" (France) to improve accuracy.',
     'Set mmc to true to get vehicle make, model, and color predictions.',
-    'Set detectionMode to "vehicle" to detect all vehicles including those without plates.'
+    'Set detectionMode to "vehicle" to detect all vehicles including those without plates. The complete detections are returned in vehicleResults; results contains recognized plates.'
   ],
   constraints: [
     'Maximum image size is 3 MB.',
@@ -129,7 +130,20 @@ Optionally specify regions to improve accuracy, or enable vehicle detection mode
         .number()
         .optional()
         .describe('Detection confidence threshold (0.0-1.0)'),
-      thresholdOcr: z.number().optional().describe('OCR confidence threshold (0.0-1.0)')
+      thresholdOcr: z.number().optional().describe('OCR confidence threshold (0.0-1.0)'),
+      detectionRule: z
+        .enum(['strict'])
+        .optional()
+        .describe('Discard plate detections outside a vehicle'),
+      textFormats: z
+        .array(z.string())
+        .optional()
+        .describe('Regular expression patterns to guide recognition'),
+      platesPerVehicle: z.number().optional().describe('Maximum expected plates per vehicle'),
+      zoomInVehicles: z
+        .number()
+        .optional()
+        .describe('Maximum vehicles to zoom in on to improve recognition')
     })
   )
   .output(
@@ -138,11 +152,27 @@ Optionally specify regions to improve accuracy, or enable vehicle detection mode
       filename: z.string().describe('Filename of the processed image'),
       cameraId: z.string().nullable().describe('Camera ID if provided'),
       timestamp: z.string().describe('Timestamp of the recognition'),
-      results: z.array(plateResultSchema).describe('Detected license plates')
+      results: z.array(plateResultSchema).describe('Detected license plates'),
+      vehicleResults: z
+        .array(z.unknown())
+        .optional()
+        .describe(
+          'Complete original detections in vehicle mode, including vehicles without plates'
+        ),
+      imageWidth: z.number().optional().describe('Input image width in pixels'),
+      imageHeight: z.number().optional().describe('Input image height in pixels'),
+      raw: z.unknown().optional().describe('Complete provider recognition response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+
+    for (let field of ['platesPerVehicle', 'zoomInVehicles'] as const) {
+      let value = ctx.input[field];
+      if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
+        throw createApiServiceError(`${field} must be a positive integer.`);
+      }
+    }
 
     let engineConfig: Record<string, unknown> = {};
     if (ctx.input.detectionMode === 'vehicle') {
@@ -160,6 +190,13 @@ Optionally specify regions to improve accuracy, or enable vehicle detection mode
     if (ctx.input.thresholdOcr !== undefined) {
       engineConfig.threshold_o = ctx.input.thresholdOcr;
     }
+    if (ctx.input.detectionRule !== undefined)
+      engineConfig.detection_rule = ctx.input.detectionRule;
+    if (ctx.input.textFormats !== undefined) engineConfig.text_formats = ctx.input.textFormats;
+    if (ctx.input.platesPerVehicle !== undefined)
+      engineConfig.plates_per_vehicle = ctx.input.platesPerVehicle;
+    if (ctx.input.zoomInVehicles !== undefined)
+      engineConfig.zoom_in_vehicles = ctx.input.zoomInVehicles;
 
     let result = await client.recognizePlate({
       imageUrl: ctx.input.imageUrl,
@@ -172,20 +209,58 @@ Optionally specify regions to improve accuracy, or enable vehicle detection mode
       config: Object.keys(engineConfig).length > 0 ? engineConfig : undefined
     });
 
-    let mappedResults = (result.results || []).map((r: any) => ({
-      plate: r.plate,
-      score: r.score,
-      dscore: r.dscore,
-      box: r.box,
-      region: r.region,
-      vehicle: r.vehicle,
-      candidates: r.candidates,
-      modelMake: r.model_make,
-      color: r.color,
-      orientation: r.orientation,
-      direction: r.direction,
-      directionScore: r.direction_score
-    }));
+    let mappedResults = (result.results || []).flatMap((r: any) => {
+      if (typeof r.plate === 'string') {
+        return [
+          {
+            plate: r.plate,
+            score: r.score,
+            dscore: r.dscore,
+            box: r.box,
+            region: r.region,
+            vehicle: r.vehicle,
+            candidates: r.candidates,
+            modelMake: r.model_make,
+            color: r.color,
+            orientation: r.orientation,
+            direction: r.direction ?? undefined,
+            directionScore: r.direction_score ?? undefined,
+            year: r.year
+          }
+        ];
+      }
+      let plate = r.plate;
+      let topPlate = plate?.props?.plate?.[0];
+      if (!topPlate) return [];
+      let region = plate.props?.region?.[0];
+      let vehicleProps = r.vehicle?.props;
+      return [
+        {
+          plate: topPlate.value,
+          score: topPlate.score,
+          dscore: plate.score,
+          box: plate.box,
+          region: region ? { code: region.value, score: region.score } : undefined,
+          vehicle: r.vehicle,
+          candidates: plate.props.plate.map((item: any) => ({
+            plate: item.value,
+            score: item.score
+          })),
+          modelMake: vehicleProps?.make_model,
+          color: vehicleProps?.color?.map((item: any) => ({
+            color: item.value,
+            score: item.score
+          })),
+          orientation: vehicleProps?.orientation?.map((item: any) => ({
+            orientation: item.value,
+            score: item.score
+          })),
+          direction: r.direction ?? undefined,
+          directionScore: r.direction_score ?? undefined,
+          year: vehicleProps?.year
+        }
+      ];
+    });
 
     let plateCount = mappedResults.length;
     let plateTexts = mappedResults.map((r: any) => r.plate).join(', ');
@@ -196,7 +271,11 @@ Optionally specify regions to improve accuracy, or enable vehicle detection mode
         filename: result.filename,
         cameraId: result.camera_id ?? null,
         timestamp: result.timestamp,
-        results: mappedResults
+        results: mappedResults,
+        vehicleResults: ctx.input.detectionMode === 'vehicle' ? result.results : undefined,
+        imageWidth: result.image_width,
+        imageHeight: result.image_height,
+        raw: result
       },
       message:
         plateCount > 0

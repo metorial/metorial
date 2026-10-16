@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let ipInfoTool = SlateTool.create(spec, {
   name: 'IP Geolocation',
   key: 'ip_info',
-  description: `Look up geolocation and ISP information for an IP address, including city, region, country, coordinates, timezone, and optional reverse DNS hostname.`,
+  description: `Look up geolocation information for an IP address, including city, region, country, coordinates, timezone, and optional reverse DNS hostname.`,
   tags: {
     readOnly: true
   }
@@ -46,7 +46,8 @@ export let ipInfoTool = SlateTool.create(spec, {
           time: z.string().describe('Current time at this location'),
           offset: z.string().describe('UTC offset')
         })
-        .describe('Timezone information')
+        .describe('Timezone information'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -60,32 +61,33 @@ export let ipInfoTool = SlateTool.create(spec, {
       reverseLookup: ctx.input.reverseLookup
     });
 
-    let tz = result.timezone ?? {};
+    let tz = result.timezone;
 
     return {
       output: {
+        raw: result.raw,
         ip: result.ip,
         valid: result.valid,
-        isV6: result.isV6 ?? false,
-        isBogon: result.isBogon ?? false,
-        country: result.country ?? '',
-        countryCode: result.countryCode ?? '',
-        continentCode: result.continentCode ?? '',
-        city: result.city ?? '',
-        region: result.region ?? '',
-        regionCode: result.regionCode ?? '',
-        latitude: result.latitude ?? 0,
-        longitude: result.longitude ?? 0,
-        hostname: result.hostname ?? '',
-        hostDomain: result.hostDomain ?? '',
-        currencyCode: result.currencyCode ?? '',
+        isV6: result.isV6,
+        isBogon: result.isBogon,
+        country: result.country,
+        countryCode: result.countryCode,
+        continentCode: result.continentCode,
+        city: result.city,
+        region: result.region,
+        regionCode: result.regionCode,
+        latitude: result.latitude,
+        longitude: result.longitude,
+        hostname: result.hostname,
+        hostDomain: result.hostDomain,
+        currencyCode: result.currencyCode,
         timezone: {
-          timezoneId: tz.id ?? '',
-          name: tz.name ?? '',
-          abbr: tz.abbr ?? '',
-          date: tz.date ?? '',
-          time: tz.time ?? '',
-          offset: tz.offset ?? ''
+          timezoneId: tz.id,
+          name: tz.name,
+          abbr: tz.abbr,
+          date: tz.date,
+          time: tz.time,
+          offset: tz.offset
         }
       },
       message: result.valid

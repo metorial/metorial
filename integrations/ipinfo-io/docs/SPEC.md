@@ -1,74 +1,39 @@
-# Slates Specification for Ipinfo.io
-
-## Overview
-
-IPinfo.io is an IP address data and intelligence provider offering geolocation, ASN, privacy detection, carrier, company, and network data for IPv4 and IPv6 addresses. IPinfo's API services provide a mix of geolocation, ASN, privacy, carrier detection, and confidence metrics across different tiers of API services. Data is available via REST API and downloadable databases.
+# IPinfo.io API specification
 
 ## Authentication
 
-IPinfo uses **API token** authentication. After registration, you'll receive a personal API token, which is required to authenticate and make requests to the IPinfo API.
+Connect with an API token from [the IPinfo dashboard](https://ipinfo.io/account/token). Requests use the documented `Authorization: Bearer` header over HTTPS. API access and available fields depend on the token's subscription; no OAuth scopes or refresh tokens are involved. Empty credentials fail before a request is made.
 
-Your API token is used to authenticate you with our API and can be provided either as an HTTP Basic Auth username, a bearer token, or alternatively as a token URL parameter.
+## Tools and API contracts
 
-The three methods are:
+| Tool | API and behavior |
+| --- | --- |
+| `lookup_ip` | `GET https://api.ipinfo.io/lookup/{ip}` for current Core, Plus, or Max data. Optional `api: legacy` uses the maintained `GET https://ipinfo.io/{ip}/json` format, including legacy company and abuse fields when subscribed. Omitted IP uses `me` on the current API and `/json` on the legacy API. |
+| `lookup_ip_lite` | `GET https://api.ipinfo.io/lite/{ip}` for free country, continent, and basic ASN information. Omitted IP uses `me`. |
+| `lookup_asn` | `GET https://ipinfo.io/AS{number}/json`. Accepts a numeric ASN or an AS-prefixed ASN, case-insensitively. Requires a Custom API subscription with ASN access. Returns registration, prefixes, and available peer/upstream/downstream relationships. Prefix sizes remain strings because IPv6 counts can exceed safe integer precision. |
+| `get_abuse_contact` | `GET https://ipinfo.io/{ip}/abuse`. Requires Custom API Abuse Contact access. |
+| `get_ip_ranges` | `GET https://ipinfo.io/ranges/{domain}`. Requires Custom API IP Ranges access. Returns provider count and CIDRs, preserving an explicit null `redirects_to` as null in `redirectsTo`. |
+| `get_hosted_domains` | `GET https://ipinfo.io/domains/{ip}`. Requires Custom API Hosted Domains access. `page` starts at 0; `limit` is 1–1000. Both accept whole numbers only. The provider reports the total and returned page data. |
+| `batch_lookup` | `POST https://api.ipinfo.io/batch` with the JSON array of 1–1000 queries. Optional `api: lite` selects `/batch/lite` for free bare-IP queries; `api: legacy` selects `/batch/legacy`. Optional `filter` omits queries with no response when true. Mixed endpoint/field patterns remain available and the result map preserves provider values, including explicit nulls and per-query errors. |
 
-1. **Token query parameter**: `https://api.ipinfo.io/lite/8.8.8.8?token=YOUR_TOKEN`
-2. **HTTP Basic Auth**: Use the token as the username with an empty password — `curl -u YOUR_TOKEN: https://api.ipinfo.io/lite/me`
-3. **Bearer token**: Pass as an `Authorization: Bearer YOUR_TOKEN` header
+IP addresses and domains are checked before they become URL segments. Required response identifiers, counts, arrays, and typed fields are validated; malformed responses produce a descriptive service error rather than invented identifiers, zero counts, or empty results. HTTP failures retain the provider's nested error details and status while removing token values from the public error.
 
-You obtain your API token by signing up at `https://ipinfo.io/signup` and finding it in your account dashboard at `https://ipinfo.io/account/token`. No OAuth2 or scopes are involved — all access control is determined by your plan tier (Lite, Core, Plus, or Enterprise).
+## Output compatibility
 
-The base URL for the current API is `https://api.ipinfo.io`.
+All seven existing tool keys and existing input types and requiredness are retained. Existing output fields keep their types and nullable branches. New API selection and batch filtering fields are optional.
 
-## Features
+Detailed lookup keeps legacy top-level location fields separate from the current `geo` object. Current `as` data maps to `asn`, current `mobile` data maps to `carrier`, and current `anonymous` VPN/proxy/Tor/relay flags and provider name map to `privacy`. Missing optional data stays omitted; false flags and numeric zero values are preserved. The additive `raw` field contains the complete detailed provider response, including optional plan-specific fields not represented in the normalized output, and `isPlace` exposes the optional public-place flag.
 
-### IP Geolocation Lookup
+When an IP is omitted, `me` reports the invoking server's public IP. It is not an account profile. The documented API has no suitable current-account or user-profile endpoint, so no account identity tool is offered. This lookup service documents no webhook subscription API and has no triggers.
 
-Look up geographic location data for any IPv4 or IPv6 address. IPinfo Core provides detailed IP address information including geolocation (city, region, country, continent, latitude/longitude, timezone, postal code). Higher tiers add radius, confidence level, and change tracking. You can also omit the IP to look up the caller's own address by using `me` as the IP parameter.
+## Sources
 
-- You can request individual fields (e.g., `/country`, `/city`) to get plaintext responses instead of full JSON.
-- The free Lite tier only provides country-level and continent-level geolocation.
-
-### ASN and Network Information
-
-The ASN API allows you to programmatically access details about an ASN, such as the assigned prefixes, related domain, and more. For IP lookups, ASN data includes ASN number, organization name, domain, route, and type (ISP, hosting, business, etc.). Available on Core tier and above.
-
-### Privacy and Anonymity Detection
-
-The Privacy Detection API detects VPNs, proxies, Tor exit nodes, relays, and hosting providers. Core tier provides boolean flags (anonymous, hosting, anycast, mobile, satellite). Higher tiers provide named anonymizer services, confidence metrics, and extended detection metadata.
-
-### Residential Proxy Detection
-
-Detect verified residential proxy IPs with metrics including usage frequency, proxy provider information, and last-seen timestamps. Available on Plus and Enterprise tiers.
-
-### Mobile Carrier Data
-
-IPinfo's carrier data identifies the mobile network associated with an IP address, including the carrier name and its Mobile Country Code (MCC) and Mobile Network Code (MNC). Core provides a basic mobile flag; Plus and Enterprise provide full carrier details.
-
-### Company Data
-
-Company Data identifies the name of the organization behind the IP, the type of business, and its domain. Available on Plus and Enterprise tiers.
-
-### IP Ranges Lookup
-
-IPinfo's IP Ranges API offers a reliable list of IP address ranges that are owned or operated by a company, identified by the provided domain name. You provide a domain name and receive the total count and list of IP ranges. Available on Enterprise tier.
-
-### Hosted Domains (Reverse IP)
-
-The Hosted Domains, or Reverse IP API returns a list of all of the domains hosted on the provided IP address. Available on Enterprise tier.
-
-### IP WHOIS Data
-
-Access WHOIS registration data for IP addresses including Point of Contact (POC), Organization Identifiers, and Network information. Available on Enterprise tier.
-
-### Abuse Contact Lookup
-
-Abuse Contact Data is contact information (usually of the network administrator) which can be used to report IP addresses that are engaged in fraudulent/malicious activities.
-
-### Bulk/Batch Lookups
-
-The /batch endpoint accepts a list of IPs or URL patterns and returns a JSON object with the inputs as keys and the responses as values. Supports mixing different query types (e.g., different API tiers, specific fields) in a single request. Works across all API endpoints including ASN, IP ranges, and hosted domains.
-
-## Events
-
-The provider does not support events. IPinfo.io is a data lookup service with no webhook or event subscription mechanism.
+- [Authentication and API overview](https://ipinfo.io/developers)
+- [Core API](https://ipinfo.io/developers/core-api)
+- [Plus API](https://ipinfo.io/developers/plus-api)
+- [Lite API](https://ipinfo.io/developers/lite-api)
+- [Batch enrichment](https://ipinfo.io/developers/batch-enrichment-api)
+- [ASN API](https://ipinfo.io/developers/asn)
+- [Abuse Contact API](https://ipinfo.io/developers/abuse-contact-api)
+- [IP Ranges API](https://ipinfo.io/developers/ranges)
+- [Hosted Domains API](https://ipinfo.io/developers/hosted-domains)

@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .enum(['production', 'development'])
       .default('production')
       .describe(
-        'The environment to use. Development uses connect.dev.instacart.tools, production uses connect.instacart.com.'
+        'Developer Platform environment and legacy Connect routing fallback. Development uses connect.dev.instacart.tools; production uses connect.instacart.com. An explicitly assigned Connect server in authentication takes precedence.'
       )
   })
 );

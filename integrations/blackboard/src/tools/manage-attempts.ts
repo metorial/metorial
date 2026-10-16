@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let attemptOutputSchema = z.object({
@@ -8,7 +8,8 @@ let attemptOutputSchema = z.object({
   userId: z.string().describe('User ID'),
   status: z.string().optional().describe('Attempt status'),
   score: z.number().optional().describe('Score awarded'),
-  text: z.string().optional().describe('Text submission'),
+  text: z.string().optional().describe('Text grade'),
+  studentSubmission: z.string().optional().describe('Student submission text'),
   feedback: z.string().optional().describe('Instructor feedback'),
   notes: z.string().optional().describe('Instructor notes'),
   studentComments: z.string().optional().describe('Student comments'),
@@ -23,6 +24,7 @@ let mapAttempt = (a: any) => ({
   status: a.status,
   score: a.score,
   text: a.text,
+  studentSubmission: a.studentSubmission,
   feedback: a.feedback,
   notes: a.notes,
   studentComments: a.studentComments,
@@ -53,7 +55,7 @@ export let listAttempts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = await client.listColumnAttempts(ctx.input.courseId, ctx.input.columnId, {
       offset: ctx.input.offset,
@@ -84,7 +86,7 @@ export let getAttempt = SlateTool.create(spec, {
   )
   .output(attemptOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let attempt = await client.getAttempt(
       ctx.input.courseId,
       ctx.input.columnId,
@@ -118,7 +120,7 @@ export let gradeAttempt = SlateTool.create(spec, {
   )
   .output(attemptOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let attempt = await client.updateAttempt(
       ctx.input.courseId,

@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Default shop UUID to use for operations that require a shop. Can be overridden per-tool.'
+        'Default shop UUID to use for operations that require a shop. Call list_shops to discover shops. Can be overridden per-tool.'
       )
   })
 );

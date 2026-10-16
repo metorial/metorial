@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { translationParams } from '../lib/translations';
 import { spec } from '../spec';
 
 let featureRequestTranslationSchema = z.object({
@@ -59,6 +60,12 @@ export let createFeatureRequestTool = SlateTool.create(spec, {
         .array(featureRequestTranslationSchema)
         .min(1)
         .describe('Feature request translations (at least one required)'),
+      date: z.string().optional().describe('Creation date (ISO-8601)'),
+      votesCount: z.number().optional().describe('Vote count, a nonnegative whole number'),
+      internalUserEmail: z
+        .string()
+        .optional()
+        .describe('Email of the team member creating the request'),
       category: z.string().optional().describe('Category name'),
       status: z
         .string()
@@ -83,14 +90,11 @@ export let createFeatureRequestTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let titles = ctx.input.translations.map(t => t.title);
-    let contents = ctx.input.translations.map(t => t.content);
-    let languages = ctx.input.translations.map(t => t.language).filter(Boolean) as string[];
-
     let request = await client.createFeatureRequest({
-      title: titles,
-      content: contents,
-      ...(languages.length > 0 ? { language: languages } : {}),
+      ...translationParams(ctx.input.translations),
+      date: ctx.input.date,
+      votesCount: ctx.input.votesCount,
+      internalUserEmail: ctx.input.internalUserEmail,
       category: ctx.input.category,
       status: ctx.input.status,
       visible: ctx.input.visible,

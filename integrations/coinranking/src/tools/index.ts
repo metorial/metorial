@@ -5,4 +5,5 @@ export * from './get-global-stats';
 export * from './get-trending-coins';
 export * from './list-coins';
 export * from './list-reference-currencies';
+export { listTags } from './list-tags';
 export * from './search-coins';

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createExpense = SlateTool.create(spec, {
@@ -27,7 +27,14 @@ export let createExpense = SlateTool.create(spec, {
         .enum(['Unbilled', 'Billed'])
         .optional()
         .describe('Whether this expense can be rebilled'),
-      rebillFactor: z.string().optional().describe('Rebill markup factor')
+      rebillFactor: z
+        .string()
+        .optional()
+        .describe('Markup percentage or fixed rebill price; required for markup or price'),
+      rebillMode: z
+        .enum(['cost', 'markup', 'price'])
+        .optional()
+        .describe('Rebill the project at cost, with a percentage markup, or at a fixed price')
     })
   )
   .output(
@@ -36,10 +43,27 @@ export let createExpense = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    if (!ctx.input.description?.trim()) {
+      throw createApiServiceError(
+        'FreeAgent requires an expense description. Provide description.'
+      );
+    }
+    if (ctx.input.rebillType !== undefined) {
+      throw createApiServiceError(
+        'Unbilled and Billed are not FreeAgent rebill modes. Omit rebillType and use rebillMode (cost, markup, or price).'
+      );
+    }
+    if (ctx.input.rebillMode && !ctx.input.projectId) {
+      throw createApiServiceError('Provide projectId when setting rebillMode.');
+    }
+    if (
+      (ctx.input.rebillMode === 'markup' || ctx.input.rebillMode === 'price') &&
+      ctx.input.rebillFactor === undefined
+    ) {
+      throw createApiServiceError('Provide rebillFactor for markup or price rebilling.');
+    }
+
+    let client = createClient(ctx);
 
     let expenseData: Record<string, any> = {
       user: ctx.input.userId,
@@ -56,7 +80,7 @@ export let createExpense = SlateTool.create(spec, {
     if (ctx.input.manualSalesTaxAmount)
       expenseData.manual_sales_tax_amount = ctx.input.manualSalesTaxAmount;
     if (ctx.input.projectId) expenseData.project = ctx.input.projectId;
-    if (ctx.input.rebillType) expenseData.rebill_type = ctx.input.rebillType;
+    if (ctx.input.rebillMode) expenseData.rebill_type = ctx.input.rebillMode;
     if (ctx.input.rebillFactor) expenseData.rebill_factor = ctx.input.rebillFactor;
 
     let expense = await client.createExpense(expenseData);

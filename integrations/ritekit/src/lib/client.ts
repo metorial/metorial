@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface HashtagStats {
   tag: string;
@@ -46,10 +51,14 @@ export interface HashtagHistory {
 
 export interface EmojiSuggestion {
   emoji: string;
-  score: number;
+  score?: number;
 }
 
 export interface QuoteImageOptions {
+  width?: number;
+  height?: number;
+  textFontWeight?: number;
+  authorFontWeight?: number;
   quote: string;
   author: string;
   fontSize?: number;
@@ -73,6 +82,10 @@ export interface CompanyLogo {
   url: string;
   permanentUrl?: string;
   domain?: string;
+  originalLogo?: Record<string, unknown>;
+  squareLogo?: Record<string, unknown>;
+  brandColors?: string[];
+  isGenerated?: boolean;
 }
 
 export interface BrandColor {
@@ -93,9 +106,27 @@ export class RiteKitClient {
 
   constructor(config: { token: string }) {
     this.clientId = config.token;
-    this.axios = createAxios({
-      baseURL: 'https://api.ritekit.com'
-    });
+    this.axios = createAxios({ baseURL: 'https://api.ritekit.com' });
+    this.axios.interceptors.response.use(
+      response => {
+        if (isApiErrorRecord(response.data) && response.data.result === false) {
+          throw createApiServiceError(
+            typeof response.data.message === 'string'
+              ? `RiteKit: ${response.data.message}`
+              : 'RiteKit could not complete the request.',
+            { reason: 'ritekit_api_error' }
+          );
+        }
+        return response;
+      },
+      error => {
+        throw buildApiServiceError(error, {
+          providerLabel: 'RiteKit',
+          reason: 'ritekit_api_error',
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+        });
+      }
+    );
   }
 
   private params(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -124,12 +155,14 @@ export class RiteKitClient {
 
   async hashtagSuggestionsForImage(imageUrl: string): Promise<{ data: HashtagSuggestion[] }> {
     let response = await this.axios.get('/v1/stats/hashtag-suggestions-image', {
-      params: this.params({ url: imageUrl })
+      params: this.params({ image: imageUrl })
     });
     return response.data;
   }
 
-  async hashtagsForUrl(url: string): Promise<{ data: HashtagSuggestion[] }> {
+  async hashtagsForUrl(
+    url: string
+  ): Promise<{ hashtags?: HashtagSuggestion[]; data?: HashtagSuggestion[] }> {
     let response = await this.axios.get('/v2/stats/hashtags-for-url', {
       params: this.params({ url })
     });
@@ -153,7 +186,9 @@ export class RiteKitClient {
   async trendingHashtags(
     green?: boolean,
     latin?: boolean
-  ): Promise<{ tags: TrendingHashtag[] }> {
+  ): Promise<{
+    tags: Array<Omit<TrendingHashtag, 'images'> & { images?: number; photos: number }>;
+  }> {
     let response = await this.axios.get('/v1/search/trending', {
       params: this.params({
         green: green !== undefined ? (green ? 1 : 0) : undefined,
@@ -176,7 +211,7 @@ export class RiteKitClient {
 
   async freemailDetection(email: string): Promise<{ freemail: boolean }> {
     let response = await this.axios.get('/v2/person-insights/freemail-detection', {
-      params: this.params({ email })
+      params: this.params({ domain: email })
     });
     return response.data;
   }
@@ -195,7 +230,11 @@ export class RiteKitClient {
     return response.data;
   }
 
-  async nameFromEmail(email: string): Promise<{ name: string; surname: string }> {
+  async nameFromEmail(email: string): Promise<{
+    name?: string;
+    surname?: string;
+    info?: { givenName?: string; surname?: string };
+  }> {
     let response = await this.axios.get('/v2/person-insights/name-from-email-address', {
       params: this.params({ email })
     });
@@ -218,23 +257,30 @@ export class RiteKitClient {
     return response.data;
   }
 
-  async companyLogo(domain: string): Promise<CompanyLogo> {
+  async companyLogo(
+    domain: string,
+    options: {
+      generateFallbackLogo?: number;
+      squareLogoSize?: number;
+      squareLogoBackground?: string;
+    } = {}
+  ): Promise<CompanyLogo> {
     let response = await this.axios.get('/v2/company-insights/logo', {
-      params: this.params({ domain })
+      params: this.params({ domain, ...options })
     });
     return response.data;
   }
 
-  async brandColors(domain: string): Promise<{ colors: string[] }> {
+  async brandColors(domain: string): Promise<{ colors?: string[]; data?: string[] }> {
     let response = await this.axios.get('/v2/company-insights/brand-colors', {
-      params: this.params({ domain })
+      params: this.params({ name: domain })
     });
     return response.data;
   }
 
   // --- Emoji ---
 
-  async emojiSuggestions(text: string): Promise<{ emojis: EmojiSuggestion[] }> {
+  async emojiSuggestions(text: string): Promise<{ emojis: Array<EmojiSuggestion | string> }> {
     let response = await this.axios.get('/v1/emoji/suggestions', {
       params: this.params({ text })
     });
@@ -252,7 +298,20 @@ export class RiteKitClient {
 
   async textToImage(options: QuoteImageOptions): Promise<{ url: string }> {
     let response = await this.axios.get('/v2/image/quote', {
-      params: this.params(options as unknown as Record<string, unknown>)
+      params: this.params({
+        ...options,
+        text: options.quote,
+        textFont: options.quoteFont,
+        textColor: options.quoteFontColor,
+        authorColor: options.authorFontColor,
+        backgroundColor1:
+          options.bgType === 'gradient' ? options.gradientColor1 : options.backgroundColor,
+        backgroundColor2:
+          options.bgType === 'solid' ? options.backgroundColor : options.gradientColor2,
+        logoUrl: options.brandLogo,
+        // The legacy parameters remain forwarded for existing connections.
+        highlightColor: options.enableHighlight === 0 ? 'transparent' : options.highlightColor
+      })
     });
     return response.data;
   }
@@ -264,7 +323,7 @@ export class RiteKitClient {
     return response.data;
   }
 
-  async extractImageFromUrl(url: string): Promise<{ url: string }> {
+  async extractImageFromUrl(url: string): Promise<{ top_image?: string; url?: string }> {
     let response = await this.axios.get('/v2/image/extract-image', {
       params: this.params({ url })
     });
@@ -294,7 +353,7 @@ export class RiteKitClient {
   async shortenLink(
     url: string,
     ctaId: number
-  ): Promise<{ url: string; original: string; service: string; ctaId: number }> {
+  ): Promise<{ url: string; original: string; service: string; ctaId: number | string }> {
     let response = await this.axios.get('/v1/link/short-link', {
       params: this.params({ url, cta: ctaId })
     });

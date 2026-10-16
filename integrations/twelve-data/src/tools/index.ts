@@ -12,4 +12,5 @@ export * from './get-quote';
 export * from './get-technical-indicator';
 export * from './get-time-series';
 export * from './list-exchanges';
+export * from './market-workflows';
 export * from './search-symbols';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { contactSchema, pageMetadata, pageMetadataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -25,22 +26,7 @@ export let listContacts = SlateTool.create(spec, {
       maxResults: z.number().optional().describe('Maximum number of results to return')
     })
   )
-  .output(
-    z.object({
-      contacts: z.array(
-        z.object({
-          contactId: z.string().describe('Unique contact identifier'),
-          customId: z.string().optional().describe('External/custom contact ID'),
-          firstName: z.string().optional().describe('First name'),
-          lastName: z.string().optional().describe('Last name'),
-          email: z.string().optional().describe('Email address'),
-          company: z.string().optional().describe('Company name'),
-          gender: z.string().optional().describe('Gender')
-        })
-      ),
-      totalCount: z.string().describe('Total number of matching contacts')
-    })
-  )
+  .output(z.object({ contacts: z.array(contactSchema), ...pageMetadataSchema }))
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
@@ -61,13 +47,14 @@ export let listContacts = SlateTool.create(spec, {
       lastName: c.lastName,
       email: c.email,
       company: c.company,
-      gender: c.gender
+      gender: c.gender,
+      raw: c.raw
     }));
 
     return {
       output: {
         contacts,
-        totalCount: result.totalCount
+        ...pageMetadata(result)
       },
       message: `Found **${contacts.length}** contact(s).`
     };

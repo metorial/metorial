@@ -13,6 +13,9 @@ export let getBettingLines = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      provider: z.string().optional().describe('Betting line provider to filter by'),
+      home: z.string().optional().describe('Home team name'),
+      away: z.string().optional().describe('Away team name'),
       year: z.number().optional().describe('Season year'),
       week: z.number().optional().describe('Week number'),
       team: z.string().optional().describe('Team name to filter by'),

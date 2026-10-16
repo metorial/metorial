@@ -8,7 +8,7 @@ export let validateLicensee = SlateTool.create(spec, {
   key: 'validate_licensee',
   description: `Validate a licensee's active licenses against the configured licensing models. Returns the complete licensing state for the licensee across all product modules, ready for use in business logic. Can also pass custom validation parameters.`,
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -59,11 +59,11 @@ export let validateLicensee = SlateTool.create(spec, {
 
     let response = await client.validateLicensee(ctx.input.licenseeNumber, params);
 
-    // Extract TTL from infos
-    let ttl: string | undefined;
+    // Current responses carry TTL at the root; retain the legacy info fallback.
+    let ttl = response.ttl;
     if (response.infos?.info) {
       let ttlInfo = response.infos.info.find(i => i.id === 'ttl');
-      if (ttlInfo) ttl = ttlInfo.value;
+      if (ttl === undefined && ttlInfo) ttl = ttlInfo.value;
     }
 
     // Parse validation items
@@ -72,7 +72,7 @@ export let validateLicensee = SlateTool.create(spec, {
       let { productModuleNumber, productModuleName, licensingModel, ...rest } = item;
       let valid: boolean | undefined;
 
-      // Check nested validation lists for valid status
+      // Nested model-specific results remain available under properties.
       if (rest.valid !== undefined) {
         valid = rest.valid === true || rest.valid === 'true';
       }
@@ -87,11 +87,15 @@ export let validateLicensee = SlateTool.create(spec, {
       };
     });
 
-    let allValid = validations.every(v => v.valid !== false);
+    let state = validations.some(v => v.valid === false)
+      ? 'INVALID'
+      : validations.length > 0 && validations.every(v => v.valid === true)
+        ? 'VALID'
+        : 'See module properties';
 
     return {
       output: { ttl, validations },
-      message: `Validation for licensee **${ctx.input.licenseeNumber}**: ${allValid ? '**VALID**' : '**INVALID**'} across ${validations.length} module(s).${ttl ? ` TTL: ${ttl}` : ''}`
+      message: `Validation for licensee **${ctx.input.licenseeNumber}**: **${state}** across ${validations.length} module(s).${ttl ? ` TTL: ${ttl}` : ''}`
     };
   })
   .build();

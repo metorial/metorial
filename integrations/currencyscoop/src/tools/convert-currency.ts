@@ -32,7 +32,8 @@ Optionally specify a historical date to convert using rates from that date.`,
       amount: z.number().describe('Original amount that was converted'),
       convertedAmount: z.number().describe('Resulting amount after conversion'),
       date: z.string().describe('Date of the exchange rate used for conversion'),
-      timestamp: z.number().describe('Unix timestamp of the exchange rate used')
+      timestamp: z.number().describe('Unix timestamp in seconds of the exchange rate used'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,7 +53,8 @@ Optionally specify a historical date to convert using rates from that date.`,
         amount: result.amount,
         convertedAmount: result.value,
         date: result.date,
-        timestamp: result.timestamp
+        timestamp: result.timestamp,
+        raw: result.raw
       },
       message: `Converted **${result.amount} ${result.from}** to **${result.value} ${result.to}** using rates from ${result.date}.`
     };

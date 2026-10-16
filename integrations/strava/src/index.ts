@@ -9,11 +9,16 @@ import {
   getClub,
   getGear,
   getRoute,
+  getRouteDetails,
   getSegment,
+  getSegmentEffort,
   getSegmentEfforts,
+  getSegmentStreams,
   listActivities,
+  listActivityComments,
   listClubs,
   listRoutes,
+  listStarredSegments,
   starSegment,
   updateActivity,
   updateAthlete
@@ -21,6 +26,11 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getRouteDetails,
+    listActivityComments,
+    listStarredSegments,
+    getSegmentEffort,
+    getSegmentStreams,
     getAthleteProfile,
     updateAthlete,
     listActivities,

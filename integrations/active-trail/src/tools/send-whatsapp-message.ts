@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ActiveTrailClient } from '../lib/client';
+import { ActiveTrailClient, readList, redactProviderData } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWhatsAppTemplates = SlateTool.create(spec, {
@@ -18,11 +18,14 @@ export let listWhatsAppTemplates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let templates = await client.listWhatsAppTemplates();
-    let list = Array.isArray(templates) ? templates : [];
-    return {
-      output: { templates: list },
-      message: `Found **${list.length}** WhatsApp template(s).`
-    };
+    let list = readList(templates);
+    return redactProviderData(
+      {
+        output: { templates: list },
+        message: `Found **${list.length}** WhatsApp template(s).`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -51,10 +54,13 @@ export let sendWhatsAppCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.sendWhatsAppCampaign(ctx.input.campaignData);
-    return {
-      output: { result },
-      message: `WhatsApp campaign sent.`
-    };
+    return redactProviderData(
+      {
+        output: { result },
+        message: `WhatsApp campaign sent.`
+      },
+      ctx.auth.token
+    );
   })
   .build();
 
@@ -81,9 +87,12 @@ export let sendWhatsAppOperationalMessage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ActiveTrailClient(ctx.auth.token);
     let result = await client.sendWhatsAppOperationalMessage(ctx.input.messageData);
-    return {
-      output: { result },
-      message: `WhatsApp operational message sent.`
-    };
+    return redactProviderData(
+      {
+        output: { result },
+        message: `WhatsApp operational message sent.`
+      },
+      ctx.auth.token
+    );
   })
   .build();

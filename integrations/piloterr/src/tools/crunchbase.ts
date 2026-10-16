@@ -1,7 +1,27 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput, responseArray } from '../lib/response';
 import { spec } from '../spec';
+
+let crunchbaseCompanyOutputSchema = z.object({
+  uuid: z.string().optional(),
+  name: z.string().optional(),
+  permalink: z.string().optional(),
+  website: z.string().optional(),
+  description: z.string().optional(),
+  headline: z.string().optional(),
+  founded: z.string().optional(),
+  companyType: z.string().optional(),
+  operatingStatus: z.string().optional(),
+  employeeCount: z.any().optional(),
+  categories: z.array(z.any()).optional(),
+  location: z.array(z.any()).optional(),
+  fundingTotal: z.any().optional(),
+  numFundingRounds: z.number().optional(),
+  socialNetworks: z.any().optional(),
+  raw: z.any().describe('Full raw response')
+});
 
 export let crunchbaseCompany = SlateTool.create(spec, {
   name: 'Crunchbase Company',
@@ -17,28 +37,12 @@ export let crunchbaseCompany = SlateTool.create(spec, {
       domain: z.string().optional().describe('Company domain for reverse lookup')
     })
   )
-  .output(
-    z.object({
-      uuid: z.string().optional(),
-      name: z.string().optional(),
-      permalink: z.string().optional(),
-      website: z.string().optional(),
-      description: z.string().optional(),
-      headline: z.string().optional(),
-      founded: z.string().optional(),
-      companyType: z.string().optional(),
-      operatingStatus: z.string().optional(),
-      employeeCount: z.any().optional(),
-      categories: z.array(z.any()).optional(),
-      location: z.array(z.any()).optional(),
-      fundingTotal: z.any().optional(),
-      numFundingRounds: z.number().optional(),
-      socialNetworks: z.any().optional(),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(crunchbaseCompanyOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
+    if ((!ctx.input.query && !ctx.input.domain) || (ctx.input.query && ctx.input.domain)) {
+      throw createApiServiceError('Provide exactly one of query or domain.');
+    }
     let result = await client.getCrunchbaseCompany({
       query: ctx.input.query,
       domain: ctx.input.domain
@@ -47,7 +51,7 @@ export let crunchbaseCompany = SlateTool.create(spec, {
     let fundingHeadline = result.funding_rounds_headline ?? {};
 
     return {
-      output: {
+      output: normalizeOutput(crunchbaseCompanyOutputSchema, {
         uuid: result.uuid,
         name: result.name,
         permalink: result.permalink,
@@ -64,11 +68,17 @@ export let crunchbaseCompany = SlateTool.create(spec, {
         numFundingRounds: fundingHeadline.num_funding_rounds,
         socialNetworks: result.social_networks,
         raw: result
-      },
+      }),
       message: `Retrieved Crunchbase data for **${result.name ?? ctx.input.query ?? ctx.input.domain}**${fundingHeadline.funding_total ? ` — total funding: $${fundingHeadline.funding_total.value_usd ?? fundingHeadline.funding_total.value}` : ''}.`
     };
   })
   .build();
+
+let crunchbaseFundingRoundsOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  totalCount: z.number().optional(),
+  fundingRounds: z.array(z.any()).describe('List of funding rounds')
+});
 
 export let crunchbaseFundingRounds = SlateTool.create(spec, {
   name: 'Crunchbase Funding Rounds',
@@ -83,26 +93,30 @@ export let crunchbaseFundingRounds = SlateTool.create(spec, {
       daysSinceAnnouncement: z
         .number()
         .optional()
-        .describe('Number of days since announcement (1-360, default 1)'),
+        .describe(
+          'Number of days since announcement. The response contains at most 15 funding rounds; combine filters for more specific results'
+        ),
       investmentType: z
         .string()
         .optional()
         .describe(
           'Investment type filter (e.g., "seed", "series_a", "angel", "private_equity")'
         ),
-      investorId: z.string().optional().describe('Crunchbase UUID of the investor'),
+      investorId: z
+        .string()
+        .optional()
+        .describe(
+          'Crunchbase UUID of the investor. Use crunchbase_search or crunchbase_company to discover organization UUIDs'
+        ),
       organizationId: z
         .string()
         .optional()
-        .describe('Crunchbase UUID of the funded organization')
+        .describe(
+          'Crunchbase UUID of the funded organization. Use crunchbase_company to discover its uuid'
+        )
     })
   )
-  .output(
-    z.object({
-      totalCount: z.number().optional(),
-      fundingRounds: z.array(z.any()).describe('List of funding rounds')
-    })
-  )
+  .output(crunchbaseFundingRoundsOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.getCrunchbaseFundingRounds({
@@ -113,18 +127,35 @@ export let crunchbaseFundingRounds = SlateTool.create(spec, {
     });
 
     let rounds = result.funding_rounds ?? result;
-    let totalCount = rounds.total ?? 0;
-    let fundingRounds = rounds.results ?? [];
+    let totalCount = rounds.total;
+    let fundingRounds = responseArray(rounds.results, 'Crunchbase funding rounds');
 
     return {
-      output: {
+      output: normalizeOutput(crunchbaseFundingRoundsOutputSchema, {
+        raw: result,
         totalCount,
         fundingRounds
-      },
-      message: `Found **${totalCount} funding rounds** matching the specified filters.`
+      }),
+      message: `Retrieved **${fundingRounds.length} funding rounds** matching the specified filters; the provider returns at most 15 per request.`
     };
   })
   .build();
+
+let crunchbaseSearchOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  results: z
+    .array(
+      z.object({
+        name: z.string().optional(),
+        type: z.string().optional(),
+        uuid: z.string().optional(),
+        permalink: z.string().optional(),
+        description: z.string().optional(),
+        logo: z.string().optional()
+      })
+    )
+    .describe('Search results')
+});
 
 export let crunchbaseSearch = SlateTool.create(spec, {
   name: 'Crunchbase Search',
@@ -139,27 +170,12 @@ export let crunchbaseSearch = SlateTool.create(spec, {
       query: z.string().describe('Search query')
     })
   )
-  .output(
-    z.object({
-      results: z
-        .array(
-          z.object({
-            name: z.string().optional(),
-            type: z.string().optional(),
-            uuid: z.string().optional(),
-            permalink: z.string().optional(),
-            description: z.string().optional(),
-            logo: z.string().optional()
-          })
-        )
-        .describe('Search results')
-    })
-  )
+  .output(crunchbaseSearchOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.searchCrunchbase({ query: ctx.input.query });
 
-    let results = (Array.isArray(result) ? result : []).map((r: any) => ({
+    let results = responseArray(result.results, 'Crunchbase search').map((r: any) => ({
       name: r.name,
       type: r.type,
       uuid: r.uuid,
@@ -169,7 +185,7 @@ export let crunchbaseSearch = SlateTool.create(spec, {
     }));
 
     return {
-      output: { results },
+      output: normalizeOutput(crunchbaseSearchOutputSchema, { raw: result, results }),
       message: `Crunchbase search for **"${ctx.input.query}"** returned **${results.length} results**.`
     };
   })

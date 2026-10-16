@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, quotaSchema } from '../lib/client';
 import { spec } from '../spec';
 
 let newsArticleSchema = z.object({
@@ -11,7 +11,7 @@ let newsArticleSchema = z.object({
   url: z.string().describe('URL to the original article'),
   image: z.string().nullable().describe('URL of the main article image'),
   video: z.string().nullable().describe('URL of the associated video'),
-  publishDate: z.string().describe('ISO date when the article was published'),
+  publishDate: z.string().describe('Publication date and time reported by the provider'),
   authors: z.array(z.string()).describe('List of article authors'),
   category: z
     .string()
@@ -115,6 +115,7 @@ export let searchNewsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      quota: quotaSchema.optional().describe('API point usage, when returned by the provider'),
       offset: z.number().describe('Current offset in the result set'),
       totalAvailable: z.number().describe('Total number of matching articles'),
       articles: z.array(newsArticleSchema).describe('List of matching news articles')
@@ -161,6 +162,7 @@ export let searchNewsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...(result.quota ? { quota: result.quota } : {}),
         offset: result.offset,
         totalAvailable: result.available,
         articles

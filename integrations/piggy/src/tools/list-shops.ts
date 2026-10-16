@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEntity, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 let shopSchema = z
@@ -30,13 +31,14 @@ export let listShops = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listShops();
-    let shops = (result.data || []).map((s: any) => ({
-      shopUuid: s.uuid,
-      name: s.name,
-      shopType: s.type,
-      reference: s.reference,
-      ...s
-    }));
+    let shops = result.data.map((s: any) =>
+      mapEntity(s, {
+        shopUuid: requiredString(s.uuid, 'shopUuid'),
+        name: s.name,
+        shopType: s.type,
+        reference: s.reference
+      })
+    );
 
     return {
       output: { shops },

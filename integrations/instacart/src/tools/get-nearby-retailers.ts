@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getNearbyRetailers = SlateTool.create(spec, {
   name: 'Get Nearby Retailers',
   key: 'get_nearby_retailers',
-  description: `Look up retailers available on Instacart Marketplace near a given postal code. Returns retailer names, keys, and logos. Retailer keys can be used to filter recipe or shopping list pages to show products from a specific store.
+  description: `Look up retailers available on Instacart Marketplace near a given postal code. Returns retailer names, keys, and logos. Retailer keys identify retailer organizations rather than individual store locations.
 
 Requires **Developer Platform API key** authentication.`,
   tags: {
@@ -25,9 +25,13 @@ Requires **Developer Platform API key** authentication.`,
       retailers: z
         .array(
           z.object({
-            retailerKey: z.string().describe('Unique retailer identifier used for filtering'),
-            name: z.string().describe('Retailer business name'),
-            retailerLogoUrl: z.string().describe('URL to the retailer logo image')
+            raw: z.unknown().optional().describe('Complete retailer data'),
+            retailerKey: z
+              .string()
+              .optional()
+              .describe('Unique retailer identifier used for filtering'),
+            name: z.string().optional().describe('Retailer business name'),
+            retailerLogoUrl: z.string().optional().describe('URL to the retailer logo image')
           })
         )
         .describe('List of nearby retailers')

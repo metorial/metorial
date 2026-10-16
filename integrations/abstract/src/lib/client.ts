@@ -1,6 +1,16 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let makeAxios = (baseURL: string) => createAxios({ baseURL });
+let makeAxios = (baseURL: string) =>
+  createAuthenticatedAxios({
+    baseURL,
+    timeout: 120_000,
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'Abstract',
+        reason: 'abstract_request_failed',
+        extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+      })
+  });
 
 export class AbstractClient {
   private tokens: {
@@ -17,6 +27,9 @@ export class AbstractClient {
     avatarsToken?: string;
     vatToken?: string;
     ibanToken?: string;
+    emailReputationToken?: string;
+    phoneIntelligenceToken?: string;
+    ipIntelligenceToken?: string;
   };
 
   constructor(tokens: AbstractClient['tokens']) {
@@ -26,7 +39,7 @@ export class AbstractClient {
   private requireToken(tokenKey: keyof AbstractClient['tokens'], serviceName: string): string {
     let token = this.tokens[tokenKey];
     if (!token) {
-      throw new Error(
+      throw createApiServiceError(
         `API key for ${serviceName} is not configured. Please provide the ${tokenKey} in your authentication settings.`
       );
     }
@@ -46,13 +59,14 @@ export class AbstractClient {
     return response.data;
   }
 
-  async validatePhone(params: { phone: string }) {
+  async validatePhone(params: { phone: string; country?: string }) {
     let token = this.requireToken('phoneValidationToken', 'Phone Validation');
     let axios = makeAxios('https://phonevalidation.abstractapi.com/v1/');
     let response = await axios.get('', {
       params: {
         api_key: token,
-        phone: params.phone
+        phone: params.phone,
+        country: params.country
       }
     });
     return response.data;
@@ -72,6 +86,7 @@ export class AbstractClient {
     let token = this.requireToken('companyEnrichmentToken', 'Company Enrichment');
     let axios = makeAxios('https://companyenrichment.abstractapi.com/v1/');
     let queryParams: Record<string, string> = { api_key: token };
+    if (!params.domain && params.email) params.domain = params.email.split('@').at(-1);
     if (params.domain) queryParams.domain = params.domain;
     if (params.email) queryParams.email = params.email;
     let response = await axios.get('', { params: queryParams });
@@ -171,6 +186,7 @@ export class AbstractClient {
     renderJs?: boolean;
     proxyCountry?: string;
     premiumProxy?: boolean;
+    useProxy?: boolean;
   }) {
     let token = this.requireToken('webScrapingToken', 'Web Scraping');
     let axios = makeAxios('https://scrape.abstractapi.com/v1/');
@@ -178,6 +194,7 @@ export class AbstractClient {
       api_key: token,
       url: params.url
     };
+    if (params.useProxy !== undefined) queryParams.use_proxy = String(params.useProxy);
     if (params.renderJs !== undefined) queryParams.render_js = String(params.renderJs);
     if (params.proxyCountry) queryParams.proxy_country = params.proxyCountry;
     if (params.premiumProxy !== undefined)
@@ -193,6 +210,8 @@ export class AbstractClient {
     width?: number;
     height?: number;
     cssInjection?: string;
+    userAgent?: string;
+    exportFormat?: string;
   }) {
     let token = this.requireToken('screenshotToken', 'Website Screenshot');
     let axios = makeAxios('https://screenshot.abstractapi.com/v1/');
@@ -202,10 +221,12 @@ export class AbstractClient {
     };
     if (params.captureFullPage !== undefined)
       queryParams.capture_full_page = String(params.captureFullPage);
-    if (params.delay !== undefined) queryParams.delay = String(params.delay);
+    if (params.delay !== undefined) queryParams.delay = String(params.delay / 1000);
     if (params.width !== undefined) queryParams.width = String(params.width);
     if (params.height !== undefined) queryParams.height = String(params.height);
     if (params.cssInjection) queryParams.css_injection = params.cssInjection;
+    if (params.userAgent) queryParams.user_agent = params.userAgent;
+    if (params.exportFormat) queryParams.export_format = params.exportFormat;
     let response = await axios.get('', { params: queryParams });
     return response.data;
   }
@@ -259,7 +280,7 @@ export class AbstractClient {
     let response = await axios.get('', {
       params: {
         api_key: token,
-        iban_number: params.ibanNumber
+        iban: params.ibanNumber
       }
     });
     return response.data;
@@ -268,13 +289,12 @@ export class AbstractClient {
   async processImage(params: { url: string; lossy?: boolean; quality?: number }) {
     let token = this.requireToken('imageProcessingToken', 'Image Processing');
     let axios = makeAxios('https://images.abstractapi.com/v1/');
-    let queryParams: Record<string, string> = {
+    let response = await axios.post('url/', {
       api_key: token,
-      url: params.url
-    };
-    if (params.lossy !== undefined) queryParams.lossy = String(params.lossy);
-    if (params.quality !== undefined) queryParams.quality = String(params.quality);
-    let response = await axios.get('', { params: queryParams });
+      url: params.url,
+      lossy: params.lossy,
+      quality: params.quality
+    });
     return response.data;
   }
 
@@ -285,6 +305,8 @@ export class AbstractClient {
     charLimit?: number;
     background?: string;
     fontColor?: string;
+    imageFormat?: string;
+    isRounded?: boolean;
   }) {
     let token = this.requireToken('avatarsToken', 'User Avatars');
     let axios = makeAxios('https://avatars.abstractapi.com/v1/');
@@ -295,9 +317,47 @@ export class AbstractClient {
     if (params.imageSize !== undefined) queryParams.image_size = String(params.imageSize);
     if (params.fontSize !== undefined) queryParams.font_size = String(params.fontSize);
     if (params.charLimit !== undefined) queryParams.char_limit = String(params.charLimit);
-    if (params.background) queryParams.background = params.background;
+    if (params.background) queryParams.background_color = params.background;
     if (params.fontColor) queryParams.font_color = params.fontColor;
+    if (params.imageFormat) queryParams.image_format = params.imageFormat;
+    if (params.isRounded !== undefined) queryParams.is_rounded = String(params.isRounded);
     let response = await axios.get('', { params: queryParams });
     return response.data;
+  }
+
+  fileRequest(service: 'screenshot' | 'avatars', params: Record<string, string>) {
+    let tokenKey: 'screenshotToken' | 'avatarsToken' =
+      service === 'screenshot' ? 'screenshotToken' : 'avatarsToken';
+    return {
+      url: `https://${service}.abstractapi.com/v1/`,
+      query: { api_key: this.requireToken(tokenKey, service), ...params }
+    };
+  }
+
+  async emailReputation(params: { email: string }) {
+    let api_key = this.requireToken('emailReputationToken', 'Email Reputation');
+    return (
+      await makeAxios('https://emailreputation.abstractapi.com/v1/').get('', {
+        params: { api_key, email: params.email }
+      })
+    ).data;
+  }
+
+  async phoneIntelligence(params: { phone: string; country?: string }) {
+    let api_key = this.requireToken('phoneIntelligenceToken', 'Phone Intelligence');
+    return (
+      await makeAxios('https://phoneintelligence.abstractapi.com/v1/').get('', {
+        params: { api_key, ...params }
+      })
+    ).data;
+  }
+
+  async ipIntelligence(params: { ipAddress?: string; fields?: string }) {
+    let api_key = this.requireToken('ipIntelligenceToken', 'IP Intelligence');
+    return (
+      await makeAxios('https://ip-intelligence.abstractapi.com/v1/').get('', {
+        params: { api_key, ip_address: params.ipAddress, fields: params.fields }
+      })
+    ).data;
   }
 }

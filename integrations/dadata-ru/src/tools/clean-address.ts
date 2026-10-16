@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CleanerClient } from '../lib/client';
+import { readCleanResult } from '../lib/response';
 import { spec } from '../spec';
 
 export let cleanAddress = SlateTool.create(spec, {
@@ -24,7 +25,8 @@ Requires the Secret Key in addition to the API Key.`,
   )
   .output(
     z.object({
-      source: z.string().describe('Original input address'),
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
+      source: z.string().optional().describe('Original input address'),
       result: z.string().nullable().describe('Standardized address'),
       postalCode: z.string().nullable().describe('Postal code'),
       country: z.string().nullable().describe('Country name'),
@@ -60,9 +62,9 @@ Requires the Secret Key in addition to the API Key.`,
       metro: z
         .array(
           z.object({
-            name: z.string().describe('Metro station name'),
-            line: z.string().describe('Metro line name'),
-            distance: z.number().describe('Distance in km')
+            name: z.string().optional().describe('Metro station name'),
+            line: z.string().optional().describe('Metro line name'),
+            distance: z.number().optional().describe('Distance in km')
           })
         )
         .nullable()
@@ -76,19 +78,20 @@ Requires the Secret Key in addition to the API Key.`,
     });
 
     let data = await client.cleanAddress(ctx.input.address);
-    let r = Array.isArray(data) ? data[0] : data;
+    let r = readCleanResult(data);
 
     let metro = r?.metro
       ? r.metro.map((m: any) => ({
-          name: m.name || '',
-          line: m.line || '',
-          distance: m.distance || 0
+          name: m.name ?? undefined,
+          line: m.line ?? undefined,
+          distance: m.distance ?? undefined
         }))
       : null;
 
     return {
       output: {
-        source: r?.source || ctx.input.address,
+        rawData: data,
+        source: r?.source ?? undefined,
         result: r?.result ?? null,
         postalCode: r?.postal_code ?? null,
         country: r?.country ?? null,

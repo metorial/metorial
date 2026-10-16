@@ -1,21 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  mapMember,
+  memberOutputSchema,
+  memberReadOutputSchema,
+  paginationSchema
+} from '../lib/maps';
 import { spec } from '../spec';
 
-let memberOutputSchema = z.object({
-  memberId: z.string().describe('Unique identifier of the subscriber'),
-  listId: z.string().describe('ID of the list the subscriber belongs to'),
-  email: z.string().describe('Email address of the subscriber'),
-  state: z.string().describe('Status: active, unsubscribed, unconfirmed, or cleaned'),
-  signupDate: z.string().describe('Date the subscriber was added'),
-  modified: z.string().describe('Last modified timestamp'),
-  ip: z.string().describe('IP address at signup'),
-  sourceUrl: z.string().describe('URL where the subscriber signed up'),
-  customFields: z
-    .record(z.string(), z.string())
-    .describe('Custom field values for the subscriber')
-});
+let customFieldInputSchema = z
+  .record(z.string(), z.union([z.string(), z.number(), z.array(z.string())]))
+  .describe(
+    'Native custom field values keyed by custom_name from get_fields; overrides matching customFields entries'
+  );
 
 export let getSubscribers = SlateTool.create(spec, {
   name: 'Get Subscribers',
@@ -35,12 +33,33 @@ export let getSubscribers = SlateTool.create(spec, {
       state: z
         .enum(['active', 'unsubscribed', 'cleaned'])
         .optional()
-        .describe('Filter subscribers by state')
+        .describe('Filter subscribers by state'),
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum subscribers per page, 1-1000. Omit both limit and cursor to retrieve the complete list.'
+        ),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque cursor from pagination.nextCursor; keep all filters unchanged'),
+      search: z
+        .string()
+        .optional()
+        .describe('Search subscriber email and custom field values, up to 255 characters'),
+      label: z.string().optional().describe('Filter by one existing label name'),
+      orderBy: z
+        .string()
+        .optional()
+        .describe('email, signup_date, or comma-separated custom text field names'),
+      order: z.enum(['asc', 'desc']).optional().describe('Sort direction')
     })
   )
   .output(
     z.object({
-      subscribers: z.array(memberOutputSchema).describe('Retrieved subscribers')
+      subscribers: z.array(memberReadOutputSchema).describe('Retrieved subscribers'),
+      pagination: paginationSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -51,43 +70,28 @@ export let getSubscribers = SlateTool.create(spec, {
       let member = result.member;
       return {
         output: {
-          subscribers: [
-            {
-              memberId: member.member_id,
-              listId: member.list_id,
-              email: member.email,
-              state: member.state,
-              signupDate: member.signup_date,
-              modified: member.modified,
-              ip: member.ip,
-              sourceUrl: member.source_url,
-              customFields: member.custom_fields
-            }
-          ]
+          subscribers: [mapMember(member, memberReadOutputSchema)]
         },
         message: `Retrieved subscriber **${member.email}** (${member.state}).`
       };
     }
 
-    let results = await client.getMembers(ctx.input.listId, ctx.input.state);
-    let subscribers = results.map(r => {
+    let result = await client.getMembers(ctx.input.listId, ctx.input.state, {
+      limit: ctx.input.limit,
+      cursor: ctx.input.cursor,
+      search: ctx.input.search,
+      label: ctx.input.label,
+      order_by: ctx.input.orderBy,
+      order: ctx.input.order
+    });
+    let subscribers = result.members.map(r => {
       let member = r.member;
-      return {
-        memberId: member.member_id,
-        listId: member.list_id,
-        email: member.email,
-        state: member.state,
-        signupDate: member.signup_date,
-        modified: member.modified,
-        ip: member.ip,
-        sourceUrl: member.source_url,
-        customFields: member.custom_fields
-      };
+      return mapMember(member, memberReadOutputSchema);
     });
 
     return {
-      output: { subscribers },
-      message: `Retrieved ${subscribers.length} subscriber(s)${ctx.input.state ? ` with state "${ctx.input.state}"` : ''}.`
+      output: { subscribers, pagination: result.pagination },
+      message: `Retrieved ${subscribers.length} subscriber(s)${result.pagination ? ' on this page' : ''}${ctx.input.state ? ` with state "${ctx.input.state}"` : ''}.`
     };
   })
   .build();
@@ -114,7 +118,8 @@ export let addSubscriber = SlateTool.create(spec, {
       customFields: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom field values keyed by field tag'),
+        .describe('Custom field values keyed by custom_name from get_fields'),
+      customFieldValues: customFieldInputSchema.optional(),
       upsert: z
         .boolean()
         .optional()
@@ -147,23 +152,16 @@ export let addSubscriber = SlateTool.create(spec, {
       email: ctx.input.email,
       ip: ctx.input.ip,
       sourceUrl: ctx.input.sourceUrl,
-      customFields: ctx.input.customFields,
+      customFields:
+        ctx.input.customFields || ctx.input.customFieldValues
+          ? { ...ctx.input.customFields, ...ctx.input.customFieldValues }
+          : undefined,
       options: Object.keys(options).length > 0 ? options : undefined
     });
 
     let member = result.member;
     return {
-      output: {
-        memberId: member.member_id,
-        listId: member.list_id,
-        email: member.email,
-        state: member.state,
-        signupDate: member.signup_date,
-        modified: member.modified,
-        ip: member.ip,
-        sourceUrl: member.source_url,
-        customFields: member.custom_fields
-      },
+      output: mapMember(member, memberOutputSchema),
       message: `Added subscriber **${member.email}** to list ${member.list_id} (${member.state}).`
     };
   })
@@ -190,7 +188,8 @@ export let updateSubscriber = SlateTool.create(spec, {
       customFields: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom field values to update, keyed by field tag')
+        .describe('Custom field values to update, keyed by custom_name from get_fields'),
+      customFieldValues: customFieldInputSchema.optional()
     })
   )
   .output(memberOutputSchema)
@@ -200,22 +199,15 @@ export let updateSubscriber = SlateTool.create(spec, {
       listId: ctx.input.listId,
       email: ctx.input.email,
       state: ctx.input.state,
-      customFields: ctx.input.customFields
+      customFields:
+        ctx.input.customFields || ctx.input.customFieldValues
+          ? { ...ctx.input.customFields, ...ctx.input.customFieldValues }
+          : undefined
     });
 
     let member = result.member;
     return {
-      output: {
-        memberId: member.member_id,
-        listId: member.list_id,
-        email: member.email,
-        state: member.state,
-        signupDate: member.signup_date,
-        modified: member.modified,
-        ip: member.ip,
-        sourceUrl: member.source_url,
-        customFields: member.custom_fields
-      },
+      output: mapMember(member, memberOutputSchema),
       message: `Updated subscriber **${member.email}** (${member.state}).`
     };
   })
@@ -243,17 +235,7 @@ export let deleteSubscriber = SlateTool.create(spec, {
 
     let member = result.member;
     return {
-      output: {
-        memberId: member.member_id,
-        listId: member.list_id,
-        email: member.email,
-        state: member.state,
-        signupDate: member.signup_date,
-        modified: member.modified,
-        ip: member.ip,
-        sourceUrl: member.source_url,
-        customFields: member.custom_fields
-      },
+      output: mapMember(member, memberOutputSchema),
       message: `Deleted subscriber **${member.email}** from list ${member.list_id}.`
     };
   })
@@ -262,11 +244,11 @@ export let deleteSubscriber = SlateTool.create(spec, {
 export let bulkSyncSubscribers = SlateTool.create(spec, {
   name: 'Bulk Sync Subscribers',
   key: 'bulk_sync_subscribers',
-  description: `Performs bulk add, update, or unsubscribe operations on subscribers in a Laposta mailing list. Supports up to 500,000 subscribers per request (paid accounts only). The **unsubscribeExcluded** action will unsubscribe all list members not present in the request.`,
+  description: `Performs bulk add, update, or unsubscribe operations on subscribers in a Laposta mailing list. Supports up to 500,000 subscribers per request (paid accounts only). The **unsubscribe_excluded** action will unsubscribe all list members not present in the request.`,
   constraints: [
     'Limited to paid accounts only.',
     'Maximum of 500,000 members per request.',
-    'The unsubscribeExcluded action is destructive: it unsubscribes all members NOT in the provided list.'
+    'The unsubscribe_excluded action is destructive: it unsubscribes all members NOT in the provided list.'
   ],
   tags: {
     destructive: true,
@@ -295,7 +277,14 @@ export let bulkSyncSubscribers = SlateTool.create(spec, {
             customFields: z
               .record(z.string(), z.string())
               .optional()
-              .describe('Custom field values keyed by field tag'),
+              .describe('Custom field values keyed by custom_name from get_fields'),
+            customFieldValues: customFieldInputSchema.optional(),
+            state: z
+              .enum(['active', 'unsubscribed'])
+              .optional()
+              .describe(
+                'State to apply to this subscriber; use update to unsubscribe selected members'
+              ),
             sourceUrl: z.string().optional().describe('URL source of the subscriber')
           })
         )
@@ -309,7 +298,10 @@ export let bulkSyncSubscribers = SlateTool.create(spec, {
       skippedCount: z.number().describe('Number of skipped members'),
       editedCount: z.number().describe('Number of members updated'),
       addedCount: z.number().describe('Number of new members added'),
-      unsubscribedCount: z.number().describe('Number of members unsubscribed')
+      unsubscribedCount: z.number().describe('Number of members unsubscribed'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Original bulk response, including errors and processed member records')
     })
   )
   .handleInvocation(async ctx => {
@@ -319,7 +311,11 @@ export let bulkSyncSubscribers = SlateTool.create(spec, {
       members: ctx.input.members.map(m => ({
         member_id: m.memberId,
         email: m.email,
-        custom_fields: m.customFields,
+        custom_fields:
+          m.customFields || m.customFieldValues
+            ? { ...m.customFields, ...m.customFieldValues }
+            : undefined,
+        state: m.state,
         source_url: m.sourceUrl
       }))
     });
@@ -332,7 +328,8 @@ export let bulkSyncSubscribers = SlateTool.create(spec, {
         skippedCount: report.skipped_count,
         editedCount: report.edited_count,
         addedCount: report.added_count,
-        unsubscribedCount: report.unsubscribed_count
+        unsubscribedCount: report.unsubscribed_count,
+        raw: { ...result }
       },
       message: `Bulk sync completed: ${report.added_count} added, ${report.edited_count} updated, ${report.unsubscribed_count} unsubscribed, ${report.errors_count} errors.`
     };

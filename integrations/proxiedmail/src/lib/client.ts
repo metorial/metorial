@@ -1,28 +1,71 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
+import { parseProxiedMailResponse, proxiedMailError } from './errors';
 
-export interface ProxyBinding {
-  proxyBindingId: string;
-  proxyAddress: string;
-  realAddresses: Record<
-    string,
-    {
-      isEnabled: boolean;
-      isVerificationNeeded: boolean;
-      isVerified: boolean;
-    }
-  >;
-  isBrowsable: boolean;
-  receivedEmailsCount: number;
-  description: string | null;
-  callbackUrl: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ProxyBindingListMeta {
-  usedProxyBindings: number;
-  availableProxyBindings: number;
-}
+let addressInfoSchema = z.object({
+  is_enabled: z.boolean(),
+  is_verification_needed: z.boolean().optional(),
+  is_verified: z.boolean()
+});
+let bindingSchema = z.object({
+  id: z.string(),
+  attributes: z.object({
+    proxy_address: z.string(),
+    real_addresses: z.record(z.string(), addressInfoSchema),
+    is_browsable: z.boolean().optional(),
+    received_emails: z.number(),
+    description: z.string().nullable(),
+    callback_url: z.string().nullable(),
+    created_at: z.string(),
+    updated_at: z.string()
+  })
+});
+let bindingResponseSchema = z.object({ data: bindingSchema });
+let listBindingSchema = bindingSchema.extend({
+  attributes: bindingSchema.shape.attributes.extend({
+    real_addresses: z.record(
+      z.string(),
+      addressInfoSchema.extend({ is_verification_needed: z.boolean() })
+    )
+  })
+});
+let receivedEmailLinkResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      attributes: z.object({
+        recipient_email: z.string(),
+        sender_email: z.string(),
+        subject: z.string(),
+        attachmentsCounter: z.number(),
+        is_processed: z.boolean(),
+        created_at: z.string()
+      })
+    })
+  )
+});
+let receivedEmailResponseSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    attributes: z.object({
+      recipient_email: z.string(),
+      sender_email: z.string(),
+      payload: z.object({
+        Subject: z.string().optional(),
+        subject: z.string().optional(),
+        'body-html': z.string().nullable().optional(),
+        'body-plain': z.string().nullable().optional(),
+        From: z.string().nullable().optional(),
+        from: z.string().nullable().optional(),
+        To: z.string().nullable().optional(),
+        to: z.string().nullable().optional()
+      }),
+      attachments: z.array(z.object({ url: z.string() })),
+      is_processed: z.boolean(),
+      created_at: z.string()
+    })
+  })
+});
 
 export interface ReceivedEmailLink {
   receivedEmailId: string;
@@ -56,7 +99,7 @@ export interface WebhookReceiver {
 
 export interface WebhookReceiverStatus {
   status: string;
-  payload: any;
+  payload: unknown;
   isReceived: boolean;
   method: string | null;
 }
@@ -76,36 +119,65 @@ export interface UpdateProxyEmailParams {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token) {
+      throw createApiServiceError(
+        'A ProxiedMail API token is required. Reconnect your account.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://proxiedmail.com/api/v1',
+      authHeader: { name: 'Token', value: config.token },
       headers: {
-        Token: config.token,
-        'Content-Type': 'application/json',
         Accept: 'application/json'
+      },
+      errorAdapter: proxiedMailError
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.data?.type === 'errors') {
+        throw proxiedMailError({ response });
       }
+      return response;
     });
   }
 
-  async listProxyEmails(): Promise<{ bindings: ProxyBinding[]; meta: ProxyBindingListMeta }> {
+  async listProxyEmails() {
     let response = await this.axios.get('/proxy-bindings');
-    let data = response.data;
+    let data = parseProxiedMailResponse(
+      z.object({
+        data: z.array(listBindingSchema),
+        meta: z.object({ usedProxyBindings: z.number(), availableProxyBindings: z.number() })
+      }),
+      response.data
+    );
 
-    let bindings: ProxyBinding[] = (data.data || []).map((item: any) => mapProxyBinding(item));
+    let bindings = data.data.map(item => ({
+      ...mapProxyBinding(item),
+      realAddresses: Object.fromEntries(
+        Object.entries(item.attributes.real_addresses).map(([email, info]) => [
+          email,
+          {
+            isEnabled: info.is_enabled,
+            isVerificationNeeded: info.is_verification_needed,
+            isVerified: info.is_verified
+          }
+        ])
+      )
+    }));
 
     return {
       bindings,
       meta: {
-        usedProxyBindings: data.meta?.usedProxyBindings ?? 0,
-        availableProxyBindings: data.meta?.availableProxyBindings ?? 0
+        usedProxyBindings: data.meta.usedProxyBindings,
+        availableProxyBindings: data.meta.availableProxyBindings
       }
     };
   }
 
-  async createProxyEmail(params: CreateProxyEmailParams): Promise<ProxyBinding> {
-    let attributes: Record<string, any> = {};
+  async createProxyEmail(params: CreateProxyEmailParams) {
+    let attributes: Record<string, unknown> = {};
 
     if (params.realAddresses !== undefined) {
       attributes.real_addresses = params.realAddresses;
@@ -127,17 +199,18 @@ export class Client {
       }
     });
 
-    return mapProxyBinding(response.data.data);
+    return mapProxyBinding(
+      parseProxiedMailResponse(bindingResponseSchema, response.data).data
+    );
   }
 
-  async updateProxyEmail(
-    proxyBindingId: string,
-    params: UpdateProxyEmailParams
-  ): Promise<ProxyBinding> {
-    let attributes: Record<string, any> = {};
+  async updateProxyEmail(proxyBindingId: string, params: UpdateProxyEmailParams) {
+    let attributes: Record<string, unknown> = {};
 
     if (params.realAddresses !== undefined) {
-      attributes.real_addresses = params.realAddresses;
+      attributes.real_addresses = Object.fromEntries(
+        params.realAddresses.map(email => [email, true])
+      );
     }
 
     if (params.callbackUrl !== undefined) {
@@ -152,100 +225,132 @@ export class Client {
       attributes.is_browsable = params.isBrowsable;
     }
 
-    let response = await this.axios.patch(`/proxy-bindings/${proxyBindingId}`, {
-      data: {
-        type: 'proxy_bindings',
-        attributes
+    let response = await this.axios.patch(
+      `/proxy-bindings/${encodeURIComponent(proxyBindingId)}`,
+      {
+        data: {
+          id: proxyBindingId,
+          type: 'proxy_bindings',
+          attributes
+        }
       }
-    });
+    );
 
-    return mapProxyBinding(response.data.data);
+    return mapProxyBinding(
+      parseProxiedMailResponse(bindingResponseSchema, response.data).data
+    );
   }
 
   async listReceivedEmails(proxyBindingId: string): Promise<ReceivedEmailLink[]> {
-    let response = await this.axios.get(`/received-emails-links/${proxyBindingId}`);
-    let items = response.data.data || [];
+    let response = await this.axios.get(
+      `/received-emails-links/${encodeURIComponent(proxyBindingId)}`
+    );
+    let items = parseProxiedMailResponse(receivedEmailLinkResponseSchema, response.data).data;
 
-    return items.map((item: any) => ({
+    return items.map(item => ({
       receivedEmailId: item.id,
-      recipientEmail: item.attributes?.recipient_email ?? '',
-      senderEmail: item.attributes?.sender_email ?? '',
-      subject: item.attributes?.subject ?? '',
-      attachmentsCount: item.attributes?.attachmentsCounter ?? 0,
-      isProcessed: item.attributes?.is_processed ?? false,
-      createdAt: item.attributes?.created_at ?? ''
+      recipientEmail: item.attributes.recipient_email,
+      senderEmail: item.attributes.sender_email,
+      subject: item.attributes.subject,
+      attachmentsCount: item.attributes.attachmentsCounter,
+      isProcessed: item.attributes.is_processed,
+      createdAt: item.attributes.created_at
     }));
   }
 
   async getReceivedEmail(receivedEmailId: string): Promise<ReceivedEmailDetail> {
-    let response = await this.axios.get(`/received-emails/${receivedEmailId}`);
-    let item = response.data.data;
-    let attrs = item.attributes || {};
-    let payload = attrs.payload || {};
+    let response = await this.axios.get(
+      `/received-emails/${encodeURIComponent(receivedEmailId)}`
+    );
+    let item = parseProxiedMailResponse(receivedEmailResponseSchema, response.data).data;
+    let attrs = item.attributes;
+    let payload = attrs.payload;
+    let subject = payload.Subject ?? payload.subject;
+    if (subject === undefined) {
+      throw createApiServiceError('ProxiedMail returned an email without a subject field.', {
+        reason: 'proxiedmail_invalid_response'
+      });
+    }
 
     return {
       receivedEmailId: item.id,
-      recipientEmail: attrs.recipient_email ?? '',
-      senderEmail: attrs.sender_email ?? '',
-      subject: payload.Subject ?? payload.subject ?? '',
+      recipientEmail: attrs.recipient_email,
+      senderEmail: attrs.sender_email,
+      subject,
       bodyHtml: payload['body-html'] ?? null,
       bodyPlain: payload['body-plain'] ?? null,
       from: payload.From ?? payload.from ?? null,
       to: payload.To ?? payload.to ?? null,
-      attachments: (attrs.attachments || []).map((att: any) => ({ url: att.url })),
-      isProcessed: attrs.is_processed ?? false,
-      createdAt: attrs.created_at ?? ''
+      attachments: attrs.attachments.map(att => ({ url: att.url })),
+      isProcessed: attrs.is_processed,
+      createdAt: attrs.created_at
     };
   }
 
   async createWebhookReceiver(): Promise<WebhookReceiver> {
     let response = await this.axios.post('/callback');
+    let receiver = parseProxiedMailResponse(
+      z.object({
+        id: z.string(),
+        call_url: z.string(),
+        get_url: z.string()
+      }),
+      response.data
+    );
 
     return {
-      receiverId: response.data.id,
-      callUrl: response.data.call_url,
-      getUrl: response.data.get_url
+      receiverId: receiver.id,
+      callUrl: receiver.call_url,
+      getUrl: receiver.get_url
     };
   }
 
   async pollWebhookReceiver(receiverId: string): Promise<WebhookReceiverStatus> {
-    let response = await this.axios.get(`/callback/get/${receiverId}`);
+    let response = await this.axios.get(`/callback/get/${encodeURIComponent(receiverId)}`);
+    let result = parseProxiedMailResponse(
+      z.object({
+        status: z.string(),
+        payload: z.unknown(),
+        is_received: z.boolean(),
+        method: z.string().nullable()
+      }),
+      response.data
+    );
 
     return {
-      status: response.data.status ?? '',
-      payload: response.data.payload ?? null,
-      isReceived: response.data.isReceived ?? false,
-      method: response.data.method ?? null
+      status: result.status,
+      payload: result.payload,
+      isReceived: result.is_received,
+      method: result.method
     };
   }
 }
 
-let mapProxyBinding = (item: any): ProxyBinding => {
-  let attrs = item.attributes || {};
-  let rawAddresses = attrs.real_addresses || {};
+let mapProxyBinding = (item: z.infer<typeof bindingSchema>) => {
+  let attrs = item.attributes;
+  let rawAddresses = attrs.real_addresses;
 
   let realAddresses: Record<
     string,
-    { isEnabled: boolean; isVerificationNeeded: boolean; isVerified: boolean }
+    { isEnabled: boolean; isVerificationNeeded?: boolean; isVerified: boolean }
   > = {};
   for (let [email, info] of Object.entries(rawAddresses)) {
-    let addrInfo = info as any;
     realAddresses[email] = {
-      isEnabled: addrInfo.is_enabled ?? false,
-      isVerificationNeeded: addrInfo.is_verification_needed ?? false,
-      isVerified: addrInfo.is_verified ?? false
+      isEnabled: info.is_enabled,
+      isVerificationNeeded: info.is_verification_needed,
+      isVerified: info.is_verified
     };
   }
 
   return {
     proxyBindingId: item.id,
-    proxyAddress: attrs.proxy_address ?? '',
+    proxyAddress: attrs.proxy_address,
     realAddresses,
-    isBrowsable: attrs.is_browsable ?? false,
-    receivedEmailsCount: attrs.received_emails ?? 0,
-    description: attrs.description ?? null,
-    callbackUrl: attrs.callback_url ?? null,
-    createdAt: attrs.created_at ?? '',
-    updatedAt: attrs.updated_at ?? ''
+    isBrowsable: attrs.is_browsable,
+    receivedEmailsCount: attrs.received_emails,
+    description: attrs.description,
+    callbackUrl: attrs.callback_url,
+    createdAt: attrs.created_at,
+    updatedAt: attrs.updated_at
   };
 };

@@ -22,7 +22,8 @@ Returns the total quota limit, remaining credits, and the timestamp when the quo
       quotaRemaining: z
         .number()
         .describe('Number of API calls remaining in the current billing period'),
-      quotaResetTimestamp: z.number().describe('UTC epoch timestamp when the quota resets')
+      quotaResetTimestamp: z.number().describe('UTC epoch timestamp when the quota resets'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -30,13 +31,15 @@ Returns the total quota limit, remaining credits, and the timestamp when the quo
 
     let quota = await client.getQuota();
 
-    let resetDate = new Date(quota.reset * 1000).toISOString();
+    let reset = new Date(quota.reset * 1000);
+    let resetDate = Number.isNaN(reset.getTime()) ? String(quota.reset) : reset.toISOString();
 
     return {
       output: {
         quotaLimit: quota.limit,
         quotaRemaining: quota.remaining,
-        quotaResetTimestamp: quota.reset
+        quotaResetTimestamp: quota.reset,
+        raw: quota.raw
       },
       message: `Quota: **${quota.remaining}** / **${quota.limit}** remaining. Resets at ${resetDate}.`
     };

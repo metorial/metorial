@@ -1,44 +1,41 @@
-# Slates Specification for Genderize
+# Genderize capabilities
 
-## Overview
+Genderize predicts the gender statistically associated with a name. Its responses contain
+the echoed name, a male/female/null prediction, probability, and supporting data count.
+These are population statistics; binary results do not establish individual identities or
+represent non-binary identities.
 
-Genderize.io is an API service that predicts the gender associated with a given name using statistical data. The API allows you to check the statistical probability of a name being male or female. The dataset covers the whole planet and supports scoping requests to specific countries.
+## Access and tools
 
-## Authentication
+An API key from the account dashboard is passed as `apikey`. The existing API-key and
+no-authentication connection methods are retained. The provider controls whether requests
+without a key are accepted. There are no configuration fields or OAuth tokens.
 
-Genderize supports two modes of access:
+| Tool | Purpose |
+| --- | --- |
+| `predict_gender` | Predict for 1–10 names, retaining the existing input contract. |
+| `predict_gender_batch` | Predict for 1–100 names in one request. |
 
-1. **No authentication (free tier):** The API is free for up to 100 names/day. No sign-up or API key is needed.
+Both tools support an optional ISO 3166-1 alpha-2 `countryId`, applied to the entire request.
+Names are sent unchanged; full names, accents, and non-Latin names are supported. Batch
+requests use repeated `name[]` query parameters and retain result order. Each name consumes
+quota. There is no documented language filter or separate account/quota API endpoint.
 
-2. **API Key (paid plans):** You can sign up for an API key if you need more requests. API keys are obtained from the Genderize store at `https://store.genderize.io`. The API key is passed as a query parameter named `apikey`, e.g.:
-   ```
-   https://api.genderize.io?name=peter&apikey=YOUR_API_KEY
-   ```
+## Results
 
-There is no OAuth or other complex authentication mechanism. The API key is the only credential needed for paid access.
+`predictions` retains the provider's probability and count, including genuine null and zero
+values. A null gender is a successful unknown prediction. No confidence or count defaults
+are created. An optional `countryId` summary is emitted only from a returned string; the
+complete provider object remains in `raw`, including a null `country_id` and additional
+fields. Malformed required prediction data produces an error rather than fabricated data.
 
-## Features
+Available successful-response headers appear as optional `rateLimit.limit`,
+`rateLimit.remaining`, and `rateLimit.resetSeconds`. Reset is a duration in seconds, not a
+timestamp. Missing or malformed header values are omitted. API errors preserve the returned
+HTTP status and error message. Quota headers on failed requests are not exposed separately.
 
-### Gender Prediction
+## References
 
-The API exposes a single endpoint that accepts a name and returns a payload with the prediction. The response includes a gender, probability, and a count. The probability indicates the ratio of males to females in the dataset, and the count indicates the amount of data rows examined for the response.
-
-- **Name parsing:** It's recommended to always use a first name. If not, the API will attempt to parse the input as a full name and pick out the first name. Diacritics from any language as well as non-latin alphabets are supported.
-- The prediction is binary (male or female) with an associated probability score.
-- Names not found in the dataset will return a null gender.
-
-### Country-Specific Localization
-
-The endpoint supports localization, allowing you to scope the gender prediction to a single country for higher accuracy. The API accepts an optional `country_id` parameter. The service follows ISO 3166-1 alpha-2 for country codes.
-
-- The dataset might be smaller for some countries, so it is worth checking the count and redoing the request globally if it's too low.
-
-### Batch Prediction
-
-The API allows you to infer the gender of up to ten names per request. To do so, send a list of names as the `name` parameter. The response will be a list of predictions.
-
-- Using localization on a batch request will apply the given `country_id` to every name in the batch.
-
-## Events
-
-The provider does not support events.
+- [API reference](https://genderize.io/documentation/api/reference)
+- [Official client SDK](https://github.com/DemografixGenderize/demografix-node)
+- [Service FAQ and inference limitations](https://genderize.io/faq)

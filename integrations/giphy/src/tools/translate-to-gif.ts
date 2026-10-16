@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { gifSchema, ratingEnum } from '../lib/types';
+import {
+  gifSchema,
+  ratingEnum,
+  requestContextFields,
+  responseMetadataFields
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let translateToGif = SlateTool.create(spec, {
@@ -14,6 +19,7 @@ export let translateToGif = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...requestContextFields,
       searchTerm: z.string().describe('Word or phrase to translate into a GIF or sticker'),
       contentType: z
         .enum(['gifs', 'stickers'])
@@ -24,11 +30,12 @@ export let translateToGif = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...responseMetadataFields,
       result: gifSchema.describe('The best-matching GIF or sticker')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, ...ctx.input });
     let rating = ctx.input.rating || ctx.config.rating;
 
     if (ctx.input.contentType === 'stickers') {
@@ -37,7 +44,7 @@ export let translateToGif = SlateTool.create(spec, {
         rating
       });
       return {
-        output: { result: result.sticker },
+        output: { raw: result.raw, result: result.sticker },
         message: `Translated "${ctx.input.searchTerm}" to sticker: **${result.sticker.title || result.sticker.gifId}**`
       };
     }
@@ -47,7 +54,7 @@ export let translateToGif = SlateTool.create(spec, {
       rating
     });
     return {
-      output: { result: result.gif },
+      output: { raw: result.raw, result: result.gif },
       message: `Translated "${ctx.input.searchTerm}" to GIF: **${result.gif.title || result.gif.gifId}**`
     };
   })

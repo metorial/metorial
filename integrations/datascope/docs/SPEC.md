@@ -1,4 +1,4 @@
-There are multiple products called "Datascope." Based on the search results, the most likely candidate for a general integration platform is **DataScope Forms** (datascope.io / mydatascope.com) — a mobile forms and data collection platform. Let me get more details on its API.# Slates Specification for Datascope
+# DataScope Integration Specification
 
 ## Overview
 
@@ -57,3 +57,15 @@ Webhooks are configured in the Integrations section of the DataScope web platfor
 - Webhooks can be scoped to a specific form.
 - Webhooks only send information for new form submissions created after the webhook is configured.
 - Each webhook targets a single URL endpoint.
+
+## Additional task and status workflows
+
+Retrieve a task assignment by its internal ID or list assignments with scheduled dates, status, location, assignee, and pagination filters. Without date filters the provider searches the full task history. Task records retain the provider's completion and timing metadata, including null values.
+
+List configured answer statuses to discover their numeric keys, then change a submitted answer's status using the exact form name and response code. Status changes can trigger history entries, webhooks, and push notifications. Deleted statuses can still appear in discovery results.
+
+Update an existing custom list's metadata independently of its elements. Generated file and notification results include downloadable reports and preserve the original provider records.
+
+Subform indices for answer modification start at 1. Standard answers support limit and offset up to 200 records; detailed answers have a 600-record provider cap and do not support those pagination options. Modification-date filtering selects modified submissions; it is not a sort option.
+
+Official API reference: https://dscope.github.io/docs/

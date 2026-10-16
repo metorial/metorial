@@ -1,117 +1,61 @@
-# Slates Specification for Foursquare
+# Foursquare API specification
 
-## Overview
+## Product and credentials
 
-Foursquare is a location technology company that provides a global database of over 100 million points of interest (POI) across 200+ countries. The Foursquare APIs provide access to tools and services, including Places, Personalization, Geofences, Studio Data, Measurement, and Targeting. The platform enables developers to build location-aware applications with venue search, place data enrichment, personalized recommendations, geofencing, and geospatial analytics.
+This integration exposes Places discovery, place content, geotagging, and place-data suggestions, plus the V2 OAuth current-user profile. It does not claim the other Foursquare products as implemented features. API versions are one Places product; user identity is a shared uncategorized utility.
 
-## Authentication
+- `service_api_key`: current Places Service API Key, stored with an explicit service-key credential type. Requests use `https://places-api.foursquare.com`, `Authorization: Bearer <key>`, and `X-Places-Api-Version: 2025-06-17`.
+- `api_key`: original legacy V3 API key. Its existing output remains unchanged.
+- `oauth`: original V2 OAuth authorization-code flow and `/v2/users/self` profile request. Existing endpoints, token output, and permissions remain unchanged. No refresh token or expiry is invented; the documented web flow returns an access token, and current Places third-party auth documentation describes permanent access tokens. Current Places tools deliberately require service-key auth instead of assuming old OAuth tokens are current API credentials.
 
-Foursquare supports multiple authentication methods depending on the API product being used:
+No account or workspace identifier is required in connection config. Saved credentials without the new service-key type retain their existing legacy interpretation. There is no fabricated identity endpoint for a service key.
 
-### API Key Authentication (Places API v3)
+## Current tools
 
-Authenticating against the API is done by passing your API Key through an `Authorization:` header parameter. API keys are generated in the Foursquare Developer Console. This is the primary method for the current Places API (v3).
+| Tool | Operation | Notes |
+| --- | --- | --- |
+| `search_places_current` | GET `/places/search` | Category/chain IDs use `fsq_category_ids`/`fsq_chain_ids`; uppercase sort; `open_at` uses local DOWTHHMM. Omitted location permits provider IP biasing. |
+| `get_place_details_current` | GET `/places/{fsq_place_id}` | Optional field selection; full provider record retained. |
+| `autocomplete_places_current` | GET `/autocomplete` | At least three query characters; place/search/geo types, bias and optional billing session token. |
+| `match_place_current` | GET `/places/match` | Requires name, street address, city and country; sends `postal_code`. Provider currently documents English-speaking countries. |
+| `get_place_photos_current` | GET `/places/{fsq_place_id}/photos` | Preserves photo metadata and original URLs; provides downloadable images when prefix/suffix are present. |
+| `get_place_tips_current` | GET `/places/{fsq_place_id}/tips` | Preserves tip fields and IDs; supports field selection. |
+| `get_geotagging_candidates` | GET `/geotagging/candidates` | Intended for device location tagging; exposes `X-Fsq-Request-Id` for confirmation. |
+| `confirm_geotagging_selection` | POST `/geotagging/confirm` | Sends request ID, selected place ID, context and delayed flag as query parameters. |
+| `suggest_place_changes` | POST `/places/{fsq_place_id}/suggest/{edit,remove,merge,flag}` | Query parameters, explicit branch requirements, optional `dryRun`. Does not claim an edit was accepted or manufacture a status. |
+| `suggest_new_place` | POST `/places/suggest/place` | Matching may return an existing place; actual result and errors preserved. |
+| `get_suggestion_status` | GET `/places/suggest/status` | Optional comma-separated `suggested_edit_ids`, limit 0–50; omission lists calling token's suggestions. |
+| `get_current_user` | GET `/v2/users/self` | V2 OAuth identity, original `oauth_token` and `v=20231010` semantics. |
 
-Example:
+All current tools preserve the unmodified provider body in `response`. Rich attributes may require the provider's paid tier. Limits, sorting, and field selection are provider-controlled; no undocumented next-page cursor or offset is synthesized. Suggestion operations submit when `dryRun` is omitted; `dryRun: true` previews. HTTP success can still contain suggestion-level errors or unresolved statuses; inspect `response`.
 
-```
-curl --request GET \
-  --url https://api.foursquare.com/v3/places/search \
-  --header 'Accept: application/json' \
-  --header 'Authorization: YOUR_API_KEY'
-```
+## Legacy compatibility
 
-### OAuth 2.0 (Personalization API and Legacy v2 API)
+The provider [announces V3 deprecation on May 15, 2026](https://docs.foursquare.com/developer/reference/upcoming-changes). Existing schemas, keys, output fields, enum values, defaults, falsy-value behavior, request bodies and client paths are retained. This includes pre-existing request limitations and validation behavior. Replacement tools have distinct keys and current contracts.
 
-Foursquare uses OAuth 2.0 to provide authorized access to the API. This is used for "user-ful" endpoints that require acting on behalf of a specific user.
+| Legacy tool | Replacement |
+| --- | --- |
+| `search_places` | `search_places_current` |
+| `get_place_details` | `get_place_details_current` |
+| `autocomplete_places` | `autocomplete_places_current` |
+| `match_place` | `match_place_current` |
+| `get_place_photos` | `get_place_photos_current` |
+| `get_place_tips` | `get_place_tips_current` |
+| `find_nearby_places` | `get_geotagging_candidates` |
+| `submit_place_feedback` | `suggest_place_changes` |
+| `get_feedback_status` | `get_suggestion_status` |
 
-There are two user models:
+V2 user APIs and Personalization use separate credentials and contracts. The V3 notice is not a V2 retirement notice. Managed-user refresh, enterprise current OAuth, geofences, Studio, Measurement, partner ingestion, batch processing and webhooks are outside this integration's implemented surface.
 
-- **Foursquare Managed Users**: Managed users are users created solely for your application. Generate a Service API Key in your Foursquare Developer account. With the resulting Service API key, create a user via the User Management API. Upon user creation, a unique `access_token` and `userId` is included in the response.
+## Official references
 
-- **Foursquare O&O Users**: O&O users are users of Foursquare's owned and operated apps; City Guide and Swarm. These users already have a Foursquare account which you can leverage for signing into your application, e.g. "Sign in with Foursquare". This uses a standard OAuth 2.0 web-based authorization flow.
-
-When making subsequent calls to any of the Personalization API endpoints, make sure to include the user-specific `access_token` as a Bearer Authorization header.
-
-### Legacy v2 Authentication
-
-The legacy Foursquare API — denoted by v2 — uses OAuth for authentication allowing both "userless" and "user" auth methods. Both userless and user authentication methods require the use of your unique Client ID and Client Secret. This applies only to accounts created before November 2021.
-
-## Features
-
-### Place Search and Discovery
-
-Access global POI data and rich content from 100K+ trusted sources via the API for real-time venue search, discovery, and ranking. Search for places by keyword, category, chain, or geographic area (lat/long, bounding box, or polygon). The Search & Data APIs go beyond basic proximity, allowing developers to filter places by category, features, hours, and more. Each result includes rich metadata like photos, reviews, ratings, and real-time popularity.
-
-- Supports autocomplete for type-ahead search experiences.
-- Results can be filtered by categories (using Category IDs or Category Codes) and chain IDs.
-- Field selection allows requesting only specific data attributes in responses.
-
-### Place Details and Rich Data
-
-Retrieve detailed information about a specific place by its Foursquare ID. Data includes name, address, coordinates, categories, hours, contact info, photos, tips/reviews, ratings, popularity, venue tags (e.g., good for dogs, gluten-free diet), and related places.
-
-- The Address Directory capability enables developers to display a directory of all POI at an address.
-
-### GeoTagging / Place Match
-
-The GeoTagging API pinpoints exact locations—from coffee shops to parks—with high accuracy using Foursquare's Place Snap technology. Place Match will match a user-provided name and location (address or lat/long) to a Foursquare POI. Useful for enriching in-house POI datasets with Foursquare data.
-
-### Places Feedback / Placemaker
-
-Places Feedback endpoints are available to all Places API users to propose changes to be incorporated into Foursquare Places data.
-
-- Propose Place Edit: Enable app users or data processing pipelines to propose edits to Place attributes such as address, phone number, or category.
-- Flag Problematic Place: Indicate an issue with a Place, such as a closed location, or correct the lat/long and label for a particular Place.
-- Get Feedback Status: Store the ID of the feedback submission for checking the status of the update later.
-
-### Personalized Recommendations
-
-Leverage the global POI database alongside personalization algorithms to provide a personalized search experience unique to a user's specific tastes, visit history, review sentiment, and more.
-
-- Requires user-ful OAuth authentication (per-user access tokens).
-- Currently in Public Beta.
-
-### Geofence Management
-
-Geofences can be configured for specific venues, categories, chains, polygons, and arbitrary lat/lng points. The Geofence API allows programmatic creation, retrieval, updating, and deletion of geofences.
-
-- Create the following types of geofences: around a Foursquare Venue, using a Custom Polygon, or around a Lat/Long Coordinate.
-- Supports bulk operations (add up to 1,000, delete up to 100 at a time).
-- Additional properties allow you to add custom metadata to each geofence event, where the additional properties will be appended to the event payload as a key-value pair.
-- Designed to be used with the Foursquare Movement SDK on mobile devices.
-
-### Studio Data Management
-
-Create, manage, and modify geospatial assets used on Foursquare Studio. Integrate into your pipeline tasks for the bulk processing of geospatial data, allowing for the efficient flow of data into Studio.
-
-- Upload, download, and update datasets.
-- Manage who can see or edit assets stored in the Studio cloud.
-
-### Measurement (MAPI)
-
-Measurement API (MAPI) is a tool for accessing measurement data, powering everything from insights gathering to campaign optimization. MAPI combines unparalleled data granularity with a flexible syntax to put you in control of your report data.
-
-### User Management
-
-The Users API lets you manage authentication on behalf of your users so that they can use the Places API endpoints and Placemaker UI. Create managed users, retrieve user tokens, and refresh tokens.
-
-## Events
-
-Foursquare provides two webhook-based real-time push APIs (part of the legacy v2 API):
-
-### User Push API
-
-The User Push API will push to your application every time one of your users checks in (these users must have previously authorized your application). Your server will receive a POST request containing a checkin parameter. Inside the checkin parameter will be a normal check-in response, rendered from your user's point of view.
-
-- Requires an HTTPS endpoint on port 443.
-- Only fires for users who have authorized your application.
-
-### Venue Push API
-
-The Venue Push API will push to your application content from venues managed by any of your application's authorized users. Supported venue content are check-ins, likes, tips, and photos at the venue.
-
-- In order for your app to see pushes for a venue, at least one of the venue's managers must have authorized use of your app.
-- Responses are generated from an anonymous point of view, meaning that some private information, such as shouts, will not be included.
-- Off-the-grid check-ins, cheat check-ins, and check-ins by users who have opted out of venue statistics collection are not sent to this API.
-- Requires an HTTPS server endpoint.
+- [Places authentication](https://docs.foursquare.com/fsq-developers-places/reference/authentication)
+- [Service key setup](https://docs.foursquare.com/developer/docs/manage-service-api-keys)
+- [Place search](https://docs.foursquare.com/fsq-developers-places/reference/place-search)
+- [Place details](https://docs.foursquare.com/fsq-developers-places/reference/place-details)
+- [Autocomplete](https://docs.foursquare.com/fsq-developers-places/reference/autocomplete)
+- [Place match](https://docs.foursquare.com/fsq-developers-places/reference/place-match)
+- [Photos](https://docs.foursquare.com/fsq-developers-places/reference/place-photos) and [tips](https://docs.foursquare.com/fsq-developers-places/reference/place-tips)
+- [Geotagging candidates](https://docs.foursquare.com/fsq-developers-places/reference/geotagging-candidates) and [confirmation](https://docs.foursquare.com/fsq-developers-places/reference/geotagging-confirm)
+- [Edits](https://docs.foursquare.com/fsq-developers-places/reference/place-suggest-edit), [removals](https://docs.foursquare.com/fsq-developers-places/reference/place-suggest-remove), [merge](https://docs.foursquare.com/fsq-developers-places/reference/suggest-merge), [flags](https://docs.foursquare.com/fsq-developers-places/reference/place-flag), [new place](https://docs.foursquare.com/fsq-developers-places/reference/places-suggest-place), [statuses](https://docs.foursquare.com/fsq-developers-places/reference/place-suggest-status)
+- [V2 OAuth setup](https://docs.foursquare.com/developer/docs/using-oauth-authentication), [Personalization auth](https://docs.foursquare.com/developer/reference/personalization-apis-authentication), [current user](https://docs.foursquare.com/developer/reference/get-user-details)

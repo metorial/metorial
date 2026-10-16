@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CuttlyClient, getShortenStatusMessage } from '../lib/client';
+import { CuttlyClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let shortenUrl = SlateTool.create(spec, {
@@ -35,6 +35,12 @@ export let shortenUrl = SlateTool.create(spec, {
         .describe(
           'Use your branded/custom domain instead of cutt.ly. Requires a paid subscription with an approved domain.'
         ),
+      domain: z
+        .string()
+        .optional()
+        .describe(
+          'Team API only: branded domain owned by your team, such as links.example.com. Use this instead of useBrandedDomain for team connections.'
+        ),
       publicStats: z
         .boolean()
         .optional()
@@ -65,14 +71,10 @@ export let shortenUrl = SlateTool.create(spec, {
       url: ctx.input.url,
       name: ctx.input.alias,
       userDomain: ctx.input.useBrandedDomain,
+      domain: ctx.input.domain,
       publicStats: ctx.input.publicStats,
       noTitle: ctx.input.noTitle
     });
-
-    if (result.status !== 7) {
-      let statusMsg = getShortenStatusMessage(result.status);
-      throw new Error(`Failed to shorten URL: ${statusMsg}`);
-    }
 
     return {
       output: {

@@ -1,9 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  responseCollection,
+  responseNullableString,
+  responseNumber,
+  responsePagination,
+  responseString
+} from '../lib/response';
 import { spec } from '../spec';
 
 let productSchema = z.object({
+  id: z.string().optional().describe('Provider resource ID including marketplace'),
   asin: z.string().describe('Amazon Standard Identification Number'),
   title: z.string().nullable().describe('Product title'),
   brand: z.string().nullable().describe('Product brand name'),
@@ -16,7 +24,7 @@ let productSchema = z.object({
   rating: z.number().nullable().describe('Average product rating (0-5)'),
   imageUrl: z.string().nullable().describe('Product image URL'),
   sellerType: z.string().nullable().describe('Seller type (amz, fba, fbm)'),
-  lqs: z.number().nullable().describe('Listing Quality Score (1-10)'),
+  lqs: z.number().nullable().describe('Provider Listing Quality Score'),
   weight: z.number().nullable().describe('Product weight'),
   numberOfSellers: z.number().nullable().describe('Number of active sellers'),
   feeBreakdown: z.any().nullable().describe('Amazon fee breakdown details'),
@@ -64,6 +72,11 @@ export let productDatabaseTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Exclude currently unavailable products'),
+      minUpdatedAt: z
+        .string()
+        .optional()
+        .describe('Earliest product update date (YYYY-MM-DD)'),
+      maxUpdatedAt: z.string().optional().describe('Latest product update date (YYYY-MM-DD)'),
       minPrice: z.number().optional().describe('Minimum product price'),
       maxPrice: z.number().optional().describe('Maximum product price'),
       minNet: z.number().optional().describe('Minimum net revenue after fees'),
@@ -82,8 +95,8 @@ export let productDatabaseTool = SlateTool.create(spec, {
       maxWeight: z.number().optional().describe('Maximum product weight'),
       minSellers: z.number().optional().describe('Minimum number of sellers'),
       maxSellers: z.number().optional().describe('Maximum number of sellers'),
-      minLqs: z.number().optional().describe('Minimum Listing Quality Score (1-10)'),
-      maxLqs: z.number().optional().describe('Maximum Listing Quality Score (1-10)'),
+      minLqs: z.number().optional().describe('Minimum listing quality filter (1-10)'),
+      maxLqs: z.number().optional().describe('Maximum listing quality filter (1-10)'),
       sort: z
         .enum([
           'name',
@@ -101,7 +114,9 @@ export let productDatabaseTool = SlateTool.create(spec, {
           'reviews',
           '-reviews',
           'lqs',
-          '-lqs'
+          '-lqs',
+          'sellers',
+          '-sellers'
         ])
         .optional()
         .describe('Sort field (prefix with - for descending)'),
@@ -116,6 +131,10 @@ export let productDatabaseTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response including native attributes and metadata'),
       products: z.array(productSchema).describe('List of matching products'),
       totalItems: z.number().nullable().describe('Total number of matching products'),
       nextPageCursor: z
@@ -139,6 +158,8 @@ export let productDatabaseTool = SlateTool.create(spec, {
       sellerTypes: ctx.input.sellerTypes,
       excludeTopBrands: ctx.input.excludeTopBrands,
       excludeUnavailableProducts: ctx.input.excludeUnavailableProducts,
+      minUpdatedAt: ctx.input.minUpdatedAt,
+      maxUpdatedAt: ctx.input.maxUpdatedAt,
       minPrice: ctx.input.minPrice,
       maxPrice: ctx.input.maxPrice,
       minNet: ctx.input.minNet,
@@ -166,35 +187,50 @@ export let productDatabaseTool = SlateTool.create(spec, {
       }
     });
 
-    let products = (result.data || []).map((item: any) => ({
-      asin: item.id || '',
-      title: item.attributes?.title ?? null,
-      brand: item.attributes?.brand ?? null,
-      category: item.attributes?.category ?? null,
-      price: item.attributes?.price ?? null,
-      rank: item.attributes?.rank ?? null,
-      sales: item.attributes?.approximate_30_day_units_sold ?? item.attributes?.sales ?? null,
-      revenue: item.attributes?.approximate_30_day_revenue ?? item.attributes?.revenue ?? null,
-      reviews: item.attributes?.reviews ?? null,
-      rating: item.attributes?.rating ?? null,
-      imageUrl: item.attributes?.image_url ?? null,
-      sellerType: item.attributes?.seller_type ?? null,
-      lqs: item.attributes?.lqs ?? null,
-      weight: item.attributes?.weight ?? null,
-      numberOfSellers: item.attributes?.number_of_sellers ?? null,
-      feeBreakdown: item.attributes?.fee_breakdown ?? null,
-      updatedAt: item.attributes?.updated_at ?? null
+    let products = responseCollection(result).map(item => ({
+      id: item.id,
+      asin: responseString(
+        item.id.includes('/') ? item.id.slice(item.id.indexOf('/') + 1) : item.id,
+        'product ASIN'
+      ),
+      title: responseNullableString(item.attributes.title, 'title'),
+      brand: responseNullableString(item.attributes.brand, 'brand'),
+      category: responseNullableString(item.attributes.category, 'category'),
+      price: responseNumber(item.attributes.price, 'price'),
+      rank: responseNumber(
+        item.attributes.product_rank ?? item.attributes.rank,
+        'product rank'
+      ),
+      sales: responseNumber(
+        item.attributes.approximate_30_day_units_sold ?? item.attributes.sales,
+        'monthly units sold'
+      ),
+      revenue: responseNumber(
+        item.attributes.approximate_30_day_revenue ?? item.attributes.revenue,
+        'monthly revenue'
+      ),
+      reviews: responseNumber(item.attributes.reviews, 'reviews'),
+      rating: responseNumber(item.attributes.rating, 'rating'),
+      imageUrl: responseNullableString(item.attributes.image_url, 'image_url'),
+      sellerType: responseNullableString(item.attributes.seller_type, 'seller_type'),
+      lqs: responseNumber(
+        item.attributes.listing_quality_score ?? item.attributes.lqs,
+        'listing quality score'
+      ),
+      weight: responseNumber(
+        item.attributes.weight_value ?? item.attributes.weight,
+        'product weight'
+      ),
+      numberOfSellers: responseNumber(item.attributes.number_of_sellers, 'number_of_sellers'),
+      feeBreakdown: item.attributes.fee_breakdown ?? null,
+      updatedAt: responseNullableString(item.attributes.updated_at, 'updated_at')
     }));
 
-    let totalItems = result.meta?.total_items ?? null;
-    let nextPageCursor: string | null = null;
-    if (result.links?.next) {
-      let nextUrl = new URL(result.links.next, 'https://developer.junglescout.com');
-      nextPageCursor = nextUrl.searchParams.get('page[cursor]');
-    }
+    let { totalItems, nextPageCursor } = responsePagination(result);
 
     return {
       output: {
+        raw: result,
         products,
         totalItems,
         nextPageCursor

@@ -1,6 +1,8 @@
 # Fathom
 
-Retrieve AI-powered meeting recordings, transcripts, summaries, and action items from Zoom, Google Meet, and Microsoft Teams calls. List and filter meetings by date, type, recorder, or invitee. Access speaker-labeled timestamped transcripts, AI-generated summaries in Markdown, and extracted action items with assignees and completion status. Retrieve CRM-matched contacts, companies, and deals for meetings. Manage teams and team members. Create and delete webhooks to receive notifications when new meeting content is ready.
+Retrieve meeting recordings, speaker-labeled transcripts, AI summaries, action items, highlights, and CRM matches from Fathom. Filter meetings by date, recorder, team, company domain, or meeting type. Discover teams, team members, and meeting types.
+
+Use API key or OAuth authentication. Meeting lists return one provider page at a time. The optional attendee-email filter is applied locally to each page; continue with the returned cursor even if a page contains no matches. The detail tool searches up to five meeting-list pages for action items and reports whether the recording was found.
 
 ## License
 

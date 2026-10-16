@@ -45,7 +45,11 @@ export let createOrUpdateCustomer = SlateTool.create(spec, {
         .optional()
         .describe('Two-letter ISO 3166-1 country code (e.g., US, GB)'),
       customerCode: z.string().optional().describe('Customer loyalty code'),
-      note: z.string().optional().describe('Note about the customer')
+      note: z.string().optional().describe('Note about the customer'),
+      totalPoints: z
+        .number()
+        .optional()
+        .describe('Set the absolute loyalty points balance; replaces the current balance')
     })
   )
   .output(
@@ -54,6 +58,7 @@ export let createOrUpdateCustomer = SlateTool.create(spec, {
       customerName: z.string().nullable().optional().describe('Customer name'),
       email: z.string().nullable().optional().describe('Email address'),
       phoneNumber: z.string().nullable().optional().describe('Phone number'),
+      totalPoints: z.number().nullable().optional().describe('Loyalty points balance'),
       createdAt: z.string().optional(),
       updatedAt: z.string().optional()
     })
@@ -82,6 +87,7 @@ export let createOrUpdateCustomer = SlateTool.create(spec, {
     if (input.countryCode !== undefined) body.country_code = input.countryCode;
     if (input.customerCode !== undefined) body.customer_code = input.customerCode;
     if (input.note !== undefined) body.note = input.note;
+    if (input.totalPoints !== undefined) body.total_points = input.totalPoints;
 
     let result = await client.createOrUpdateCustomer(body);
 
@@ -91,6 +97,7 @@ export let createOrUpdateCustomer = SlateTool.create(spec, {
         customerName: result.name,
         email: result.email,
         phoneNumber: result.phone_number,
+        totalPoints: result.total_points,
         createdAt: result.created_at,
         updatedAt: result.updated_at
       },

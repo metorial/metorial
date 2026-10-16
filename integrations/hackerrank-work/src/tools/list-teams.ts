@@ -38,6 +38,15 @@ export let listTeams = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('Array of team member objects (when listing members of a specific team)'),
+      next: z
+        .string()
+        .optional()
+        .describe('Provider URL for the next page, empty when no next page exists'),
+      previous: z.string().optional().describe('Provider URL for the previous page'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response including pagination'),
       total: z.number().describe('Total number of records available'),
       offset: z.number().describe('Current pagination offset')
     })
@@ -54,6 +63,9 @@ export let listTeams = SlateTool.create(spec, {
       return {
         output: {
           members: result.data,
+          next: result.next,
+          previous: result.previous,
+          raw: result.raw,
           total: result.total,
           offset: result.offset
         },
@@ -69,6 +81,9 @@ export let listTeams = SlateTool.create(spec, {
     return {
       output: {
         teams: result.data,
+        next: result.next,
+        previous: result.previous,
+        raw: result.raw,
         total: result.total,
         offset: result.offset
       },

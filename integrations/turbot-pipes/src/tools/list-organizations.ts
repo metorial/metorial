@@ -34,10 +34,7 @@ export let listOrganizations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listOrgs({
       limit: ctx.input.limit,

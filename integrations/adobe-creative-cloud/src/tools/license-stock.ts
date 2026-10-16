@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StockClient } from '../lib/stock';
 import { spec } from '../spec';
@@ -37,11 +37,14 @@ export let licenseStock = SlateTool.create(spec, {
 
     if (ctx.input.action === 'check') {
       let result = await client.getLicenseInfo(ctx.input.contentId);
-      let content = result.contents?.[ctx.input.contentId] || {};
+      let content = result.contents?.[ctx.input.contentId];
+      if (typeof content?.purchase_details?.state !== 'string') {
+        throw createApiServiceError('Adobe Stock did not return the asset license state.');
+      }
       return {
         output: {
           contentId: ctx.input.contentId,
-          isLicensed: content.purchase_details?.state === 'purchased' || false,
+          isLicensed: ['purchased', 'just_purchased'].includes(content.purchase_details.state),
           purchaseDetails: content.purchase_details
         },
         message: `License status for asset \`${ctx.input.contentId}\`: **${content.purchase_details?.state || 'not licensed'}**`
@@ -49,16 +52,30 @@ export let licenseStock = SlateTool.create(spec, {
     }
 
     let result = await client.licenseContent(ctx.input.contentId, ctx.input.licenseState);
-    let content = result.contents?.[ctx.input.contentId] || {};
+    let content = result.contents?.[ctx.input.contentId];
+    if (typeof content?.purchase_details?.state !== 'string') {
+      throw createApiServiceError('Adobe Stock did not return the asset license state.');
+    }
 
+    let state = content.purchase_details.state;
+    let isLicensed = ['purchased', 'just_purchased'].includes(state);
+    let downloadUrl = content.purchase_details.url;
+    if (isLicensed && typeof downloadUrl === 'string') {
+      await ctx.addAttachment({
+        type: 'url',
+        url: downloadUrl,
+        query: { token: ctx.auth.token },
+        mimeType: content.purchase_details.content_type
+      });
+    }
     return {
       output: {
         contentId: ctx.input.contentId,
-        isLicensed: true,
-        downloadUrl: content.purchase_details?.url,
+        isLicensed,
+        downloadUrl,
         purchaseDetails: content.purchase_details
       },
-      message: `Successfully licensed stock asset \`${ctx.input.contentId}\`.`
+      message: `Adobe Stock asset \`${ctx.input.contentId}\` license state: **${state}**.`
     };
   })
   .build();

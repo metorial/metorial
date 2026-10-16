@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTables = SlateTool.create(spec, {
@@ -13,7 +13,11 @@ export let listTables = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      databaseId: z.number().describe('The ID of the database to list tables from')
+      databaseId: z
+        .number()
+        .describe(
+          'The database ID. Call list_databases to discover database IDs with a JWT connection.'
+        )
     })
   )
   .output(
@@ -33,22 +37,18 @@ export let listTables = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
     let tables = await client.listTables(ctx.input.databaseId);
 
     return {
       output: {
         tables: tables.map((t: any) => ({
+          ...t,
           tableId: t.id,
           name: t.name,
           order: t.order,
-          databaseId: t.database_id,
-          ...t
+          databaseId: t.database_id
         }))
       },
       message: `Found **${tables.length}** table(s) in database ${ctx.input.databaseId}.`

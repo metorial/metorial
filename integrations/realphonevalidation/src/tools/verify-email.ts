@@ -13,6 +13,9 @@ export let verifyEmail = SlateTool.create(spec, {
   key: 'verify_email',
   description: `Validates an email address in real-time to identify incorrect, disposable, and bogus addresses. Checks formatting standards, pings SMTP servers, validates MX records, and detects disposable email providers. Best used at the point of collection to prevent bad data from entering your database.`,
   constraints: ['API rate limit of 10 requests per second.'],
+  instructions: [
+    'Uses the legacy Email Verification API. Use Validate Email Lightning for the current REV Lightning API and its deliverability and domain-risk flags.'
+  ],
   tags: {
     readOnly: true
   }
@@ -49,8 +52,8 @@ export let verifyEmail = SlateTool.create(spec, {
     return {
       output: {
         validityStatus: result.status,
-        isDisposable: result.disposable as string | undefined,
-        isConnected: result.connected as string | undefined,
+        isDisposable: result.disposable,
+        isConnected: result.connected,
         errorText: errorText || undefined
       },
       message: `Email **${ctx.input.email}** is **${result.status}**${result.disposable ? `, disposable: ${result.disposable}` : ''}${result.connected ? `, connected: ${result.connected}` : ''}.`

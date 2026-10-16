@@ -1,6 +1,8 @@
 # Linguapop
 
-Send CEFR-aligned language placement tests to candidates and receive detailed proficiency results. Fetch available test languages, create and send test invitations with customizable options (reading/listening sections, kiosk mode, email delivery), and receive webhook callbacks with granular CEFR level results including numeric ratings, sub-level codes, and score breakdowns.
+Discover test languages and create CEFR-aligned placement test invitations with optional email delivery, kiosk codes, and reading/listening sections. Configure your own callback URL to receive completion results. Invitation responses include a direct test URL and the provider-confirmed email status.
+
+Use an API key from an active integration in the Linguapop dashboard. See the [API reference](https://docs.linguapop.eu/api/) and [API key guide](https://docs.linguapop.eu/integrations/).
 
 ## License
 

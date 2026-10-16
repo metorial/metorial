@@ -1,66 +1,78 @@
-# Slates Specification for Cutt.ly
+# Cutt.ly API Specification
 
-## Overview
+## Authentication and API selection
 
-Cutt.ly is a URL shortening and link management platform. It provides API access for creating shortened URLs, editing link properties, and retrieving click analytics. It offers both a Regular API for individual accounts and a Team API for collaborative use.
+API key authentication uses the `key` query parameter. Select the matching
+`apiType` connection setting:
 
-## Authentication
+- `regular`: personal key from Edit Account; endpoint `https://cutt.ly/api/api.php`.
+- `team`: team key from the Team edit page; endpoint `https://cutt.ly/team/API/index.php`.
+  Requires a Team subscription.
 
-Cutt.ly uses **API key** authentication. The API is available only to registered users; an API key can be generated on the Edit Account page. For the Team API, the API key can be generated in the Team edit page.
+Keys are non-expiring credentials; no OAuth scopes or token refresh are involved.
+No profile, account identity, domain-list, or link-list operation is documented.
+Keep the returned short URL for future edits, deletion, and analytics.
 
-The API key is passed as a query parameter named `key` in every request. For example:
+## Tools
 
-```
-https://cutt.ly/api/api.php?key=YOUR_API_KEY&short=https://example.com
-```
+| Tool | Provider operation |
+| --- | --- |
+| `shorten_url` | Regular: `short=<url>`; Team: `action=shorten&url=<url>`. Returns the created short URL, destination, title, and creation date. |
+| `edit_link` | Regular: `edit=<short-url>`; Team: `action=edit&url=<short-url>`. Changes alias, destination, title, tag, uniqueness, expiration, redirects, or A/B/C testing. |
+| `delete_link` | Edit operation with `delete=1`. |
+| `get_link_analytics` | Regular: `stats=<short-url>`; Team: `action=stats&url=<short-url>`. Returns click counts, breakdowns, and the complete analytics payload. |
+| `remove_mobile_redirect` | Edit operation with `mobile=<platform>` and the `destination` parameter omitted. |
 
-There are two separate API base URLs depending on usage context:
+Links managed by these APIs are stored in the account's **API URLs** section;
+links created in the dashboard's main link manager cannot be edited or analyzed
+through these endpoints.
 
-- **Regular API:** `https://cutt.ly/api/api.php` — available to all registered users.
-- **Team API:** `https://cutt.ly/team/API/index.php` — available only to registered users with a minimum Team subscription plan.
+## Request and response contracts
 
-No OAuth flow or additional scopes are required. Be cautious when generating or changing API keys, as this action will affect the functionality of any integrations using the previous key.
+Shortening succeeds with status `7`. Edit, password, redirect-removal, and delete
+operations succeed with top-level status `1`; nested legacy `url.status`
+responses are also accepted. Analytics succeeds with `stats.status=1`.
+Provider statuses, HTTP failures, invalid responses, and invalid operation
+combinations surface as actionable errors.
 
-## Features
+For personal branded links, `useBrandedDomain=true` sends `userDomain=1` and
+uses the active approved account domain. Team links use the optional `domain`
+input, which sends the domain name owned by the team. The Team API does not
+use the personal `userDomain` flag. Both APIs encode query parameters once,
+including URLs containing UTM parameters and deep links.
 
-### URL Shortening
+Password changes send multipart form data by POST with query `password=1`.
+An empty password removes protection. Password changes and other edits are
+separate requests; a later failure reports that the earlier password change
+already succeeded. Invalid combinations are checked before either request.
 
-Create shortened URLs from long URLs. You can set click stats as public using the `public` parameter, and optionally include a custom alias (`name`), disable page title fetching (`noTitle`), or use a branded custom domain (`userDomain`).
+Expiration uses `expire=0` for click counts and `expire=1` for dates. Nonzero
+expiration needs a condition and post-expiration destination. A condition of
+`0` removes expiration. Redirect and unique-click expiration edits are sent
+even when they are the only fields supplied.
 
-- **Custom alias (back-half):** Specify a preferred short link name if not already taken.
-- **Custom/branded domains:** Use your own domain instead of `cutt.ly`. Requires a paid subscription with an approved, active domain.
-- **UTM tag support:** URLs with UTM parameters or other query strings are preserved when properly URL-encoded.
-- Some features like `noTitle` are only available on higher-tier plans.
+The existing nested `mobileRedirect` input continues requiring a destination.
+Use `remove_mobile_redirect` to restore normal routing without supplying one.
+Android package IDs and install referrers apply only to Android redirects.
 
-### Link Editing
+A/B tests need a B percentage and URL; A/B/C tests additionally need C values.
+Each percentage must be 0–100 and the B/C total cannot exceed 100. Removing a
+test sends only `abtest=0` without stale variation fields.
 
-Edit properties of existing shortened links. Available from the Single plan onwards. Editable properties include:
+Analytics supports independent start/end dates in `YYYY-MM-DD` format, subject
+to plan eligibility. The normalized fields remain available, with the original
+analytics payload under `raw` to preserve additional provider data.
 
-- **Alias/name:** Change the short link's back-half.
-- **Source URL:** Change the destination URL the short link redirects to.
-- **Title:** Modify the link's display title.
-- **Tags:** Add or change a tag associated with the link.
-- **Unique click tracking:** Configure unique click counting with customizable time windows (15–1440 minutes on Team plans).
-- **Password protection:** Set or remove a password on a shortened link (via POST request with form-data body).
-- **Link expiration:** Set expiration based on a click count or a specific date (YYYY-MM-DD), with a configurable redirect URL after expiration.
-- **Mobile redirects and deep links:** Configure alternative redirect destinations based on mobile OS (Android, iOS, Windows Mobile). Supports deep links, deferred deep links (with Android package ID), and install referrer payloads.
-- **AB/C testing:** Set up AB or ABC split tests on a link, specifying percentage distribution and variation URLs.
-- **Deletion:** Delete a shortened link.
+## Plan restrictions and boundaries
 
-### Link Analytics
+Custom domains require an active paid plan and an approved domain. Editing,
+passwords, expiration, A/B/C tests, date filtering, and `noTitle` have provider
+plan restrictions; unsupported operations fail without automatic retries.
+The integration does not expose undocumented listing, identity, webhook,
+QR-code, or export endpoints.
 
-Retrieve click statistics for any shortened URL you own. Analytics data includes:
+## Official references
 
-- Total clicks, with breakdowns by source (Facebook, Twitter, LinkedIn, other, bots).
-- Referral domains and click counts per referrer.
-- Device-level data: geography (country), device type, operating system, browser, device brand, and language.
-- Bot click details.
-- **Date range filtering:** Filter analytics by start and/or end date (Team plan and above).
-
-### Team Link Management
-
-The Team API mirrors the Regular API features but operates within a team context. It allows shortening links, editing existing short links, and accessing link analytics under a team workspace. Each team can have its own dedicated API key and custom domains.
-
-## Events
-
-The provider does not support events. Cutt.ly does not offer webhooks, event subscriptions, or purpose-built polling mechanisms through its API.
+- [Regular API](https://cutt.ly/api-documentation/cuttly-links-api)
+- [Team API](https://cutt.ly/api-documentation/team-api)
+- [Developer workflow and API URLs boundary](https://cutt.ly/resources/tools/cuttly-api)

@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'owl-protocol',
   name: 'Owl Protocol',
   description:
-    'Web3 developer platform for deploying and managing smart contracts and digital assets (ERC20, ERC721, ERC1155) across EVM-compatible blockchains via REST API without private keys or crypto.',
+    'Deploy ERC721 collections, mint tokens, manage project users and metadata, and discover project contracts and user tokens on supported EVM-compatible blockchains.',
   metadata: {},
   config,
   auth

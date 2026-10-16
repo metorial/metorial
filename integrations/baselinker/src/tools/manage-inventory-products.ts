@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BaseLinkerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -20,7 +20,9 @@ export let manageInventoryProducts = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create_or_update', 'delete']).describe('Operation to perform'),
-      inventoryId: z.number().describe('Catalog (inventory) ID'),
+      inventoryId: z
+        .number()
+        .describe('Catalog ID. Call get_inventories to discover catalog IDs.'),
       productId: z
         .string()
         .optional()
@@ -72,6 +74,14 @@ export let manageInventoryProducts = SlateTool.create(spec, {
     let client = new BaseLinkerClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'delete') {
+      if (
+        ctx.input.productId === undefined ||
+        !/^\d+$/.test(ctx.input.productId) ||
+        !Number.isSafeInteger(Number(ctx.input.productId)) ||
+        Number(ctx.input.productId) <= 0
+      ) {
+        throw createApiServiceError('A positive numeric productId is required for delete.');
+      }
       await client.deleteInventoryProduct(Number(ctx.input.productId));
       return {
         output: { productId: ctx.input.productId, success: true },
@@ -104,6 +114,9 @@ export let manageInventoryProducts = SlateTool.create(spec, {
       bundleProducts: ctx.input.bundleProducts
     });
 
+    if (typeof result.product_id !== 'number' && typeof result.product_id !== 'string') {
+      throw createApiServiceError('BaseLinker did not return the saved product ID.');
+    }
     let verb = ctx.input.productId ? 'Updated' : 'Created';
     return {
       output: { productId: String(result.product_id), success: true },

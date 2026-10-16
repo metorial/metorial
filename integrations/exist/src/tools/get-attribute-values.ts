@@ -7,7 +7,9 @@ export let getAttributeValuesTool = SlateTool.create(spec, {
   name: 'Get Attribute Values',
   key: 'get_attribute_values',
   description: `Retrieve the historical daily values for a specific attribute. Returns a paginated list of date/value pairs, allowing you to query extensive history for a single attribute with date range filtering.`,
-  instructions: ['Use dateMin and dateMax (YYYY-MM-DD) to narrow the date range.'],
+  instructions: [
+    'Discover attribute names with get_attributes. Use dateMax (YYYY-MM-DD) for the latest date; dateMin is forwarded for compatibility but is not listed in the current endpoint reference.'
+  ],
   tags: {
     readOnly: true
   }
@@ -25,6 +27,17 @@ export let getAttributeValuesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the next page, when returned'),
+      previousPageUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Provider URL for the previous page, when returned'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       totalCount: z.number().describe('Total number of values'),
       values: z
         .array(
@@ -51,6 +64,9 @@ export let getAttributeValuesTool = SlateTool.create(spec, {
 
     return {
       output: {
+        nextPageUrl: result.next,
+        previousPageUrl: result.previous,
+        raw: result,
         totalCount: result.count,
         values,
         hasMore: result.next !== null

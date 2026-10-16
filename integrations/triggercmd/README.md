@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Triggercmd
 
-Remotely execute commands on registered computers via REST API. Trigger pre-configured scripts, programs, or system commands on any computer running the TRIGGERcmd agent. List registered computers and their available commands, pass parameters to triggered commands, query command run history, and create shareable bookmark URLs for command execution. Supports managing multiple computers and sharing computer access with other accounts.
+Run configured commands on computers with the TRIGGERcmd agent. Discover computers and commands, pass optional parameters, inspect run history, and list or trigger panel buttons. A successful trigger request confirms acceptance; run history provides subsequent execution status.
 
 ## License
 

@@ -37,12 +37,20 @@ export let updateAttributeValuesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      successful: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe(
+          'Successful provider records, including returned names or current totals when supplied'
+        ),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       successCount: z.number().describe('Number of successfully updated values'),
       failedCount: z.number().describe('Number of failed updates'),
       failures: z
         .array(
           z.object({
             attributeName: z.string().optional().describe('Attribute that failed'),
+            errorCode: z.string().optional().describe('Provider error code'),
             error: z.string().describe('Error message')
           })
         )
@@ -60,12 +68,15 @@ export let updateAttributeValuesTool = SlateTool.create(spec, {
     let result = await client.updateAttributeValues(payload);
 
     let failures = result.failed.map(f => ({
-      attributeName: (f as Record<string, unknown>).name as string | undefined,
+      attributeName: typeof f.name === 'string' ? f.name : undefined,
+      errorCode: f.error_code,
       error: f.error
     }));
 
     return {
       output: {
+        raw: result,
+        successful: result.success,
         successCount: result.success.length,
         failedCount: result.failed.length,
         failures

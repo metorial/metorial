@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -10,13 +10,25 @@ export let auth = SlateAuth.create()
   )
   .addCustomAuth({
     type: 'auth.custom',
-    name: 'API Key',
+    name: 'Legacy API Key',
     key: 'api_key',
     inputSchema: z.object({
       username: z.string().describe('Your Kaggle username'),
-      apiKey: z.string().describe('Your Kaggle API key (from kaggle.com/settings)')
+      apiKey: z
+        .string()
+        .describe(
+          'Legacy API key from the key field in kaggle.json; create it under Legacy API Credentials at kaggle.com/settings/api. This is not a personal API token.'
+        )
     }),
     getOutput: async ctx => {
+      if (
+        !ctx.input.username.trim() ||
+        ctx.input.username.includes(':') ||
+        !ctx.input.apiKey.trim()
+      )
+        throw createApiServiceError(
+          'Provide your Kaggle username and a valid legacy API key.'
+        );
       let basicToken = Buffer.from(`${ctx.input.username}:${ctx.input.apiKey}`).toString(
         'base64'
       );

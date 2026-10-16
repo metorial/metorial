@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, recordsFrom, stringValue } from '../lib/client';
 import { spec } from '../spec';
 
 let govTradeSchema = z.object({
@@ -43,6 +43,10 @@ export let getGovernmentTradesTool = SlateTool.create(spec, {
       date: z.string().optional().describe('Specific date (YYYY-MM-DD)'),
       dateFrom: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       dateTo: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      updatedSince: z
+        .number()
+        .optional()
+        .describe('Return records updated since this Unix timestamp in seconds'),
       page: z.number().optional().default(0).describe('Page offset'),
       pageSize: z.number().optional().default(50).describe('Results per page (max 1000)')
     })
@@ -50,6 +54,7 @@ export let getGovernmentTradesTool = SlateTool.create(spec, {
   .output(
     z.object({
       trades: z.array(govTradeSchema).describe('Congressional trade records'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of trades returned')
     })
   )
@@ -62,11 +67,12 @@ export let getGovernmentTradesTool = SlateTool.create(spec, {
       date: ctx.input.date,
       dateFrom: ctx.input.dateFrom,
       dateTo: ctx.input.dateTo,
+      updatedSince: ctx.input.updatedSince,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
 
-    let items = data?.data || (Array.isArray(data) ? data : []);
+    let items = recordsFrom(data);
     let trades = items.map((item: any) => ({
       tradeId: item.id,
       transactionDate: item.transaction_date,
@@ -74,19 +80,24 @@ export let getGovernmentTradesTool = SlateTool.create(spec, {
       transactionType: item.transaction_type,
       amount: item.amount,
       chamber: item.chamber,
-      filerName: item.filer_info?.name || item.filer_info?.name_full,
+      filerName:
+        item.filer_info?.display_name ??
+        item.filer_info?.member_name ??
+        item.filer_info?.name ??
+        item.filer_info?.name_full,
       filerState: item.filer_info?.state,
-      filerDistrict: item.filer_info?.district,
+      filerDistrict: stringValue(item.filer_info?.district),
       securityName: item.security?.name,
       ticker: item.security?.ticker,
       securityType: item.security?.type,
       ownership: item.ownership,
-      created: item.created,
-      updated: item.updated
+      created: stringValue(item.created),
+      updated: stringValue(item.updated)
     }));
 
     return {
       output: {
+        raw: data,
         trades,
         count: trades.length
       },

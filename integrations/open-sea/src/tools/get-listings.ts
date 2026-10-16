@@ -75,18 +75,27 @@ export let getListings = SlateTool.create(spec, {
       });
     }
 
-    let rawListings = data.listings ?? (data.order ? [data.order] : []);
+    let rawListings =
+      data.listings ?? (data.order ? [data.order] : ctx.input.tokenIdentifier ? [data] : []);
     let listings = rawListings.map((l: any) => {
       let price = l.price?.current ?? l.price ?? {};
       return {
         orderHash: l.order_hash ?? null,
         chain: l.chain ?? null,
-        contractAddress: l.protocol_data?.parameters?.offer?.[0]?.token ?? null,
-        tokenIdentifier: l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria ?? null,
+        contractAddress:
+          l.asset?.contract ?? l.protocol_data?.parameters?.offer?.[0]?.token ?? null,
+        tokenIdentifier:
+          l.asset?.identifier ??
+          l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria ??
+          null,
         priceAmount: price.value ?? price.amount ?? null,
         priceSymbol: price.currency ?? price.symbol ?? null,
         priceDecimals: price.decimals ?? null,
-        maker: l.maker?.address ?? l.protocol_data?.parameters?.offerer ?? null,
+        maker:
+          l.maker?.address ??
+          l.protocol_data?.parameters?.offerer ??
+          l.svm_order?.maker ??
+          null,
         listingTimestamp:
           l.listing_timestamp ?? l.protocol_data?.parameters?.startTime ?? null,
         expirationTimestamp:

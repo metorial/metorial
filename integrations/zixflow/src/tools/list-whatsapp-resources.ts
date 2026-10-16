@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { providerRecords, requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let listWhatsAppResources = SlateTool.create(spec, {
@@ -10,7 +11,7 @@ export let listWhatsAppResources = SlateTool.create(spec, {
   instructions: [
     'Use resourceType "accounts" to list connected WhatsApp Business Accounts and their phone IDs.',
     'Use resourceType "templates" to list approved message templates for a specific phone ID.',
-    'Use resourceType "template_variables" to get the variables required by a specific template.'
+    'Use resourceType "template_variables" to get the variables required by a specific template; provide phoneId, templateName, and language.'
   ],
   tags: {
     destructive: false,
@@ -30,6 +31,12 @@ export let listWhatsAppResources = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Template name (required for template_variables)'),
+      language: z
+        .string()
+        .optional()
+        .describe(
+          'Template language from list_whatsapp_resources templates; required for template_variables'
+        ),
       limit: z
         .number()
         .optional()
@@ -39,6 +46,7 @@ export let listWhatsAppResources = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
       success: z.boolean().describe('Whether the request was successful'),
       resources: z.array(z.record(z.string(), z.any())).describe('Retrieved resources')
     })
@@ -51,26 +59,26 @@ export let listWhatsAppResources = SlateTool.create(spec, {
       result = await client.getWhatsAppAccounts();
     } else if (ctx.input.resourceType === 'templates') {
       result = await client.getWhatsAppTemplates(
-        ctx.input.phoneId!,
+        requireInput(ctx.input.phoneId, 'phoneId'),
         ctx.input.limit ?? 10,
         ctx.input.offset ?? 0
       );
     } else {
       result = await client.getWhatsAppTemplateVariables(
-        ctx.input.phoneId!,
-        ctx.input.templateName!
+        requireInput(ctx.input.phoneId, 'phoneId'),
+        requireInput(ctx.input.templateName, 'templateName'),
+        requireInput(ctx.input.language, 'language')
       );
     }
 
-    let resources = Array.isArray(result.data)
-      ? result.data
-      : result.data
-        ? [result.data]
-        : [];
+    let resources = providerRecords(
+      isApiErrorRecord(result.data) ? [result.data] : result.data
+    );
 
     return {
       output: {
         success: result.status === true,
+        raw: result,
         resources
       },
       message: `Retrieved ${resources.length} WhatsApp ${ctx.input.resourceType}.`

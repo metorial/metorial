@@ -1,4 +1,4 @@
-# Slates Specification for OpenGraph.io
+# OpenGraph.io Integration Specification
 
 ## Overview
 
@@ -15,7 +15,7 @@ OpenGraph.io uses API keys for authentication. The API key is referred to as an 
   ```
 - Create an account (no credit card ever required) to receive your app_id.
 
-There is no OAuth flow or other authentication method. All requests are authenticated solely via the `app_id` query parameter.
+This integration uses the REST API's `app_id` query parameter. The separate hosted API-assistant and site-audit products have their own authentication and are outside this integration's scope.
 
 ## Features
 
@@ -49,6 +49,7 @@ The screenshot API endpoint allows you to capture screenshots of web pages. By p
   - `full_page`: Capture the entire page rather than just the viewport.
   - `quality`: Scale image quality up or down.
 - Screenshot images are available for download for 24 hours after they are generated. After this time period, the images are automatically removed.
+- Screenshot results include a downloadable image. A cached image can expire sooner; download-link renewal captures the current page again and can use API credits.
 
 ### Content Extraction
 
@@ -57,6 +58,30 @@ Extract specific HTML elements in a structured format for AI/LLM pipelines. This
 ### AI-Powered Page Querying
 
 Ask questions about any webpage and get structured answers powered by AI. This allows you to submit a URL along with a question and receive an AI-generated answer based on the page's content.
+
+### Markdown Conversion
+
+Convert a webpage into a downloadable Markdown document. Optional controls select main content, limit document size, split content into chunks, find passages by keywords, and return headings, links, images, metadata, and usage information. Prompt-injection scanning can sanitize, flag, or block suspicious page content. Missing optional metrics remain absent.
+
+### Embeddable Content
+
+Retrieve an oEmbed representation with provider HTML and dimensions. Native embeds and discovered provider embeds are used when available; other pages receive a hosted preview card. Optional dimensions, card layout, color theme, rendering, and proxy controls are supported.
+
+## API Compatibility
+
+The five original tools keep their v1.1 endpoints and public input/output fields. The provider's own implementation specifically retains the v1.1 GET extraction route; the newer POST extraction API has a different request/response model. Markdown and oEmbed use the documented v3.0 endpoints. Page queries send `responseStructure` and `modelSize`, and screenshots send `navigationTimeout`, with the provider's exact casing. Metadata preserves the original response and exposes snake-case site names through the existing `siteName` fields.
+
+## References
+
+- [API overview](https://www.opengraph.io/docs/api)
+- [Site metadata](https://www.opengraph.io/docs/api/site)
+- [HTML scraping](https://www.opengraph.io/docs/api/scrape)
+- [Screenshots](https://www.opengraph.io/docs/api/screenshot)
+- [Extraction](https://www.opengraph.io/docs/api/extract)
+- [Page queries](https://www.opengraph.io/docs/api/query)
+- [Markdown](https://www.opengraph.io/docs/api/markdown)
+- [oEmbed](https://www.opengraph.io/docs/api/oembed)
+- [Provider implementation and legacy route notes](https://github.com/securecoders/opengraph-io-mcp)
 
 ## Events
 

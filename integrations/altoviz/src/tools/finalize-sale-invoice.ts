@@ -13,11 +13,23 @@ export let finalizeSaleInvoice = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      invoiceId: z.number().describe('Altoviz invoice ID to finalize')
+      invoiceId: z.number().describe('Altoviz invoice ID to finalize'),
+      finalizationDate: z
+        .string()
+        .optional()
+        .describe('Finalization date (YYYY-MM-DD); defaults to the invoice date'),
+      dateAdjustment: z
+        .enum(['None', 'MinimumDate', 'Today'])
+        .optional()
+        .describe('How to adjust a date that prevents finalization')
     })
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including fields not shown in the summary'),
       invoiceId: z.number(),
       number: z.string().nullable().optional(),
       status: z.string().nullable().optional()
@@ -26,11 +38,15 @@ export let finalizeSaleInvoice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.finalizeSaleInvoice(ctx.input.invoiceId);
+    let result = await client.finalizeSaleInvoice(ctx.input.invoiceId, {
+      finalizationDate: ctx.input.finalizationDate,
+      dateAdjustment: ctx.input.dateAdjustment
+    });
 
     return {
       output: {
-        invoiceId: result.id ?? ctx.input.invoiceId,
+        raw: result,
+        invoiceId: result.id,
         number: result.number,
         status: result.status
       },

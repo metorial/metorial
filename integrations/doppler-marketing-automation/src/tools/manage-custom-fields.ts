@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageCustomFields = SlateTool.create(spec, {
   key: 'manage_custom_fields',
   description: `Create, update, or delete custom fields for subscriber data. Custom fields allow storing additional subscriber attributes like names, birthdates, and other data used for personalization and segmentation.`,
   instructions: [
-    'Supported field types: boolean, string, number, date, gender, country.',
+    'Supported field types: boolean, string, number, date, email, gender, country.',
     'Boolean values must be "true" or "false" (case-sensitive). Date format: yyyy-MM-dd. Gender: "M" or "F". Country: ISO 3166-1 alpha-2 code.'
   ],
   tags: {
@@ -25,7 +25,7 @@ export let manageCustomFields = SlateTool.create(spec, {
           'Name of the custom field. Used to identify the field for update and delete actions.'
         ),
       fieldType: z
-        .enum(['boolean', 'string', 'number', 'date', 'gender', 'country'])
+        .enum(['boolean', 'string', 'number', 'date', 'gender', 'country', 'email'])
         .optional()
         .describe('Type of the field. Required for create action.'),
       isPrivate: z.boolean().optional().describe('Whether the field should be private'),
@@ -50,7 +50,7 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fieldType) {
-        throw new Error('fieldType is required when creating a custom field');
+        throw createApiServiceError('fieldType is required when creating a custom field');
       }
       let result = await client.createField({
         name: ctx.input.fieldName,
@@ -94,6 +94,6 @@ export let manageCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -19,8 +19,14 @@ export let updatePost = SlateTool.create(spec, {
       postStatus: z.string().optional().describe('Updated status.'),
       postImage: z.string().optional().describe('Updated image URL.'),
       postTags: z.string().optional().describe('Updated comma-separated tags.'),
-      postLiveDate: z.string().optional().describe('Updated live date (YYYY-MM-DD).'),
-      postExpireDate: z.string().optional().describe('Updated expiration date (YYYY-MM-DD).'),
+      postLiveDate: z
+        .string()
+        .optional()
+        .describe('Updated creation timestamp in YYYYMMDDHHmmss format.'),
+      postExpireDate: z
+        .string()
+        .optional()
+        .describe('Updated expiration timestamp in YYYYMMDDHHmmss format.'),
       additionalFields: z
         .record(z.string(), z.string())
         .optional()
@@ -30,6 +36,10 @@ export let updatePost = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       post: z.any().describe('The updated post record.')
     })
   )
@@ -63,6 +73,7 @@ export let updatePost = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         post: result.message
       },
       message: `Updated post **${ctx.input.postId}**.`

@@ -2,6 +2,7 @@ export * from './add-bookmark';
 export * from './check-for-updates';
 export * from './delete-bookmark';
 export * from './get-bookmark-dates';
+export * from './get-bookmark-hashes';
 export * from './get-bookmarks';
 export * from './get-tag-suggestions';
 export * from './list-all-bookmarks';

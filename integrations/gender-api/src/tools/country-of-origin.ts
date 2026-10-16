@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -46,14 +46,36 @@ export let countryOfOrigin = SlateTool.create(spec, {
           })
         )
         .describe('Ranked list of likely countries of origin'),
-      mapUrl: z.string().describe('URL to an interactive map visualization of the results')
+      mapUrl: z
+        .string()
+        .optional()
+        .describe('Interactive map URL when returned by the provider'),
+      languageOfOrigin: z.string().optional().describe('Origin language of the name'),
+      meaning: z.string().optional().describe('Meaning of the name'),
+      ethnicity: z
+        .object({
+          id: z.string().optional(),
+          name: z.string().optional(),
+          distribution: z
+            .array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                percentage: z.number()
+              })
+            )
+            .optional()
+        })
+        .optional()
+        .describe('Provider-estimated ethnic group and distribution'),
+      raw: z.record(z.string(), z.unknown()).describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
     if (!ctx.input.firstName && !ctx.input.fullName && !ctx.input.email) {
-      throw new Error('Provide one of: firstName, fullName, or email.');
+      throw createApiServiceError('Provide one of: firstName, fullName, or email.');
     }
 
     let result = await client.getCountryOfOrigin({
@@ -74,9 +96,13 @@ export let countryOfOrigin = SlateTool.create(spec, {
         gender: result.gender,
         probability: result.probability,
         countryOfOrigin: result.countryOfOrigin,
-        mapUrl: result.countryOfOriginMapUrl
+        mapUrl: result.countryOfOriginMapUrl,
+        languageOfOrigin: result.languageOfOrigin,
+        meaning: result.meaning,
+        ethnicity: result.ethnicity,
+        raw: result.raw
       },
-      message: `**${result.firstName}** most likely originates from: ${topCountries}. [View map](${result.countryOfOriginMapUrl})`
+      message: `**${result.firstName}** most likely originates from: ${topCountries}.${result.countryOfOriginMapUrl ? ` [View map](${result.countryOfOriginMapUrl})` : ''}`
     };
   })
   .build();

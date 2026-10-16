@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageDiscussionTool = SlateTool.create(spec, {
@@ -9,7 +9,7 @@ export let manageDiscussionTool = SlateTool.create(spec, {
   description: `Create, update, or delete a discussion topic in a course. Supports threaded discussions, graded discussions, and announcements. Configure pinning, locking, and publish state.`,
   instructions: [
     'Set isAnnouncement to true to create an announcement instead of a discussion.',
-    'To create a graded discussion, provide an assignmentId or set assignmentGroupId.'
+    'Use assignment to create or update the associated graded assignment. Deleting a graded discussion also deletes its assignment.'
   ],
   tags: {
     destructive: true
@@ -42,11 +42,34 @@ export let manageDiscussionTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Require students to post before seeing replies'),
-      allowRating: z.boolean().optional().describe('Allow users to rate entries')
+      allowRating: z.boolean().optional().describe('Allow users to rate entries'),
+      assignment: z
+        .object({
+          pointsPossible: z.number().optional(),
+          gradingType: z
+            .enum([
+              'pass_fail',
+              'percent',
+              'letter_grade',
+              'gpa_scale',
+              'points',
+              'not_graded'
+            ])
+            .optional(),
+          dueAt: z.string().nullable().optional(),
+          assignmentGroupId: z.string().optional(),
+          setAssignment: z
+            .boolean()
+            .optional()
+            .describe('Set false to remove the associated graded assignment')
+        })
+        .optional()
+        .describe('Associated assignment settings for a graded discussion')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       topicId: z.string().describe('Discussion topic ID'),
       title: z.string().optional().describe('Topic title'),
       discussionType: z.string().optional().describe('Threading type'),
@@ -57,14 +80,11 @@ export let manageDiscussionTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let topicData: Record<string, any> = {};
-    if (ctx.input.title) topicData.title = ctx.input.title;
-    if (ctx.input.message) topicData.message = ctx.input.message;
+    if (ctx.input.title !== undefined) topicData.title = ctx.input.title;
+    if (ctx.input.message !== undefined) topicData.message = ctx.input.message;
     if (ctx.input.discussionType) topicData.discussion_type = ctx.input.discussionType;
     if (ctx.input.published !== undefined) topicData.published = ctx.input.published;
     if (ctx.input.pinned !== undefined) topicData.pinned = ctx.input.pinned;
@@ -77,6 +97,15 @@ export let manageDiscussionTool = SlateTool.create(spec, {
       topicData.require_initial_post = ctx.input.requireInitialPost;
     if (ctx.input.allowRating !== undefined) topicData.allow_rating = ctx.input.allowRating;
 
+    if (ctx.input.assignment) {
+      topicData.assignment = {
+        points_possible: ctx.input.assignment.pointsPossible,
+        grading_type: ctx.input.assignment.gradingType,
+        due_at: ctx.input.assignment.dueAt,
+        assignment_group_id: ctx.input.assignment.assignmentGroupId,
+        set_assignment: ctx.input.assignment.setAssignment
+      };
+    }
     let result: any;
     let actionDesc: string;
 
@@ -84,7 +113,7 @@ export let manageDiscussionTool = SlateTool.create(spec, {
       result = await client.createDiscussionTopic(ctx.input.courseId, topicData);
       actionDesc = 'Created';
     } else if (ctx.input.action === 'update') {
-      if (!ctx.input.topicId) throw new Error('topicId is required for update');
+      if (!ctx.input.topicId) throw createApiServiceError('topicId is required for update');
       result = await client.updateDiscussionTopic(
         ctx.input.courseId,
         ctx.input.topicId,
@@ -92,17 +121,18 @@ export let manageDiscussionTool = SlateTool.create(spec, {
       );
       actionDesc = 'Updated';
     } else {
-      if (!ctx.input.topicId) throw new Error('topicId is required for delete');
+      if (!ctx.input.topicId) throw createApiServiceError('topicId is required for delete');
       result = await client.deleteDiscussionTopic(ctx.input.courseId, ctx.input.topicId);
       actionDesc = 'Deleted';
     }
 
     return {
       output: {
+        raw: result,
         topicId: String(result.id),
         title: result.title,
         discussionType: result.discussion_type,
-        posted: result.posted,
+        posted: result.published,
         pinned: result.pinned,
         locked: result.locked,
         isAnnouncement: result.is_announcement

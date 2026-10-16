@@ -1,7 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SensiboClient } from '../lib/client';
+import { checked, deviceIdSchema, SensiboClient } from '../lib/client';
 import { spec } from '../spec';
+
+let measurementTime = (time: any): string | undefined => {
+  if (typeof time === 'string') return time;
+  if (typeof time?.time === 'string') return time.time;
+  if (time?.secondsAgo === undefined) return undefined;
+  let timestamp =
+    typeof time.secondsAgo === 'number' ? Date.now() - time.secondsAgo * 1000 : Number.NaN;
+  if (!Number.isFinite(timestamp) || Math.abs(timestamp) > 8.64e15)
+    throw createApiServiceError('Sensibo returned an invalid measurement time.');
+  return new Date(timestamp).toISOString();
+};
 
 let measurementSchema = z.object({
   temperature: z.number().optional().describe('Temperature reading'),
@@ -9,18 +20,25 @@ let measurementSchema = z.object({
   time: z.string().optional().describe('ISO 8601 timestamp of the measurement')
 });
 
+let outputSchema = z.object({
+  deviceId: z.string().describe('The device measurements belong to'),
+  measurements: z.array(measurementSchema).describe('Array of measurement readings')
+});
+
 export let getMeasurementsTool = SlateTool.create(spec, {
   name: 'Get Measurements',
   key: 'get_measurements',
-  description: `Retrieve environmental sensor measurements from a Sensibo device. Returns temperature and humidity readings, either current or historical up to 7 days in the past. Sensibo Air Pro and Elements devices may also include air quality data.`,
-  constraints: ['Historical data is available for up to 7 days in the past.'],
+  description: `Retrieve environmental sensor measurements from a Sensibo device. Returns temperature and humidity readings, historical for the requested number of days. Availability depends on the device and account.`,
+  constraints: [
+    'This tool accepts 1–7 days; the provider may restrict the available history.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      deviceId: z.string().describe('The unique ID of the Sensibo device'),
+      deviceId: deviceIdSchema,
       days: z
         .number()
         .min(1)
@@ -29,33 +47,32 @@ export let getMeasurementsTool = SlateTool.create(spec, {
         .describe('Number of days of historical data to retrieve (1-7, default 1)')
     })
   )
-  .output(
-    z.object({
-      deviceId: z.string().describe('The device measurements belong to'),
-      measurements: z.array(measurementSchema).describe('Array of measurement readings')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new SensiboClient(ctx.auth.token);
-    let days = ctx.input.days ?? 1;
+    let result = await (async () => {
+      let days = ctx.input.days ?? 1;
 
-    let rawMeasurements = await client.getHistoricalMeasurements(ctx.input.deviceId, days);
+      let rawMeasurements = await client.getHistoricalMeasurements(ctx.input.deviceId, days);
 
-    let measurements = (rawMeasurements || []).map((m: any) => ({
-      temperature: m.temperature,
-      humidity: m.humidity,
-      time:
-        m.time?.secondsAgo !== undefined
-          ? new Date(Date.now() - m.time.secondsAgo * 1000).toISOString()
-          : m.time?.time
-    }));
+      let measurements = rawMeasurements.map((m: any) => ({
+        temperature: m.temperature,
+        humidity: m.humidity,
+        time: measurementTime(m.time)
+      }));
 
+      return {
+        output: {
+          deviceId: ctx.input.deviceId,
+          measurements
+        },
+        message: `Retrieved **${measurements.length}** measurement(s) from device **${ctx.input.deviceId}** over the last ${days} day(s).`
+      };
+    })();
     return {
-      output: {
-        deviceId: ctx.input.deviceId,
-        measurements
-      },
-      message: `Retrieved **${measurements.length}** measurement(s) from device **${ctx.input.deviceId}** over the last ${days} day(s).`
+      ...result,
+      output: checked(outputSchema, client.sanitize(result.output), 'tool output'),
+      message: client.sanitize(result.message)
     };
   })
   .build();

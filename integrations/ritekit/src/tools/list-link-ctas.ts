@@ -16,6 +16,7 @@ Use this to discover available CTA IDs before creating shortened links with the 
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       ctas: z
         .array(
           z.object({
@@ -32,7 +33,7 @@ Use this to discover available CTA IDs before creating shortened links with the 
     let ctas = result.list || [];
 
     return {
-      output: { ctas },
+      output: { ctas, raw: { ...result } },
       message: `Found **${ctas.length}** available CTAs: ${ctas.map(c => c.name).join(', ')}`
     };
   })

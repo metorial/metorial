@@ -3,6 +3,7 @@ export * from './classify-data';
 export * from './company-insights';
 export * from './contact-intelligence';
 export * from './custom-data-enrichment';
+export * from './extended-capabilities';
 export * from './generate-similarity-key';
 export * from './get-currency-rate';
 export * from './get-remaining-credits';

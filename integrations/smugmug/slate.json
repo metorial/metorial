@@ -1,18 +1,19 @@
 {
   "name": "@metorial/smugmug",
-  "description": "Upload, organize, and manage photos and videos on SmugMug. Create and configure albums (galleries) with privacy, watermark, and download settings. Organize content into hierarchical folders and pages. Upload images from local files or URLs, replace existing images, and retrieve multiple size variants and EXIF metadata. Update image properties such as titles, captions, and keywords. Move and collect images across albums. Search across albums, images, and nodes. Manage user profiles, site settings, featured albums, and sharing URIs. Apply watermarks to albums and manage comments on albums and nodes.",
+  "description": "Manage SmugMug albums, images, folders, and page nodes. Upload media from direct URLs, update image details, move or collect images, search content, browse paginated results, export image metadata as JSON, update your biography, list watermarks, and retrieve sharing links.",
   "categories": ["apis-and-http-requests", "document-processing", "e-commerce-and-retail"],
   "skills": [
-    "upload photos and videos",
+    "upload photos and videos from direct URLs",
     "create and manage albums",
     "organize folders and pages",
     "search images and albums",
-    "manage image metadata and EXIF",
+    "read image metadata and size variants",
+    "export image metadata as JSON",
     "configure album privacy settings",
-    "apply watermarks to albums",
+    "list watermarks",
     "share album galleries",
-    "manage user profiles",
-    "move images between albums"
+    "update profile biography",
+    "move and collect images"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/smugmug.svg"
 }

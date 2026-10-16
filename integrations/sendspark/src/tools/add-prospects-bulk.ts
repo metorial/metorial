@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let prospectInputSchema = z.object({
@@ -12,7 +13,17 @@ let prospectInputSchema = z.object({
   screenshotUrl: z
     .string()
     .optional()
-    .describe('Direct screenshot URL for the video background')
+    .describe('Direct screenshot URL for the video background'),
+  customField: z.string().optional().describe('Custom personalization value'),
+  fields: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Additional personalization fields'),
+  webhookUrl: z.string().optional().describe('Webhook URL for this prospect'),
+  webhookEvents: z
+    .array(z.string())
+    .optional()
+    .describe('Webhook event names for this prospect')
 });
 
 export let addProspectsBulk = SlateTool.create(spec, {
@@ -28,6 +39,11 @@ export let addProspectsBulk = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
+      callbackId: z
+        .string()
+        .optional()
+        .describe('Callback identifier for this processing request'),
       campaignId: z.string().describe('ID of the dynamic video campaign'),
       prospects: z.array(prospectInputSchema).min(1).describe('List of prospects to add'),
       forceCreation: z
@@ -42,6 +58,7 @@ export let addProspectsBulk = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       campaignId: z.string().optional(),
       campaignName: z.string().optional(),
       status: z.string().optional(),
@@ -57,11 +74,7 @@ export let addProspectsBulk = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret,
-      workspaceId: ctx.config.workspaceId
-    });
+    let client = createClient(ctx);
 
     let result = await client.addProspectsBulk(ctx.input.campaignId, {
       processAndAuthorizeCharge: true,
@@ -72,7 +85,8 @@ export let addProspectsBulk = SlateTool.create(spec, {
               payloadDepurationStrategy: ctx.input.duplicateStrategy
             }
           : undefined,
-      prospectList: ctx.input.prospects
+      prospectList: ctx.input.prospects,
+      callbackId: ctx.input.callbackId
     });
 
     let prospectList = result.prospectList || [];
@@ -89,9 +103,10 @@ export let addProspectsBulk = SlateTool.create(spec, {
         campaignId: result._id,
         campaignName: result.name,
         status: result.status,
-        prospects
+        prospects,
+        raw: result
       },
-      message: `Added **${prospects.length}** prospect(s) to campaign in bulk.`
+      message: `Sendspark accepted the bulk prospect request.${result.prospectList ? ` Returned **${prospects.length}** prospect(s).` : ''}`
     };
   })
   .build();

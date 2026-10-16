@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -63,6 +63,29 @@ export let encodeVideo = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
 
+    for (let [label, dimension] of [
+      ['width', ctx.input.width],
+      ['height', ctx.input.height]
+    ] as const) {
+      if (
+        dimension !== undefined &&
+        (!Number.isInteger(dimension) || dimension <= 0 || dimension % 4 !== 0)
+      ) {
+        throw createApiServiceError(
+          `${label} must be a positive whole number divisible by 4.`
+        );
+      }
+    }
+    if (
+      ctx.input.thumbnailCount !== undefined &&
+      !Number.isInteger(ctx.input.thumbnailCount)
+    ) {
+      throw createApiServiceError('thumbnailCount must be a whole number.');
+    }
+    if ((ctx.input.cutStart === undefined) !== (ctx.input.cutLength === undefined)) {
+      throw createApiServiceError('cutStart and cutLength must be provided together.');
+    }
+
     let path = `${ctx.input.fileId}/video/`;
 
     if (ctx.input.width !== undefined || ctx.input.height !== undefined) {
@@ -87,7 +110,9 @@ export let encodeVideo = SlateTool.create(spec, {
 
     let first = result.result[0];
     if (!first) {
-      throw new Error('No encoding result returned');
+      throw createApiServiceError(
+        `Video encoding did not start. ${Object.values(result.problems).join('; ')}`
+      );
     }
 
     return {

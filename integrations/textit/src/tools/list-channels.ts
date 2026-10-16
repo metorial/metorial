@@ -13,6 +13,10 @@ export let listChannels = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque nextCursor from the previous response; keep the same filters.'),
       channelUuid: z.string().optional().describe('Filter by channel UUID'),
       address: z.string().optional().describe('Filter by channel address (e.g., phone number)')
     })
@@ -24,11 +28,13 @@ export let listChannels = SlateTool.create(spec, {
           channelUuid: z.string(),
           name: z.string(),
           address: z.string(),
-          country: z.string(),
-          lastSeen: z.string(),
+          country: z.string().optional(),
+          lastSeen: z.string().optional(),
           createdOn: z.string()
         })
       ),
+      nextCursor: z.string().nullable(),
+      raw: z.unknown(),
       hasMore: z.boolean()
     })
   )
@@ -36,6 +42,7 @@ export let listChannels = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     let result = await client.listChannels({
+      cursor: ctx.input.cursor,
       uuid: ctx.input.channelUuid,
       address: ctx.input.address
     });
@@ -44,14 +51,16 @@ export let listChannels = SlateTool.create(spec, {
       channelUuid: c.uuid,
       name: c.name,
       address: c.address,
-      country: c.country,
-      lastSeen: c.last_seen,
+      country: c.country === null ? undefined : c.country,
+      lastSeen: c.last_seen === null ? undefined : c.last_seen,
       createdOn: c.created_on
     }));
 
     return {
       output: {
         channels,
+        nextCursor: client.nextCursor(result),
+        raw: result,
         hasMore: result.next !== null
       },
       message: `Found **${channels.length}** channel(s).`

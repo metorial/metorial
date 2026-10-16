@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { publicationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listUnsubscribers = SlateTool.create(spec, {
   name: 'List Unsubscribers',
   key: 'list_unsubscribers',
-  description: `List email addresses that have unsubscribed from a publication. Supports pagination for large unsubscriber lists.`,
+  description: `List email addresses that have unsubscribed from a publication. Supports pagination for large unsubscriber lists. Call list_publications to discover the publication ID.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      publicationId: z.string().describe('ID of the publication'),
+      publicationId: publicationIdSchema,
       page: z.number().optional().describe('Page number for pagination'),
       perPage: z
         .number()
@@ -23,6 +24,10 @@ export let listUnsubscribers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional metadata'),
       unsubscribers: z.array(
         z.object({
           subscriberId: z.number().describe('Unique identifier of the unsubscriber'),
@@ -42,21 +47,22 @@ export let listUnsubscribers = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let unsubscriberList = response.unsubscribers || response.data || [];
+    let unsubscriberList = response.unsubscribers ?? response.data!;
     let unsubscribers = unsubscriberList.map(sub => ({
       subscriberId: sub.id,
       email: sub.email,
-      createdAt: sub.created_at
+      createdAt: sub.created_at ?? undefined
     }));
 
     return {
       output: {
+        raw: response,
         unsubscribers,
-        page: response.page,
-        totalPages: response.total_pages,
-        totalResults: response.total_results
+        page: response.page ?? undefined,
+        totalPages: response.total_pages ?? undefined,
+        totalResults: response.total_results ?? undefined
       },
-      message: `Found **${response.total_results ?? unsubscribers.length}** unsubscriber(s)${response.page ? ` (page ${response.page}/${response.total_pages})` : ''}.`
+      message: `Retrieved **${unsubscribers.length}** unsubscriber(s)${response.total_results != null ? ` of ${response.total_results} total` : ''}${response.page != null ? ` (page ${response.page}${response.total_pages != null ? `/${response.total_pages}` : ''})` : ''}.`
     };
   })
   .build();

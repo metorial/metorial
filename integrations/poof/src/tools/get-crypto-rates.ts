@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PoofClient } from '../lib/client';
 import { spec } from '../spec';
@@ -53,7 +53,8 @@ export let getCryptoRates = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'price') {
-      if (!ctx.input.crypto) throw new Error('crypto is required for price action');
+      if (!ctx.input.crypto)
+        throw createApiServiceError('Provide crypto for the price action.');
       let result = await client.getPrice({ crypto: ctx.input.crypto });
       return {
         output: { price: result },
@@ -62,7 +63,8 @@ export let getCryptoRates = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'gas_price') {
-      if (!ctx.input.crypto) throw new Error('crypto is required for gas_price action');
+      if (!ctx.input.crypto)
+        throw createApiServiceError('Provide crypto for the gas_price action.');
       let result = await client.getGasPrice({ crypto: ctx.input.crypto });
       return {
         output: { gasPrice: result },
@@ -70,6 +72,6 @@ export let getCryptoRates = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

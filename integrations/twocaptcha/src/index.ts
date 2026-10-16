@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createTask,
   getBalance,
   getTaskResult,
   reportSolution,
@@ -9,6 +10,13 @@ import {
 } from './tools';
 export let provider = Slate.create({
   spec,
-  tools: [solveCaptcha, solveImageCaptcha, getTaskResult, reportSolution, getBalance],
+  tools: [
+    solveCaptcha,
+    solveImageCaptcha,
+    getTaskResult,
+    reportSolution,
+    getBalance,
+    createTask
+  ],
   triggers: []
 });

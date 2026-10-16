@@ -16,14 +16,20 @@ export let getMember = SlateTool.create(spec, {
     z.object({
       memberIdOrEmail: z
         .string()
-        .describe('The member ID (e.g. mem_abc123) or email address to look up')
+        .describe('The member ID (e.g. mem_abc123) or email address to look up'),
+      includeTeams: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include team memberships, roles, seat counts, invite tokens, and owner-plan details.'
+        )
     })
   )
   .output(memberSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let member = await client.getMember(ctx.input.memberIdOrEmail);
+    let member = await client.getMember(ctx.input.memberIdOrEmail, ctx.input.includeTeams);
 
     return {
       output: member,

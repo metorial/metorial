@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let getSubtitles = SlateTool.create(spec, {
   name: 'Get Subtitles',
   key: 'get_subtitles',
-  description: `Fetch subtitles for a video in a specific language. Returns subtitle content in the requested format (JSON, DFXP, SRT, VTT, SBV, SSA), along with metadata such as version, author, and title.`,
+  description: `Fetch subtitles for a video in a specific language. Provides a downloadable subtitle file for non-JSON formats and returns subtitle content in the requested format (JSON, DFXP, SRT, VTT, SBV, SSA), along with metadata such as version, author, and title.`,
   instructions: [
     'Use subFormat to get subtitles in a specific subtitle format (json, dfxp, srt, vtt, sbv, ssa).',
-    'Use versionNumber to fetch a specific version. Omit to get the latest published version.'
+    'Use list_subtitle_versions to discover version numbers. Use versionNumber to fetch a specific version; omit it to get the latest published version.'
   ],
   tags: {
     readOnly: true
@@ -33,7 +33,7 @@ export let getSubtitles = SlateTool.create(spec, {
       subFormat: z.string().describe('Format of the returned subtitles'),
       author: z
         .object({
-          username: z.string().describe('Author username'),
+          username: z.string().optional().describe('Author username, when returned'),
           userId: z.string().describe('Author user ID')
         })
         .describe('Author of this subtitle version'),
@@ -56,17 +56,40 @@ export let getSubtitles = SlateTool.create(spec, {
       versionNumber: ctx.input.versionNumber
     });
 
+    if (typeof s?.language?.name !== 'string') {
+      throw createApiServiceError('Amara returned subtitles without a valid language name.', {
+        reason: 'amara_invalid_response'
+      });
+    }
+
+    if (ctx.input.subFormat && ctx.input.subFormat !== 'json') {
+      let mimeTypes = {
+        dfxp: 'application/ttml+xml',
+        srt: 'text/srt',
+        vtt: 'text/vtt',
+        sbv: 'text/sbv',
+        ssa: 'text/ssa'
+      };
+      await ctx.addAttachment({
+        type: 'url',
+        url: `https://amara.org/api/videos/${encodeURIComponent(ctx.input.videoId)}/languages/${encodeURIComponent(ctx.input.languageCode)}/subtitles/`,
+        headers: { 'X-api-key': ctx.auth.token },
+        query: { format: ctx.input.subFormat, version_number: String(s.version_number) },
+        mimeType: mimeTypes[ctx.input.subFormat]
+      });
+    }
+
     return {
       output: {
         versionNumber: s.version_number,
         subtitles: s.subtitles,
         subFormat: s.sub_format,
         author: {
-          username: s.author?.username ?? '',
-          userId: s.author?.id ?? ''
+          username: s.author.username,
+          userId: s.author.id
         },
         languageCode: s.language?.code ?? ctx.input.languageCode,
-        languageName: s.language?.name ?? '',
+        languageName: s.language.name,
         title: s.title,
         description: s.description,
         videoTitle: s.video_title,

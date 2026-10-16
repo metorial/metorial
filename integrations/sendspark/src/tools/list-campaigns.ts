@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let campaignSummarySchema = z.object({
@@ -44,6 +45,11 @@ export let listCampaigns = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
+      sortOrder: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Sort campaigns in ascending or descending order'),
       offset: z.number().optional().describe('Page offset for pagination (starts at 1)'),
       limit: z
         .number()
@@ -56,21 +62,19 @@ export let listCampaigns = SlateTool.create(spec, {
   .output(
     z.object({
       campaigns: z.array(campaignItemSchema),
-      pagination: paginationSchema.optional()
+      pagination: paginationSchema.optional(),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret,
-      workspaceId: ctx.config.workspaceId
-    });
+    let client = createClient(ctx);
 
     let result = await client.listCampaigns({
       offset: ctx.input.offset,
       limit: ctx.input.limit,
       filters: ctx.input.creatorId,
-      search: ctx.input.search
+      search: ctx.input.search,
+      sortOrder: ctx.input.sortOrder
     });
 
     let responseData = result.response || result;
@@ -95,7 +99,7 @@ export let listCampaigns = SlateTool.create(spec, {
     let pagination = responseData.pagination;
 
     return {
-      output: { campaigns, pagination },
+      output: { campaigns, pagination, raw: result },
       message: `Found **${campaigns.length}** campaign(s)${pagination?.total ? ` out of ${pagination.total} total` : ''}.`
     };
   })

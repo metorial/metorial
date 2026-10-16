@@ -70,8 +70,9 @@ let placeSchema = z.object({
 export let searchPlaces = SlateTool.create(spec, {
   name: 'Search Places',
   key: 'search_places',
-  description: `Search for places (points of interest) in the Foursquare database. Supports searching by keyword, location, category, chain, and geographic area. Results can be filtered by price range, operating hours, and sorted by relevance, rating, distance, or popularity.`,
+  description: `DEPRECATED — use \`search_places_current\` instead. Search for places (points of interest) in the Foursquare database. Supports searching by keyword, location, category, chain, and geographic area. Results can be filtered by price range, operating hours, and sorted by relevance, rating, distance, or popularity.`,
   instructions: [
+    'Use search_places_current with a Places Service API Key. This legacy V3 tool retains its original request and schema.',
     'Provide at least one of: query, ll (latitude,longitude), near (place name), or a bounding box (ne + sw).',
     'Use comma-separated category IDs in the categories field to filter by place type.',
     'The fields parameter accepts a comma-separated list of response fields to include.'
@@ -81,6 +82,7 @@ export let searchPlaces = SlateTool.create(spec, {
     'Radius is in meters, maximum 100,000.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

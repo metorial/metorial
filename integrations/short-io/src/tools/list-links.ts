@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { domainIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listLinks = SlateTool.create(spec, {
@@ -18,10 +19,7 @@ export let listLinks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      domainId: z
-        .number()
-        .optional()
-        .describe('Domain ID to list links for. Falls back to config default.'),
+      domainId: domainIdSchema.optional(),
       limit: z.number().optional().describe('Number of links per page (1-150).'),
       pageToken: z.string().optional().describe('Pagination token from a previous response.'),
       dateSortOrder: z
@@ -64,13 +62,19 @@ export let listLinks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let domainId = ctx.input.domainId || ctx.config.domainId;
+    let domainId = ctx.input.domainId ?? ctx.config.domainId;
     if (!domainId) {
-      throw new Error(
+      throw createApiServiceError(
         'Domain ID is required. Provide it in the input or set a default in config.'
       );
     }
 
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 150)
+    ) {
+      throw createApiServiceError('limit must be an integer between 1 and 150.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listLinks({

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NasaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -24,12 +24,19 @@ export let getFireballs = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       count: z.number().describe('Number of fireball events'),
       fields: z.array(z.string()).describe('Column field names for the data rows'),
       data: z.array(z.array(z.any())).describe('Fireball event data rows')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.minEnergy !== undefined &&
+      (!Number.isFinite(ctx.input.minEnergy) || ctx.input.minEnergy <= 0)
+    ) {
+      throw createApiServiceError('Minimum energy must be positive, in joules.');
+    }
     let client = new NasaClient({ token: ctx.auth.token });
 
     let result = await client.getSsdFireballs({
@@ -43,8 +50,8 @@ export let getFireballs = SlateTool.create(spec, {
     let data = result.data || [];
 
     return {
-      output: { count: result.count || data.length, fields, data },
-      message: `Found **${result.count || data.length}** fireball events${ctx.input.dateMin ? ` since ${ctx.input.dateMin}` : ''}.`
+      output: { raw: result, count: result.count ?? data.length, fields, data },
+      message: `Found **${result.count ?? data.length}** fireball events${ctx.input.dateMin ? ` since ${ctx.input.dateMin}` : ''}.`
     };
   })
   .build();

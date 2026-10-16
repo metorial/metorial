@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { buildApiServiceError, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,11 +6,8 @@ import { spec } from '../spec';
 export let deleteLinks = SlateTool.create(spec, {
   name: 'Delete Links',
   key: 'delete_links',
-  description: `Permanently deletes one or more shortened links by their IDs. Deleted links stop working immediately and cannot be recovered.`,
-  constraints: [
-    'This action is irreversible — deleted links cannot be restored.',
-    'Links stop redirecting immediately after deletion.'
-  ],
+  description: `Deletes one or more shortened links by their IDs. Deleted links stop redirecting.`,
+  constraints: ['Links stop redirecting immediately after deletion.'],
   tags: {
     destructive: true,
     readOnly: false
@@ -33,18 +30,39 @@ export let deleteLinks = SlateTool.create(spec, {
       workspaceId: ctx.auth.workspaceId
     });
 
-    if (ctx.input.linkIds.length === 1) {
-      await client.deleteLink(ctx.input.linkIds[0]!);
-    } else {
-      await client.deleteLinks(ctx.input.linkIds);
+    let linkIds = [...new Set(ctx.input.linkIds)];
+    if (linkIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+      throw createApiServiceError('linkIds must contain positive integer link IDs.');
+    }
+    let deletedLinkIds: number[] = [];
+    for (let [index, linkId] of linkIds.entries()) {
+      try {
+        await client.deleteLink(linkId);
+        deletedLinkIds.push(linkId);
+      } catch (error) {
+        let failure = buildApiServiceError(error, {
+          providerLabel: 'Linkly',
+          reason: 'linkly_api_error',
+          operation: 'delete link'
+        });
+        let unattemptedLinkIds = linkIds.slice(index + 1);
+        failure.data.deletedCount = deletedLinkIds.length;
+        failure.data.deletedLinkIds = [...deletedLinkIds];
+        failure.data.failedLinkId = linkId;
+        failure.data.unattemptedLinkIds = unattemptedLinkIds;
+        failure.data.failedLinkOutcome = 'unconfirmed';
+        failure.data.message += ` Confirmed deleted IDs: ${deletedLinkIds.join(', ') || 'none'}. Failed request for link ID: ${linkId}. Unattempted IDs: ${unattemptedLinkIds.join(', ') || 'none'}. Verify the failed link before retrying; exclude confirmed deleted IDs.`;
+        failure.message = failure.data.message;
+        throw failure;
+      }
     }
 
     return {
       output: {
-        deletedCount: ctx.input.linkIds.length,
-        deletedLinkIds: ctx.input.linkIds
+        deletedCount: linkIds.length,
+        deletedLinkIds: linkIds
       },
-      message: `Deleted **${ctx.input.linkIds.length}** link(s): ${ctx.input.linkIds.join(', ')}`
+      message: `Deleted **${linkIds.length}** link(s): ${linkIds.join(', ')}`
     };
   })
   .build();

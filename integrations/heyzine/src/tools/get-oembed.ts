@@ -54,17 +54,17 @@ Useful for embedding flipbooks in third-party platforms that support oEmbed disc
 
     return {
       output: {
-        type: data.type || '',
-        version: data.version || '',
-        title: data.title || '',
-        providerName: data.provider_name || '',
-        providerUrl: data.provider_url || '',
-        html: data.html || '',
-        width: data.width || 0,
-        height: data.height || 0,
-        thumbnailUrl: data.thumbnail_url || '',
-        thumbnailWidth: data.thumbnail_width || 0,
-        thumbnailHeight: data.thumbnail_height || 0
+        type: data.type,
+        version: data.version,
+        title: data.title,
+        providerName: data.provider_name,
+        providerUrl: data.provider_url,
+        html: data.html,
+        width: data.width,
+        height: data.height,
+        thumbnailUrl: data.thumbnail_url,
+        thumbnailWidth: data.thumbnail_width,
+        thumbnailHeight: data.thumbnail_height
       },
       message: `Retrieved oEmbed data for **${data.title || ctx.input.flipbookUrl}** (${data.width}x${data.height}).`
     };

@@ -23,6 +23,7 @@ export let listExchanges = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
         limit: z.number(),
         offset: z.number(),
@@ -34,13 +35,13 @@ export let listExchanges = SlateTool.create(spec, {
           name: z.string(),
           acronym: z.string(),
           mic: z.string(),
-          country: z.string(),
+          country: z.string().optional(),
           countryCode: z.string(),
           city: z.string(),
           website: z.string(),
-          timezone: z.string(),
-          currencyCode: z.string(),
-          currencyName: z.string()
+          timezone: z.string().optional(),
+          currencyCode: z.string().optional(),
+          currencyName: z.string().optional()
         })
       )
     })
@@ -62,17 +63,18 @@ export let listExchanges = SlateTool.create(spec, {
       countryCode: e.country_code,
       city: e.city,
       website: e.website,
-      timezone: e.timezone?.timezone ?? '',
-      currencyCode: e.currency?.code ?? '',
-      currencyName: e.currency?.name ?? ''
+      timezone: e.timezone.timezone,
+      currencyCode: e.currency.code,
+      currencyName: e.currency.name
     }));
 
     return {
       output: {
         pagination: result.pagination,
+        raw: result.raw,
         exchanges
       },
-      message: `Found ${exchanges.length} exchanges${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}. Total available: ${result.pagination.total}.`
+      message: `Found ${exchanges.length} exchanges${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };
   })
   .build();

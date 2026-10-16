@@ -23,7 +23,15 @@ export let getTimezones = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      timezones: z.record(z.string(), z.unknown()).describe('Available timezones')
+      timezones: z
+        .record(z.string(), z.unknown())
+        .describe(
+          'Timezone strings keyed by their zero-based position in the provider array; keys are array indices, not provider IDs'
+        ),
+      timezoneList: z
+        .array(z.string())
+        .optional()
+        .describe('Original timezone array returned by the provider')
     })
   )
   .handleInvocation(async ctx => {
@@ -31,7 +39,10 @@ export let getTimezones = SlateTool.create(spec, {
     let timezones = await client.getTimezones(ctx.input.country);
 
     return {
-      output: { timezones },
+      output: {
+        timezones: Object.fromEntries(timezones.map((value, index) => [String(index), value])),
+        timezoneList: timezones
+      },
       message: `Retrieved timezones${ctx.input.country ? ` for country **${ctx.input.country}**` : ''}.`
     };
   })

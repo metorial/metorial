@@ -1,386 +1,297 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+
+export interface MailerParams {
+  size?: string;
+  creativeId?: number;
+  frontImageUrl?: string;
+  imageTemplate?: number;
+  message?: string;
+  messageTemplate?: number;
+  useCustomBackground?: boolean;
+  customBackgroundImage?: string;
+  qrcodeUrl?: string;
+  mailingLists?: number[];
+  recipients?: Record<string, unknown>[];
+  radiusSearch?: Record<string, unknown>;
+  handwritingStyle?: number;
+  handwritingColor?: string;
+  handwritingRealism?: boolean;
+  subAccount?: number;
+  emailAdditional?: string;
+  sendStandardMail?: boolean;
+  returnName?: string;
+  returnAddress?: string;
+  returnAddress2?: string;
+  returnCity?: string;
+  returnState?: string;
+  returnPostalCode?: string;
+  preview?: boolean;
+  additionalPagesUrl?: string;
+  pdfOnlyUrl?: string;
+  giftcardBrand?: string;
+  giftcardAmountInCents?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RadiusSearchParams {
+  address: string;
+  postalCode: string;
+  recordCount: number;
+  mailingListId?: number;
+  recordTypes?: string;
+  includeCondos?: boolean;
+  appendData?: boolean;
+  usePropertyOwner?: boolean;
+  includeSearchAddress?: boolean;
+}
+
+export interface ListParams {
+  page?: number;
+  itemsPerPage?: number;
+  subAccountId?: number;
+  type?: string;
+  creativeId?: number;
+  campaignId?: number;
+}
 
 export class ThanksIoClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.thanks.io/api/v2',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Thanks.io',
+          reason: 'thanks_io_api_failed'
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.failure === true || response.data?.success === false) {
+        throw createApiServiceError(
+          response.data.message || 'Thanks.io could not complete the request.'
+        );
       }
+      return response;
     });
   }
 
-  // ---- Send Mailer ----
-
-  async sendPostcard(params: {
-    size?: string;
-    frontImageUrl?: string;
-    imageTemplate?: number;
-    message?: string;
-    messageTemplate?: number;
-    useCustomBackground?: boolean;
-    customBackgroundImage?: string;
-    qrcodeUrl?: string;
-    mailingLists?: number[];
-    recipients?: Record<string, unknown>[];
-    radiusSearch?: Record<string, unknown>;
-    handwritingStyle?: number;
-    handwritingColor?: string;
-    handwritingRealism?: boolean;
-    subAccount?: number;
-    emailAdditional?: string;
-    sendStandardMail?: boolean;
-    returnName?: string;
-    returnAddress?: string;
-    returnAddress2?: string;
-    returnCity?: string;
-    returnState?: string;
-    returnPostalCode?: string;
-    preview?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.size !== undefined) body.size = params.size;
-    if (params.frontImageUrl !== undefined) body.front_image_url = params.frontImageUrl;
-    if (params.imageTemplate !== undefined) body.image_template = params.imageTemplate;
-    if (params.message !== undefined) body.message = params.message;
-    if (params.messageTemplate !== undefined) body.message_template = params.messageTemplate;
-    if (params.useCustomBackground !== undefined)
-      body.use_custom_background = params.useCustomBackground;
-    if (params.customBackgroundImage !== undefined)
-      body.custom_background_image = params.customBackgroundImage;
-    if (params.qrcodeUrl !== undefined) body.qrcode_url = params.qrcodeUrl;
-    if (params.mailingLists !== undefined) body.mailing_lists = params.mailingLists;
-    if (params.recipients !== undefined) body.recipients = params.recipients;
-    if (params.radiusSearch !== undefined) body.radius_search = params.radiusSearch;
-    if (params.handwritingStyle !== undefined)
-      body.handwriting_style = params.handwritingStyle;
-    if (params.handwritingColor !== undefined)
-      body.handwriting_color = params.handwritingColor;
-    if (params.handwritingRealism !== undefined)
-      body.handwriting_realism = params.handwritingRealism;
-    if (params.subAccount !== undefined) body.sub_account = params.subAccount;
-    if (params.emailAdditional !== undefined) body.email_additional = params.emailAdditional;
-    if (params.sendStandardMail !== undefined)
-      body.send_standard_mail = params.sendStandardMail;
-    if (params.returnName !== undefined) body.return_name = params.returnName;
-    if (params.returnAddress !== undefined) body.return_address = params.returnAddress;
-    if (params.returnAddress2 !== undefined) body.return_address2 = params.returnAddress2;
-    if (params.returnCity !== undefined) body.return_city = params.returnCity;
-    if (params.returnState !== undefined) body.return_state = params.returnState;
-    if (params.returnPostalCode !== undefined)
-      body.return_postal_code = params.returnPostalCode;
-    if (params.preview !== undefined) body.preview = params.preview;
-
-    let response = await this.axios.post('/send/postcard', body);
-    return response.data;
+  private mailerBody(params: MailerParams) {
+    let body = pickDefined({
+      size: params.size,
+      creative_id: params.creativeId,
+      front_image_url: params.frontImageUrl,
+      image_template_id: params.imageTemplate,
+      message: params.message,
+      message_template_id: params.messageTemplate,
+      use_custom_background: params.useCustomBackground,
+      custom_background_image: params.customBackgroundImage,
+      qrcode_url: params.qrcodeUrl,
+      mailing_list_ids: params.mailingLists,
+      recipients: params.recipients,
+      radius_search: params.radiusSearch,
+      handwriting_style_id: params.handwritingStyle,
+      handwriting_color: params.handwritingColor,
+      handwriting_realism: params.handwritingRealism,
+      sub_account: params.subAccount,
+      notification_emails: params.emailAdditional,
+      send_standard_mail: params.sendStandardMail,
+      return_name: params.returnName,
+      return_address: params.returnAddress,
+      return_address2: params.returnAddress2,
+      return_city: params.returnCity,
+      return_state: params.returnState,
+      return_postal_code: params.returnPostalCode,
+      preview: params.preview,
+      additional_pages_url: params.additionalPagesUrl,
+      pdf_only_url: params.pdfOnlyUrl,
+      giftcard_brand: params.giftcardBrand,
+      giftcard_amount_in_cents: params.giftcardAmountInCents,
+      metadata: params.metadata
+    });
+    if (!params.recipients?.length && !params.mailingLists?.length && !params.radiusSearch) {
+      throw createApiServiceError('Provide recipients, mailingListIds, or radiusSearch.');
+    }
+    if (params.recipients?.some(recipient => !recipient.address && !recipient.email)) {
+      throw createApiServiceError(
+        'Every recipient requires an address or email. Email address lookup may incur a fee.'
+      );
+    }
+    if (params.creativeId !== undefined) {
+      let conflicting = [
+        params.frontImageUrl,
+        params.imageTemplate,
+        params.message,
+        params.messageTemplate,
+        params.handwritingStyle,
+        params.handwritingColor,
+        params.handwritingRealism,
+        params.useCustomBackground,
+        params.customBackgroundImage,
+        params.pdfOnlyUrl,
+        params.giftcardBrand,
+        params.giftcardAmountInCents
+      ];
+      if (conflicting.some(value => value !== undefined)) {
+        throw createApiServiceError(
+          'creativeId cannot be combined with design, message, handwriting, background, PDF-only, or gift card settings. Use the saved creative settings.'
+        );
+      }
+    }
+    if (
+      params.metadata &&
+      new TextEncoder().encode(JSON.stringify(params.metadata)).length > 8192
+    ) {
+      throw createApiServiceError('metadata must be at most 8192 bytes when encoded as JSON.');
+    }
+    return body;
   }
 
-  async sendNotecard(params: {
-    frontImageUrl?: string;
-    imageTemplate?: number;
-    message?: string;
-    messageTemplate?: number;
-    useCustomBackground?: boolean;
-    customBackgroundImage?: string;
-    qrcodeUrl?: string;
-    mailingLists?: number[];
-    recipients?: Record<string, unknown>[];
-    radiusSearch?: Record<string, unknown>;
-    handwritingStyle?: number;
-    handwritingColor?: string;
-    handwritingRealism?: boolean;
-    subAccount?: number;
-    emailAdditional?: string;
-    sendStandardMail?: boolean;
-    returnName?: string;
-    returnAddress?: string;
-    returnAddress2?: string;
-    returnCity?: string;
-    returnState?: string;
-    returnPostalCode?: string;
-    preview?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.frontImageUrl !== undefined) body.front_image_url = params.frontImageUrl;
-    if (params.imageTemplate !== undefined) body.image_template = params.imageTemplate;
-    if (params.message !== undefined) body.message = params.message;
-    if (params.messageTemplate !== undefined) body.message_template = params.messageTemplate;
-    if (params.useCustomBackground !== undefined)
-      body.use_custom_background = params.useCustomBackground;
-    if (params.customBackgroundImage !== undefined)
-      body.custom_background_image = params.customBackgroundImage;
-    if (params.qrcodeUrl !== undefined) body.qrcode_url = params.qrcodeUrl;
-    if (params.mailingLists !== undefined) body.mailing_lists = params.mailingLists;
-    if (params.recipients !== undefined) body.recipients = params.recipients;
-    if (params.radiusSearch !== undefined) body.radius_search = params.radiusSearch;
-    if (params.handwritingStyle !== undefined)
-      body.handwriting_style = params.handwritingStyle;
-    if (params.handwritingColor !== undefined)
-      body.handwriting_color = params.handwritingColor;
-    if (params.handwritingRealism !== undefined)
-      body.handwriting_realism = params.handwritingRealism;
-    if (params.subAccount !== undefined) body.sub_account = params.subAccount;
-    if (params.emailAdditional !== undefined) body.email_additional = params.emailAdditional;
-    if (params.sendStandardMail !== undefined)
-      body.send_standard_mail = params.sendStandardMail;
-    if (params.returnName !== undefined) body.return_name = params.returnName;
-    if (params.returnAddress !== undefined) body.return_address = params.returnAddress;
-    if (params.returnAddress2 !== undefined) body.return_address2 = params.returnAddress2;
-    if (params.returnCity !== undefined) body.return_city = params.returnCity;
-    if (params.returnState !== undefined) body.return_state = params.returnState;
-    if (params.returnPostalCode !== undefined)
-      body.return_postal_code = params.returnPostalCode;
-    if (params.preview !== undefined) body.preview = params.preview;
-
-    let response = await this.axios.post('/send/notecard', body);
-    return response.data;
+  async sendPostcard(params: MailerParams): Promise<Record<string, unknown>> {
+    return (await this.axios.post('/send/postcard', this.mailerBody(params))).data;
   }
 
-  async sendLetter(params: {
-    letterType: 'windowed' | 'windowless';
-    frontImageUrl?: string;
-    imageTemplate?: number;
-    message?: string;
-    messageTemplate?: number;
-    qrcodeUrl?: string;
-    additionalPagesUrl?: string;
-    pdfOnlyUrl?: string;
-    mailingLists?: number[];
-    recipients?: Record<string, unknown>[];
-    radiusSearch?: Record<string, unknown>;
-    handwritingStyle?: number;
-    handwritingColor?: string;
-    handwritingRealism?: boolean;
-    subAccount?: number;
-    emailAdditional?: string;
-    sendStandardMail?: boolean;
-    returnName?: string;
-    returnAddress?: string;
-    returnAddress2?: string;
-    returnCity?: string;
-    returnState?: string;
-    returnPostalCode?: string;
-    preview?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.frontImageUrl !== undefined) body.front_image_url = params.frontImageUrl;
-    if (params.imageTemplate !== undefined) body.image_template = params.imageTemplate;
-    if (params.message !== undefined) body.message = params.message;
-    if (params.messageTemplate !== undefined) body.message_template = params.messageTemplate;
-    if (params.qrcodeUrl !== undefined) body.qrcode_url = params.qrcodeUrl;
-    if (params.additionalPagesUrl !== undefined)
-      body.additional_pages_url = params.additionalPagesUrl;
-    if (params.pdfOnlyUrl !== undefined) body.pdf_only_url = params.pdfOnlyUrl;
-    if (params.mailingLists !== undefined) body.mailing_lists = params.mailingLists;
-    if (params.recipients !== undefined) body.recipients = params.recipients;
-    if (params.radiusSearch !== undefined) body.radius_search = params.radiusSearch;
-    if (params.handwritingStyle !== undefined)
-      body.handwriting_style = params.handwritingStyle;
-    if (params.handwritingColor !== undefined)
-      body.handwriting_color = params.handwritingColor;
-    if (params.handwritingRealism !== undefined)
-      body.handwriting_realism = params.handwritingRealism;
-    if (params.subAccount !== undefined) body.sub_account = params.subAccount;
-    if (params.emailAdditional !== undefined) body.email_additional = params.emailAdditional;
-    if (params.sendStandardMail !== undefined)
-      body.send_standard_mail = params.sendStandardMail;
-    if (params.returnName !== undefined) body.return_name = params.returnName;
-    if (params.returnAddress !== undefined) body.return_address = params.returnAddress;
-    if (params.returnAddress2 !== undefined) body.return_address2 = params.returnAddress2;
-    if (params.returnCity !== undefined) body.return_city = params.returnCity;
-    if (params.returnState !== undefined) body.return_state = params.returnState;
-    if (params.returnPostalCode !== undefined)
-      body.return_postal_code = params.returnPostalCode;
-    if (params.preview !== undefined) body.preview = params.preview;
-
-    let endpoint =
-      params.letterType === 'windowed' ? '/send/letter/windowed' : '/send/letter/windowless';
-    let response = await this.axios.post(endpoint, body);
-    return response.data;
+  async sendNotecard(params: MailerParams): Promise<Record<string, unknown>> {
+    return (await this.axios.post('/send/notecard', this.mailerBody(params))).data;
   }
 
-  async sendGiftcard(params: {
-    frontImageUrl?: string;
-    imageTemplate?: number;
-    message?: string;
-    messageTemplate?: number;
-    giftcardBrand?: string;
-    giftcardAmountInCents?: number;
-    mailingLists?: number[];
-    recipients?: Record<string, unknown>[];
-    radiusSearch?: Record<string, unknown>;
-    handwritingStyle?: number;
-    handwritingColor?: string;
-    handwritingRealism?: boolean;
-    subAccount?: number;
-    emailAdditional?: string;
-    sendStandardMail?: boolean;
-    returnName?: string;
-    returnAddress?: string;
-    returnAddress2?: string;
-    returnCity?: string;
-    returnState?: string;
-    returnPostalCode?: string;
-    preview?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.frontImageUrl !== undefined) body.front_image_url = params.frontImageUrl;
-    if (params.imageTemplate !== undefined) body.image_template = params.imageTemplate;
-    if (params.message !== undefined) body.message = params.message;
-    if (params.messageTemplate !== undefined) body.message_template = params.messageTemplate;
-    if (params.giftcardBrand !== undefined) body.giftcard_brand = params.giftcardBrand;
-    if (params.giftcardAmountInCents !== undefined)
-      body.giftcard_amount_in_cents = params.giftcardAmountInCents;
-    if (params.mailingLists !== undefined) body.mailing_lists = params.mailingLists;
-    if (params.recipients !== undefined) body.recipients = params.recipients;
-    if (params.radiusSearch !== undefined) body.radius_search = params.radiusSearch;
-    if (params.handwritingStyle !== undefined)
-      body.handwriting_style = params.handwritingStyle;
-    if (params.handwritingColor !== undefined)
-      body.handwriting_color = params.handwritingColor;
-    if (params.handwritingRealism !== undefined)
-      body.handwriting_realism = params.handwritingRealism;
-    if (params.subAccount !== undefined) body.sub_account = params.subAccount;
-    if (params.emailAdditional !== undefined) body.email_additional = params.emailAdditional;
-    if (params.sendStandardMail !== undefined)
-      body.send_standard_mail = params.sendStandardMail;
-    if (params.returnName !== undefined) body.return_name = params.returnName;
-    if (params.returnAddress !== undefined) body.return_address = params.returnAddress;
-    if (params.returnAddress2 !== undefined) body.return_address2 = params.returnAddress2;
-    if (params.returnCity !== undefined) body.return_city = params.returnCity;
-    if (params.returnState !== undefined) body.return_state = params.returnState;
-    if (params.returnPostalCode !== undefined)
-      body.return_postal_code = params.returnPostalCode;
-    if (params.preview !== undefined) body.preview = params.preview;
-
-    let response = await this.axios.post('/send/giftcard', body);
-    return response.data;
+  async sendLetter(
+    params: MailerParams & { letterType: 'windowed' | 'windowless' }
+  ): Promise<Record<string, unknown>> {
+    let endpoint = params.letterType === 'windowed' ? 'windowedletter' : 'windowlessletter';
+    return (await this.axios.post(`/send/${endpoint}`, this.mailerBody(params))).data;
   }
 
-  // ---- Recipients ----
+  async sendGiftcard(params: MailerParams): Promise<Record<string, unknown>> {
+    if (
+      params.giftcardAmountInCents !== undefined &&
+      (!Number.isInteger(params.giftcardAmountInCents) || params.giftcardAmountInCents <= 0)
+    ) {
+      throw createApiServiceError(
+        'giftcardAmountInCents must be a positive whole number of cents from the gift card catalog.'
+      );
+    }
+    if (
+      params.creativeId === undefined &&
+      (!params.giftcardBrand || !params.giftcardAmountInCents)
+    ) {
+      throw createApiServiceError(
+        'Provide giftcardBrand and giftcardAmountInCents, or use a saved creativeId.'
+      );
+    }
+    return (await this.axios.post('/send/giftcard', this.mailerBody(params))).data;
+  }
 
-  async createRecipient(params: {
-    mailingListId: number;
-    name?: string;
-    company?: string;
-    address?: string;
-    address2?: string;
-    city?: string;
-    province?: string;
-    postalCode?: string;
-    country?: string;
-    email?: string;
-    phone?: string;
-    dob?: string;
-    custom1?: string;
-    custom2?: string;
-    custom3?: string;
-    custom4?: string;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      mailing_list_id: params.mailingListId
-    };
-    if (params.name !== undefined) body.name = params.name;
-    if (params.company !== undefined) body.company = params.company;
-    if (params.address !== undefined) body.address = params.address;
-    if (params.address2 !== undefined) body.address2 = params.address2;
-    if (params.city !== undefined) body.city = params.city;
-    if (params.province !== undefined) body.province = params.province;
-    if (params.postalCode !== undefined) body.postal_code = params.postalCode;
-    if (params.country !== undefined) body.country = params.country;
-    if (params.email !== undefined) body.email = params.email;
-    if (params.phone !== undefined) body.phone = params.phone;
-    if (params.dob !== undefined) body.dob = params.dob;
-    if (params.custom1 !== undefined) body.custom1 = params.custom1;
-    if (params.custom2 !== undefined) body.custom2 = params.custom2;
-    if (params.custom3 !== undefined) body.custom3 = params.custom3;
-    if (params.custom4 !== undefined) body.custom4 = params.custom4;
+  async estimateMailer(
+    mailerType: string,
+    params: MailerParams
+  ): Promise<Record<string, unknown>> {
+    return (await this.axios.post(`/estimate/${mailerType}`, this.mailerBody(params))).data;
+  }
 
-    let response = await this.axios.post('/recipients', body);
-    return response.data;
+  private recipientBody(params: Record<string, unknown>) {
+    return pickDefined({
+      mailing_list_id: params.mailingListId,
+      name: params.name,
+      company: params.company,
+      address: params.address,
+      address2: params.address2,
+      city: params.city,
+      province: params.province,
+      postal_code: params.postalCode,
+      country: params.country,
+      email: params.email,
+      phone: params.phone,
+      dob: params.dob,
+      anniversary: params.anniversary,
+      custom1: params.custom1,
+      custom2: params.custom2,
+      custom3: params.custom3,
+      custom4: params.custom4,
+      custom5: params.custom5,
+      custom6: params.custom6,
+      custom7: params.custom7,
+      custom8: params.custom8,
+      custom9: params.custom9,
+      custom10: params.custom10
+    });
+  }
+
+  async createRecipient(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (!params.address && !params.email)
+      throw createApiServiceError(
+        'Provide a recipient address or email. Email address lookup may incur a fee.'
+      );
+    return (await this.axios.post('/recipients', this.recipientBody(params))).data;
   }
 
   async createMultipleRecipients(
     recipients: Record<string, unknown>[]
   ): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/recipients-utils/create-multiple', recipients);
-    return response.data;
+    return (
+      await this.axios.post(
+        '/recipients-utils/create-multiple',
+        recipients.map(recipient => {
+          if (!recipient.mailingListId || (!recipient.address && !recipient.email)) {
+            throw createApiServiceError(
+              'Every recipient requires mailingListId and an address or email.'
+            );
+          }
+          return this.recipientBody(recipient);
+        })
+      )
+    ).data;
   }
 
   async getRecipient(recipientId: number): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/recipients/${recipientId}`);
-    return response.data;
+    return (await this.axios.get(`/recipients/${recipientId}`)).data;
   }
 
   async updateRecipient(
     recipientId: number,
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.name !== undefined) body.name = params.name;
-    if (params.company !== undefined) body.company = params.company;
-    if (params.address !== undefined) body.address = params.address;
-    if (params.address2 !== undefined) body.address2 = params.address2;
-    if (params.city !== undefined) body.city = params.city;
-    if (params.province !== undefined) body.province = params.province;
-    if (params.postalCode !== undefined) body.postal_code = params.postalCode;
-    if (params.country !== undefined) body.country = params.country;
-    if (params.email !== undefined) body.email = params.email;
-    if (params.phone !== undefined) body.phone = params.phone;
-    if (params.dob !== undefined) body.dob = params.dob;
-    if (params.custom1 !== undefined) body.custom1 = params.custom1;
-    if (params.custom2 !== undefined) body.custom2 = params.custom2;
-    if (params.custom3 !== undefined) body.custom3 = params.custom3;
-    if (params.custom4 !== undefined) body.custom4 = params.custom4;
-
-    let response = await this.axios.put(`/recipients/${recipientId}`, body);
-    return response.data;
+    return (await this.axios.put(`/recipients/${recipientId}`, this.recipientBody(params)))
+      .data;
   }
 
   async deleteRecipient(recipientId: number): Promise<Record<string, unknown>> {
-    let response = await this.axios.delete(`/recipients/${recipientId}`);
-    return response.data;
+    return (await this.axios.delete(`/recipients/${recipientId}`)).data;
   }
 
-  async deleteRecipientByAddress(params: {
-    mailingListId: number;
-    address?: string;
-    address2?: string;
-    city?: string;
-    province?: string;
-    postalCode?: string;
-    country?: string;
-    email?: string;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      mailing_list_id: params.mailingListId
-    };
-    if (params.address !== undefined) body.address = params.address;
-    if (params.address2 !== undefined) body.address2 = params.address2;
-    if (params.city !== undefined) body.city = params.city;
-    if (params.province !== undefined) body.province = params.province;
-    if (params.postalCode !== undefined) body.postal_code = params.postalCode;
-    if (params.country !== undefined) body.country = params.country;
-    if (params.email !== undefined) body.email = params.email;
-
-    let response = await this.axios.post('/recipients-utils/delete-by-address', body);
-    return response.data;
+  async deleteRecipientByAddress(
+    params: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    if (!params.email && (!params.address || !params.postalCode)) {
+      throw createApiServiceError(
+        'Provide email, or both address and postalCode, to delete a recipient.'
+      );
+    }
+    return (
+      await this.axios.post('/recipients-utils/delete-by-address', this.recipientBody(params))
+    ).data;
   }
 
-  // ---- Mailing Lists ----
+  private listQuery(params: ListParams = {}) {
+    return pickDefined({
+      page: params.page,
+      items_per_page: params.itemsPerPage,
+      sub_account_id: params.subAccountId,
+      type: params.type,
+      creative_id: params.creativeId,
+      campaign: params.campaignId
+    });
+  }
 
-  async listMailingLists(params?: {
-    itemsPerPage?: number;
-  }): Promise<Record<string, unknown>> {
-    let query: Record<string, string> = {};
-    if (params?.itemsPerPage !== undefined) query.items_per_page = String(params.itemsPerPage);
-
-    let response = await this.axios.get('/mailing-lists/', { params: query });
-    return response.data;
+  async listMailingLists(params?: ListParams): Promise<Record<string, unknown>> {
+    return (await this.axios.get('/mailing-lists/', { params: this.listQuery(params) })).data;
   }
 
   async createMailingList(params: {
@@ -388,228 +299,189 @@ export class ThanksIoClient {
     subAccountId?: number;
     qrcodeUrl?: string;
   }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      description: params.description
-    };
-    if (params.subAccountId !== undefined) body.sub_account_id = params.subAccountId;
-    if (params.qrcodeUrl !== undefined) body.qrcode_url = params.qrcodeUrl;
-
-    let response = await this.axios.post('/mailing-lists/', body);
-    return response.data;
+    return (
+      await this.axios.post(
+        '/mailing-lists/',
+        pickDefined({
+          description: params.description,
+          sub_account_id: params.subAccountId,
+          qrcode_url: params.qrcodeUrl
+        })
+      )
+    ).data;
   }
 
-  async getMailingList(mailingListId: number): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/mailing-lists/${mailingListId}`);
-    return response.data;
+  async getMailingList(id: number): Promise<Record<string, unknown>> {
+    return (await this.axios.get(`/mailing-lists/${id}`)).data;
   }
 
-  async deleteMailingList(mailingListId: number): Promise<Record<string, unknown>> {
-    let response = await this.axios.delete(`/mailing-lists/${mailingListId}`);
-    return response.data;
+  async deleteMailingList(id: number): Promise<Record<string, unknown>> {
+    return (await this.axios.delete(`/mailing-lists/${id}`)).data;
   }
 
   async listMailingListRecipients(
-    mailingListId: number,
-    params?: {
-      limit?: number;
-      updatedSince?: string;
-    }
+    id: number,
+    params?: { limit?: number; updatedSince?: string; page?: number }
   ): Promise<Record<string, unknown>> {
-    let query: Record<string, string> = {};
-    if (params?.limit !== undefined) query.limit = String(params.limit);
-    if (params?.updatedSince !== undefined) query.updated_since = params.updatedSince;
-
-    let response = await this.axios.get(`/mailing-lists-utils/recipients/${mailingListId}`, {
-      params: query
-    });
-    return response.data;
+    return (
+      await this.axios.get(`/mailing-lists-utils/recipients/${id}`, {
+        params: pickDefined({
+          limit: params?.limit,
+          updated_since: params?.updatedSince,
+          page: params?.page
+        })
+      })
+    ).data;
   }
 
-  async buyRadiusSearch(params: {
-    address: string;
-    postalCode: string;
-    recordCount: number;
-    mailingListId?: number;
-    recordTypes?: string;
-    includeCondos?: boolean;
-    appendData?: boolean;
-    usePropertyOwner?: boolean;
-    includeSearchAddress?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
+  private radiusBody(params: RadiusSearchParams) {
+    return pickDefined({
       address: params.address,
       postal_code: params.postalCode,
-      record_count: params.recordCount
-    };
-    if (params.mailingListId !== undefined) body.mailing_list_id = params.mailingListId;
-    if (params.recordTypes !== undefined) body.record_types = params.recordTypes;
-    if (params.includeCondos !== undefined) body.include_condos = params.includeCondos;
-    if (params.appendData !== undefined) body.append_data = params.appendData;
-    if (params.usePropertyOwner !== undefined)
-      body.use_property_owner = params.usePropertyOwner;
-    if (params.includeSearchAddress !== undefined)
-      body.include_search_address = params.includeSearchAddress;
-
-    let response = await this.axios.post('/mailing-lists-utils/buy-radius-search', body);
-    return response.data;
+      record_count: params.recordCount,
+      mailing_list_id: params.mailingListId,
+      record_types: params.recordTypes,
+      include_condos: params.includeCondos,
+      append_data: params.appendData,
+      use_property_owner: params.usePropertyOwner,
+      include_search_address: params.includeSearchAddress
+    });
   }
 
-  // ---- Orders ----
+  async buyRadiusSearch(params: RadiusSearchParams): Promise<Record<string, unknown>> {
+    if (
+      !Number.isInteger(params.recordCount) ||
+      params.recordCount < 1 ||
+      params.recordCount > 2500
+    ) {
+      throw createApiServiceError(
+        'A radius purchase requires recordCount from 1 to 2500; API Test Mode limits purchases to 5 records.'
+      );
+    }
+    return (
+      await this.axios.post('/mailing-lists-utils/buy-radius-search', this.radiusBody(params))
+    ).data;
+  }
 
-  async listOrders(params?: {
-    itemsPerPage?: number;
-    subAccountId?: number;
-  }): Promise<Record<string, unknown>> {
-    let query: Record<string, string> = {};
-    if (params?.itemsPerPage !== undefined) query.items_per_page = String(params.itemsPerPage);
-    if (params?.subAccountId !== undefined) query.sub_account_id = String(params.subAccountId);
+  async countRadiusSearch(params: RadiusSearchParams): Promise<Record<string, unknown>> {
+    return (
+      await this.axios.post(
+        '/mailing-lists-utils/count-radius-search',
+        this.radiusBody(params)
+      )
+    ).data;
+  }
 
-    let response = await this.axios.get('/orders/list', { params: query });
-    return response.data;
+  async listOrders(params?: ListParams): Promise<Record<string, unknown>> {
+    return (await this.axios.get('/orders/list', { params: this.listQuery(params) })).data;
+  }
+
+  async listOrderItems(
+    orderId: string,
+    params: { page?: number; perPage?: number }
+  ): Promise<Record<string, unknown>> {
+    return (
+      await this.axios.get(`/orders/${encodeURIComponent(orderId)}/items`, {
+        params: pickDefined({ page: params.page, per_page: params.perPage })
+      })
+    ).data;
   }
 
   async trackOrder(orderId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/orders/${orderId}/track`);
-    return response.data;
+    return (await this.axios.get(`/orders/${encodeURIComponent(orderId)}/track`)).data;
   }
 
   async cancelOrder(orderId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.put(`/orders/${orderId}/cancel`);
-    return response.data;
+    return (await this.axios.put(`/orders/${encodeURIComponent(orderId)}/cancel`)).data;
   }
 
-  // ---- Templates ----
-
-  async listImageTemplates(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/image-templates');
-    return response.data;
+  async listImageTemplates(params?: ListParams): Promise<Record<string, unknown>> {
+    return (await this.axios.get('/image-templates/', { params: this.listQuery(params) }))
+      .data;
   }
 
-  async listMessageTemplates(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/message-templates');
-    return response.data;
+  async listMessageTemplates(params?: ListParams): Promise<Record<string, unknown>> {
+    return (await this.axios.get('/message-templates/', { params: this.listQuery(params) }))
+      .data;
   }
 
-  // ---- Handwriting Styles ----
+  async listCreatives(params: {
+    page?: number;
+    subAccountId?: number;
+    mailerType?: string;
+    completeOnly?: boolean;
+    search?: string;
+    includeHidden?: boolean;
+  }): Promise<Record<string, unknown>> {
+    return (
+      await this.axios.get('/creatives/', {
+        params: pickDefined({
+          page: params.page,
+          sub_account_id: params.subAccountId,
+          mailer_type: params.mailerType,
+          complete_only:
+            params.completeOnly === undefined ? undefined : Number(params.completeOnly),
+          search: params.search,
+          include_hidden:
+            params.includeHidden === undefined ? undefined : Number(params.includeHidden)
+        })
+      })
+    ).data;
+  }
+
+  async getCreative(id: number): Promise<Record<string, unknown>> {
+    return (await this.axios.get(`/creatives/${id}`)).data;
+  }
 
   async listHandwritingStyles(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/handwriting-styles');
-    return response.data;
+    return (await this.axios.get('/handwriting-styles')).data;
   }
 
-  // ---- Gift Card Brands ----
-
   async listGiftcardBrands(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/giftcard-brands');
-    return response.data;
+    return (await this.axios.get('/giftcard-brands')).data;
   }
 
   async listGiftcardBrandsFlat(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/giftcard-brands/flat');
-    return response.data;
+    return (await this.axios.get('/giftcard-brands-list')).data;
   }
 
-  // ---- Sub-Accounts ----
-
   async listSubAccounts(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/sub-accounts');
-    return response.data;
+    return (await this.axios.get('/sub-accounts/')).data;
+  }
+
+  private subAccountBody(params: Record<string, unknown>) {
+    return pickDefined({
+      title: params.name,
+      return_name: params.returnName,
+      return_address: params.returnAddress,
+      return_address2: params.returnAddress2,
+      return_city: params.returnCity,
+      return_state: params.returnState,
+      return_postal_code: params.returnPostalCode
+    });
   }
 
   async createSubAccount(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.name !== undefined) body.name = params.name;
-    if (params.returnName !== undefined) body.return_name = params.returnName;
-    if (params.returnAddress !== undefined) body.return_address = params.returnAddress;
-    if (params.returnAddress2 !== undefined) body.return_address2 = params.returnAddress2;
-    if (params.returnCity !== undefined) body.return_city = params.returnCity;
-    if (params.returnState !== undefined) body.return_state = params.returnState;
-    if (params.returnPostalCode !== undefined)
-      body.return_postal_code = params.returnPostalCode;
-
-    let response = await this.axios.post('/sub-accounts', body);
-    return response.data;
+    if (!params.name) throw createApiServiceError('name is required to create a sub-account.');
+    return (await this.axios.post('/sub-accounts/', this.subAccountBody(params))).data;
   }
 
-  async getSubAccount(subAccountId: number): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/sub-accounts/${subAccountId}`);
-    return response.data;
+  async getSubAccount(id: number): Promise<Record<string, unknown>> {
+    return (await this.axios.get(`/sub-accounts/${id}`)).data;
   }
 
   async updateSubAccount(
-    subAccountId: number,
+    id: number,
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.name !== undefined) body.name = params.name;
-    if (params.returnName !== undefined) body.return_name = params.returnName;
-    if (params.returnAddress !== undefined) body.return_address = params.returnAddress;
-    if (params.returnAddress2 !== undefined) body.return_address2 = params.returnAddress2;
-    if (params.returnCity !== undefined) body.return_city = params.returnCity;
-    if (params.returnState !== undefined) body.return_state = params.returnState;
-    if (params.returnPostalCode !== undefined)
-      body.return_postal_code = params.returnPostalCode;
-
-    let response = await this.axios.put(`/sub-accounts/${subAccountId}`, body);
-    return response.data;
-  }
-
-  async deleteSubAccount(subAccountId: number): Promise<Record<string, unknown>> {
-    let response = await this.axios.delete(`/sub-accounts/${subAccountId}`);
-    return response.data;
-  }
-
-  // ---- Webhooks ----
-
-  async listWebhooks(params?: { itemsPerPage?: number }): Promise<Record<string, unknown>> {
-    let query: Record<string, string> = {};
-    if (params?.itemsPerPage !== undefined) query.items_per_page = String(params.itemsPerPage);
-
-    let response = await this.axios.get('/webhooks', { params: query });
-    return response.data;
-  }
-
-  async createWebhook(params: {
-    url: string;
-    type: string;
-    verb: string;
-    description?: string;
-    mailingListId?: number;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      url: params.url,
-      type: params.type,
-      verb: params.verb
-    };
-    if (params.description !== undefined) body.description = params.description;
-    if (params.mailingListId !== undefined) body.mailing_list_id = params.mailingListId;
-
-    let response = await this.axios.post('/webhooks', body);
-    return response.data;
-  }
-
-  async updateWebhook(
-    webhookId: number,
-    params: {
-      url: string;
-      type: string;
-      verb: string;
-      description?: string;
+    if (!params.name) {
+      let existing = await this.getSubAccount(id);
+      params = { ...params, name: existing.title };
     }
-  ): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      url: params.url,
-      type: params.type,
-      verb: params.verb
-    };
-    if (params.description !== undefined) body.description = params.description;
-
-    let response = await this.axios.put(`/webhooks/${webhookId}`, body);
-    return response.data;
+    return (await this.axios.put(`/sub-accounts/${id}`, this.subAccountBody(params))).data;
   }
 
-  async deleteWebhook(webhookId: number): Promise<Record<string, unknown>> {
-    let response = await this.axios.delete(`/webhooks/${webhookId}`);
-    return response.data;
+  async deleteSubAccount(id: number): Promise<Record<string, unknown>> {
+    return (await this.axios.delete(`/sub-accounts/${id}`)).data;
   }
 }

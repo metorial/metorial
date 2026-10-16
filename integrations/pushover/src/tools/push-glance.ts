@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PushoverClient } from '../lib/client';
 import { spec } from '../spec';
@@ -53,6 +53,35 @@ export let pushGlance = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.count !== undefined && !Number.isInteger(ctx.input.count)) ||
+      (ctx.input.percent !== undefined && !Number.isInteger(ctx.input.percent))
+    ) {
+      throw createApiServiceError('count and percent must be integers.');
+    }
+    if (
+      [
+        ctx.input.title,
+        ctx.input.text,
+        ctx.input.subtext,
+        ctx.input.count,
+        ctx.input.percent
+      ].every(value => value === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide at least one of title, text, subtext, count, or percent.'
+      );
+    }
+    for (let [field, value] of [
+      ['title', ctx.input.title],
+      ['text', ctx.input.text],
+      ['subtext', ctx.input.subtext]
+    ] as const) {
+      if (value !== undefined && Array.from(value).length > 100) {
+        throw createApiServiceError(`${field} must not exceed 100 characters.`);
+      }
+    }
+
     let client = new PushoverClient({
       token: ctx.auth.token,
       userKey: ctx.auth.userKey

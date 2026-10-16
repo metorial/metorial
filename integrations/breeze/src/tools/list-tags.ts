@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listTags = SlateTool.create(spec, {
@@ -33,12 +33,12 @@ export let listTags = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let tags = await client.listTags(ctx.input.folderId);
-    let tagsArray = Array.isArray(tags) ? tags : [];
+    let tagsArray = requireList(tags, 'list-tags');
 
     let folders: unknown[] | undefined;
     if (ctx.input.includeFolders) {
       let foldersResult = await client.listTagFolders();
-      folders = Array.isArray(foldersResult) ? foldersResult : [];
+      folders = requireList(foldersResult, 'list-tags');
     }
 
     return {

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreeAgentClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateTimeslip = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let updateTimeslip = SlateTool.create(spec, {
   key: 'update_timeslip',
   description: `Update an existing time entry in FreeAgent. Can also start or stop a running timer on the timeslip.`,
   instructions: [
-    'Use "timerAction" to start or stop a timer. When set, only the timer action is performed.'
+    'Use "timerAction" to start or stop a timer. Calls combining a timer action with field updates are rejected.'
   ],
   tags: {
     destructive: false
@@ -32,15 +32,23 @@ export let updateTimeslip = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FreeAgentClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    if (
+      ctx.input.timerAction &&
+      [ctx.input.datedOn, ctx.input.hours, ctx.input.comment].some(
+        value => value !== undefined
+      )
+    ) {
+      throw createApiServiceError(
+        'Start or stop a timer separately from timeslip field updates.'
+      );
+    }
+
+    let client = createClient(ctx);
 
     if (ctx.input.timerAction === 'start') {
       let timeslip = await client.startTimer(ctx.input.timeslipId);
       return {
-        output: { timeslip: timeslip || {} },
+        output: { timeslip },
         message: `Started timer on timeslip **${ctx.input.timeslipId}**`
       };
     }
@@ -48,7 +56,7 @@ export let updateTimeslip = SlateTool.create(spec, {
     if (ctx.input.timerAction === 'stop') {
       let timeslip = await client.stopTimer(ctx.input.timeslipId);
       return {
-        output: { timeslip: timeslip || {} },
+        output: { timeslip },
         message: `Stopped timer on timeslip **${ctx.input.timeslipId}**`
       };
     }
@@ -61,7 +69,7 @@ export let updateTimeslip = SlateTool.create(spec, {
     let timeslip = await client.updateTimeslip(ctx.input.timeslipId, timeslipData);
 
     return {
-      output: { timeslip: timeslip || {} },
+      output: { timeslip },
       message: `Updated timeslip **${ctx.input.timeslipId}**`
     };
   })

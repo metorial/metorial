@@ -31,14 +31,14 @@ export let getCompanyDetails = SlateTool.create(spec, {
 
     return {
       output: {
-        companyName: result.company_name || '',
-        companyEmail: result.company_email || '',
-        addressLine1: result.address_1 || '',
-        addressLine2: result.address_2 || null,
-        city: result.city || '',
-        state: result.state || '',
-        zip: result.zip || '',
-        createdDate: result.created_date || ''
+        companyName: result.company_name,
+        companyEmail: result.company_email,
+        addressLine1: result.address_1,
+        addressLine2: result.address_2,
+        city: result.city,
+        state: result.state,
+        zip: result.zip,
+        createdDate: result.created_date
       },
       message: `Company **${result.company_name}** (${result.company_email}) — ${result.city}, ${result.state} ${result.zip}. Created: ${result.created_date}.`
     };

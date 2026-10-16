@@ -36,6 +36,36 @@ export let searchNews = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Keywords to search for in article titles and descriptions'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Boolean query using AND, OR, NOT, quotes, and parentheses. Keywords take precedence when both are provided.'
+        ),
+      author: z
+        .string()
+        .optional()
+        .describe(
+          'Author filter. Exact match by default; wrap a token in asterisks for a substring match.'
+        ),
+      hasImage: z
+        .boolean()
+        .optional()
+        .describe(
+          'When true, return only articles with an image. False leaves this filter disabled.'
+        ),
+      hasDescription: z
+        .boolean()
+        .optional()
+        .describe(
+          'When true, return only articles with a description. False leaves this filter disabled.'
+        ),
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Convenience result cap from 1 to 300, subject to the account plan and page size.'
+        ),
       language: z
         .string()
         .optional()
@@ -78,13 +108,21 @@ export let searchNews = SlateTool.create(spec, {
       pageSize: z
         .number()
         .optional()
-        .describe('Number of articles per page (1-200, default 30)')
+        .describe(
+          'Number of articles per page (1-300, subject to the account plan; provider default is up to 30)'
+        )
     })
   )
   .output(
     z.object({
       articles: z.array(newsArticleSchema).describe('List of matching news articles'),
-      page: z.number().describe('Current page number')
+      page: z.number().describe('Current page number'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Complete provider response, including original article fields and additional query metadata'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -92,6 +130,11 @@ export let searchNews = SlateTool.create(spec, {
 
     let result = await client.searchNews({
       keywords: ctx.input.keywords,
+      query: ctx.input.query,
+      author: ctx.input.author,
+      hasImage: ctx.input.hasImage,
+      hasDescription: ctx.input.hasDescription,
+      limit: ctx.input.limit,
       language: ctx.input.language,
       country: ctx.input.country,
       category: ctx.input.category,
@@ -122,7 +165,8 @@ export let searchNews = SlateTool.create(spec, {
     return {
       output: {
         articles,
-        page: result.page || 1
+        page: result.page || 1,
+        raw: result
       },
       message: `Found **${articles.length}** articles${searchDesc} on page ${result.page || 1}.`
     };

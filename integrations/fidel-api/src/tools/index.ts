@@ -1,3 +1,4 @@
+export * from './additional-tools';
 export * from './manage-brand';
 export * from './manage-card';
 export * from './manage-location';

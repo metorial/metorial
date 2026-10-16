@@ -21,6 +21,7 @@ export let getClub = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete response returned by Strava'),
       clubId: z.number().describe('Club identifier'),
       name: z.string().describe('Club name'),
       description: z.string().nullable().optional().describe('Club description'),
@@ -60,6 +61,7 @@ export let getClub = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: club,
         clubId: club.id,
         name: club.name,
         description: club.description,
@@ -75,7 +77,7 @@ export let getClub = SlateTool.create(spec, {
         recentActivities,
         admins
       },
-      message: `Retrieved club **${club.name}** with ${club.member_count || 0} members.`
+      message: `Retrieved club **${club.name}**.`
     };
   })
   .build();

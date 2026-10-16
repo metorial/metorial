@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { NasaClient } from '../lib/client';
+import { NasaClient, validateDateRange } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSpaceWeather = SlateTool.create(spec, {
@@ -35,12 +35,15 @@ export let getSpaceWeather = SlateTool.create(spec, {
       startDate: z
         .string()
         .optional()
-        .describe('Start date (YYYY-MM-DD). Defaults to 30 days ago.'),
+        .describe(
+          'Start date (YYYY-MM-DD). Defaults to 30 days ago for events and 7 days ago for notifications.'
+        ),
       endDate: z.string().optional().describe('End date (YYYY-MM-DD). Defaults to today.')
     })
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       events: z
         .array(z.record(z.string(), z.any()))
         .describe('List of space weather events with fields specific to the event type'),
@@ -48,6 +51,11 @@ export let getSpaceWeather = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateDateRange(
+      ctx.input.startDate,
+      ctx.input.endDate,
+      ctx.input.eventType === 'notifications' ? 30 : undefined
+    );
     let client = new NasaClient({ token: ctx.auth.token });
 
     let result = await client.getDonkiEvents(ctx.input.eventType, {
@@ -55,10 +63,13 @@ export let getSpaceWeather = SlateTool.create(spec, {
       endDate: ctx.input.endDate
     });
 
+    if (result !== '' && result !== null && !Array.isArray(result)) {
+      throw createApiServiceError('NASA DONKI returned an unexpected event response.');
+    }
     let events = Array.isArray(result) ? result : [];
 
     return {
-      output: { events, eventCount: events.length },
+      output: { raw: result, events, eventCount: events.length },
       message: `Retrieved **${events.length}** ${ctx.input.eventType} space weather events${ctx.input.startDate ? ` from ${ctx.input.startDate}` : ''}${ctx.input.endDate ? ` to ${ctx.input.endDate}` : ''}.`
     };
   })

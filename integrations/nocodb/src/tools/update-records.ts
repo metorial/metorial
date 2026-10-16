@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateRecords = SlateTool.create(spec, {
@@ -31,17 +32,20 @@ Supports bulk update by passing multiple records at once.`,
     z.object({
       updatedRecords: z
         .array(z.record(z.string(), z.any()))
-        .describe('Array of updated record objects')
+        .describe('Array of updated record objects'),
+      raw: z.any().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
 
     let result = await client.updateRecords(ctx.input.tableId, ctx.input.records);
-    let updatedRecords = Array.isArray(result) ? result : [result];
+    let updatedRecords = (Array.isArray(result) ? result : [result]).map(record =>
+      requireRecord(record, 'record')
+    );
 
     return {
-      output: { updatedRecords },
+      output: { updatedRecords, raw: result },
       message: `Updated **${updatedRecords.length}** record(s) in table \`${ctx.input.tableId}\`.`
     };
   })

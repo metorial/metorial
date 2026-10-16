@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RocketadminClient } from '../lib/client';
+import { createRocketadminClient, paginationFrom, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRows = SlateTool.create(spec, {
@@ -10,7 +10,8 @@ export let getRows = SlateTool.create(spec, {
   instructions: [
     'Provide connectionId and tableName to get rows.',
     'Use primaryKey to fetch a specific row by its primary key values.',
-    'Use filters as key-value pairs to filter results.'
+    'Use filters as column-to-operator objects, for example {"id": {"eq": 1}}. Call list_tables to inspect columns.',
+    'Provide page and perPage together, and sortField and sortOrder together.'
   ],
   tags: {
     readOnly: true
@@ -18,7 +19,11 @@ export let getRows = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the database connection'),
+      connectionId: z
+        .string()
+        .describe(
+          'Connection ID. Call list_connections to discover authorized connection IDs.'
+        ),
       tableName: z.string().describe('Name of the table to query'),
       primaryKey: z
         .record(z.string(), z.unknown())
@@ -32,7 +37,7 @@ export let getRows = SlateTool.create(spec, {
       filters: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Filter conditions for querying rows'),
+        .describe('Column-to-operator filters, e.g. {"id": {"eq": 1}, "age": {"gt": 18}}'),
       masterPassword: z
         .string()
         .optional()
@@ -41,6 +46,7 @@ export let getRows = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       rows: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -60,11 +66,7 @@ export let getRows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RocketadminClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      masterPassword: ctx.input.masterPassword
-    });
+    let client = createRocketadminClient(ctx.auth, ctx.config, ctx.input.masterPassword);
 
     if (ctx.input.primaryKey) {
       let row = await client.getRowByPrimaryKey(
@@ -78,57 +80,18 @@ export let getRows = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.filters) {
-      let result = await client.findRows(
-        ctx.input.connectionId,
-        ctx.input.tableName,
-        ctx.input.filters,
-        {
-          page: ctx.input.page,
-          perPage: ctx.input.perPage,
-          sortField: ctx.input.sortField,
-          sortOrder: ctx.input.sortOrder
-        }
-      );
-
-      let rows = Array.isArray(result)
-        ? result
-        : (result.rows as Record<string, unknown>[]) || [];
-      let pagination = !Array.isArray(result)
-        ? {
-            total: result.total_count as number | undefined,
-            page: ctx.input.page,
-            perPage: ctx.input.perPage
-          }
-        : undefined;
-
-      return {
-        output: { rows, pagination },
-        message: `Found **${rows.length}** row(s) matching filters in **${ctx.input.tableName}**.`
-      };
-    }
-
     let result = await client.getRows(ctx.input.connectionId, ctx.input.tableName, {
       page: ctx.input.page,
       perPage: ctx.input.perPage,
       search: ctx.input.search,
       sortField: ctx.input.sortField,
-      sortOrder: ctx.input.sortOrder
+      sortOrder: ctx.input.sortOrder,
+      filters: ctx.input.filters
     });
-
-    let rows = Array.isArray(result)
-      ? result
-      : (result.rows as Record<string, unknown>[]) || [];
-    let pagination = !Array.isArray(result)
-      ? {
-          total: result.total_count as number | undefined,
-          page: ctx.input.page,
-          perPage: ctx.input.perPage
-        }
-      : undefined;
-
+    let rows = records(result.rows, 'table rows');
+    let pagination = paginationFrom(result.pagination);
     return {
-      output: { rows, pagination },
+      output: { rows, pagination, raw: result },
       message: `Retrieved **${rows.length}** row(s) from **${ctx.input.tableName}**.`
     };
   })

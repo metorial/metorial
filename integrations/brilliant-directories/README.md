@@ -1,6 +1,6 @@
 # Brilliant Directories
 
-Create, read, update, delete, and search members, leads, reviews, and content posts in online membership and business directory websites. Manage member subscriptions, transactions, and credits. Create and manage widgets, post types (categories), and album photos. Track user clicks and verify login credentials for SSO. Unsubscribe members from email campaigns. Supports smart list webhooks on scheduled cron jobs and custom webhook events for any form or smart list.
+Manage members, leads, reviews, posts, photo albums, widgets, post types, member transactions, credits, and email unsubscribe records. Verify member credentials, inspect the connected website and API key, discover writable fields, and list core directory records with filters and cursor pagination.
 
 ## License
 

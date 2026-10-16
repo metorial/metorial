@@ -7,7 +7,7 @@ export let lookupNetworkTool = SlateTool.create(spec, {
   name: 'Lookup Network by IP',
   key: 'lookup_network',
   description: `Retrieve detailed information about the active network an IP address belongs to, including the Autonomous Systems that announce and serve that network. Useful for network engineering, abuse investigation, and infrastructure analysis.
-If no IP is provided, the caller's own IP network is returned.`,
+If no IP is provided, the execution server's public IP network is returned.`,
   tags: {
     readOnly: true
   }
@@ -17,13 +17,17 @@ If no IP is provided, the caller's own IP network is returned.`,
       ip: z
         .string()
         .optional()
-        .describe("IPv4 or IPv6 address to look up. If omitted, the caller's IP is used.")
+        .describe(
+          "IPv4 or IPv6 address to look up. If omitted, the execution server's public IP is used."
+        )
     })
   )
   .output(
     z
       .object({
         ip: z.string().optional().describe('The queried IP address'),
+        bgpPrefix: z.string().optional().describe('Announced BGP network prefix'),
+        totalAddresses: z.number().optional().describe('Number of addresses in the network'),
         network: z.string().optional().describe('Network CIDR notation'),
         networkSize: z.number().optional().describe('Number of IP addresses in the network'),
         isBogon: z
@@ -57,8 +61,8 @@ If no IP is provided, the caller's own IP network is returned.`,
 
     let result = await client.networkByIp({ ip: ctx.input.ip });
 
-    let ipAddr = result.ip || ctx.input.ip || 'caller IP';
-    let network = result.network || 'unknown';
+    let ipAddr = result.ip || ctx.input.ip || 'execution server IP';
+    let network = result.bgpPrefix || result.network || 'not reported';
     let carriers = result.carriers || [];
     let carrierNames = carriers
       .slice(0, 3)

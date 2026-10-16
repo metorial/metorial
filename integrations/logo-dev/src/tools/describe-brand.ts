@@ -20,10 +20,17 @@ let brandColorSchema = z
 export let describeBrand = SlateTool.create(spec, {
   name: 'Describe Brand',
   key: 'describe_brand',
-  description: `Retrieve comprehensive brand data for a domain, including company name, description, logo URL, brand colors, blurhash placeholder, and social media links across 13 platforms (Facebook, GitHub, Instagram, LinkedIn, Pinterest, Reddit, Snapchat, Telegram, Tumblr, Twitter/X, WeChat, WhatsApp, YouTube).`,
-  constraints: ['Available on paid plans only.', 'Requires a secret key (sk_...).'],
+  description: `DEPRECATED — use \`lookup_brand\` instead. Retrieve legacy brand data for a domain, including company name, description, logo URL, brand colors, blurhash, and social media links.`,
+  instructions: [
+    'Use lookup_brand for current brand profiles. This legacy API is available only to accounts explicitly enabled for Describe.'
+  ],
+  constraints: [
+    'Requires an account enabled for the retired Describe API.',
+    'Requires a secret key (sk_...).'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

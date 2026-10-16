@@ -11,7 +11,8 @@ let linkSummarySchema = z.object({
   shortenedPath: z.string().optional().describe('Short URL path segment'),
   subdomain: z.string().optional().describe('Subdomain for the link'),
   clickCount: z.number().optional().describe('Total click count'),
-  clickthroughCount: z.number().optional().describe('Total clickthrough count')
+  clickthroughCount: z.number().optional().describe('Total clickthrough count'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let listLinks = SlateTool.create(spec, {
@@ -63,7 +64,8 @@ export let listLinks = SlateTool.create(spec, {
       shortenedPath: l.shortened_path,
       subdomain: l.subdomain,
       clickCount: l.click_count,
-      clickthroughCount: l.clickthrough_count
+      clickthroughCount: l.clickthrough_count,
+      raw: l
     }));
 
     return {

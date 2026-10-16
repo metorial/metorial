@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let pipelineSchema = z.object({
+export let pipelineSchema = z.object({
   pipelineId: z.string().describe('Unique pipeline identifier'),
   workspaceId: z.string().optional().describe('Workspace identifier'),
   title: z.string().optional().describe('Pipeline title'),
@@ -17,6 +17,8 @@ let pipelineSchema = z.object({
     })
     .optional()
     .describe('Pipeline schedule frequency'),
+  args: z.unknown().optional().describe('Provider pipeline arguments without key conversion'),
+  tags: z.unknown().optional().describe('Provider pipeline tags'),
   lastProcessId: z.string().optional().describe('Last execution process ID'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   updatedAt: z.string().optional().describe('Last update timestamp')
@@ -25,7 +27,7 @@ let pipelineSchema = z.object({
 export let listPipelines = SlateTool.create(spec, {
   name: 'List Pipelines',
   key: 'list_pipelines',
-  description: `List Flowpipe pipelines configured in a workspace. Pipelines automate workflows and can be triggered by schedules, webhooks, or manual execution.`,
+  description: `List scheduled workspace pipelines for snapshots, datatank refreshes and integration imports. Use list_workspaces to discover workspace handles.`,
   tags: {
     readOnly: true
   }
@@ -36,11 +38,14 @@ export let listPipelines = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
         .describe('Whether the owner is a user or organization'),
+      filter: z.string().optional().describe('Optional Pipes query-filter expression'),
       limit: z.number().optional().describe('Maximum number of results to return'),
       nextToken: z.string().optional().describe('Pagination cursor from a previous response')
     })
@@ -52,25 +57,20 @@ export let listPipelines = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['listUserPipelines']>>;
     if (ctx.input.ownerType === 'org') {
       result = await client.listOrgPipelines(ownerHandle, ctx.input.workspaceHandle, {
+        where: ctx.input.filter,
         limit: ctx.input.limit,
         nextToken: ctx.input.nextToken
       });
     } else {
       result = await client.listUserPipelines(ownerHandle, ctx.input.workspaceHandle, {
+        where: ctx.input.filter,
         limit: ctx.input.limit,
         nextToken: ctx.input.nextToken
       });
@@ -89,7 +89,7 @@ export let listPipelines = SlateTool.create(spec, {
 export let runPipeline = SlateTool.create(spec, {
   name: 'Run Pipeline',
   key: 'run_pipeline',
-  description: `Execute a Flowpipe pipeline command in a workspace. This triggers a pipeline run which will be tracked as a process.`
+  description: `Run a scheduled workspace pipeline and return its process reference. Call list_pipelines to discover pipeline IDs.`
 })
   .input(
     z.object({
@@ -100,10 +100,16 @@ export let runPipeline = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('Arguments to pass to the pipeline'),
+      ownerType: z
+        .enum(['user', 'org'])
+        .optional()
+        .describe('Whether the owner is a user or organization'),
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user). Defaults to the authenticated user.')
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        )
     })
   )
   .output(
@@ -112,18 +118,15 @@ export let runPipeline = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let result = await client.runPipelineCommand(
+    let runCommand =
+      ctx.input.ownerType === 'org'
+        ? client.runOrgPipelineCommand.bind(client)
+        : client.runPipelineCommand.bind(client);
+    let result = await runCommand(
       ownerHandle,
       ctx.input.workspaceHandle,
       ctx.input.pipelineId,
@@ -135,7 +138,7 @@ export let runPipeline = SlateTool.create(spec, {
 
     return {
       output: { executionResult: result },
-      message: `Executed pipeline command **${ctx.input.command}** on pipeline **${ctx.input.pipelineId}**.`
+      message: `Submitted pipeline command **${ctx.input.command}** on pipeline **${ctx.input.pipelineId}**.`
     };
   })
   .build();

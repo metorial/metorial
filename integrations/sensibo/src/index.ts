@@ -1,12 +1,15 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getAcStatesTool,
   getDeviceEventsTool,
   getDeviceTool,
   getDoorSensorEventsTool,
+  getDoorSensorHistoryTool,
   getMeasurementsTool,
   listDevicesTool,
   manageClimateReactTool,
+  manageRecurringScheduleTool,
   manageScheduleTool,
   manageTimerTool,
   setAcStateTool
@@ -15,6 +18,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getAcStatesTool,
+    getDoorSensorHistoryTool,
+    manageRecurringScheduleTool,
     listDevicesTool,
     getDeviceTool,
     setAcStateTool,

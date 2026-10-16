@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseProviderOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  smsTransactionId: z.string().describe('Transaction ID to use when verifying the OTP'),
+  creditsRemaining: z.string().optional().describe('Remaining SMS credits in your account')
+});
 
 export let sendSmsVerification = SlateTool.create(spec, {
   name: 'Send SMS Verification',
@@ -42,16 +48,11 @@ export let sendSmsVerification = SlateTool.create(spec, {
         .describe('OTP expiration duration in seconds (15-86400, default 3600)')
     })
   )
-  .output(
-    z.object({
-      smsTransactionId: z.string().describe('Transaction ID to use when verifying the OTP'),
-      creditsRemaining: z.string().optional().describe('Remaining SMS credits in your account')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    ctx.info(`Sending SMS verification to ${ctx.input.phoneNumber}...`);
+    ctx.info('Sending SMS verification...');
 
     let result = await client.sendSmsVerification({
       phoneNumber: ctx.input.phoneNumber,
@@ -60,14 +61,18 @@ export let sendSmsVerification = SlateTool.create(spec, {
       otpTimeout: ctx.input.otpTimeout
     });
 
-    let output = {
-      smsTransactionId: result.tran_id,
-      creditsRemaining: result.credits_remaining
-    };
+    let output = parseProviderOutput(
+      outputSchema,
+      {
+        smsTransactionId: result.tran_id,
+        creditsRemaining: result.credits_remaining
+      },
+      'SMS verification'
+    );
 
     return {
       output,
-      message: `SMS verification sent to **${ctx.input.phoneNumber}**. Transaction ID: \`${output.smsTransactionId}\`. Credits remaining: ${output.creditsRemaining}.`
+      message: `SMS verification sent. Transaction ID: \`${output.smsTransactionId}\`. ${output.creditsRemaining !== undefined ? `Credits remaining: ${output.creditsRemaining}.` : ''}`
     };
   })
   .build();

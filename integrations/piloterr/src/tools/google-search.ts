@@ -1,15 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
 
-let _organicResultSchema = z.object({
-  position: z.number().optional(),
-  title: z.string().optional(),
-  link: z.string().optional(),
-  domain: z.string().optional(),
-  snippet: z.string().optional(),
-  snippetMatched: z.array(z.string()).optional()
+let googleSearchOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  organicResults: z.array(z.any()).optional().describe('Organic search results'),
+  knowledgeGraph: z.any().optional().describe('Knowledge graph panel (web search)'),
+  relatedSearches: z.array(z.any()).optional().describe('Related search suggestions'),
+  searchInformation: z
+    .any()
+    .optional()
+    .describe('Search metadata like total results and time taken'),
+  pagination: z.any().optional().describe('Pagination information'),
+  searchParameters: z.any().optional().describe('Provider search parameters'),
+  images: z.array(z.any()).optional().describe('Image results (images search type)'),
+  suggestions: z.array(z.any()).optional().describe('Search suggestions')
 });
 
 export let googleSearch = SlateTool.create(spec, {
@@ -31,7 +38,18 @@ export let googleSearch = SlateTool.create(spec, {
         .enum(['web', 'news', 'images', 'videos'])
         .default('web')
         .describe('Type of Google search to perform'),
-      location: z.string().optional().describe('Geographic location for localized results'),
+      location: z
+        .string()
+        .optional()
+        .describe('Geographic location for localized web, news, or video results'),
+      uule: z
+        .string()
+        .optional()
+        .describe('Google-encoded location for web, news, or video search'),
+      safe: z
+        .enum(['active', 'off'])
+        .optional()
+        .describe('SafeSearch filter for web, images, or videos; omit to use Google default'),
       countryCode: z
         .string()
         .optional()
@@ -47,23 +65,15 @@ export let googleSearch = SlateTool.create(spec, {
           'Time-based search filter (e.g., "qdr:d" for past day, "qdr:w" for past week)'
         ),
       page: z.number().optional().describe('Page number for pagination'),
-      resultsPerPage: z.number().optional().describe('Number of results per page (default 10)')
-    })
-  )
-  .output(
-    z.object({
-      organicResults: z.array(z.any()).optional().describe('Organic search results'),
-      knowledgeGraph: z.any().optional().describe('Knowledge graph panel (web search)'),
-      relatedSearches: z.array(z.any()).optional().describe('Related search suggestions'),
-      searchInformation: z
-        .any()
+      resultsPerPage: z
+        .number()
         .optional()
-        .describe('Search metadata like total results and time taken'),
-      pagination: z.any().optional().describe('Pagination information'),
-      images: z.array(z.any()).optional().describe('Image results (images search type)'),
-      suggestions: z.array(z.any()).optional().describe('Search suggestions')
+        .describe(
+          'Requested results per page. Deprecated and unreliable for web search; images return batches of 100'
+        )
     })
   )
+  .output(googleSearchOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result: any;
@@ -72,6 +82,7 @@ export let googleSearch = SlateTool.create(spec, {
       result = await client.googleNews({
         query: ctx.input.query,
         location: ctx.input.location,
+        uule: ctx.input.uule,
         gl: ctx.input.countryCode,
         hl: ctx.input.languageCode,
         page: ctx.input.page,
@@ -81,6 +92,7 @@ export let googleSearch = SlateTool.create(spec, {
       result = await client.googleImages({
         query: ctx.input.query,
         gl: ctx.input.countryCode,
+        safe: ctx.input.safe,
         hl: ctx.input.languageCode,
         page: ctx.input.page
       });
@@ -88,7 +100,9 @@ export let googleSearch = SlateTool.create(spec, {
       result = await client.googleVideos({
         query: ctx.input.query,
         location: ctx.input.location,
+        uule: ctx.input.uule,
         gl: ctx.input.countryCode,
+        safe: ctx.input.safe,
         hl: ctx.input.languageCode,
         page: ctx.input.page,
         num: ctx.input.resultsPerPage
@@ -98,26 +112,28 @@ export let googleSearch = SlateTool.create(spec, {
         query: ctx.input.query,
         tbs: ctx.input.tbs,
         location: ctx.input.location,
+        uule: ctx.input.uule,
         gl: ctx.input.countryCode,
+        safe: ctx.input.safe,
         hl: ctx.input.languageCode,
         page: ctx.input.page,
         num: ctx.input.resultsPerPage
       });
     }
 
-    let resultCount = result.organic_results?.length ?? result.images?.length ?? 0;
-
     return {
-      output: {
+      output: normalizeOutput(googleSearchOutputSchema, {
+        raw: result,
         organicResults: result.organic_results,
         knowledgeGraph: result.knowledge_graph,
         relatedSearches: result.related_searches,
         searchInformation: result.search_information,
         pagination: result.pagination,
+        searchParameters: result.search_parameters,
         images: result.images,
         suggestions: result.suggestions
-      },
-      message: `Google ${ctx.input.searchType} search for **"${ctx.input.query}"** returned **${resultCount} results**.`
+      }),
+      message: `Google ${ctx.input.searchType} search for **"${ctx.input.query}"** completed.`
     };
   })
   .build();

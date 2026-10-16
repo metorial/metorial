@@ -20,13 +20,14 @@ export let listProjects = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete project list returned by Amara'),
       totalCount: z.number().describe('Total number of projects'),
       projects: z.array(
         z.object({
           name: z.string().describe('Project name'),
           projectSlug: z.string().describe('Project slug'),
           description: z.string().describe('Project description'),
-          guidelines: z.string().describe('Project guidelines'),
+          guidelines: z.string().optional().describe('Project guidelines, when available'),
           workflowEnabled: z.boolean().describe('Whether task workflow is enabled'),
           created: z.string().describe('Creation date'),
           modified: z.string().describe('Last modified date')
@@ -49,7 +50,7 @@ export let listProjects = SlateTool.create(spec, {
       name: p.name,
       projectSlug: p.slug,
       description: p.description,
-      guidelines: p.guidelines,
+      guidelines: p.guidelines ?? undefined,
       workflowEnabled: p.workflow_enabled,
       created: p.created,
       modified: p.modified
@@ -57,6 +58,7 @@ export let listProjects = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         totalCount: result.meta.total_count,
         projects
       },

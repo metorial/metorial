@@ -1,113 +1,37 @@
-Now let me get the full list of webhook event types:Now I have comprehensive information. Let me also check on the concepts like Pods, custom domains, semantic search, and labels:Now I have all the information needed. Let me compile the specification.
+# Agent Mail
 
-# Slates Specification for Agent Mail
+The integration provides 33 public email and resource-management tools using the documented AgentMail v0 REST API at `https://api.agentmail.to/v0`.
 
-## Overview
+## Authentication and scope
 
-AgentMail is an API platform for giving AI agents their own inboxes to send, receive, and act upon emails, allowing agents to assume their own identity and communicate via email with services, people, and other agents. There is no inbox to open in a browser — all operations are performed entirely through the API.
+Use a bearer API key created in the [AgentMail Console](https://console.agentmail.to). API keys may restrict access to particular pods, inboxes, labels, and operations. The optional pod configuration selects the documented pod routes for inbox, domain, webhook, and allow/block list management. Discover pod IDs with `list_pods`; email tools select their inbox through `inboxId`. The configuration is an operational scope, and API-key permissions enforce authorization.
 
-## Authentication
+## Tool capabilities
 
-AgentMail uses straightforward API key authentication. You include your key in requests and you're done.
+| Area | Tools |
+| --- | --- |
+| Inboxes | `create_inbox`, `list_inboxes`, `get_inbox`, `update_inbox`, `delete_inbox` |
+| Messages | `send_email`, `reply_to_email`, `forward_email`, `list_messages`, `search_messages`, `get_message`, `update_message_labels`, `delete_message`, `get_raw_message` |
+| Threads | `list_threads`, `search_threads`, `get_thread`, `update_thread_labels`, `delete_thread` |
+| Drafts | `manage_draft`, `list_drafts`, `get_draft`, `delete_draft` |
+| Files | `get_attachment` retrieves message or thread attachments |
+| Domains | `manage_domain`, `list_domains`, `get_domain` |
+| Pods | `manage_pod`, `list_pods` |
+| Allow/block lists | `manage_list_entry`, `list_list_entries` |
+| Webhooks | `manage_webhook`, `list_webhooks` |
 
-Authentication uses Bearer token format: `Bearer <token>`, where token is your API key.
+## Behavior
 
-API keys are obtained from the AgentMail Console at `https://console.agentmail.to`. Get your API key from the Console — if you don't have an account yet, you can sign up directly from the console. Once you're logged in, you'll be able to manage your inboxes, view analytics, and create API keys.
+- Lists retain AgentMail's page count and next-page cursor. `get_thread` returns one page of messages, ordered oldest to newest within the page; the first page contains the newest messages, and its cursor retrieves older pages. `messageCount` is the total thread size.
+- Message and thread searches rank full-text matches by relevance and exclude spam, blocked, unauthenticated, and trashed mail. Search pages contain at most 100 items. Message lists also support sender, recipient, and subject substring filters.
+- Replies retain threading and can combine `replyAll` with explicit recipients. Send, reply, forward, and draft-send operations accept an optional HTTP idempotency key; reuse it only to retry the same logical email within 24 hours.
+- Listing drafts retrieves detail records to preserve each draft's creation timestamp, which summary records omit.
+- Draft creation may omit recipients and may derive a reply or forward from a source message. Draft updates preserve omitted fields. `labels` and `attachments` replace their respective collections using documented incremental operations. `addLabels`/`removeLabels` are also available for incremental label changes on update or send. `clearSendAt` cancels scheduling on update. A reply target cannot be changed on an existing draft.
+- Sending an attachment requires exactly one of base64 `content` or a provider-fetchable `url`. Downloads include a downloadable file. Signed links renew when needed. The existing `get_attachment` output retains its temporary URL for compatibility.
+- Domain verification starts an asynchronous check and then reads the domain's current state. Listing domains retrieves detail records because list summaries omit verification status.
+- Webhook event types are a full replacement when non-empty on update; an empty list leaves them unchanged. URL changes require creating a replacement webhook. Pod and inbox filter arrays are translated to documented add/remove operations. A pod webhook cannot be moved to another pod, and narrowing a webhook that covers its entire pod requires a replacement. Webhook URLs and signing-secret verification remain the caller's responsibility.
+- Delete operations only report success after AgentMail accepts the delete request. Allow/block lists control email delivery policies rather than contact or mailing-list subscriptions.
 
-API keys are prefixed with `am_`. The key is passed as a Bearer token in the `Authorization` header:
+## Official references
 
-```
-Authorization: Bearer am_your_api_key_here
-```
-
-The base URL for all API requests is `https://api.agentmail.to/v0/`.
-
-You can create scoped API keys that are restricted to a single pod. A scoped key can only access resources within its pod. This is useful for multi-tenant setups.
-
-## Features
-
-### Inbox Management
-
-The core of AgentMail is the ability to create, manage, and operate email inboxes entirely via API. You can spin up new inboxes programmatically, assign custom domains for branded identities, manage conversation threads and replies, and handle attachments.
-
-- Inboxes are created with an optional username, domain, and display name. The domain parameter is optional. If not provided, AgentMail will use the default `@agentmail.to` domain. Custom domains require a paid plan.
-- Each inbox belongs to one agent and is used for all email activity.
-- A `client_id` parameter can be passed to make inbox creation idempotent.
-
-### Sending & Receiving Email
-
-AgentMail lets AI agents send, receive, and reply to emails using an API. Each agent gets its own inbox.
-
-- Messages support `to`, `cc`, `bcc`, `reply_to`, `subject`, plain text body, HTML body, attachments, custom headers, and labels.
-- Agents can reply to emails using the same inbox. Replies stay linked to the original email.
-- When receiving emails, messages include `extracted_text` and `extracted_html` for reply content without quoted history.
-- AgentMail handles the basic email setup needed to send messages. It supports SPF, DKIM, and DMARC, so email identities work without extra steps.
-
-### Threading
-
-AgentMail provides built-in threading via API with comprehensive Message-ID, In-Reply-To, and References email headers.
-
-- AgentMail keeps emails grouped as conversations. This helps agents continue the same email discussion without starting over.
-- Threads can be listed, filtered by labels, and queried per inbox.
-
-### Labels
-
-Labels are simple, string-based tags that you can attach to Messages and Threads. They are the primary mechanism for organizing, categorizing, and managing the state of your conversations. A Message can have multiple Labels.
-
-- Labels can be attached at send time or added/modified later via update.
-- You can list Threads, Messages, and Drafts by filtering for one or more Labels, allowing you to create highly targeted queries.
-
-### Drafts
-
-AgentMail supports creating and managing email drafts within inboxes before sending.
-
-### Semantic Search
-
-AgentMail provides semantic search to search across all inboxes in your organization by meaning.
-
-### Structured Data Extraction
-
-AgentMail can pull structured data from unstructured emails. Every email is automatically parsed into structured JSON format.
-
-### Automatic Labeling
-
-AgentMail supports automatic labeling, which can automatically categorize emails with user-defined prompts.
-
-### Custom Domains
-
-Custom domains are supported on paid plans. You can assign branded domains like `agent@yourcompany.com` to your AI agents. Domain verification is done via DNS records (SPF, DKIM, DMARC).
-
-### Pods (Multi-Tenancy)
-
-AgentMail offers a feature called "pods." A pod groups inboxes and domains for a single customer, user, or agent. Everything in a pod is kept separate, so email data doesn't mix with other pods. This makes it easy to run multi-tenant systems.
-
-- When you sign up, you are automatically created a Default Pod, and all resources created whether its Inboxes or Domains are all associated with this Default Pod.
-- Pods can contain inboxes, domains, and other resources. Scoped API keys can be created per pod.
-- You cannot delete a Pod that has existing children resources. Make sure to delete any existing Inboxes or Domains before deleting a Pod.
-
-### Lists
-
-AgentMail supports contact/mailing list management as a core concept within the API.
-
-### IMAP & SMTP
-
-AgentMail provides IMAP and SMTP access for inboxes, enabling compatibility with traditional email clients and protocols alongside the REST API.
-
-## Events
-
-AgentMail supports seven webhook event types. When creating a webhook, you can subscribe to specific events or receive all of them. AgentMail also delivers email events via WebSockets for real-time streaming.
-
-Webhooks are registered via the API by specifying an endpoint URL, event types, and optionally scoping to specific pod IDs or inbox IDs. A secret is provided for webhook signature verification. Omit `event_types` to subscribe to all event types.
-
-### Message Events
-
-- **`message.received`** — Triggered when a new email is received and processed in one of your inboxes. This is the primary event for triggering agent workflows. It is the only event that includes both full message and thread data in the payload.
-- **`message.sent`** — Triggered when a message is successfully sent from one of your inboxes. Useful for tracking outgoing messages or triggering follow-up workflows.
-- **`message.delivered`** — Triggered when a sent message is successfully delivered to the recipient's mail server. Confirms delivery but does not guarantee inbox placement.
-- **`message.bounced`** — Triggered when a sent message fails to deliver and bounces back. Includes bounce type and sub-type information.
-- **`message.complained`** — Triggered when a recipient marks your message as spam or files a complaint.
-- **`message.rejected`** — Triggered when a message is rejected before being sent, typically due to validation errors or policy violations.
-
-### Domain Events
-
-- **`domain.verified`** — Triggered when a custom domain is successfully verified and ready to use for sending emails.
+[API reference](https://docs.agentmail.to/api-reference), [permissions](https://docs.agentmail.to/permissions), [idempotency](https://docs.agentmail.to/idempotency), [messages](https://docs.agentmail.to/messages), [threads](https://docs.agentmail.to/threads), [drafts](https://docs.agentmail.to/drafts), [attachments](https://docs.agentmail.to/attachments), [pods](https://docs.agentmail.to/multi-tenancy), [error reference](https://docs.agentmail.to/errors).

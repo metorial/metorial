@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,22 +13,30 @@ export let deleteUsersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      emails: z.array(z.string()).describe('List of email addresses of users to delete')
+      emails: z
+        .array(z.string())
+        .describe(
+          'Between 1 and 10 email addresses of users to delete; unknown users are ignored'
+        )
     })
   )
   .output(
     z.object({
-      result: z.record(z.string(), z.any()).describe('Deletion result from the API')
+      result: z
+        .record(z.string(), z.any())
+        .describe('Deletion response; a scalar response is preserved under status'),
+      raw: z.any().optional().describe('Unmodified provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.deleteUsers(ctx.input.emails);
+    let raw = await client.deleteUsers(ctx.input.emails);
+    let result = isApiErrorRecord(raw) ? raw : { status: raw };
 
     return {
-      output: { result },
-      message: `Deleted **${ctx.input.emails.length}** user(s): ${ctx.input.emails.join(', ')}.`
+      output: { result, raw },
+      message: `Processed deletion for **${ctx.input.emails.length}** email address(es); unknown users are ignored: ${ctx.input.emails.join(', ')}.`
     };
   })
   .build();

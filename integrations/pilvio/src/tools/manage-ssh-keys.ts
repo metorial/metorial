@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let sshKeySchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   sshKeyUuid: z.string().describe('SSH key UUID'),
   name: z.string().describe('Key name'),
   publicKey: z.string().optional().describe('SSH public key content'),
@@ -41,14 +42,15 @@ export let manageSshKeys = SlateTool.create(spec, {
     let mapKey = (k: any) => ({
       sshKeyUuid: k.uuid,
       name: k.name,
-      publicKey: k.public_key,
-      createdAt: k.created_at
+      publicKey: k.public_key ?? undefined,
+      createdAt: k.created_at ?? undefined,
+      raw: k
     });
 
     switch (action) {
       case 'list': {
         let keys = await client.listSshKeys();
-        let mapped = (Array.isArray(keys) ? keys : []).map(mapKey);
+        let mapped = keys.map(mapKey);
         return {
           output: { sshKeys: mapped, success: true },
           message: `Found **${mapped.length}** SSH key(s).`
@@ -57,7 +59,7 @@ export let manageSshKeys = SlateTool.create(spec, {
 
       case 'create': {
         if (!ctx.input.name || !ctx.input.publicKey)
-          throw new Error('name and publicKey are required for create action');
+          throw createApiServiceError('name and publicKey are required for create action');
         let key = await client.createSshKey({
           name: ctx.input.name,
           publicKey: ctx.input.publicKey
@@ -70,7 +72,7 @@ export let manageSshKeys = SlateTool.create(spec, {
 
       case 'rename': {
         if (!ctx.input.sshKeyUuid || !ctx.input.name)
-          throw new Error('sshKeyUuid and name are required for rename action');
+          throw createApiServiceError('sshKeyUuid and name are required for rename action');
         let key = await client.updateSshKey(ctx.input.sshKeyUuid, { name: ctx.input.name });
         return {
           output: { sshKey: mapKey(key), success: true },
@@ -79,7 +81,8 @@ export let manageSshKeys = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.sshKeyUuid) throw new Error('sshKeyUuid is required for delete action');
+        if (!ctx.input.sshKeyUuid)
+          throw createApiServiceError('sshKeyUuid is required for delete action');
         await client.deleteSshKey(ctx.input.sshKeyUuid);
         return {
           output: { success: true },

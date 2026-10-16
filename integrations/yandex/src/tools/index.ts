@@ -1,3 +1,4 @@
+export * from './discovery';
 export * from './manage-container-registry';
 export * from './manage-disks';
 export * from './manage-dns';

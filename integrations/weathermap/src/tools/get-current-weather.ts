@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpenWeatherClient } from '../lib/client';
+import { weatherArray, weatherString, weatherTimestamp } from '../lib/validation';
 import { spec } from '../spec';
 
 let weatherConditionSchema = z.object({
@@ -70,8 +71,8 @@ export let getCurrentWeather = SlateTool.create(spec, {
     let data = await client.getCurrentWeather(ctx.input.latitude, ctx.input.longitude);
 
     let output = {
-      locationName: data.name || '',
-      country: data.sys?.country || '',
+      locationName: weatherString(data.name),
+      country: weatherString(data.sys?.country),
       latitude: data.coord?.lat,
       longitude: data.coord?.lon,
       temperature: data.main.temp,
@@ -80,26 +81,26 @@ export let getCurrentWeather = SlateTool.create(spec, {
       temperatureMax: data.main.temp_max,
       pressure: data.main.pressure,
       humidity: data.main.humidity,
-      seaLevelPressure: data.main.sea_level,
-      groundLevelPressure: data.main.grnd_level,
-      visibility: data.visibility,
-      windSpeed: data.wind?.speed,
-      windDirection: data.wind?.deg,
-      windGust: data.wind?.gust,
-      cloudiness: data.clouds?.all,
-      rainLastHour: data.rain?.['1h'],
-      rainLastThreeHours: data.rain?.['3h'],
-      snowLastHour: data.snow?.['1h'],
-      snowLastThreeHours: data.snow?.['3h'],
-      conditions: (data.weather || []).map((w: any) => ({
+      seaLevelPressure: data.main.sea_level ?? undefined,
+      groundLevelPressure: data.main.grnd_level ?? undefined,
+      visibility: data.visibility ?? undefined,
+      windSpeed: data.wind?.speed ?? undefined,
+      windDirection: data.wind?.deg ?? undefined,
+      windGust: data.wind?.gust ?? undefined,
+      cloudiness: data.clouds?.all ?? undefined,
+      rainLastHour: data.rain?.['1h'] ?? undefined,
+      rainLastThreeHours: data.rain?.['3h'] ?? undefined,
+      snowLastHour: data.snow?.['1h'] ?? undefined,
+      snowLastThreeHours: data.snow?.['3h'] ?? undefined,
+      conditions: weatherArray(data.weather).map((w: any) => ({
         conditionId: w.id,
         group: w.main,
         description: w.description,
         icon: w.icon
       })),
-      sunrise: data.sys?.sunrise ? new Date(data.sys.sunrise * 1000).toISOString() : undefined,
-      sunset: data.sys?.sunset ? new Date(data.sys.sunset * 1000).toISOString() : undefined,
-      observedAt: new Date(data.dt * 1000).toISOString(),
+      sunrise: data.sys?.sunrise ? weatherTimestamp(data.sys.sunrise) : undefined,
+      sunset: data.sys?.sunset ? weatherTimestamp(data.sys.sunset) : undefined,
+      observedAt: weatherTimestamp(data.dt),
       timezone: data.timezone
     };
 
@@ -107,7 +108,7 @@ export let getCurrentWeather = SlateTool.create(spec, {
 
     return {
       output,
-      message: `**${output.locationName}, ${output.country}**: ${output.temperature}° — ${conditionText}. Humidity: ${output.humidity}%, Wind: ${output.windSpeed ?? 'N/A'} m/s.`
+      message: `**${output.locationName}, ${output.country}**: ${output.temperature}° — ${conditionText}. Humidity: ${output.humidity}%, Wind: ${output.windSpeed ?? 'N/A'} ${ctx.config.units === 'imperial' ? 'mph' : 'm/s'}.`
     };
   })
   .build();

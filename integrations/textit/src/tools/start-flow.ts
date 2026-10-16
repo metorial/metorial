@@ -44,6 +44,7 @@ export let startFlow = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       flowStartUuid: z.string().describe('UUID of the created flow start'),
       flowUuid: z.string(),
       flowName: z.string(),
@@ -66,6 +67,7 @@ export let startFlow = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: flowStart,
         flowStartUuid: flowStart.uuid,
         flowUuid: flowStart.flow.uuid,
         flowName: flowStart.flow.name,

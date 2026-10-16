@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LicenseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,12 +32,21 @@ Requires the **product secret key** to be configured in the authentication setti
       buyerEmail: z.string().describe('Email address of the buyer'),
       uses: z.number().describe('Current usage count for the license'),
       productName: z.string().describe('Name of the associated product'),
-      date: z.string().describe('Date the license was created')
+      date: z.string().describe('Date the license was created'),
+      variantName: z
+        .string()
+        .optional()
+        .describe('Purchased product variant name, when available'),
+      variantId: z
+        .string()
+        .optional()
+        .describe('Purchased product variant ID, when available'),
+      raw: z.record(z.string(), z.unknown()).describe('Original license details')
     })
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.productSecretKey) {
-      throw new Error(
+      throw createApiServiceError(
         'Product secret key is required for license key operations. Please configure it in your authentication settings.'
       );
     }

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateInteger } from '../lib/client';
 import { spec } from '../spec';
 
 export let createDeployment = SlateTool.create(spec, {
@@ -15,8 +15,12 @@ export let createDeployment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
-      parentIdentifier: z.string().describe('UUID of the target server or server group'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
+      parentIdentifier: z
+        .string()
+        .describe('Target identifier from list_servers or list_server_groups'),
       startRevision: z
         .string()
         .optional()
@@ -24,7 +28,9 @@ export let createDeployment = SlateTool.create(spec, {
       endRevision: z
         .string()
         .optional()
-        .describe('Ending revision (commit SHA). Defaults to latest.'),
+        .describe(
+          'Ending revision (commit SHA). Required unless scheduling with useLatest enabled.'
+        ),
       branch: z.string().optional().describe('Branch to deploy from'),
       mode: z
         .enum(['queue', 'preview'])
@@ -53,6 +59,18 @@ export let createDeployment = SlateTool.create(spec, {
         .describe('Schedule type for scheduled deployments'),
       scheduleHour: z.number().optional().describe('Hour for scheduled deployment (0-23)'),
       scheduleMinute: z.number().optional().describe('Minute for scheduled deployment (0-59)'),
+      useLatest: z
+        .boolean()
+        .optional()
+        .describe(
+          'For scheduled deployments, select the last deployed and latest repository revisions automatically'
+        ),
+      scheduleDay: z
+        .number()
+        .optional()
+        .describe('Day of month for monthly or future schedules (1-31)'),
+      scheduleMonth: z.number().optional().describe('Month for a future schedule (1-12)'),
+      scheduleYear: z.number().optional().describe('Year for a future schedule'),
       scheduleWeekday: z
         .number()
         .optional()
@@ -69,7 +87,8 @@ export let createDeployment = SlateTool.create(spec, {
       endRevision: z.string().optional().describe('End revision ref'),
       queuedAt: z.string().optional().describe('When the deployment was queued'),
       startedAt: z.string().nullable().optional().describe('When the deployment started'),
-      completedAt: z.string().nullable().optional().describe('When the deployment completed')
+      completedAt: z.string().nullable().optional().describe('When the deployment completed'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -79,8 +98,28 @@ export let createDeployment = SlateTool.create(spec, {
       accountName: ctx.config.accountName
     });
 
+    for (let [name, value, min, max] of [
+      ['scheduleHour', ctx.input.scheduleHour, 0, 23],
+      ['scheduleMinute', ctx.input.scheduleMinute, 0, 59],
+      ['scheduleWeekday', ctx.input.scheduleWeekday, 0, 6],
+      ['scheduleDay', ctx.input.scheduleDay, 1, 31],
+      ['scheduleMonth', ctx.input.scheduleMonth, 1, 12],
+      ['scheduleYear', ctx.input.scheduleYear, 1, 9999]
+    ] as const)
+      validateInteger(value, name, min, max);
+    if (!ctx.input.endRevision && !(ctx.input.schedule && ctx.input.useLatest)) {
+      throw createApiServiceError(
+        'Provide endRevision, or enable useLatest for a scheduled deployment.'
+      );
+    }
+    if (ctx.input.useLatest && !ctx.input.schedule) {
+      throw createApiServiceError('useLatest is supported only for scheduled deployments.');
+    }
+
     let deploymentData: Record<string, any> = {
-      parent_identifier: ctx.input.parentIdentifier
+      parent_identifier: ctx.input.parentIdentifier,
+      start_revision: ctx.input.startRevision ?? '',
+      ...(ctx.input.useLatest ? { use_latest: '1' } : {})
     };
 
     if (ctx.input.startRevision !== undefined)
@@ -99,28 +138,78 @@ export let createDeployment = SlateTool.create(spec, {
       deploymentData.deploy_entire_repository = ctx.input.deployEntireRepository;
     if (ctx.input.configFilesDeployment !== undefined)
       deploymentData.config_files_deployment = ctx.input.configFilesDeployment;
+    let schedule: Record<string, unknown> | undefined;
     if (ctx.input.schedule !== undefined) {
-      deploymentData.at = ctx.input.schedule;
-      if (ctx.input.scheduleHour !== undefined) deploymentData.hour = ctx.input.scheduleHour;
-      if (ctx.input.scheduleMinute !== undefined)
-        deploymentData.minute = ctx.input.scheduleMinute;
-      if (ctx.input.scheduleWeekday !== undefined)
-        deploymentData.weekday = ctx.input.scheduleWeekday;
+      if (ctx.input.scheduleHour === undefined || ctx.input.scheduleMinute === undefined) {
+        throw createApiServiceError(
+          'Provide scheduleHour and scheduleMinute for scheduled deployments.'
+        );
+      }
+      let timing: Record<string, unknown> = {
+        hour: ctx.input.scheduleHour,
+        minute: ctx.input.scheduleMinute
+      };
+      if (ctx.input.schedule === 'weekly') {
+        if (ctx.input.scheduleWeekday === undefined)
+          throw createApiServiceError('Provide scheduleWeekday for a weekly deployment.');
+        timing.weekday = [
+          'Sunday',
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday'
+        ][ctx.input.scheduleWeekday];
+      }
+      if (ctx.input.schedule === 'monthly' || ctx.input.schedule === 'future') {
+        if (ctx.input.scheduleDay === undefined)
+          throw createApiServiceError(
+            'Provide scheduleDay for a monthly or future deployment.'
+          );
+        timing.day = ctx.input.scheduleDay;
+      }
+      if (ctx.input.schedule === 'future') {
+        if (ctx.input.scheduleMonth === undefined || ctx.input.scheduleYear === undefined)
+          throw createApiServiceError(
+            'Provide scheduleMonth and scheduleYear for a future deployment.'
+          );
+        let date = new Date(0);
+        date.setUTCFullYear(
+          ctx.input.scheduleYear,
+          ctx.input.scheduleMonth - 1,
+          ctx.input.scheduleDay
+        );
+        if (date.getUTCMonth() !== ctx.input.scheduleMonth - 1)
+          throw createApiServiceError('The future deployment date is invalid.');
+        timing.month = ctx.input.scheduleMonth;
+        timing.year = ctx.input.scheduleYear;
+      }
+      schedule = { frequency: ctx.input.schedule, [ctx.input.schedule]: timing };
     }
 
-    let d = await client.createDeployment(ctx.input.projectPermalink, deploymentData);
+    let d = await client.createDeployment(
+      ctx.input.projectPermalink,
+      deploymentData,
+      schedule
+    );
 
     return {
       output: {
         deploymentIdentifier: d.identifier,
         status: d.status,
-        deployer: d.deployer,
+        deployer: typeof d.deployer === 'string' ? d.deployer : undefined,
         branch: d.branch,
         startRevision: d.start_revision?.ref,
         endRevision: d.end_revision?.ref,
-        queuedAt: d.queued_at,
-        startedAt: d.started_at ?? null,
-        completedAt: d.completed_at ?? null
+        queuedAt: d.timestamps?.queued_at ?? d.queued_at,
+        startedAt:
+          d.timestamps?.started_at !== undefined ? d.timestamps.started_at : d.started_at,
+        completedAt:
+          d.timestamps?.completed_at !== undefined
+            ? d.timestamps.completed_at
+            : d.completed_at,
+        raw: d
       },
       message: `Deployment \`${d.identifier}\` created with status **${d.status}**.`
     };

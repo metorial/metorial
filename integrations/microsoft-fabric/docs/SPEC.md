@@ -19,6 +19,8 @@
 - OneLake token audience:
   - `https://storage.azure.com/.default`
 
+Token refresh preserves both audience tokens, stores the latest returned refresh token, retains the previous token when no replacement is issued, and exposes the earliest provider-reported token expiry as optional `expiresAt`. Missing or invalid expiry information is omitted.
+
 The callback first redeems the authorization code for Fabric scopes, then redeems the refresh token for the Storage audience. Tools fail with a `ServiceError` when Storage consent is unavailable because OneLake data-plane calls cannot use a Fabric-audience token.
 
 ## Create Item Contract
@@ -27,6 +29,7 @@ The callback first redeems the authorization code for Fabric scopes, then redeem
 
 - `displayName` and `itemType` are required.
 - `description`, `folderId`, and `sensitivityLabelSettings` are optional.
+- Optional `options` supplies item-type-specific definition options and requires `definition`.
 - `definition` and `creationPayload` are optional but mutually exclusive. Supplying both returns a `ServiceError`.
 
 Data Pipeline and Dataflow create tools support `definition`, `description`, `folderId`, and `sensitivityLabelSettings`.
@@ -49,7 +52,7 @@ Docs:
 - `docs_best_practices`
 - `docs_api_examples`
 
-Docs tools return compact vendored JSON attachments with operation specs, request fields, response status/LRO metadata, scopes, examples, and Microsoft source URLs.
+Docs tools return compact vendored JSON files with operation specs, request fields, response status/LRO metadata, scopes, examples, and Microsoft source URLs.
 
 OneLake:
 
@@ -71,6 +74,14 @@ OneLake:
 Core and Data Factory:
 
 - `core_create_item`
+- `core_list_workspaces`
+- `core_list_items`
+- `core_get_item`
+- `core_update_item`
+- `core_delete_item`
+- `core_get_operation_state`
+- `core_get_item_job`
+- `core_cancel_item_job`
 - `datafactory_list_pipelines`
 - `datafactory_create_pipeline`
 - `datafactory_get_pipeline`
@@ -98,3 +109,28 @@ Core and Data Factory:
 - Run on-demand item job: `https://learn.microsoft.com/en-us/rest/api/fabric/core/job-scheduler/run-on-demand-item-job`
 - Dataflow list: `https://learn.microsoft.com/en-us/rest/api/fabric/dataflow/items/list-dataflows`
 - Dataflow execute query: `https://learn.microsoft.com/en-us/rest/api/fabric/dataflow/query-execution/execute-query`
+
+## Compatibility and API boundaries
+
+Fabric Core and Data Factory use `api.fabric.microsoft.com/v1` with the Fabric audience. OneLake uses its API/DFS/Blob endpoints and Iceberg REST Catalog endpoint with the Storage audience. No Power BI or Microsoft Graph endpoints are called. The categories are `fabric_core`, `data_factory` and `onelake`; shared documentation tools are uncategorized.
+
+Use `core_list_workspaces` and `core_list_items` for Fabric REST discovery. Existing OneLake discovery routes, token audiences, config overrides, unrecognized stored config, runtime defaults, and optional/falsy request values remain supported as before. There is no verified current-user endpoint for the implemented APIs; no profile endpoint is invented and no Graph permission or token is requested.
+
+The new core list tools retrieve all pages by default and accept a positive integer `pageLimit` to bound retrieval, returning a continuation token. Item mutations expose the original response. Canceling a job reports a cancellation request, with `core_get_item_job` available to confirm the final state. `core_get_operation_state` exposes the full operation state and polling headers.
+
+The four prefix-dependent OneLake table tools add optional `catalogPrefix`, from `overrides.prefix` returned by `onelake_get_table_config`. Omission preserves the original workspace/item URL. Namespaces, table lists and metadata remain unmodified provider responses.
+
+Legacy `attachmentCount` output fields keep their numeric contract and now count prepared downloadable files. OneLake downloads retain the original GET to obtain actual MIME type, byte size, ETag and last-modified metadata, then prepare the authenticated provider URL. Dataflow POST query streams and generated documentation use content files. A preparation result does not assert subsequent delivery completion.
+
+Additional official references:
+
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/workspaces/list-workspaces
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/items/list-items
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/items/get-item
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/items/update-item
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/items/delete-item
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/long-running-operations/get-operation-state
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/job-scheduler/get-item-job-instance
+- https://learn.microsoft.com/en-us/rest/api/fabric/core/job-scheduler/cancel-item-job-instance
+- https://learn.microsoft.com/en-us/fabric/onelake/table-apis/iceberg-table-apis-get-started
+- https://learn.microsoft.com/en-us/entra/identity-platform/refresh-tokens

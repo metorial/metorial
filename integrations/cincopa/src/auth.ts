@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let axios = createAxios({
-  baseURL: 'https://api.cincopa.com/v2'
-});
+import { CincopaClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,15 +26,22 @@ export let auth = SlateAuth.create()
         }
       };
     },
-    getProfile: async (ctx: any) => {
-      let response = await axios.get('/ping.json', {
-        params: { api_token: ctx.output.token }
-      });
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let data = await new CincopaClient(ctx.output).ping();
       return {
         profile: {
-          id: response.data?.uid || undefined,
-          name: response.data?.name || undefined,
-          email: response.data?.email || undefined
+          id:
+            typeof data.userid === 'string'
+              ? data.userid
+              : typeof data.accid === 'string'
+                ? data.accid
+                : undefined,
+          email:
+            typeof data.useremail === 'string'
+              ? data.useremail
+              : typeof data.accemail === 'string'
+                ? data.accemail
+                : undefined
         }
       };
     }

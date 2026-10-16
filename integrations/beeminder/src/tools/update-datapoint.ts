@@ -23,7 +23,8 @@ export let updateDatapoint = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BeeminderClient({
       token: ctx.auth.token,
-      username: ctx.auth.username
+      username: ctx.auth.username,
+      authType: ctx.auth.authType
     });
 
     let { goalSlug, datapointId, ...params } = ctx.input;

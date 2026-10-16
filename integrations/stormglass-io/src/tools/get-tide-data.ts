@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getResponseRows } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTideDataTool = SlateTool.create(spec, {
@@ -12,7 +12,8 @@ Can return either **sea level** data (hourly predicted sea levels) or **extremes
   instructions: [
     'Provide latitude and longitude for the target location.',
     'Choose the data type: "seaLevel" for hourly predictions, "extremes" for high/low tide times, or "both" for combined data.',
-    'Datum can be set to "MSL" (Mean Sea Level, default) or "MLLW" (Mean Lower Low Water).'
+    'Choose a datum reference level; the default is MSL (Mean Sea Level). Heights are relative to the chosen datum and do not represent water depth.',
+    'The end timestamp is inclusive for sea level and exclusive for extremes.'
   ],
   constraints: [
     'Defaults to 10-day range if end is not specified.',
@@ -33,10 +34,17 @@ Can return either **sea level** data (hourly predicted sea levels) or **extremes
       start: z
         .string()
         .optional()
-        .describe('Start time in ISO 8601 or UNIX timestamp format.'),
-      end: z.string().optional().describe('End time in ISO 8601 or UNIX timestamp format.'),
+        .describe(
+          'Start time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets.'
+        ),
+      end: z
+        .string()
+        .optional()
+        .describe(
+          'End time in UTC ISO 8601 or UNIX seconds. Inclusive for sea level; exclusive for extremes.'
+        ),
       datum: z
-        .enum(['MSL', 'MLLW'])
+        .enum(['MSL', 'MLLW', 'LAT', 'MLW', 'MHW', 'MHHW', 'HAT'])
         .optional()
         .describe('Datum reference level. Defaults to MSL (Mean Sea Level).')
     })
@@ -69,7 +77,19 @@ Can return either **sea level** data (hourly predicted sea levels) or **extremes
         .describe('High and low tide extremes'),
       meta: z
         .record(z.string(), z.any())
-        .describe('Request metadata including station information')
+        .describe('Request metadata including station information'),
+      seaLevelMeta: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Metadata for the sea-level request'),
+      extremesMeta: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Metadata for the extremes request'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete original provider responses by data type')
     })
   )
   .handleInvocation(async ctx => {
@@ -84,18 +104,25 @@ Can return either **sea level** data (hourly predicted sea levels) or **extremes
 
     let seaLevelData: any;
     let extremesData: any;
-    let meta: any = {};
+    let meta: Record<string, any> = {};
+    let seaLevelMeta: Record<string, any> | undefined;
+    let extremesMeta: Record<string, any> | undefined;
+    let raw: Record<string, any> = {};
 
     if (ctx.input.dataType === 'seaLevel' || ctx.input.dataType === 'both') {
       let seaLevelResult = await client.getTideSeaLevel(tideParams);
-      seaLevelData = seaLevelResult.data ?? [];
-      meta = { ...meta, ...seaLevelResult.meta };
+      seaLevelData = getResponseRows(seaLevelResult, 'data');
+      seaLevelMeta = seaLevelResult.meta;
+      raw.seaLevel = seaLevelResult;
+      meta = { ...meta, ...seaLevelMeta };
     }
 
     if (ctx.input.dataType === 'extremes' || ctx.input.dataType === 'both') {
       let extremesResult = await client.getTideExtremes(tideParams);
-      extremesData = extremesResult.data ?? [];
-      meta = { ...meta, ...extremesResult.meta };
+      extremesData = getResponseRows(extremesResult, 'data');
+      extremesMeta = extremesResult.meta;
+      raw.extremes = extremesResult;
+      meta = { ...meta, ...extremesMeta };
     }
 
     let messageParts: string[] = [];
@@ -110,7 +137,10 @@ Can return either **sea level** data (hourly predicted sea levels) or **extremes
       output: {
         seaLevel: seaLevelData,
         extremes: extremesData,
-        meta
+        meta,
+        seaLevelMeta,
+        extremesMeta,
+        raw
       },
       message: `Retrieved ${messageParts.join(' and ')} for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}).`
     };

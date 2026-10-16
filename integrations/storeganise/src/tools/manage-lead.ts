@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,6 +52,10 @@ export let manageLeadTool = SlateTool.create(spec, {
     });
 
     let { action } = ctx.input;
+
+    if ((action === 'get' || action === 'update') && !ctx.input.leadId?.trim()) {
+      throw createApiServiceError(`leadId is required for the ${action} action.`);
+    }
 
     if (action === 'create') {
       let leadData: Record<string, any> = {};

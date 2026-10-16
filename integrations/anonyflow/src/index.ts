@@ -1,9 +1,15 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { protectData, protectValue, unprotectData } from './tools';
+import {
+  checkConnection,
+  protectData,
+  protectValue,
+  unprotectData,
+  unprotectValue
+} from './tools';
 
 export let provider = Slate.create({
   spec,
-  tools: [protectData, unprotectData, protectValue],
+  tools: [protectData, unprotectData, protectValue, unprotectValue, checkConnection],
   triggers: []
 });

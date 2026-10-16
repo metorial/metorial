@@ -7,6 +7,9 @@ export let checkReceipt = SlateTool.create(spec, {
   name: 'Check Emergency Receipt',
   key: 'check_receipt',
   description: `Check the acknowledgement status of an emergency-priority notification by its receipt ID. Returns whether the notification has been acknowledged, by whom, from which device, delivery status, and expiration info.`,
+  constraints: [
+    'Poll no faster than once every 5 seconds. Receipts are available for up to one week.'
+  ],
   tags: {
     destructive: false,
     readOnly: true

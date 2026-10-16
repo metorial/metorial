@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let exportTranscription = SlateTool.create(spec, {
   name: 'Export Transcription',
   key: 'export_transcription',
-  description: `Export one or more transcriptions to a specific format. Supports text (txt, docx, pdf), subtitle (srt, vtt, stl), professional editing (avid, premiere, fcp), and other formats (html, maxqda, json). The export is processed asynchronously; this tool creates the export and polls until it's ready, returning the download link.`,
+  description: `DEPRECATED — use \`create_export\` instead. Export one or more transcriptions to a specific format. Supports text (txt, docx, pdf), subtitle (srt, vtt, stl), professional editing (avid, premiere, fcp), and other formats (html, maxqda, json). The export is processed asynchronously; this tool creates the export and polls until it's ready, returning the download link.`,
   instructions: [
+    'Use create_export, then get_export to check progress and download_export for supported downloads.',
     'Timestamps, speakers, comments, and highlights options only apply to certain formats (txt, docx, pdf).',
     'Export processing typically takes about 10 seconds per file.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

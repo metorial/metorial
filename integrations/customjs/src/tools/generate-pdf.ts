@@ -52,6 +52,13 @@ export let generatePdf = SlateTool.create(spec, {
       heightMm: ctx.input.heightMm
     });
 
+    await ctx.addAttachment({
+      type: 'content',
+      content: Buffer.from(pdfBase64, 'base64'),
+      filename: 'document.pdf',
+      mimeType: 'application/pdf'
+    });
+
     return {
       output: { pdfBase64 },
       message: `PDF generated successfully from HTML content.`

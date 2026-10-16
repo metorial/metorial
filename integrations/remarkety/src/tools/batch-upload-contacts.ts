@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { formatContactForBatch, RemarketyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,8 +57,20 @@ export let batchUploadContactsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the batch upload was successful'),
-      contactCount: z.number().describe('Number of contacts included in the batch')
+      success: z.boolean().describe('Whether Remarkety confirmed the batch had no failures'),
+      contactCount: z.number().describe('Number of contacts included in the batch'),
+      successfulCount: z
+        .number()
+        .optional()
+        .describe('Successful contact count returned by Remarkety'),
+      failedCount: z
+        .number()
+        .optional()
+        .describe('Failed contact count returned by Remarkety'),
+      result: z
+        .any()
+        .optional()
+        .describe('Complete provider result, including failedReason entries')
     })
   )
   .handleInvocation(async ctx => {
@@ -75,17 +87,33 @@ export let batchUploadContactsTool = SlateTool.create(spec, {
 
     ctx.info(`Uploading batch of ${formattedContacts.length} contacts`);
 
-    await client.batchUploadContacts(formattedContacts, {
+    let result = await client.batchUploadContacts(formattedContacts, {
       updateExisting: ctx.input.updateExisting,
       appendTags: ctx.input.appendTags
     });
 
+    let successfulCount =
+      isApiErrorRecord(result) && typeof result.success === 'number'
+        ? result.success
+        : undefined;
+    let failedCount =
+      isApiErrorRecord(result) && typeof result.failed === 'number'
+        ? result.failed
+        : undefined;
+    let success = successfulCount !== undefined && failedCount === 0;
+
     return {
       output: {
-        success: true,
-        contactCount: formattedContacts.length
+        success,
+        contactCount: formattedContacts.length,
+        successfulCount,
+        failedCount,
+        result
       },
-      message: `Successfully uploaded **${formattedContacts.length}** contacts in batch.`
+      message:
+        successfulCount !== undefined && failedCount !== undefined
+          ? `Remarkety reported **${successfulCount}** successful and **${failedCount}** failed contacts. Check the result for failure reasons.`
+          : `Submitted **${formattedContacts.length}** contacts. Remarkety did not return complete result counts; check the provider result before retrying.`
     };
   })
   .build();

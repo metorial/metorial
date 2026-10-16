@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTopTokens = SlateTool.create(spec, {
@@ -21,6 +21,10 @@ export let getTopTokens = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       tokens: z
         .array(z.record(z.string(), z.any()))
         .describe('Ranked list of top tokens by market cap')
@@ -30,10 +34,10 @@ export let getTopTokens = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getTopMarketCapTokens(ctx.input.count ?? 100);
-    let tokens = result?.data ?? [];
+    let tokens = getRecords(result);
 
     return {
-      output: { tokens },
+      output: { tokens, raw: result },
       message: `Retrieved **${tokens.length}** top token(s) by market cap.`
     };
   })

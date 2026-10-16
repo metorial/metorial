@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BeaconstacClient } from '../lib/client';
 import { spec } from '../spec';
@@ -20,6 +20,10 @@ Use **action "create"** to define a new geofence with coordinates and radius, **
 })
   .input(
     z.object({
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Organization ID from list_organizations; overrides the configured default'),
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       geofenceId: z
         .number()
@@ -46,6 +50,7 @@ Use **action "create"** to define a new geofence with coordinates and radius, **
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       geofenceId: z.number().optional().describe('ID of the geofence'),
       name: z.string().optional().describe('Name of the geofence'),
       latitude: z.number().optional().describe('Latitude'),
@@ -57,6 +62,20 @@ Use **action "create"** to define a new geofence with coordinates and radius, **
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.action === 'create' &&
+      (!ctx.input.name ||
+        ctx.input.latitude === undefined ||
+        ctx.input.longitude === undefined ||
+        ctx.input.radius === undefined)
+    ) {
+      throw createApiServiceError(
+        'Creating a geofence requires name, latitude, longitude, and radius.'
+      );
+    }
+    if (ctx.input.action !== 'create' && ctx.input.geofenceId === undefined) {
+      throw createApiServiceError('Provide geofenceId from list_geofences.');
+    }
     let client = new BeaconstacClient({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId
@@ -76,7 +95,9 @@ Use **action "create"** to define a new geofence with coordinates and radius, **
     }
 
     if (ctx.input.action === 'create') {
-      let orgId = ctx.config.organizationId ? Number(ctx.config.organizationId) : undefined;
+      let orgId =
+        ctx.input.organizationId ??
+        (ctx.config.organizationId ? Number(ctx.config.organizationId) : undefined);
       let result = await client.createGeofence({
         name: ctx.input.name!,
         latitude: ctx.input.latitude!,
@@ -89,13 +110,14 @@ Use **action "create"** to define a new geofence with coordinates and radius, **
 
       return {
         output: {
+          raw: result,
           geofenceId: result.id,
-          name: result.name,
-          latitude: result.latitude,
-          longitude: result.longitude,
-          radius: result.radius,
-          createdAt: result.created,
-          updatedAt: result.updated
+          name: typeof result.name === 'string' ? result.name : undefined,
+          latitude: typeof result.latitude === 'number' ? result.latitude : undefined,
+          longitude: typeof result.longitude === 'number' ? result.longitude : undefined,
+          radius: typeof result.radius === 'number' ? result.radius : undefined,
+          createdAt: typeof result.created === 'string' ? result.created : undefined,
+          updatedAt: typeof result.updated === 'string' ? result.updated : undefined
         },
         message: `Created geofence **"${result.name}"** (ID: ${result.id}) at (${result.latitude}, ${result.longitude}) with radius ${result.radius}m.`
       };
@@ -114,22 +136,24 @@ Use **action "create"** to define a new geofence with coordinates and radius, **
 
       return {
         output: {
+          raw: result,
           geofenceId: result.id,
-          name: result.name,
-          latitude: result.latitude,
-          longitude: result.longitude,
-          radius: result.radius,
-          updatedAt: result.updated
+          name: typeof result.name === 'string' ? result.name : undefined,
+          latitude: typeof result.latitude === 'number' ? result.latitude : undefined,
+          longitude: typeof result.longitude === 'number' ? result.longitude : undefined,
+          radius: typeof result.radius === 'number' ? result.radius : undefined,
+          updatedAt: typeof result.updated === 'string' ? result.updated : undefined
         },
         message: `Updated geofence **"${result.name}"** (ID: ${result.id}).`
       };
     }
 
     // delete
-    await client.deleteGeofence(ctx.input.geofenceId!);
+    let result = await client.deleteGeofence(ctx.input.geofenceId!);
 
     return {
       output: {
+        raw: result,
         geofenceId: ctx.input.geofenceId,
         deleted: true
       },

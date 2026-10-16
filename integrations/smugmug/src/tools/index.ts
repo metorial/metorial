@@ -1,4 +1,5 @@
 export * from './browse-folder';
+export { exportImageMetadataTool } from './export-image-metadata';
 export * from './get-comments';
 export * from './get-share-uris';
 export * from './get-user';
@@ -8,3 +9,4 @@ export * from './manage-album';
 export * from './manage-image';
 export * from './manage-node';
 export * from './search';
+export { updateProfileTool } from './update-profile';

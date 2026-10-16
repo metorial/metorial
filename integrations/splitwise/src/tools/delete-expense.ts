@@ -30,13 +30,13 @@ export let deleteExpense = SlateTool.create(spec, {
     if (ctx.input.action === 'delete') {
       let result = await client.deleteExpense(ctx.input.expenseId);
       return {
-        output: { success: result.success !== false },
+        output: { success: result.success },
         message: `Deleted expense ${ctx.input.expenseId}`
       };
     } else {
       let result = await client.restoreExpense(ctx.input.expenseId);
       return {
-        output: { success: result.success !== false },
+        output: { success: result.success },
         message: `Restored expense ${ctx.input.expenseId}`
       };
     }

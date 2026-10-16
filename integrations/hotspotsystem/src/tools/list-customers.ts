@@ -42,10 +42,15 @@ export let listCustomers = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter customers by a specific location ID. Omit to retrieve across all locations.'
+          'Filter customers by a location ID from list_locations. Omit to retrieve across all locations.'
         ),
       limit: z.number().optional().describe('Maximum number of customers to return per page'),
-      offset: z.number().optional().describe('Zero-based page offset for pagination'),
+      offset: z
+        .number()
+        .optional()
+        .describe(
+          'Zero-based starting item offset; use the provider Link header to continue pagination'
+        ),
       sort: z
         .string()
         .optional()
@@ -54,6 +59,13 @@ export let listCustomers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete original provider response'),
+      linkHeader: z
+        .string()
+        .optional()
+        .describe(
+          'Provider Link header with self, next, and previous page URLs when available'
+        ),
       totalCount: z.number().describe('Total number of customers matching the query'),
       customers: z.array(customerSchema).describe('List of customer records')
     })
@@ -61,33 +73,37 @@ export let listCustomers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.getCustomers({
+    let {
+      data: result,
+      raw,
+      linkHeader
+    } = await client.getCustomers({
       locationId: ctx.input.locationId,
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort
     });
 
-    let customers = (result.items ?? []).map(c => ({
+    let customers = result.items.map(c => ({
       customerId: String(c.id),
-      userName: c.user_name ?? '',
-      name: c.name ?? '',
-      email: c.email ?? '',
-      companyName: c.company_name ?? '',
-      address: c.address ?? '',
-      city: c.city ?? '',
-      state: c.state ?? '',
-      zip: c.zip ?? '',
-      countryCode: c.country_code ?? '',
-      phone: c.phone ?? '',
-      socialNetwork: c.social_network ?? '',
-      socialId: c.social_id ?? '',
-      socialUsername: c.social_username ?? '',
-      socialLink: c.social_link ?? '',
-      socialGender: c.social_gender ?? '',
-      socialAgeRange: c.social_age_range ?? '',
-      socialFollowersCount: c.social_followers_count ?? '',
-      registeredAt: c.registered_at ?? ''
+      userName: c.user_name,
+      name: c.name,
+      email: c.email,
+      companyName: c.company_name,
+      address: c.address,
+      city: c.city,
+      state: c.state,
+      zip: c.zip,
+      countryCode: c.country_code,
+      phone: c.phone,
+      socialNetwork: c.social_network,
+      socialId: c.social_id,
+      socialUsername: c.social_username,
+      socialLink: c.social_link,
+      socialGender: c.social_gender,
+      socialAgeRange: c.social_age_range,
+      socialFollowersCount: c.social_followers_count,
+      registeredAt: c.registered_at
     }));
 
     let locationLabel = ctx.input.locationId
@@ -95,6 +111,8 @@ export let listCustomers = SlateTool.create(spec, {
       : ' across all locations';
     return {
       output: {
+        raw,
+        linkHeader,
         totalCount: result.metadata.total_count,
         customers
       },

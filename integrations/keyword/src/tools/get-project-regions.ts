@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getCollection } from '../lib/response';
 import { spec } from '../spec';
 
 export let getProjectRegions = SlateTool.create(spec, {
@@ -27,7 +28,7 @@ export let getProjectRegions = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let data = await client.listRegions(ctx.input.projectName);
-    let regions = Array.isArray(data) ? data : (data?.regions ?? []);
+    let regions = getCollection(data, 'regions');
 
     return {
       output: { regions },

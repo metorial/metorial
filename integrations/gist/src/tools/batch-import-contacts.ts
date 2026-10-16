@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let batchImportContacts = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let batchImportContacts = SlateTool.create(spec, {
   description: `Import multiple contacts at once into Gist. Returns a batch ID that can be used to check import status. Contacts are de-duplicated by email address.`,
   instructions: [
     'Each contact in the array follows the same format as create/update contact.',
-    'Use the batch ID to check import progress with the status endpoint.'
+    'Use the batch ID to check import progress with get_batch_import_status.'
   ]
 })
   .input(
@@ -32,6 +33,7 @@ export let batchImportContacts = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       batchId: z.string().describe('Batch import ID for tracking status'),
       status: z.string().optional().describe('Initial batch status')
     })
@@ -39,7 +41,11 @@ export let batchImportContacts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GistClient({ token: ctx.auth.token });
 
+    if (!ctx.input.contacts.length)
+      throw createApiServiceError('Provide at least one contact.');
     let contacts = ctx.input.contacts.map(c => {
+      if (!c.email && !c.userId)
+        throw createApiServiceError('Each contact needs email or userId.');
       let contact: Record<string, any> = {};
       if (c.email) contact.email = c.email;
       if (c.userId) contact.user_id = c.userId;
@@ -54,7 +60,8 @@ export let batchImportContacts = SlateTool.create(spec, {
 
     return {
       output: {
-        batchId: String(batch.batch_id || batch.id),
+        rawResponse: client.responses,
+        batchId: requiredId(batch.batch_id ?? batch.id),
         status: batch.status
       },
       message: `Started batch import of **${contacts.length}** contacts. Batch ID: **${batch.batch_id || batch.id}**.`

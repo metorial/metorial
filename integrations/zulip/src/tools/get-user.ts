@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getUser = SlateTool.create(spec, {
   name: 'Get User',
   key: 'get_user',
-  description: `Get detailed profile information for a specific user by their user ID or email address. Use "me" as the identifier to get the authenticated user's profile.`,
+  description: `Get detailed profile information for a specific user by their user ID or email address. Omit both userId and email to get the authenticated user's profile and connection identity.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -24,6 +24,15 @@ export let getUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider user profile'),
+      serverUrl: z.string().optional().describe('Connected Zulip server URL'),
+      deliveryEmail: z.string().optional().describe('Real email address, when visible'),
+      isAdmin: z.boolean().optional().describe('Whether the user is an administrator'),
+      isOwner: z.boolean().optional().describe('Whether the user owns the organization'),
+      profileData: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Custom profile data keyed by profile field ID'),
       userId: z.number().describe('Unique user ID'),
       email: z.string().describe('User email address'),
       fullName: z.string().describe('Full display name'),
@@ -68,6 +77,12 @@ export let getUser = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: user,
+        serverUrl: ctx.auth.serverUrl,
+        deliveryEmail: user.delivery_email ?? undefined,
+        isAdmin: user.is_admin,
+        isOwner: user.is_owner,
+        profileData: user.profile_data,
         userId: user.user_id,
         email: user.email,
         fullName: user.full_name,

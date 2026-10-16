@@ -1,4 +1,4 @@
-Let me fetch the Algolia HN Search API page for additional details on the search feature.# Slates Specification for Hacker News
+# Hacker News API Specification
 
 ## Overview
 

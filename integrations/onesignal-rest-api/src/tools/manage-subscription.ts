@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { appIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let subscriptionTypeEnum = z.enum([
@@ -29,7 +30,7 @@ let subscriptionOutputSchema = z.object({
 export let createSubscription = SlateTool.create(spec, {
   name: 'Create Subscription',
   key: 'create_subscription',
-  description: `Add a new subscription (push device, email, or SMS) to an existing user. The user is identified by alias.`,
+  description: `Add a new subscription (push device, email, or SMS) to an existing user. The user is identified by alias. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -37,6 +38,7 @@ export let createSubscription = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       aliasLabel: z.string().default('external_id').describe('Alias type, e.g. "external_id"'),
       aliasId: z.string().describe('Alias value of the target user'),
       type: subscriptionTypeEnum.describe('Subscription platform type'),
@@ -48,7 +50,7 @@ export let createSubscription = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let subscription: Record<string, any> = {
@@ -71,7 +73,7 @@ export let createSubscription = SlateTool.create(spec, {
         token: sub.token,
         enabled: sub.enabled
       },
-      message: `Created **${ctx.input.type}** subscription for user **${ctx.input.aliasId}**.`
+      message: `Accepted **${ctx.input.type}** subscription creation for user **${ctx.input.aliasId}**.`
     };
   })
   .build();
@@ -79,7 +81,7 @@ export let createSubscription = SlateTool.create(spec, {
 export let updateSubscription = SlateTool.create(spec, {
   name: 'Update Subscription',
   key: 'update_subscription',
-  description: `Update an existing subscription's properties such as token, enabled status, or type.`,
+  description: `Update an existing subscription's token or enabled status. Subscription types are immutable; recreate the subscription to change its type. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -87,8 +89,13 @@ export let updateSubscription = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       subscriptionId: z.string().describe('ID of the subscription to update'),
-      type: subscriptionTypeEnum.optional().describe('New subscription type'),
+      type: subscriptionTypeEnum
+        .optional()
+        .describe(
+          'Legacy field. Types cannot be changed; delete and recreate the subscription instead.'
+        ),
       token: z.string().optional().describe('New push token, email, or phone number'),
       enabled: z.boolean().optional().describe('Enable or disable the subscription')
     })
@@ -101,19 +108,24 @@ export let updateSubscription = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let subscription: Record<string, any> = {};
-    if (ctx.input.type) subscription.type = ctx.input.type;
-    if (ctx.input.token) subscription.token = ctx.input.token;
+    if (ctx.input.type !== undefined)
+      throw createApiServiceError(
+        'Subscription types cannot be changed. Use delete_subscription and create_subscription with the desired type.'
+      );
+    if (ctx.input.token === undefined && ctx.input.enabled === undefined)
+      throw createApiServiceError('Provide token or enabled to update.');
+    if (ctx.input.token !== undefined) subscription.token = ctx.input.token;
     if (ctx.input.enabled !== undefined) subscription.enabled = ctx.input.enabled;
 
     await client.updateSubscription(ctx.input.subscriptionId, subscription);
 
     return {
       output: { success: true },
-      message: `Subscription **${ctx.input.subscriptionId}** updated successfully.`
+      message: `Subscription **${ctx.input.subscriptionId}** update accepted; changes may take a few seconds.`
     };
   })
   .build();
@@ -121,13 +133,14 @@ export let updateSubscription = SlateTool.create(spec, {
 export let deleteSubscription = SlateTool.create(spec, {
   name: 'Delete Subscription',
   key: 'delete_subscription',
-  description: `Remove a subscription (device/email/SMS) from a user permanently.`,
+  description: `Remove a subscription (device/email/SMS) from a user permanently. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       subscriptionId: z.string().describe('ID of the subscription to delete')
     })
   )
@@ -139,14 +152,14 @@ export let deleteSubscription = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     await client.deleteSubscription(ctx.input.subscriptionId);
 
     return {
       output: { success: true },
-      message: `Subscription **${ctx.input.subscriptionId}** deleted.`
+      message: `Subscription **${ctx.input.subscriptionId}** deletion accepted.`
     };
   })
   .build();
@@ -154,7 +167,7 @@ export let deleteSubscription = SlateTool.create(spec, {
 export let transferSubscription = SlateTool.create(spec, {
   name: 'Transfer Subscription',
   key: 'transfer_subscription',
-  description: `Transfer a subscription from one user to another. Useful when a device changes ownership.`,
+  description: `Transfer a subscription from one user to another. Useful when a device changes ownership. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -162,6 +175,7 @@ export let transferSubscription = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       subscriptionId: z.string().describe('ID of the subscription to transfer'),
       targetExternalId: z.string().describe('External ID of the new owner')
     })
@@ -174,7 +188,7 @@ export let transferSubscription = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     await client.transferSubscription(ctx.input.subscriptionId, {

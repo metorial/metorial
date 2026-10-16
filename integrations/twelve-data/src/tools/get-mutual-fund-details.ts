@@ -6,9 +6,11 @@ import { spec } from '../spec';
 export let getMutualFundDetails = SlateTool.create(spec, {
   name: 'Get Mutual Fund Details',
   key: 'get_mutual_fund_details',
-  description: `Retrieve detailed mutual fund information including profile data and top holdings.
+  description: `DEPRECATED — use \`get_fund_data\` instead. Retrieve detailed mutual fund information including profile data and top holdings.
 Use this to analyze mutual fund composition, expense ratios, and underlying holdings.`,
+  instructions: ['Use get_fund_data for the current documented endpoint contract.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

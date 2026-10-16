@@ -25,6 +25,7 @@ export let browseGallery = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       templates: z.array(
         z.object({
           templateId: z.string().optional(),
@@ -57,6 +58,7 @@ export let browseGallery = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: templates,
         templates: items.map((t: any) => ({
           templateId: t.id,
           name: t.name,

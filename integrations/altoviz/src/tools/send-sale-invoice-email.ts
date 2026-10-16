@@ -13,7 +13,11 @@ export let sendSaleInvoiceEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      invoiceId: z.number().describe('Altoviz invoice ID to send')
+      invoiceId: z.number().describe('Altoviz invoice ID to send'),
+      recipients: z
+        .array(z.string())
+        .optional()
+        .describe('Recipient email addresses; omit to use the provider default')
     })
   )
   .output(
@@ -24,7 +28,7 @@ export let sendSaleInvoiceEmail = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.sendSaleInvoiceByEmail(ctx.input.invoiceId);
+    await client.sendSaleInvoiceByEmail(ctx.input.invoiceId, ctx.input.recipients);
 
     return {
       output: {

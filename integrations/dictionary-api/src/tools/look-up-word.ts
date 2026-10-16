@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DictionaryClient } from '../lib/client';
+import { DictionaryClient, getPronunciationAudioUrl } from '../lib/client';
 import { spec } from '../spec';
 
 let definitionSchema = z.object({
@@ -25,6 +25,7 @@ let phoneticSchema = z.object({
 let entrySchema = z.object({
   word: z.string().describe('The looked-up word'),
   phonetic: z.string().optional().describe('Primary phonetic transcription'),
+  origin: z.string().optional().describe('Word origin or etymology, when available'),
   phonetics: z
     .array(phoneticSchema)
     .describe('All available phonetic transcriptions and audio'),
@@ -35,7 +36,11 @@ let entrySchema = z.object({
 export let lookUpWord = SlateTool.create(spec, {
   name: 'Look Up Word',
   key: 'look_up_word',
-  description: `Look up a word in the dictionary to get its full definition, including all meanings grouped by part of speech, example sentences, phonetics, synonyms, and antonyms. Supports multiple languages by specifying a language code.`,
+  description: `Look up a word in the Free Dictionary API to get definitions, meanings grouped by part of speech, example sentences, phonetics, synonyms, antonyms, and available word origins. Pronunciation recordings are available as downloadable audio when provided.`,
+  constraints: [
+    'English uses language code en. Availability of other language codes depends on the provider.',
+    'Pronunciations, examples, origins, synonyms, and antonyms are not available for every word.'
+  ],
   tags: {
     readOnly: true,
     destructive: false
@@ -48,13 +53,17 @@ export let lookUpWord = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Language code override (e.g., "en", "fr", "es"). Uses the configured default if not specified.'
+          'Language code override, such as "en" for English. Uses the configured default when omitted; availability depends on the provider.'
         )
     })
   )
   .output(
     z.object({
-      entries: z.array(entrySchema).describe('Dictionary entries for the word')
+      entries: z.array(entrySchema).describe('Dictionary entries for the word'),
+      rawEntries: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Original provider entries, including available source and license metadata')
     })
   )
   .handleInvocation(async ctx => {
@@ -67,9 +76,10 @@ export let lookUpWord = SlateTool.create(spec, {
     let mappedEntries = entries.map(entry => ({
       word: entry.word,
       phonetic: entry.phonetic,
+      origin: entry.origin,
       phonetics: entry.phonetics.map(p => ({
         text: p.text,
-        audioUrl: p.audio || undefined
+        audioUrl: getPronunciationAudioUrl(p.audio)
       })),
       meanings: entry.meanings.map(m => ({
         partOfSpeech: m.partOfSpeech,
@@ -79,11 +89,20 @@ export let lookUpWord = SlateTool.create(spec, {
           synonyms: d.synonyms,
           antonyms: d.antonyms
         })),
-        synonyms: m.synonyms,
-        antonyms: m.antonyms
+        synonyms: m.synonyms ?? [],
+        antonyms: m.antonyms ?? []
       })),
-      sourceUrls: entry.sourceUrls || []
+      sourceUrls: entry.sourceUrls ?? []
     }));
+
+    let audioUrls = new Set(
+      mappedEntries.flatMap(entry =>
+        entry.phonetics.flatMap(phonetic => (phonetic.audioUrl ? [phonetic.audioUrl] : []))
+      )
+    );
+    for (let url of audioUrls) {
+      await ctx.addAttachment({ type: 'url', url });
+    }
 
     let totalMeanings = mappedEntries.reduce((sum, e) => sum + e.meanings.length, 0);
     let totalDefinitions = mappedEntries.reduce(
@@ -92,7 +111,7 @@ export let lookUpWord = SlateTool.create(spec, {
     );
 
     return {
-      output: { entries: mappedEntries },
+      output: { entries: mappedEntries, rawEntries: entries },
       message: `Found **${mappedEntries.length}** entr${mappedEntries.length === 1 ? 'y' : 'ies'} for "${ctx.input.word}" with **${totalMeanings}** part${totalMeanings === 1 ? '' : 's'} of speech and **${totalDefinitions}** definition${totalDefinitions === 1 ? '' : 's'}.`
     };
   })

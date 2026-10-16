@@ -1,14 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { clicksOutputSchema, formatClickPage } from '../lib/clicks';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let getClicks = SlateTool.create(spec, {
   name: 'Get Click Analytics',
   key: 'get_clicks',
-  description: `Retrieves click tracking data for a specific shortened URL. Includes details about each click such as browser, OS, country, referrer, and user agent. Results are paginated; use the returned cursor to fetch more.`,
+  description: `Retrieves clicks for a specific alias and domain by filtering one page of account-wide click data. Includes browser, OS, country, referrer, and user agent. A page may contain no matching clicks and still have more results.`,
   instructions: [
-    'To paginate through all clicks, pass the nextCursor from the previous response as the cursor for the next request.'
+    'Each call retrieves one account-wide page and filters it by alias and domain. limit controls account records examined, not matching clicks returned.',
+    'Continue with nextCursor even when clicks is empty. Stop only when nextCursor is absent. Use list_clicks to retrieve account-wide records.'
   ],
   tags: {
     destructive: false,
@@ -31,35 +33,12 @@ export let getClicks = SlateTool.create(spec, {
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of click records to return per page.')
-    })
-  )
-  .output(
-    z.object({
-      clicks: z
-        .array(
-          z.object({
-            aliasName: z.string().describe('The alias that was clicked.'),
-            aliasId: z.string().describe('Internal ID of the alias.'),
-            browser: z.string().describe('Browser used by the visitor.'),
-            os: z.string().describe('Operating system of the visitor.'),
-            country: z.string().describe('Country of the visitor.'),
-            destination: z
-              .string()
-              .describe('The destination URL the visitor was redirected to.'),
-            domain: z.string().describe('The domain of the short URL.'),
-            referrer: z.string().describe('The referring URL.'),
-            userAgent: z.string().describe('Full user agent string.'),
-            clickedAt: z.string().describe('ISO timestamp of when the click occurred.')
-          })
+        .describe(
+          'Account-wide records to examine per page, from 1 to 1000. Defaults to 1000; the returned matching click count can be smaller.'
         )
-        .describe('List of click records.'),
-      nextCursor: z
-        .string()
-        .optional()
-        .describe('Pagination cursor for fetching the next page. Absent if no more results.')
     })
   )
+  .output(clicksOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
@@ -70,25 +49,11 @@ export let getClicks = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let clicks = result.clicks.map(c => ({
-      aliasName: c.alias,
-      aliasId: c.aliasId,
-      browser: c.browser,
-      os: c.os,
-      country: c.country,
-      destination: c.destination,
-      domain: c.domain,
-      referrer: c.referrer,
-      userAgent: c.userAgent,
-      clickedAt: new Date(c.createdAt).toISOString()
-    }));
+    let output = formatClickPage(result);
 
     return {
-      output: {
-        clicks,
-        nextCursor: result.lastId || undefined
-      },
-      message: `Retrieved **${clicks.length}** click(s) for alias \`${ctx.input.aliasName}\`.${result.lastId ? ' More results available with pagination.' : ''}`
+      output,
+      message: `Retrieved **${output.clicks.length}** matching click(s) for alias \`${ctx.input.aliasName}\` from one account-wide page.${result.lastId ? ' Continue with nextCursor to inspect the next page.' : ''}`
     };
   })
   .build();

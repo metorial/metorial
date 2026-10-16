@@ -4,9 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'docupost',
-  name: 'Docupost',
+  name: 'DocuPost',
   description:
-    'Send physical postal mail including letters and postcards via U.S. mail. HIPAA-compliant service for sending documents online.',
+    'Send letters and postcards through U.S. mail using PDF or HTML letter content and postcard images.',
   metadata: {},
   config,
   auth

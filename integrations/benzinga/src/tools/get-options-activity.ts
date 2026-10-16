@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BenzingaClient } from '../lib/client';
+import { BenzingaClient, numericValue, recordsFrom } from '../lib/client';
 import { spec } from '../spec';
 
 let optionActivitySchema = z.object({
@@ -41,6 +41,10 @@ export let getOptionsActivityTool = SlateTool.create(spec, {
       date: z.string().optional().describe('Specific date (YYYY-MM-DD)'),
       dateFrom: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       dateTo: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      updatedSince: z
+        .number()
+        .optional()
+        .describe('Return records updated since this Unix timestamp in seconds'),
       page: z.number().optional().default(0).describe('Page offset'),
       pageSize: z.number().optional().default(50).describe('Results per page (max 1000)')
     })
@@ -48,6 +52,7 @@ export let getOptionsActivityTool = SlateTool.create(spec, {
   .output(
     z.object({
       signals: z.array(optionActivitySchema).describe('Unusual options activity signals'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       count: z.number().describe('Number of signals returned')
     })
   )
@@ -59,11 +64,12 @@ export let getOptionsActivityTool = SlateTool.create(spec, {
       date: ctx.input.date,
       dateFrom: ctx.input.dateFrom,
       dateTo: ctx.input.dateTo,
+      updated: ctx.input.updatedSince,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
 
-    let items = Array.isArray(data) ? data : [];
+    let items = recordsFrom(data, ['option_activity', 'data'], true);
     let signals = items.map((item: any) => ({
       signalId: item.id,
       ticker: item.ticker,
@@ -71,21 +77,22 @@ export let getOptionsActivityTool = SlateTool.create(spec, {
       time: item.time,
       optionSymbol: item.option_symbol,
       putCall: item.put_call,
-      strikePrice: item.strike_price ? Number(item.strike_price) : undefined,
+      strikePrice: numericValue(item.strike_price),
       expirationDate: item.date_expiration,
       sentiment: item.sentiment,
       activityType: item.option_activity_type,
       description: item.description,
-      size: item.size ? Number(item.size) : undefined,
-      volume: item.volume ? Number(item.volume) : undefined,
-      openInterest: item.open_interest ? Number(item.open_interest) : undefined,
+      size: numericValue(item.size),
+      volume: numericValue(item.volume),
+      openInterest: numericValue(item.open_interest),
       costBasis: item.cost_basis,
-      underlyingPrice: item.underlying_price ? Number(item.underlying_price) : undefined,
+      underlyingPrice: numericValue(item.underlying_price),
       updated: item.updated
     }));
 
     return {
       output: {
+        raw: data,
         signals,
         count: signals.length
       },

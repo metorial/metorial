@@ -23,7 +23,7 @@ Note that **tags**, **expiration**, and **description** require a paid TinyURL s
       alias: z
         .string()
         .optional()
-        .describe('Custom alias for the short URL (5-30 characters)'),
+        .describe('Custom alias: 5-30 characters on tinyurl.com; 1-30 on a branded domain'),
       tags: z
         .array(z.string())
         .optional()
@@ -71,7 +71,7 @@ Note that **tags**, **expiration**, and **description** require a paid TinyURL s
         createdAt: result.created_at,
         expiresAt: result.expires_at,
         tags: result.tags || [],
-        description: result.description
+        description: result.description ?? null
       },
       message: `Created TinyURL **${result.tiny_url}** → ${result.url}`
     };

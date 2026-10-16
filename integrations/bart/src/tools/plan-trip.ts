@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BartClient } from '../lib/client';
+import { bartRecord, bartRecords, bartText } from '../lib/response';
 import { spec } from '../spec';
 
 let fareSchema = z.object({
@@ -22,6 +23,8 @@ let legSchema = z.object({
   line: z.string().describe('Route line identifier'),
   trainHeadStation: z.string().describe('Train head station (final destination of the train)'),
   bikeflag: z.string().describe('"1" if bikes are allowed on this leg'),
+  originPlatform: z.string().optional().describe('Departure platform for this leg'),
+  destinationPlatform: z.string().optional().describe('Arrival platform for this leg'),
   transferCode: z
     .string()
     .describe(
@@ -93,68 +96,52 @@ export let planTrip = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new BartClient({ token: ctx.auth.token });
-
-    let result = await client.planTrip({
-      origin: ctx.input.origin,
-      destination: ctx.input.destination,
-      type: ctx.input.tripType,
-      time: ctx.input.time,
-      date: ctx.input.date,
-      tripsBefore: ctx.input.tripsBefore,
-      tripsAfter: ctx.input.tripsAfter
-    });
-
-    let schedule = result?.schedule;
-    let tripData = schedule?.request?.trip;
-    let trips = Array.isArray(tripData) ? tripData : tripData ? [tripData] : [];
-
-    let mappedTrips = trips.map((trip: any) => {
-      let faresData = trip.fares?.fare;
-      let fares = Array.isArray(faresData) ? faresData : faresData ? [faresData] : [];
-
-      let legData = trip.leg;
-      let legs = Array.isArray(legData) ? legData : legData ? [legData] : [];
-
+    let result = await client.planTrip({ ...ctx.input, type: ctx.input.tripType });
+    let schedule = bartRecord(result.schedule);
+    let trips = bartRecords(bartRecord(schedule.request).trip).map(trip => {
+      let fares = bartRecords(bartRecord(trip.fares).fare).map(f => ({
+        amount: bartText(f['@amount']),
+        fareClass: bartText(f['@class']),
+        fareName: bartText(f['@name'])
+      }));
       return {
-        origin: trip['@origin'] || '',
-        destination: trip['@destination'] || '',
-        fare: trip['@fare'] || '',
-        clipperFare: trip['@clipper'] || '',
-        originTime: trip['@origTimeMin'] || '',
-        originDate: trip['@origTimeDate'] || '',
-        destinationTime: trip['@destTimeMin'] || '',
-        destinationDate: trip['@destTimeDate'] || '',
-        tripTime: trip['@tripTime'] || '',
-        fares: fares.map((f: any) => ({
-          amount: f['@amount'] || '',
-          fareClass: f['@class'] || '',
-          fareName: f['@name'] || ''
-        })),
-        legs: legs.map((leg: any) => ({
-          order: leg['@order'] || '',
-          origin: leg['@origin'] || '',
-          destination: leg['@destination'] || '',
-          originTime: leg['@origTimeMin'] || '',
-          originDate: leg['@origTimeDate'] || '',
-          destinationTime: leg['@destTimeMin'] || '',
-          destinationDate: leg['@destTimeDate'] || '',
-          line: leg['@line'] || '',
-          trainHeadStation: leg['@trainHeadStation'] || '',
-          bikeflag: leg['@bikeflag'] || '0',
-          transferCode: leg['@transfercode'] || ''
+        origin: bartText(trip['@origin']),
+        destination: bartText(trip['@destination']),
+        fare: fares.find(f => f.fareClass === 'cash')?.amount || bartText(trip['@fare']),
+        clipperFare:
+          fares.find(f => f.fareClass === 'clipper')?.amount || bartText(trip['@clipper']),
+        originTime: bartText(trip['@origTimeMin']),
+        originDate: bartText(trip['@origTimeDate']),
+        destinationTime: bartText(trip['@destTimeMin']),
+        destinationDate: bartText(trip['@destTimeDate']),
+        tripTime: bartText(trip['@tripTime']),
+        fares,
+        legs: bartRecords(trip.leg).map(leg => ({
+          order: bartText(leg['@order']),
+          origin: bartText(leg['@origin']),
+          destination: bartText(leg['@destination']),
+          originTime: bartText(leg['@origTimeMin']),
+          originDate: bartText(leg['@origTimeDate']),
+          destinationTime: bartText(leg['@destTimeMin']),
+          destinationDate: bartText(leg['@destTimeDate']),
+          line: bartText(leg['@line']),
+          trainHeadStation: bartText(leg['@trainHeadStation']),
+          bikeflag: bartText(leg['@bikeflag']) || '0',
+          transferCode: bartText(leg['@transfercode']),
+          originPlatform: bartText(leg['@originPlatform']),
+          destinationPlatform: bartText(leg['@destinationPlatform'])
         }))
       };
     });
-
     return {
       output: {
-        origin: result?.origin || '',
-        destination: result?.destination || '',
-        scheduleDate: schedule?.date || '',
-        scheduleTime: schedule?.time || '',
-        trips: mappedTrips
+        origin: bartText(result.origin),
+        destination: bartText(result.destination),
+        scheduleDate: bartText(schedule.date),
+        scheduleTime: bartText(schedule.time),
+        trips
       },
-      message: `Found **${mappedTrips.length}** trip option(s) from **${ctx.input.origin}** to **${ctx.input.destination}**.`
+      message: `Found **${trips.length}** trip option(s) from **${ctx.input.origin}** to **${ctx.input.destination}**.`
     };
   })
   .build();

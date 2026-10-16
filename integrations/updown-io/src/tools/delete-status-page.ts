@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let deleteStatusPage = SlateTool.create(spec, {
@@ -20,7 +21,8 @@ export let deleteStatusPage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deleted: z.boolean().describe('Whether the status page was successfully deleted')
+      deleted: z.boolean().describe('Whether the status page was successfully deleted'),
+      raw: rawSchema.optional().describe('Complete original deletion response')
     })
   )
   .handleInvocation(async ctx => {
@@ -29,7 +31,9 @@ export let deleteStatusPage = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Deleted status page \`${ctx.input.statusPageToken}\`.`
+      message: result.deleted
+        ? `Deleted status page \`${ctx.input.statusPageToken}\`.`
+        : 'Updown.io did not confirm status page deletion.'
     };
   })
   .build();

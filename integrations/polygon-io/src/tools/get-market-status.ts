@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 let exchangeStatusSchema = z.object({
@@ -61,35 +62,35 @@ export let getMarketStatus = SlateTool.create(spec, {
     let holidays: any[] | undefined;
 
     if (ctx.input.includeHolidays) {
-      holidays = await client.getMarketHolidays();
+      holidays = responseRows(await client.getMarketHolidays(), 'market holidays');
     }
 
     return {
       output: {
-        market: status.market,
-        earlyHours: status.earlyHours,
-        afterHours: status.afterHours,
-        serverTime: status.serverTime,
+        market: status.market ?? undefined,
+        earlyHours: status.earlyHours ?? undefined,
+        afterHours: status.afterHours ?? undefined,
+        serverTime: status.serverTime ?? undefined,
         exchanges: status.exchanges
           ? {
-              nasdaq: status.exchanges.nasdaq,
-              nyse: status.exchanges.nyse,
-              otc: status.exchanges.otc
+              nasdaq: status.exchanges.nasdaq ?? undefined,
+              nyse: status.exchanges.nyse ?? undefined,
+              otc: status.exchanges.otc ?? undefined
             }
           : undefined,
         currencies: status.currencies
           ? {
-              fx: status.currencies.fx,
-              crypto: status.currencies.crypto
+              fx: status.currencies.fx ?? undefined,
+              crypto: status.currencies.crypto ?? undefined
             }
           : undefined,
         holidays: holidays?.map((h: any) => ({
-          exchange: h.exchange,
-          name: h.name,
-          date: h.date,
-          status: h.status,
-          open: h.open,
-          close: h.close
+          exchange: h.exchange ?? undefined,
+          name: h.name ?? undefined,
+          date: h.date ?? undefined,
+          status: h.status ?? undefined,
+          open: h.open ?? undefined,
+          close: h.close ?? undefined
         }))
       },
       message: `Market is currently **${status.market || 'unknown'}**.${status.afterHours ? ' After-hours trading is active.' : ''}${status.earlyHours ? ' Early trading hours are active.' : ''}${holidays ? ` ${holidays.length} upcoming holiday(s).` : ''}`

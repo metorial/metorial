@@ -5,7 +5,10 @@ import { spec } from '../spec';
 
 let realAddressInfoSchema = z.object({
   isEnabled: z.boolean().describe('Whether forwarding to this address is enabled'),
-  isVerificationNeeded: z.boolean().describe('Whether a verification email was sent'),
+  isVerificationNeeded: z
+    .boolean()
+    .optional()
+    .describe('Whether a verification email was sent'),
   isVerified: z.boolean().describe('Whether the address has been verified')
 });
 
@@ -15,7 +18,7 @@ export let updateProxyEmail = SlateTool.create(spec, {
   description: `Update the configuration of an existing proxy email address. Change forwarding addresses, callback URL, description, or browsable status. Only provided fields are updated.`,
   instructions: [
     'The isBrowsable flag can only be changed if no emails have been received yet.',
-    'To stop forwarding while keeping webhooks active, set realAddresses to ["int.proxiedmail.com"].'
+    'To stop forwarding while keeping webhooks active, use an address such as notifications@int.proxiedmail.com.'
   ],
   tags: {
     destructive: false,
@@ -52,7 +55,12 @@ export let updateProxyEmail = SlateTool.create(spec, {
       realAddresses: z
         .record(z.string(), realAddressInfoSchema)
         .describe('Updated forwarding addresses and their status'),
-      isBrowsable: z.boolean().describe('Whether received emails can be browsed via the API'),
+      isBrowsable: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether received emails can be browsed via the API, when returned by the provider'
+        ),
       description: z.string().nullable().describe('Updated description'),
       callbackUrl: z.string().nullable().describe('Updated webhook callback URL'),
       updatedAt: z.string().describe('Last update timestamp')

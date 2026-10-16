@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZixflowClient } from '../lib/client';
+import { requireInput } from '../lib/response';
 import { spec } from '../spec';
 
 export let getMessageReport = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ export let getMessageReport = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete response returned by Zixflow'),
       success: z.boolean().describe('Whether the report was retrieved successfully'),
       accountId: z.string().optional().describe('Account ID'),
       messageId: z.string().optional().describe('Message ID'),
@@ -35,23 +37,23 @@ export let getMessageReport = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ZixflowClient({ token: ctx.auth.token });
+    requireInput(ctx.input.messageId, 'messageId');
     let result = await client.getMessageReport(ctx.input.channel, ctx.input.messageId);
     let report = result.data;
 
     return {
       output: {
         success: result.status === true,
-        accountId: report?.accountId,
-        messageId: report?.messageId,
-        campaignId: report?.campaignId,
-        deliveryStatus: report?.status,
-        statusAt: report?.statusAt,
-        destination: report?.destination,
-        remark: report?.remark
+        raw: result,
+        accountId: typeof report?.accountId === 'string' ? report.accountId : undefined,
+        messageId: typeof report?.messageId === 'string' ? report.messageId : undefined,
+        campaignId: typeof report?.campaignId === 'string' ? report.campaignId : undefined,
+        deliveryStatus: typeof report?.status === 'string' ? report.status : undefined,
+        statusAt: typeof report?.statusAt === 'string' ? report.statusAt : undefined,
+        destination: typeof report?.destination === 'string' ? report.destination : undefined,
+        remark: typeof report?.remark === 'string' ? report.remark : undefined
       },
-      message: result.status
-        ? `${ctx.input.channel} message to ${report?.destination ?? 'unknown'}: **${report?.status ?? 'unknown'}**`
-        : `Failed to fetch report: ${result.message}`
+      message: 'Retrieved the Zixflow delivery report.'
     };
   })
   .build();

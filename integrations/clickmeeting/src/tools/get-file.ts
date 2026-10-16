@@ -32,8 +32,12 @@ export let getFile = SlateTool.create(spec, {
     let downloadUrl: string | undefined;
 
     if (ctx.input.includeDownloadUrl) {
-      let dlResult = await client.getFileDownloadUrl(ctx.input.fileId);
-      downloadUrl = typeof dlResult === 'string' ? dlResult : dlResult?.url;
+      downloadUrl = `https://api.clickmeeting.com/v1/file-library/${encodeURIComponent(ctx.input.fileId)}/download`;
+      await ctx.addAttachment({
+        type: 'url',
+        url: downloadUrl,
+        headers: { 'X-Api-Key': ctx.auth.token }
+      });
     }
 
     return {

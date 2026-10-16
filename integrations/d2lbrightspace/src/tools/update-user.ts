@@ -48,9 +48,9 @@ export let updateUser = SlateTool.create(spec, {
     return {
       output: {
         userId: String(user.UserId),
-        userName: user.UserName,
-        firstName: user.FirstName,
-        lastName: user.LastName
+        userName: user.UserName ?? undefined,
+        firstName: user.FirstName ?? undefined,
+        lastName: user.LastName ?? undefined
       },
       message: `Updated user **${user.FirstName} ${user.LastName}** (ID: ${user.UserId}).`
     };

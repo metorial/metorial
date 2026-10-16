@@ -21,4 +21,5 @@ export { manageVolunteerRoles } from './manage-volunteer-roles';
 export { manageVolunteers } from './manage-volunteers';
 export { queryAccountLog } from './query-account-log';
 export { removeFormEntry } from './remove-form-entry';
+export { searchPeople } from './search-people';
 export { updatePerson } from './update-person';

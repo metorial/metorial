@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let paperSchema = z
+export let paperSchema = z
   .object({
     paperId: z.string().nullable().optional().describe('Semantic Scholar paper ID'),
     corpusId: z.number().nullable().optional().describe('Semantic Scholar corpus ID'),
@@ -36,6 +36,7 @@ let paperSchema = z
         url: z.string().nullable().optional(),
         status: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
       .describe('Open access PDF details'),
@@ -44,6 +45,7 @@ let paperSchema = z
         model: z.string().nullable().optional(),
         text: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
       .describe('TLDR summary'),
@@ -68,6 +70,7 @@ let paperSchema = z
         volume: z.string().nullable().optional(),
         pages: z.string().nullable().optional()
       })
+      .passthrough()
       .nullable()
       .optional()
       .describe('Journal information')
@@ -163,16 +166,16 @@ Use the **fields** parameter to control which metadata is returned for each pape
       fieldsOfStudy: ctx.input.fieldsOfStudy
     });
 
-    let papers = result.data || [];
+    let papers = result.data;
 
     return {
       output: {
-        total: result.total ?? 0,
+        total: result.total,
         offset: result.offset,
         next: result.next,
         papers
       },
-      message: `Found approximately **${result.total ?? 0}** papers for query "${ctx.input.query}". Returned **${papers.length}** papers in this page.`
+      message: `Found approximately **${result.total}** papers for query "${ctx.input.query}". Returned **${papers.length}** papers in this page.`
     };
   })
   .build();

@@ -1,7 +1,19 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  raw: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Provider response with credentials removed'),
+  projectId: z.string().describe('ID of the created project'),
+  projectName: z.string().describe('Name of the created project'),
+  stage: z.string().optional().describe('Current project stage'),
+  target: z.string().optional().nullable().describe('Target variable if set')
+});
 
 export let createProject = SlateTool.create(spec, {
   name: 'Create Project',
@@ -29,21 +41,25 @@ export let createProject = SlateTool.create(spec, {
       positiveClass: z.string().optional().describe('Positive class for binary classification')
     })
   )
-  .output(
-    z.object({
-      projectId: z.string().describe('ID of the created project'),
-      projectName: z.string().describe('Name of the created project'),
-      stage: z.string().optional().describe('Current project stage'),
-      target: z.string().optional().nullable().describe('Target variable if set')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
-    let createBody: any = {
+    if (Boolean(ctx.input.datasetUrl) === Boolean(ctx.input.datasetId)) {
+      throw createApiServiceError('Provide exactly one of datasetUrl or datasetId.');
+    }
+    if (
+      !ctx.input.target &&
+      (ctx.input.mode !== undefined ||
+        ctx.input.metric !== undefined ||
+        ctx.input.positiveClass !== undefined)
+    ) {
+      throw createApiServiceError('Provide target when configuring Autopilot options.');
+    }
+    let createBody: Record<string, unknown> = {
       projectName: ctx.input.projectName
     };
     if (ctx.input.datasetUrl) {
@@ -54,7 +70,7 @@ export let createProject = SlateTool.create(spec, {
     }
 
     let project = await client.createProject(createBody);
-    let projectId = project.id || project.projectId;
+    let projectId = project.id ?? project.projectId;
 
     if (ctx.input.target) {
       ctx.info('Setting target and starting Autopilot...');
@@ -69,12 +85,13 @@ export let createProject = SlateTool.create(spec, {
     }
 
     return {
-      output: {
+      output: parseOutput(outputSchema, {
+        raw: project,
         projectId: projectId,
         projectName: project.projectName,
         stage: project.stage,
         target: project.target
-      },
+      }),
       message: `Created project **${project.projectName}** (${projectId}).${ctx.input.target ? ` Autopilot started targeting **${ctx.input.target}**.` : ''}`
     };
   })

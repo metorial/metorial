@@ -50,8 +50,8 @@ export let getFlipbook = SlateTool.create(spec, {
 
     let embedHtml: string | undefined;
     if (ctx.input.includeEmbedCode) {
-      let embedResult = await client.getEmbedCode(
-        ctx.input.flipbookId,
+      let embedResult = await client.getOEmbed(
+        details.links.base,
         ctx.input.maxWidth,
         ctx.input.maxHeight
       );
@@ -61,20 +61,20 @@ export let getFlipbook = SlateTool.create(spec, {
     return {
       output: {
         flipbookId: details.id,
-        title: details.title || '',
-        subtitle: details.subtitle || '',
-        description: details.description || '',
-        url: details.url || '',
-        thumbnailUrl: details.thumbnail || '',
-        pdfUrl: details.pdf || '',
-        pages: details.pages || 0,
-        tags: details.tags || '',
-        created: details.created || '',
-        links: details.links || {},
-        oembed: details.oembed || {},
+        title: details.title,
+        subtitle: details.subtitle,
+        description: details.description,
+        url: details.links.base,
+        thumbnailUrl: details.links.thumbnail,
+        pdfUrl: details.links.pdf,
+        pages: details.pages,
+        tags: details.tags,
+        created: details.date,
+        links: details.links,
+        oembed: details.oembed,
         embedHtml
       },
-      message: `Retrieved flipbook **${details.title || details.id}** (${details.pages || 0} pages).${embedHtml ? ' Embed code included.' : ''}`
+      message: `Retrieved flipbook **${details.title || details.id}** (${details.pages} pages).${embedHtml ? ' Embed code included.' : ''}`
     };
   })
   .build();

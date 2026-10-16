@@ -14,6 +14,8 @@ import {
   getSessionAttendees,
   getSessions,
   getTimezones,
+  getTokensByEmail,
+  listAccountRecordings,
   listConferences,
   listFiles,
   listRegistrations,
@@ -21,7 +23,8 @@ import {
   manageRecordings,
   registerAttendee,
   sendInvitations,
-  updateConference
+  updateConference,
+  uploadFile
 } from './tools';
 
 export let provider = Slate.create({
@@ -47,7 +50,10 @@ export let provider = Slate.create({
     addContact,
     getChatLogs,
     getTimezones,
-    getPhoneGateways
+    getPhoneGateways,
+    getTokensByEmail,
+    listAccountRecordings,
+    uploadFile
   ],
   triggers: []
 });

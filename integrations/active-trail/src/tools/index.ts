@@ -1,4 +1,5 @@
 export * from './account-info';
+export * from './additional-tools';
 export * from './campaign-reports';
 export * from './manage-automation';
 export * from './manage-contact';

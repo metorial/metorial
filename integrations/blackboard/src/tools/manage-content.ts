@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let contentOutputSchema = z.object({
@@ -35,7 +35,7 @@ export let createContent = SlateTool.create(spec, {
   description: `Create a content item in a course. Supports documents, folders, links, and other content types. Optionally place it inside a parent folder.`,
   instructions: [
     'Common content handler IDs: `resource/x-bb-document` (document), `resource/x-bb-folder` (folder), `resource/x-bb-externallink` (external link), `resource/x-bb-blankpage` (blank page).',
-    'To create a link, set contentHandlerId to `resource/x-bb-externallink` and provide the URL in the body.'
+    'To create a link, set contentHandlerId to `resource/x-bb-externallink` and provide the URL in contentHandlerUrl.'
   ],
   tags: { readOnly: false }
 })
@@ -62,7 +62,7 @@ export let createContent = SlateTool.create(spec, {
   )
   .output(contentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let content = await client.createContent(ctx.input.courseId, {
       title: ctx.input.title,
@@ -109,7 +109,7 @@ export let getContent = SlateTool.create(spec, {
   )
   .output(contentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let content = await client.getContent(ctx.input.courseId, ctx.input.contentId);
 
     return {
@@ -143,7 +143,7 @@ export let listContent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = ctx.input.parentId
       ? await client.listContentChildren(ctx.input.courseId, ctx.input.parentId, {
@@ -185,7 +185,7 @@ export let updateContent = SlateTool.create(spec, {
   )
   .output(contentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let content = await client.updateContent(ctx.input.courseId, ctx.input.contentId, {
       title: ctx.input.title,
@@ -229,7 +229,7 @@ export let deleteContent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     await client.deleteContent(ctx.input.courseId, ctx.input.contentId);
     return {
       output: { deleted: true },

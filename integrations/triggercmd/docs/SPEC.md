@@ -1,62 +1,42 @@
-# Slates Specification for Triggercmd
+# TRIGGERcmd Specification
 
 ## Overview
 
-TRIGGERcmd is a cloud service that allows you to securely and remotely run commands on your computers. You can use your phone, Alexa, Google Assistant, IFTTT, Zapier, n8n, and many other methods to run your commands on your computers. Users install a TRIGGERcmd agent on their computers, configure commands locally, and then trigger those commands remotely via the web, REST API, or voice assistants.
+TRIGGERcmd runs commands configured locally on computers with its agent installed. This integration discovers registered computers and commands, requests command execution, inspects run history, and discovers or triggers panel buttons. The commands themselves remain on each computer; trigger names and metadata are available through the cloud API.
 
 ## Authentication
 
-TRIGGERcmd supports two authentication methods:
+- **API Token** (`api_token`): use the personal Bearer token from the [Instructions page](https://www.triggercmd.com/user/computer/create) or profile page. Requests send `Authorization: Bearer <token>`; run-history and panel routes additionally use the token query parameter shown in the provider's examples.
+- **OAuth** (`oauth`): retains the existing authorization-code connection at `https://www.triggercmd.com/oauth/authorize` and form-encoded token exchange at `https://www.triggercmd.com/oauth/token`. The existing `default` scope is retained. Access tokens, returned refresh tokens, and returned expiry values are saved. Refresh uses the saved refresh token and preserves it when the provider omits a replacement. Existing connections without a saved refresh token must reconnect if a refresh is needed.
 
-### OAuth 2.0
+The provider confirms the OAuth endpoint URLs in its [SmartThings setup instructions](https://www.triggercmd.com/forum/topic/2494/new-smartthings-integration-2023/7). Public documentation does not specify token lifetime, refresh-response fields, or a dedicated current-user REST endpoint. Expiry is therefore derived only when the token response includes `expires_in`; no lifetime or identity endpoint is guessed.
 
-TRIGGERcmd uses OAuth authentication. This is the standard method used by third-party integrations (Pipedream, Make, Power Automate, etc.).
+No additional connection configuration is required.
 
-- **Authorization URL:** `https://www.triggercmd.com/oauth/authorize`
-- **Token URL:** `https://www.triggercmd.com/oauth/token`
-- The authorization request uses `response_type=code` with standard OAuth parameters (`client_id`, `redirect_uri`, `state`, `scope`).
-- Token requests use `application/x-www-form-urlencoded` content type.
+## Tools
 
-### Bearer Token (API Token)
+| Key | Behavior |
+| --- | --- |
+| `list_computers` | Retrieve registered computer IDs and names with `GET /api/computer/list`. |
+| `list_commands` | Retrieve commands with `POST /api/command/list`; optionally filter by `computer_id` using a `computerId` from `list_computers`. Outputs retain command IDs, names, trigger names, parameter support, metadata, and computer references; populated computer names are exposed when returned. |
+| `trigger_command` | Submit the computer name, trigger name, and optional `params` string to the existing `POST /api/run/triggerSave` route. The full provider response remains in `result`. An explicitly supplied empty parameter string is preserved. |
+| `command_run_history` | Retrieve `GET /api/run/list` with `command_id` and descending `createdAt` order. Use a command ID from `list_commands`. Outputs retain run IDs, statuses, and timestamps. |
+| `list_panel_buttons` | Retrieve `GET /api/panelbutton/list` and return button IDs and names, panel IDs and names, and configured parameter choices. |
+| `trigger_panel_button` | Request `GET /api/panel/trigger` with the panel and button names discovered above and optional parameters. Return the full provider response in `result`. |
 
-For direct REST API usage, TRIGGERcmd supports authentication via a personal Bearer token. You will need your user token, which can be found at the bottom of your TRIGGERcmd profile page or the instructions page.
+Discovery supports the documented `records` response envelope as well as legacy bare arrays. Record IDs accept `id` and `_id`; optional null metadata is omitted from normalized outputs. API errors and invalid discovery responses fail with a service error instead of being reported as successful empty results.
 
-The token is passed as a Bearer token in the `Authorization` header:
+Trigger requests acknowledge dispatch, not completion. Use command run history to inspect later execution status. Commands must accept parameters for parameters to take effect. Panel actions are configured in TRIGGERcmd before using this integration. Public sources do not define pagination parameters for these routes; tools return the records included by the provider response.
 
-```
-Authorization: Bearer <your_token>
-```
+## Boundaries
 
-Alternatively, for some endpoints (like the IFTTT webhook), the token can be passed in the POST body as `token=<your_token>`.
+Computer and command setup remains in the TRIGGERcmd agent and dashboard. Computer sharing and unauthenticated command bookmarks are dashboard features and are not exposed as tools. The reviewed REST documentation provides no suitable current-user endpoint or webhook registration API, so this integration has no identity tool or event triggers. It does not download or export files.
 
-## Features
+## Official sources
 
-### Remote Command Execution
-
-The core feature of TRIGGERcmd. TRIGGERcmd allows you to execute commands on your computers remotely through a REST API. A trigger request requires:
-
-- **computer** (required): The name of a computer in your TRIGGERcmd account.
-- **trigger** (required): The name of a command configured on that computer.
-- **params** (optional): Parameters to pass to the command.
-
-Your commands could install updates, open your garage, run a script, or anything else you decide. Commands are defined locally on each computer in a `commands.json` file and are not stored on TRIGGERcmd's servers.
-
-### Computer Management
-
-You can list your computers, list the commands for a given computer, and list all commands across all computers. The API provides endpoints to retrieve your registered computers and their associated commands.
-
-### Command Run History
-
-You can query run history for a specific command, including timestamps and status (e.g., "Command ran", "Trigger sent from website"). This requires the command ID and your token.
-
-### Computer Sharing
-
-You can share your computer with another TRIGGERcmd account by clicking the computer's yellow "Share" button and entering the other account's email address. After accepting, it shows up under "Other user's computers" and they can run that computer's commands.
-
-### Bookmarks
-
-You can create and share URLs that run your commands without authentication. You can set an optional timeout to make bookmark URLs expire. People can also scan your bookmark's QR code to run the command. There are two types: standard bookmarks (JWT-based, can expire) and short bookmarks (based on computer name and trigger name, more persistent).
-
-## Events
-
-The provider does not support events (webhooks or event subscriptions). TRIGGERcmd is designed as a command-execution service where external systems trigger commands on registered computers. It does not offer webhook callbacks or event subscription mechanisms for notifying external systems when commands are executed or when computer status changes.
+- [List commands](https://github.com/rvmey/triggercmd-docs/blob/master/API/ListCommands.md): current command discovery route and Bearer authentication.
+- [Trigger command](https://github.com/rvmey/triggercmd-docs/blob/master/API/TriggerCommand.md): computer, trigger, and parameter semantics for the current `/api/run/trigger` route.
+- [Computer and scoped command discovery](https://www.triggercmd.com/forum/topic/370/install-from-github-repo): provider-maintainer examples of computer listing and `computer_id` filtering.
+- [Run history](https://www.triggercmd.com/forum/topic/59/api-call-to-list-your-commands-on-each-computer): run route, command filter, descending ordering, and status/timestamp fields.
+- [CLI documentation](https://github.com/rvmey/triggercmd-docs/blob/master/tcmdCLI.md) and [provider CLI source](https://github.com/rvmey/triggercmdGOclient/blob/master/tcmd.go): `records`, populated computers/panels, panel discovery/trigger routes, optional parameters, and continued support for `/api/run/triggerSave`.
+- [Local command definitions](https://github.com/rvmey/triggercmd-docs/blob/master/Commands.md): trigger names, parameter support, and local command storage.

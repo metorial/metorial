@@ -27,7 +27,9 @@ export let createWorkspace = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -45,18 +47,11 @@ export let createWorkspace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let workspace: any;
+    let workspace: Awaited<ReturnType<Client['getUserWorkspace']>>;
     if (ctx.input.ownerType === 'org') {
       workspace = await client.createOrgWorkspace(ownerHandle, {
         handle: ctx.input.handle,
@@ -73,7 +68,7 @@ export let createWorkspace = SlateTool.create(spec, {
 
     return {
       output: workspace,
-      message: `Created workspace **${workspace.handle}** (${workspace.instanceType || 'default'}).`
+      message: `Created workspace **${workspace.handle}**.`
     };
   })
   .build();
@@ -95,7 +90,9 @@ export let updateWorkspace = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -120,16 +117,9 @@ export let updateWorkspace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
     let updates = {
       handle: ctx.input.handle,
@@ -138,7 +128,7 @@ export let updateWorkspace = SlateTool.create(spec, {
       dbVolumeSizeBytes: ctx.input.dbVolumeSizeBytes
     };
 
-    let workspace: any;
+    let workspace: Awaited<ReturnType<Client['getUserWorkspace']>>;
     if (ctx.input.ownerType === 'org') {
       workspace = await client.updateOrgWorkspace(
         ownerHandle,
@@ -174,7 +164,9 @@ export let deleteWorkspace = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
@@ -188,18 +180,11 @@ export let deleteWorkspace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let workspace: any;
+    let workspace: Awaited<ReturnType<Client['getUserWorkspace']>>;
     if (ctx.input.ownerType === 'org') {
       workspace = await client.deleteOrgWorkspace(ownerHandle, ctx.input.workspaceHandle);
     } else {

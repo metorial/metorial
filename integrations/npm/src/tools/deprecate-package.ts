@@ -21,6 +21,7 @@ export let deprecatePackage = SlateTool.create(spec, {
         .string()
         .describe('Full package name (e.g. "my-package" or "@scope/my-package")'),
       version: z.string().describe('Semver version to deprecate (e.g. "1.2.3")'),
+      otp: z.string().optional().describe('One-time password when required by the account.'),
       message: z
         .string()
         .describe('Deprecation message shown to users. Use empty string to undeprecate.')
@@ -39,7 +40,8 @@ export let deprecatePackage = SlateTool.create(spec, {
     await client.deprecatePackageVersion(
       ctx.input.packageName,
       ctx.input.version,
-      ctx.input.message
+      ctx.input.message,
+      ctx.input.otp
     );
 
     let action = ctx.input.message ? 'Deprecated' : 'Undeprecated';

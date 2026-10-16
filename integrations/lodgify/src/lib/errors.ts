@@ -5,6 +5,7 @@ export let lodgifyApiError = (error: unknown, operation = 'request') =>
     providerLabel: 'Lodgify',
     operation,
     reason: 'lodgify_api_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
     detailKeys: ['message', 'code', 'correlation_id', 'detail', 'title'],
     extractUpstreamCode: (_error, response, helpers) => {
       if (!helpers.isRecord(response?.data)) return undefined;

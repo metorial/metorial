@@ -1,9 +1,14 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   assessIpRiskTool,
   geolocateIpTool,
+  getCountryInfoTool,
+  getTimezoneInfoTool,
+  listAsnPeersTool,
   lookupAsnTool,
+  lookupNetworksByCidrTool,
   lookupNetworkTool,
   reverseGeocodeTool,
   validatePhoneNumberTool,
@@ -19,7 +24,12 @@ export let provider = Slate.create({
     validatePhoneNumberTool,
     verifyEmailTool,
     lookupAsnTool,
-    lookupNetworkTool
+    lookupNetworkTool,
+    getCountryInfoTool,
+    getTimezoneInfoTool,
+    listAsnPeersTool,
+    lookupNetworksByCidrTool
   ],
+  toolCategories,
   triggers: []
 });

@@ -33,6 +33,10 @@ export let getTransfersTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       transfers: z.array(transferSchema),
       count: z.number().describe('Number of transfers returned')
     })
@@ -66,6 +70,7 @@ export let getTransfersTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         transfers: allTransfers,
         count: allTransfers.length
       },

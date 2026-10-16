@@ -5,7 +5,10 @@ import { spec } from '../spec';
 
 let realAddressInfoSchema = z.object({
   isEnabled: z.boolean().describe('Whether forwarding to this address is enabled'),
-  isVerificationNeeded: z.boolean().describe('Whether a verification email was sent'),
+  isVerificationNeeded: z
+    .boolean()
+    .optional()
+    .describe('Whether a verification email was sent'),
   isVerified: z.boolean().describe('Whether the address has been verified')
 });
 
@@ -14,7 +17,7 @@ export let createProxyEmail = SlateTool.create(spec, {
   key: 'create_proxy_email',
   description: `Create a new proxy email address (alias) that forwards incoming messages to one or more real email addresses. The proxy address is auto-generated on a ProxiedMail domain unless specified. Optionally enable email browsing via the API and configure a webhook callback URL for incoming mail notifications.`,
   instructions: [
-    'To receive webhook callbacks without forwarding, set realAddresses to ["int.proxiedmail.com"].',
+    'To receive webhook callbacks without forwarding, leave realAddresses empty or use an address such as notifications@int.proxiedmail.com.',
     'Set isBrowsable to true if you want to later read received emails through the API.'
   ],
   tags: {
@@ -57,7 +60,12 @@ export let createProxyEmail = SlateTool.create(spec, {
       realAddresses: z
         .record(z.string(), realAddressInfoSchema)
         .describe('Map of real email addresses and their verification status'),
-      isBrowsable: z.boolean().describe('Whether received emails can be browsed via the API'),
+      isBrowsable: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether received emails can be browsed via the API, when returned by the provider'
+        ),
       callbackUrl: z.string().nullable().describe('Configured webhook callback URL'),
       createdAt: z.string().describe('Creation timestamp')
     })
@@ -81,7 +89,7 @@ export let createProxyEmail = SlateTool.create(spec, {
         callbackUrl: result.callbackUrl,
         createdAt: result.createdAt
       },
-      message: `Created proxy email **${result.proxyAddress}** (ID: ${result.proxyBindingId}). Browsable: ${result.isBrowsable}. Forwarding to ${Object.keys(result.realAddresses).length} address(es).`
+      message: `Created proxy email **${result.proxyAddress}** (ID: ${result.proxyBindingId}). Forwarding to ${Object.keys(result.realAddresses).length} address(es).`
     };
   })
   .build();

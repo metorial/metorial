@@ -1,24 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { publicationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let unsubscribeEmail = SlateTool.create(spec, {
   name: 'Unsubscribe Email',
   key: 'unsubscribe_email',
-  description: `Unsubscribe an email address from a publication. The email will be added to the unsubscriber list and will no longer receive newsletters.`,
+  description: `Unsubscribe an email address from a publication. The email will be added to the unsubscriber list and will no longer receive newsletters. Call list_publications to discover the publication ID.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      publicationId: z.string().describe('ID of the publication'),
+      publicationId: publicationIdSchema,
       email: z.string().describe('Email address to unsubscribe')
     })
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional metadata'),
       success: z.boolean().describe('Whether the unsubscription was successful'),
       errorMessage: z.string().optional().describe('Error message if unsubscription failed'),
       errors: z.array(z.string()).optional().describe('Detailed error reasons')
@@ -32,9 +37,10 @@ export let unsubscribeEmail = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         success: response.success,
-        errorMessage: response.error_message,
-        errors: response.errors
+        errorMessage: response.error_message ?? undefined,
+        errors: response.errors ?? undefined
       },
       message: response.success
         ? `Successfully unsubscribed **${ctx.input.email}**.`

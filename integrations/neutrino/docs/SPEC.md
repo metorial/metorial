@@ -1,67 +1,33 @@
-# Slates Specification for Neutrino
+# Neutrino Specification
 
-## Overview
-
-Neutrino API is a collection of general-purpose utility APIs that provide data validation, security, telephony, geolocation, imaging, and e-commerce tools. It offers services such as email/phone validation, IP intelligence, geocoding, BIN lookups, image processing, content filtering, and SMS/voice verification.
+Neutrino exposes stateless utility APIs for validation, security and networking, geolocation, e-commerce, telephony, web metadata, and imaging. The tool categories follow the provider's API families.
 
 ## Authentication
 
-All API requests must be authenticated using an API key and your user ID.
+Use the existing API Key connection with `userId` and `apiKey`. The saved output remains `userId` and `token`. Requests send `User-ID` and `API-Key` headers to `https://neutrinoapi.net` using JSON POST bodies; the provider accepts JSON requests and both credential headers. There is no OAuth refresh flow, required resource configuration, or documented account identity API.
 
-Two parameters are required for every request:
+## Capabilities
 
-- **user-id**: Your static account user ID, assigned upon registration and cannot be changed.
-- **api-key**: An API key generated from your Neutrino account dashboard. You can create multiple API keys per account.
+- Email syntax/DNS validation and SMTP verification; phone parsing and formatting.
+- IP geolocation, blocklist and network intelligence; host reputation.
+- Domain details with registration, provider, threat, pending state, and detailed mail/website status. `get_domain_details` supersedes the legacy `domain_lookup` summary while retaining the old tool.
+- Address geocoding and reverse geocoding; currency and unit conversion; BIN lookup.
+- SMS and voice verification codes plus code validation. Telephony charges and account verification restrictions apply.
+- Text profanity detection/censoring; user-agent and client-hint lookup; URL metadata and optional page content.
+- Downloadable PNG QR/Code 128 codes, HTML rendered as PDF/PNG/JPG, and PNG/JPG image resizing. Downloads contain validated binary responses; structured results contain metadata and download request status and unconfirmed availability. Generating a file may consume API quota even if its download request or later delivery fails. Download availability remains unconfirmed after submission.
 
-The authentication parameters can be sent with POST, GET or as HTTP headers.
+## Response handling
 
-When authenticating via HTTP headers, the `api-key` header may also combine both credentials in the format: `API-Key: your-user-id:your-api-key`.
+Updated tools preserve complete provider JSON in optional `raw` data. Public summary fields retain their existing types. Missing or incompatible required provider values fail explicitly rather than being replaced with invented empty strings, zeroes, or false results. The legacy domain summary handler and schema remain frozen; new workflows should use its detailed replacement.
 
-There is no OAuth or token-based authentication. The user ID and API key are obtained by signing up at [neutrinoapi.com](https://www.neutrinoapi.com/signup/).
+## Deferred capabilities
 
-## Features
+HLR lookups, phone playback, bulk database/blocklist downloads, image watermarking, HTML cleaning, and browser automation are not implemented. The integration does not register triggers or webhooks. No operational requests or live verification were performed during this refresh.
 
-### Data Validation & Cleaning
+## Official documentation
 
-Parse, validate, and clean email addresses and phone numbers. Detect disposable or invalid emails and identify phone number types, carriers, and country of origin. Also includes a bad word filter for content moderation with configurable strictness levels ("strict" for children's content, "obscene" for adult audiences) and a user agent parser.
-
-### Unit & Currency Conversion
-
-Convert between currencies and measurement units using a single conversion tool.
-
-### Telephony & Verification
-
-Send security codes via SMS or automated phone calls for two-factor authentication. Verify security codes, send free-form SMS messages, and play back audio messages to phone numbers. All telephony APIs include a "limit" option to restrict the number of calls or SMS to a particular number, useful for abuse, fraud, and cost controls. HLR Lookup connects to the global mobile network to check mobile device status and carrier details.
-
-### Geolocation
-
-Geocode addresses to coordinates and reverse geocode coordinates to addresses. Look up geolocation and ISP information for IP addresses, including reverse DNS.
-
-### Security & Networking
-
-- **IP Blocklist**: Detect potentially malicious or dangerous IP addresses against known blocklists.
-- **Host Reputation**: Check the reputation of an IP address, domain name or URL against a comprehensive list of blacklists and blocklists.
-- **Domain Lookup**: Retrieve DNS and WHOIS information for domains.
-- **Email Verify**: Perform SMTP-based email address verification to confirm real, deliverable mailboxes.
-- **IP Probe**: Detect ISPs, hosting providers, and VPN/proxy usage for a given IP.
-
-### E-Commerce
-
-Perform BIN (Bank Identification Number) or IIN (Issuer Identification Number) lookups to identify card issuers, types, and countries. Download the full BIN database for local use.
-
-### Imaging
-
-- **HTML Render**: Render HTML content to PDF, JPG or PNG based on the latest Chromium browser engine. Fully supports HTML5, CSS3, SVG and JavaScript with configurable rendering options.
-- **Image Resize**: Resize images and output as JPEG or PNG.
-- **Image Watermark**: Overlay one image onto another with configurable position and opacity.
-- **QR Code**: Generate QR codes as PNG images with customizable size, foreground, and background colors.
-
-### Web Tools
-
-- **Browser Bot**: Programmatically load and interact with web pages.
-- **HTML Clean**: Sanitize and clean HTML content.
-- **URL Info**: Retrieve metadata and information about a URL including page title and language.
-
-## Events
-
-The provider does not support events. Neutrino API is a stateless utility API platform with no webhook or event subscription mechanism.
+- [API fundamentals and authentication](https://www.neutrinoapi.com/api/api-basics/)
+- [API specification](https://www.neutrinoapi.com/api/specification/)
+- [Domain lookup](https://www.neutrinoapi.com/api/domain-lookup/)
+- [Phone verification](https://www.neutrinoapi.com/api/phone-verify/)
+- [Imaging APIs](https://www.neutrinoapi.com/api/html-render/)

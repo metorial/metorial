@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let listCategories = SlateTool.create(spec, {
   name: 'List Categories',
   key: 'list_categories',
-  description: `Retrieve all available event categories from CoinMarketCal. Categories represent types of events such as exchange listings, airdrops, hard forks, partnerships, and updates. Use the returned category IDs when filtering events with the Search Events tool.`,
+  description: `DEPRECATED — use \`list_event_categories\` instead. Retrieve all available event categories from CoinMarketCal. Categories represent types of events such as exchange listings, airdrops, hard forks, partnerships, and updates. Use the returned category IDs when filtering events with the Search Events tool.`,
+  instructions: [
+    'API V1 was retired on July 14, 2026. Use list_event_categories with a V2 API key and Standard or higher plan. V2 category IDs are strings.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

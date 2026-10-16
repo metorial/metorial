@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requiredArray, requiredNumber, requiredString } from '../lib/client';
 import { spec } from '../spec';
 
 let frameSchema = z.object({
@@ -48,6 +48,7 @@ export let browseFraming = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       collections: z
         .array(
           z.object({
@@ -103,61 +104,57 @@ export let browseFraming = SlateTool.create(spec, {
         collectionId: ctx.input.collectionId,
         productCode: ctx.input.productCode
       });
-      if (!data.status?.success)
-        throw new Error(data.status?.message || 'Failed to list collections');
 
-      let collections = (data.collections ?? []).map((c: any) => ({
-        collectionId: c.id,
-        name: c.name ?? '',
-        description: c.description || undefined,
-        alias: c.alias || undefined,
-        iconUrl: c.icon_url_1 || undefined,
-        startingPrice: c.starting_price,
-        frames: (c.frames ?? []).map((f: any) => ({
-          frameId: f.id,
-          name: f.name ?? '',
-          thickness: f.thickness,
-          depth: f.depth,
-          color: f.color || undefined,
-          composite: f.composite || undefined,
-          minWidth: f.min_width,
-          minHeight: f.min_height,
-          maxWidth: f.max_width,
-          maxHeight: f.max_height,
-          priceLevel: f.price_level,
-          allowGlazing: f.allow_glazing,
-          allowMatting: f.allow_matting,
-          sampleImageUrl: f.sample_image_url_1 || undefined,
-          profileSvgUrl: f.profile_svg_url || undefined,
-          startingPrice: f.starting_price
+      let collections = requiredArray(data.collections, 'collections').map((c: any) => ({
+        collectionId: requiredNumber(c.id, 'id'),
+        name: requiredString(c.name, 'name'),
+        description: c.description ?? undefined,
+        alias: c.alias ?? undefined,
+        iconUrl: c.icon_url_1 ?? undefined,
+        startingPrice: c.starting_price ?? undefined,
+        frames: c.frames?.map((f: any) => ({
+          frameId: requiredNumber(f.id, 'id'),
+          name: requiredString(f.name, 'name'),
+          thickness: f.thickness ?? undefined,
+          depth: f.depth ?? undefined,
+          color: f.color ?? undefined,
+          composite: f.composite ?? undefined,
+          minWidth: f.min_width ?? undefined,
+          minHeight: f.min_height ?? undefined,
+          maxWidth: f.max_width ?? undefined,
+          maxHeight: f.max_height ?? undefined,
+          priceLevel: f.price_level ?? undefined,
+          allowGlazing: f.allow_glazing ?? undefined,
+          allowMatting: f.allow_matting ?? undefined,
+          sampleImageUrl: f.sample_image_url_1 ?? undefined,
+          profileSvgUrl: f.profile_svg_url ?? undefined,
+          startingPrice: f.starting_price ?? undefined
         }))
       }));
 
       return {
-        output: { collections },
-        message: `Found **${collections.length}** frame collection(s). ${collections.map((c: any) => `"${c.name}" (${c.frames?.length ?? 0} frames)`).join(', ')}`
+        output: { collections, raw: data },
+        message: `Found **${collections.length}** frame collection(s). ${collections.map((c: any) => `"${c.name}" ${c.frames ? `(${c.frames.length} frames)` : ''}`).join(', ')}`
       };
     }
 
     if (ctx.input.resourceType === 'mats') {
       let data = await client.listMats(ctx.input.resourceId);
-      if (!data.status?.success)
-        throw new Error(data.status?.message || 'Failed to list mats');
 
-      let mats = (data.mats ?? []).map((m: any) => ({
-        matId: m.id,
-        name: m.name ?? '',
-        color: m.color || undefined,
-        minWidth: m.min_width,
-        minHeight: m.min_height,
-        maxWidth: m.max_width,
-        maxHeight: m.max_height,
-        composite: m.composite || undefined,
-        startingPrice: m.starting_price
+      let mats = requiredArray(data.mats, 'mats').map((m: any) => ({
+        matId: requiredNumber(m.id, 'id'),
+        name: requiredString(m.name, 'name'),
+        color: m.color ?? undefined,
+        minWidth: m.min_width ?? undefined,
+        minHeight: m.min_height ?? undefined,
+        maxWidth: m.max_width ?? undefined,
+        maxHeight: m.max_height ?? undefined,
+        composite: m.composite ?? undefined,
+        startingPrice: m.starting_price ?? undefined
       }));
 
       return {
-        output: { mats },
+        output: { mats, raw: data },
         message: `Found **${mats.length}** mat option(s). ${mats
           .slice(0, 10)
           .map((m: any) => `"${m.name}"`)
@@ -167,18 +164,16 @@ export let browseFraming = SlateTool.create(spec, {
 
     // glazing
     let data = await client.listGlazing(ctx.input.resourceId);
-    if (!data.status?.success)
-      throw new Error(data.status?.message || 'Failed to list glazing');
 
-    let glazing = (data.glazing ?? []).map((g: any) => ({
-      glazingId: g.id,
-      name: g.name ?? '',
-      description: g.description || undefined,
-      startingPrice: g.starting_price
+    let glazing = requiredArray(data.glazing, 'glazing').map((g: any) => ({
+      glazingId: requiredNumber(g.id, 'id'),
+      name: requiredString(g.name, 'name'),
+      description: g.description ?? undefined,
+      startingPrice: g.starting_price ?? undefined
     }));
 
     return {
-      output: { glazing },
+      output: { glazing, raw: data },
       message: `Found **${glazing.length}** glazing option(s). ${glazing.map((g: any) => `"${g.name}" ($${g.startingPrice?.toFixed(2) ?? 'N/A'})`).join(', ')}`
     };
   })

@@ -2,6 +2,8 @@ export * from './check-review-optin';
 export * from './get-location-details';
 export * from './get-location-photos';
 export * from './get-location-reviews';
+export * from './list-location-mappings';
+export * from './list-review-requests';
 export * from './manage-review-request';
 export * from './map-location';
 export * from './search-locations';

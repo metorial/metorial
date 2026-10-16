@@ -10,7 +10,7 @@ export let callModule = SlateTool.create(spec, {
 
 Provide the module ID and a JSON payload to send to the module endpoint.`,
   instructions: [
-    'Find module IDs in the API Labz marketplace at apilabz.com.',
+    'Call list_api_modules to discover current public module IDs and example parameters. Custom module IDs are available in your API Labz account.',
     'The parameters object should contain the fields required by the specific module.'
   ],
   tags: {
@@ -19,7 +19,11 @@ Provide the module ID and a JSON payload to send to the module endpoint.`,
 })
   .input(
     z.object({
-      moduleId: z.string().describe('The module ID to call, e.g. "617"'),
+      moduleId: z
+        .string()
+        .describe(
+          'The module ID to call. Use list_api_modules to discover public module IDs.'
+        ),
       parameters: z
         .record(z.string(), z.unknown())
         .describe('Key-value parameters to send to the module as the request body')

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DotSimpleClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let schedulePost = SlateTool.create(spec, {
@@ -18,6 +19,7 @@ export let schedulePost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       postUuid: z.string().describe('UUID of the post to schedule or publish'),
       postNow: z
         .boolean()
@@ -39,7 +41,7 @@ export let schedulePost = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     if (ctx.input.addToQueue) {

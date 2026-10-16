@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,11 @@ Useful for terrain analysis, flood risk assessment, and geographic data enrichme
       elevation: z.number().describe('Elevation in meters relative to sea level'),
       meta: z
         .record(z.string(), z.any())
-        .describe('Request metadata including source and coordinates')
+        .describe('Request metadata including source and coordinates'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete original provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -35,14 +39,20 @@ Useful for terrain analysis, flood risk assessment, and geographic data enrichme
       lng: ctx.input.longitude
     });
 
-    let elevation = result.data?.elevation ?? 0;
+    let elevation = result.data?.elevation;
+    if (typeof elevation !== 'number' || !Number.isFinite(elevation)) {
+      throw createApiServiceError(
+        'Stormglass returned an invalid response: elevation is missing or not a number.'
+      );
+    }
 
     return {
       output: {
         elevation,
-        meta: result.meta ?? {}
+        meta: result.meta,
+        raw: result
       },
-      message: `Elevation at coordinates (${ctx.input.latitude}, ${ctx.input.longitude}): **${elevation} meters** above sea level.`
+      message: `Elevation at coordinates (${ctx.input.latitude}, ${ctx.input.longitude}): **${elevation} meters** relative to sea level.`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, rawSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCustomFields = SlateTool.create(spec, {
@@ -16,6 +16,9 @@ Useful for understanding which fields are available before adding or importing s
   .input(z.object({}))
   .output(
     z.object({
+      raw: rawSchema
+        .optional()
+        .describe('Original provider response, with credentials removed'),
       fields: z
         .array(
           z.object({
@@ -23,10 +26,13 @@ Useful for understanding which fields are available before adding or importing s
             type: z
               .string()
               .describe('Field type (boolean, string, number, date, gender, country)'),
-            predefined: z.boolean().describe('Whether the field is a predefined system field'),
+            predefined: z
+              .boolean()
+              .optional()
+              .describe('Whether the field is a predefined system field'),
             isPrivate: z.boolean().describe('Whether the field is private'),
             isReadonly: z.boolean().describe('Whether the field is read-only'),
-            sample: z.string().describe('Sample value for the field')
+            sample: z.string().optional().describe('Sample value for the field')
           })
         )
         .describe('Array of custom field definitions')
@@ -39,7 +45,7 @@ Useful for understanding which fields are available before adding or importing s
     });
 
     let result = await client.getFields();
-    let fields = (result.items ?? []).map(f => ({
+    let fields = result.items.map(f => ({
       name: f.name,
       type: f.type,
       predefined: f.predefined,
@@ -49,7 +55,7 @@ Useful for understanding which fields are available before adding or importing s
     }));
 
     return {
-      output: { fields },
+      output: { fields, raw: result.raw },
       message: `Found **${fields.length}** custom fields.`
     };
   })

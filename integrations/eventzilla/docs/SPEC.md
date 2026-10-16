@@ -1,4 +1,4 @@
-# Slates Specification for Eventzilla
+# Eventzilla API Capabilities
 
 ## Overview
 
@@ -8,7 +8,7 @@ Eventzilla is a do-it-yourself event ticketing and marketing platform that helps
 
 Eventzilla uses **API Key** authentication via a custom header.
 
-To send a request to the Eventzilla API, you must generate an API key by creating a new application within your account settings section (**Settings > App Management**). You must authenticate your account when using the API by including your API key in the request.
+To send a request to the Eventzilla API, you must generate an API key by creating a new application within your account settings section (**Settings > Developers > API Credentials**). You must authenticate your account when using the API by including your API key in the request.
 
 The API key is passed as a request header named `x-api-key`:
 
@@ -32,7 +32,7 @@ Retrieve a list of all events in your Eventzilla account or get details for a sp
 
 ### Ticket Configuration
 
-Retrieve ticket types (categories) for a specific event, including pricing, sale dates, quantity limits, group discounts, partial payment options, unlock codes, and visibility settings. Ticket types include paid, free, partial, add-on, donation, and approval-based tickets.
+Retrieve ticket types (categories) for a specific event, including pricing, sale dates, quantity limits, group discounts, partial payment options, unlock codes, and visibility settings. Retrieved ticket types include paid, free, partial, add-on, donation, and approval-based tickets. Create or update free ticket types with names, capacity, sale windows, purchase limits, visibility, box-office availability, instructions, and optional unlock codes. Updates require the complete ticket definition. Donation options remain available in ticket results.
 
 ### Registration & Checkout
 
@@ -57,12 +57,19 @@ Retrieve transaction details for a specific event or look up individual transact
 
 ### User Management
 
-Retrieve organizer and sub-organizer account details, including contact information, company, address, timezone, social media profiles, and user type.
+List organizer and sub-organizer accounts, then retrieve a specific user by ID with `get_user`. Profiles include contact information, company, address, timezone, social profiles, and user type. These endpoints do not identify the owner of the API key.
 
 ### Event Categories
 
 Retrieve the list of available event categories (e.g., Business, Music, Conferences, Training) used for organizing and filtering events.
 
-## Events
+## Webhooks
 
-The provider does not support webhooks or event subscriptions through its API. Eventzilla mentions webhook and HTTP request options on its integrations page, but no webhook registration or subscription endpoints are documented in the public API. Third-party integration platforms like Zapier use polling-based triggers (e.g., new attendee added, new transaction) rather than native webhooks.
+Eventzilla documents registration and attendee check-in webhooks configured in the account. The integration does not currently expose webhook triggers. No public API endpoint for creating webhook subscriptions is documented.
+
+## API Reference
+
+- [Eventzilla API v2](https://developer.eventzilla.net/docs/): API-key authentication, pagination, events, ticket types, categories, checkout, orders, attendees, transactions, and organizer profiles.
+- [Eventzilla webhooks](https://developer.eventzilla.net/docs/webhooks.html): account-configured notification payloads and supported triggers.
+
+API keys use the `x-api-key` header. List tools return one page; pass offset and limit to continue where supported. Responses include the original provider data alongside normalized fields. Monetary values and counts exposed as text retain their existing output types, including when Eventzilla returns JSON numbers. New free-ticket operations follow the documented POST and PATCH routes; availability has not been verified with a live account.

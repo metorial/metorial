@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,6 +44,14 @@ export let manageMoveOutTool = SlateTool.create(spec, {
     });
 
     let { action } = ctx.input;
+
+    if (action === 'create') {
+      if (!ctx.input.unitRentalId?.trim()) {
+        throw createApiServiceError('unitRentalId is required to create a move-out.');
+      }
+    } else if (!ctx.input.jobId?.trim()) {
+      throw createApiServiceError(`jobId is required for the ${action} action.`);
+    }
 
     if (action === 'create') {
       let jobData: Record<string, any> = {

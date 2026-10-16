@@ -1,6 +1,19 @@
+import { createApiServiceError } from 'slates';
 import { type AdobeAuthConfig, createAdobeAxios } from './client';
 
 let LIBRARIES_BASE_URL = 'https://cc-libraries.adobe.io';
+
+let libraryStart = (cursor?: string) => {
+  if (!cursor) return '0';
+  if (/^\d+$/.test(cursor)) return cursor;
+  // Older invocations returned the next link as the cursor. Read its offset;
+  // never use a caller-provided URL as a transport destination.
+  try {
+    let start = new URL(cursor, LIBRARIES_BASE_URL).searchParams.get('start');
+    if (start && /^\d+$/.test(start)) return start;
+  } catch {}
+  throw createApiServiceError('Use the nextCursor returned by the library listing.');
+};
 
 export class LibrariesClient {
   private http;
@@ -12,8 +25,8 @@ export class LibrariesClient {
   async listLibraries(params?: { limit?: number; start?: string }) {
     let response = await this.http.get('/api/v1/libraries', {
       params: {
-        limit: params?.limit || 50,
-        ...(params?.start ? { start: params.start } : {})
+        limit: params?.limit ?? 50,
+        start: libraryStart(params?.start)
       }
     });
     return response.data;
@@ -37,8 +50,8 @@ export class LibrariesClient {
   async listElements(libraryId: string, params?: { limit?: number; start?: string }) {
     let response = await this.http.get(`/api/v1/libraries/${libraryId}/elements`, {
       params: {
-        limit: params?.limit || 50,
-        ...(params?.start ? { start: params.start } : {})
+        limit: params?.limit ?? 50,
+        start: libraryStart(params?.start)
       }
     });
     return response.data;

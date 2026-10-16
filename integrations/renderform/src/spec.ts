@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'renderform',
   name: 'Renderform',
   description:
-    'Template-based image, PDF, and screenshot generation API with CDN hosting and webhook notifications.',
+    'Generate images, PDFs, videos, and screenshots, manage templates and results, and inspect account usage.',
   metadata: {},
   config,
   auth

@@ -1,4 +1,4 @@
-# Slates Specification for Sendspark
+# Sendspark API Specification
 
 ## Overview
 
@@ -13,7 +13,7 @@ Sendspark uses API keys for authentication. Two credentials are required for all
 
 Both credentials can be found in the **API Credentials** tab in Sendspark settings at `https://sendspark.com/settings/api-credentials`. Your API Secret Key will appear for you to copy and use. Note that you will never be able to view this key again.
 
-Additionally, a **Workspace ID** is required in all API request URLs. This is also available from the API Credentials tab.
+The connected workspace is discovered from `GET /v1/workspaces/identifier` during authentication. Existing saved workspace routing remains available. Workspace-scoped tools also accept an optional `workspaceId` from `list_workspaces`; an explicit tool value takes precedence over saved connection routing, then the credential-bound workspace is used. Setup does not require a workspace ID.
 
 The base URL for all API requests is `https://api-gw.sendspark.com`.
 
@@ -36,7 +36,7 @@ Add prospects (recipients) to dynamic video campaigns to automatically generate 
 
 ### API Health Check
 
-A simple endpoint to verify that the API is operational and that your credentials are valid.
+The existing `check_health` tool retains `GET /v1/auth/health`, documented in the [official API guide](https://help.sendspark.com/api-automatically-create-dynamic-videos-via-api). The published OpenAPI does not include its response schema. New authentication uses the documented workspace identifier endpoint.
 
 ## Events
 
@@ -44,7 +44,7 @@ Webhooks in Sendspark allow you to trigger specific events from your dynamic vid
 
 Webhooks are configured in the Sendspark Settings panel. Each webhook has a name and a target URL, and can be associated with all campaigns in a workspace or linked to specific dynamic video campaigns.
 
-Webhooks can also be configured per-prospect when adding prospects via the API, by providing a unique `webhookUrl` and selecting specific `webhookEvents`.
+Webhooks can also be configured per-prospect when adding prospects via the API, by providing a unique `webhookUrl` and selecting specific `webhookEvents` inside the `prospect` object. Bulk requests may provide these fields on each prospect. These are outbound provider notifications; the integration does not expose inbound event subscriptions.
 
 The following event types are available:
 
@@ -79,3 +79,24 @@ Triggered when a viewer clicks the "Like" button on a video.
 ### Video CTA Clicked
 
 Triggered when a viewer clicks a Call-to-Action button on the video share page.
+
+
+## Additional operations
+
+- `get_workspace` identifies the API key's workspace; `list_workspaces` returns accessible workspace names and IDs.
+- `get_dynamics_settings` returns supported personalization languages; `update_campaign_settings` changes `useFallbackData` without altering other settings.
+- `get_prospect` can request `emailEmbedHTML` and `fields`, and exposes the real prospect ID and original background URL when returned.
+- `get_transcript_status` reads `none`, `processing`, `ready`, or `failed` without starting transcription. `get_transcript` reads ready transcript text and timed segments.
+- `download_transcript` prepares a WebVTT or SubRip download through the authenticated transcript endpoint after checking readiness. Output contains metadata, never subtitle file contents. The stable endpoint has no documented URL expiry; none is invented. Provider readiness, download access, and account permissions can change after the check.
+
+## Pagination and compatibility
+
+`list_campaigns` retains the existing numeric `offset` and `limit` inputs, creator filter, search behavior, and omitted defaults; optional `sortOrder` is forwarded when supplied. The current reference lists these parameters without publishing pagination limits or a successful response schema. Existing pagination metadata is returned when supplied by Sendspark. Complete JSON responses are retained on existing tools alongside their normalized fields, so additional provider data is not lost.
+
+All seven original tool keys and field contracts remain available. Prospect processing still authorizes charges as documented in the existing tools; no additional read request blocks those mutations when workspace routing is already saved. Optional prospect personalization values are forwarded without trimming or converting old falsy omissions.
+
+## Documentation and verification limits
+
+The [official reference](https://help.sendspark.com/api-reference) and [OpenAPI](https://help.sendspark.com/api-reference/openapi.json) document API-key and API-secret headers, workspace discovery, campaigns, prospects, settings, and transcripts. The current OpenAPI labels itself a draft; several campaign responses are generic objects or omit a success response definition. Those gaps do not establish endpoint retirement or missing output values. Required legacy campaign output fields remain unchanged.
+
+This refresh was verified with local build, type checking, formatting, and original-schema comparisons. It did not make live provider calls or run live end-to-end tests; credential acceptance, billing behavior, provider response shapes, webhooks, pagination, and actual subtitle downloads remain unverified against an account.

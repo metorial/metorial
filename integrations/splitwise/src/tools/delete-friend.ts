@@ -27,7 +27,7 @@ export let deleteFriend = SlateTool.create(spec, {
     let result = await client.deleteFriend(ctx.input.friendId);
 
     return {
-      output: { success: result.success !== false },
+      output: { success: result.success },
       message: `Removed friend ${ctx.input.friendId}`
     };
   })

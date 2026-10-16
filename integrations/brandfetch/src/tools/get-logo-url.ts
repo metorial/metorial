@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { buildLogoUrl } from '../lib/client';
 import { spec } from '../spec';
@@ -14,8 +14,8 @@ Supports customizable dimensions, theme variants, multiple logo types, output fo
     'The same identifier types as the Brand API are supported: domain, ticker, ISIN, crypto symbol.'
   ],
   constraints: [
-    'Up to 500,000 requests/month under free fair use.',
-    'Rate limited to 1,000 requests per 5 minutes per IP.'
+    'Up to 1,000,000 requests/month under free fair use.',
+    'Rate limited to 1,000 requests per 5 minutes per IP and 2,400 per customer.'
   ],
   tags: {
     readOnly: true
@@ -28,6 +28,12 @@ Supports customizable dimensions, theme variants, multiple logo types, output fo
         .describe(
           'Brand identifier: domain (e.g. "nike.com"), ticker, ISIN, or crypto symbol'
         ),
+      identifierType: z
+        .enum(['domain', 'ticker', 'isin', 'crypto'])
+        .optional()
+        .describe(
+          'Explicit identifier type to avoid collisions. Omit to preserve auto-detection.'
+        ),
       logoType: z
         .enum(['icon', 'logo', 'symbol'])
         .optional()
@@ -38,11 +44,15 @@ Supports customizable dimensions, theme variants, multiple logo types, output fo
       height: z
         .number()
         .optional()
-        .describe('Desired height in pixels (aspect ratio is preserved)'),
+        .describe(
+          'Desired height in pixels. The provider preserves aspect ratio, clamps sizes to 16-2048, truncates decimals, and ignores nonpositive values.'
+        ),
       width: z
         .number()
         .optional()
-        .describe('Desired width in pixels (aspect ratio is preserved)'),
+        .describe(
+          'Desired width in pixels. The provider preserves aspect ratio, clamps sizes to 16-2048, truncates decimals, and ignores nonpositive values.'
+        ),
       fallback: z
         .enum(['brandfetch', 'transparent', 'lettermark', '404'])
         .optional()
@@ -63,8 +73,8 @@ Supports customizable dimensions, theme variants, multiple logo types, output fo
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.clientId) {
-      throw new Error(
+    if (!ctx.auth.clientId?.trim()) {
+      throw createApiServiceError(
         'Client ID is required for the Logo API. Please configure your Brandfetch Client ID in the authentication settings.'
       );
     }
@@ -74,6 +84,7 @@ Supports customizable dimensions, theme variants, multiple logo types, output fo
     let url = buildLogoUrl({
       identifier: ctx.input.identifier,
       clientId: ctx.auth.clientId,
+      identifierType: ctx.input.identifierType,
       type: ctx.input.logoType,
       theme: ctx.input.theme,
       height: ctx.input.height,

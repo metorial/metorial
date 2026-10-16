@@ -26,10 +26,18 @@ let ingredientSchema = z.object({
   filters: z
     .object({
       brandName: z.string().optional().describe('Filter by brand name'),
+      brandFilters: z
+        .array(z.string())
+        .optional()
+        .describe('Case-sensitive brand names for product matching'),
+      healthFilters: z
+        .array(z.string())
+        .optional()
+        .describe('Health filters such as ORGANIC, GLUTEN_FREE, or VEGAN'),
       healthAttributes: z
         .array(z.string())
         .optional()
-        .describe('Filter by health attributes (e.g., "organic", "gluten_free")')
+        .describe('Filter by health attributes (e.g., "ORGANIC", "GLUTEN_FREE")')
     })
     .optional()
     .describe('Filters to narrow product matching')
@@ -64,6 +72,10 @@ Requires **Developer Platform API key** authentication.`,
         .string()
         .optional()
         .describe('External tracking ID for your reference'),
+      contentCreatorCreditInfo: z
+        .string()
+        .optional()
+        .describe('Credit for the recipe content creator'),
       expiresIn: z
         .number()
         .optional()
@@ -87,6 +99,7 @@ Requires **Developer Platform API key** authentication.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       productsLinkUrl: z.string().describe('URL to the hosted Instacart recipe page')
     })
   )

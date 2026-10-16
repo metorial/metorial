@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'marketstack',
   name: 'Marketstack',
   description:
-    'Real-time, intraday, and historical stock market data covering 30,000+ tickers from 70+ exchanges worldwide, plus commodities, bonds, indices, ETF holdings, and SEC EDGAR filings.',
+    'Query stock prices, company information, corporate actions, commodities, bonds, indices, ETF holdings, and SEC EDGAR data through Marketstack.',
   metadata: {},
   config,
   auth

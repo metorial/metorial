@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,15 +34,15 @@ export let manageProductModule = SlateTool.create(spec, {
       maxCheckoutValidity: z
         .number()
         .optional()
-        .describe('Maximum checkout validity in seconds for offline validation'),
+        .describe('Maximum checkout validity in days for offline validation'),
       yellowThreshold: z
         .number()
         .optional()
-        .describe('Warning level yellow threshold percentage (0-100)'),
+        .describe('Remaining time volume for the yellow warning level (Rental model)'),
       redThreshold: z
         .number()
         .optional()
-        .describe('Warning level red threshold percentage (0-100)'),
+        .describe('Remaining time volume for the red warning level (Rental model)'),
       forceCascade: z.boolean().optional().describe('When deleting, force cascade deletion')
     })
   )
@@ -61,7 +61,10 @@ export let manageProductModule = SlateTool.create(spec, {
     let { action, productModuleNumber, forceCascade, ...params } = ctx.input;
 
     if (action === 'delete') {
-      if (!productModuleNumber) throw new Error('productModuleNumber is required for delete');
+      if (!productModuleNumber)
+        throw createApiServiceError('productModuleNumber is required for delete', {
+          reason: 'invalid_input'
+        });
       await client.deleteProductModule(productModuleNumber, forceCascade);
       return {
         output: { productModuleNumber, deleted: true },
@@ -70,9 +73,15 @@ export let manageProductModule = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!productModuleNumber) throw new Error('productModuleNumber is required for update');
+      if (!productModuleNumber)
+        throw createApiServiceError('productModuleNumber is required for update', {
+          reason: 'invalid_input'
+        });
       let result = await client.updateProductModule(productModuleNumber, params);
-      if (!result) throw new Error('Failed to update product module');
+      if (!result)
+        throw createApiServiceError('Failed to update product module', {
+          reason: 'invalid_response'
+        });
       return {
         output: {
           productModuleNumber: result.number,
@@ -89,7 +98,10 @@ export let manageProductModule = SlateTool.create(spec, {
     let createParams: Record<string, any> = { ...params };
     if (productModuleNumber) createParams.number = productModuleNumber;
     let result = await client.createProductModule(createParams);
-    if (!result) throw new Error('Failed to create product module');
+    if (!result)
+      throw createApiServiceError('Failed to create product module', {
+        reason: 'invalid_response'
+      });
     return {
       output: {
         productModuleNumber: result.number,

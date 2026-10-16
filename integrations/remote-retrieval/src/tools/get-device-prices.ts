@@ -30,10 +30,10 @@ export let getDevicePrices = SlateTool.create(spec, {
 
     let result = await client.getDevicePrices();
 
-    let prices = (Array.isArray(result) ? result : []).map((item: any) => ({
-      equipmentType: item.equipment_type || '',
-      orderAmount: item.order_amount || 0,
-      optionLabel: item.option_lbl || ''
+    let prices = result.map(item => ({
+      equipmentType: item.equipment_type,
+      orderAmount: item.order_amount,
+      optionLabel: item.option_lbl
     }));
 
     let summary = prices.map(p => `${p.equipmentType}: $${p.orderAmount}`).join(', ');

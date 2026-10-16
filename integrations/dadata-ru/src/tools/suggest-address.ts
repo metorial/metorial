@@ -1,11 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let addressSuggestionSchema = z.object({
-  value: z.string().describe('Formatted address string'),
-  unrestrictedValue: z.string().describe('Full address without restrictions applied'),
+  value: z.string().optional().describe('Formatted address string'),
+  unrestrictedValue: z
+    .string()
+    .optional()
+    .describe('Full address without restrictions applied'),
   postalCode: z.string().nullable().describe('Postal code'),
   country: z.string().nullable().describe('Country name'),
   countryIsoCode: z.string().nullable().describe('ISO country code'),
@@ -57,6 +61,10 @@ Results can be constrained by region, geographic coordinates/radius, or bounded 
         .number()
         .optional()
         .describe('Number of results to return (max 20, default 10)'),
+      division: z
+        .enum(['ADMINISTRATIVE', 'MUNICIPAL'])
+        .optional()
+        .describe('Administrative or municipal address division'),
       language: z.enum(['ru', 'en']).optional().describe('Response language'),
       fromBound: z
         .enum(['country', 'region', 'area', 'city', 'settlement', 'street', 'house'])
@@ -92,6 +100,7 @@ Results can be constrained by region, geographic coordinates/radius, or bounded 
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       suggestions: z.array(addressSuggestionSchema).describe('List of address suggestions')
     })
   )
@@ -104,7 +113,8 @@ Results can be constrained by region, geographic coordinates/radius, or bounded 
     let data = await client.suggestAddress({
       query: ctx.input.query,
       count: ctx.input.count,
-      language: ctx.input.language || ctx.config.language,
+      division: ctx.input.division,
+      language: ctx.input.language ?? ctx.config.language,
       locations: ctx.input.locations,
       locationsGeo: ctx.input.locationsGeo,
       locationsBoost: ctx.input.locationsBoost,
@@ -113,9 +123,9 @@ Results can be constrained by region, geographic coordinates/radius, or bounded 
       restrictValue: ctx.input.restrictValue
     });
 
-    let suggestions = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
-      unrestrictedValue: s.unrestricted_value || '',
+    let suggestions = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
+      unrestrictedValue: s.unrestricted_value ?? undefined,
       postalCode: s.data?.postal_code ?? null,
       country: s.data?.country ?? null,
       countryIsoCode: s.data?.country_iso_code ?? null,
@@ -137,7 +147,10 @@ Results can be constrained by region, geographic coordinates/radius, or bounded 
     }));
 
     return {
-      output: { suggestions },
+      output: {
+        rawData: data,
+        suggestions
+      },
       message: `Found **${suggestions.length}** address suggestion(s) for "${ctx.input.query}".`
     };
   })

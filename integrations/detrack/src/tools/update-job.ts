@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DetrackClient } from '../lib/client';
+import { DetrackClient, type JobData } from '../lib/client';
 import { spec } from '../spec';
 
 let itemSchema = z
@@ -100,65 +100,69 @@ export let updateJobTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DetrackClient(ctx.auth.token);
 
-    let jobData: Record<string, unknown> = {
+    let jobData: Partial<JobData> & { do_number: string; date: string } = {
       do_number: ctx.input.doNumber,
       date: ctx.input.date
     };
 
-    if (ctx.input.address) jobData.address = ctx.input.address;
-    if (ctx.input.type) jobData.type = ctx.input.type;
+    if (ctx.input.address !== undefined) jobData.address = ctx.input.address;
+    if (ctx.input.type !== undefined) jobData.type = ctx.input.type;
     if (ctx.input.assignTo !== undefined) jobData.assign_to = ctx.input.assignTo;
-    if (ctx.input.deliverTo) jobData.deliver_to_collect_from = ctx.input.deliverTo;
-    if (ctx.input.lastName) jobData.last_name = ctx.input.lastName;
-    if (ctx.input.companyName) jobData.company_name = ctx.input.companyName;
-    if (ctx.input.phone) jobData.phone = ctx.input.phone;
-    if (ctx.input.senderPhone) jobData.sender_phone = ctx.input.senderPhone;
-    if (ctx.input.notifyEmail) jobData.notify_email = ctx.input.notifyEmail;
-    if (ctx.input.trackingNumber) jobData.tracking_number = ctx.input.trackingNumber;
-    if (ctx.input.orderNumber) jobData.order_number = ctx.input.orderNumber;
-    if (ctx.input.instructions) jobData.instructions = ctx.input.instructions;
-    if (ctx.input.jobType) jobData.job_type = ctx.input.jobType;
+    if (ctx.input.deliverTo !== undefined)
+      jobData.deliver_to_collect_from = ctx.input.deliverTo;
+    if (ctx.input.lastName !== undefined) jobData.last_name = ctx.input.lastName;
+    if (ctx.input.companyName !== undefined) jobData.company_name = ctx.input.companyName;
+    if (ctx.input.phone !== undefined) jobData.phone_number = ctx.input.phone;
+    if (ctx.input.senderPhone !== undefined)
+      jobData.sender_phone_number = ctx.input.senderPhone;
+    if (ctx.input.notifyEmail !== undefined) jobData.notify_email = ctx.input.notifyEmail;
+    if (ctx.input.trackingNumber !== undefined)
+      jobData.tracking_number = ctx.input.trackingNumber;
+    if (ctx.input.orderNumber !== undefined) jobData.order_number = ctx.input.orderNumber;
+    if (ctx.input.instructions !== undefined) jobData.instructions = ctx.input.instructions;
+    if (ctx.input.jobType !== undefined) jobData.job_type = ctx.input.jobType;
     if (ctx.input.jobSequence !== undefined) jobData.job_sequence = ctx.input.jobSequence;
-    if (ctx.input.jobTime) jobData.job_time = ctx.input.jobTime;
-    if (ctx.input.timeWindow) jobData.time_window = ctx.input.timeWindow;
-    if (ctx.input.zone) jobData.zone = ctx.input.zone;
+    if (ctx.input.jobTime !== undefined) jobData.job_time = ctx.input.jobTime;
+    if (ctx.input.timeWindow !== undefined) jobData.time_window = ctx.input.timeWindow;
+    if (ctx.input.zone !== undefined) jobData.zone = ctx.input.zone;
     if (ctx.input.weight !== undefined) jobData.weight = ctx.input.weight;
-    if (ctx.input.customer) jobData.customer = ctx.input.customer;
-    if (ctx.input.invoiceNumber) jobData.invoice_number = ctx.input.invoiceNumber;
+    if (ctx.input.customer !== undefined) jobData.customer = ctx.input.customer;
+    if (ctx.input.invoiceNumber !== undefined)
+      jobData.invoice_number = ctx.input.invoiceNumber;
     if (ctx.input.invoiceAmount !== undefined)
       jobData.invoice_amount = ctx.input.invoiceAmount;
-    if (ctx.input.paymentMode) jobData.payment_mode = ctx.input.paymentMode;
+    if (ctx.input.paymentMode !== undefined) jobData.payment_mode = ctx.input.paymentMode;
     if (ctx.input.paymentAmount !== undefined)
       jobData.payment_amount = ctx.input.paymentAmount;
-    if (ctx.input.remarks) jobData.remarks = ctx.input.remarks;
+    if (ctx.input.remarks !== undefined) jobData.remarks = ctx.input.remarks;
     if (ctx.input.openToMarketplace !== undefined)
       jobData.open_to_marketplace = ctx.input.openToMarketplace;
     if (ctx.input.autoReschedule !== undefined)
       jobData.auto_reschedule = ctx.input.autoReschedule;
 
-    if (ctx.input.items && ctx.input.items.length > 0) {
+    if (ctx.input.items !== undefined) {
       jobData.items = ctx.input.items.map(item => ({
         sku: item.sku,
-        desc: item.description,
-        qty: item.quantity,
+        description: item.description,
+        quantity: item.quantity,
         unit_of_measure: item.unitOfMeasure,
         comments: item.comments,
         unit_price: item.unitPrice,
         weight: item.weight,
-        serial_no: item.serialNumber,
-        batch_no: item.batchNumber,
+        serial_numbers: item.serialNumber !== undefined ? [item.serialNumber] : undefined,
+        batch_number: item.batchNumber,
         expiry_date: item.expiryDate,
-        po_number: item.poNumber
+        purchase_order_number: item.poNumber
       }));
     }
 
-    let result = await client.updateJob(jobData as any);
+    let result = await client.updateJob(jobData);
 
     return {
       output: {
         jobId: result.id ? String(result.id) : undefined,
-        doNumber: String(result.do_number ?? ctx.input.doNumber),
-        date: String(result.date ?? ctx.input.date),
+        doNumber: result.do_number,
+        date: result.date,
         status: result.status ? String(result.status) : undefined,
         assignTo: result.assign_to ? String(result.assign_to) : undefined,
         address: result.address ? String(result.address) : undefined,

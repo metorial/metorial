@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getResponseRows } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTideStationsTool = SlateTool.create(spec, {
@@ -38,26 +38,36 @@ Use the bounding box filter to find stations in a specific region.`,
             source: z.string().optional().describe('Data source for this station')
           })
         )
-        .describe('List of tide stations')
+        .describe('List of tide stations'),
+      meta: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Request metadata including quota usage'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete original provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let result: any;
-    if (ctx.input.boundingBox) {
+    if (ctx.input.boundingBox !== undefined) {
       result = await client.getTideStationsArea({ box: ctx.input.boundingBox });
     } else {
       result = await client.getTideStations();
     }
 
-    let stations = result.data ?? result ?? [];
+    let stations = getResponseRows(result, 'data');
 
     return {
       output: {
-        stations: Array.isArray(stations) ? stations : []
+        stations,
+        meta: result.meta,
+        raw: result
       },
-      message: `Found **${Array.isArray(stations) ? stations.length : 0}** tide stations${ctx.input.boundingBox ? ' within the specified bounding box' : ' globally'}.`
+      message: `Found **${stations.length}** tide stations${ctx.input.boundingBox ? ' within the specified bounding box' : ' globally'}.`
     };
   })
   .build();

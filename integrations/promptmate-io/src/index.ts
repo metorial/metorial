@@ -1,14 +1,17 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createWebhook,
   getApp,
   getAppResults,
   getJob,
   getUserInfo,
   listApps,
+  listLanguages,
   listProjects,
   listReferenceData,
   listTemplates,
+  listWebhooks,
   runJob,
   useTemplate
 } from './tools';
@@ -24,7 +27,10 @@ export let provider = Slate.create({
     useTemplate,
     listReferenceData,
     listProjects,
-    getUserInfo
+    getUserInfo,
+    listLanguages,
+    listWebhooks,
+    createWebhook
   ],
   triggers: []
 });

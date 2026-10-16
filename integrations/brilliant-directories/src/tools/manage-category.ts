@@ -20,6 +20,10 @@ Post types define the content categories available in the directory.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       category: z.any().describe('The post type configuration data.')
     })
   )
@@ -34,6 +38,7 @@ Post types define the content categories available in the directory.`,
     return {
       output: {
         status: result.status,
+        raw: result,
         category: result.message
       },
       message: `Retrieved post type **${ctx.input.categoryId}**.`
@@ -49,7 +54,10 @@ export let createCategory = SlateTool.create(spec, {
   .input(
     z.object({
       categoryName: z.string().optional().describe('Name of the post type.'),
-      categoryStatus: z.string().optional().describe('Status of the post type.'),
+      categoryStatus: z
+        .string()
+        .optional()
+        .describe('Activation code: "1" for active or "0" for disabled.'),
       additionalFields: z
         .record(z.string(), z.string())
         .optional()
@@ -59,6 +67,10 @@ export let createCategory = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       category: z.any().describe('The newly created post type record.')
     })
   )
@@ -69,8 +81,8 @@ export let createCategory = SlateTool.create(spec, {
     });
 
     let data: Record<string, any> = {};
-    if (ctx.input.categoryName) data.category_name = ctx.input.categoryName;
-    if (ctx.input.categoryStatus) data.category_status = ctx.input.categoryStatus;
+    if (ctx.input.categoryName) data.data_name = ctx.input.categoryName;
+    if (ctx.input.categoryStatus) data.data_active = ctx.input.categoryStatus;
     if (ctx.input.additionalFields) {
       for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
         data[key] = value;
@@ -82,6 +94,7 @@ export let createCategory = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         category: result.message
       },
       message: `Created post type${ctx.input.categoryName ? ` **"${ctx.input.categoryName}"**` : ''}.`
@@ -98,7 +111,10 @@ export let updateCategory = SlateTool.create(spec, {
     z.object({
       categoryId: z.string().describe('The data category ID to update.'),
       categoryName: z.string().optional().describe('Updated name.'),
-      categoryStatus: z.string().optional().describe('Updated status.'),
+      categoryStatus: z
+        .string()
+        .optional()
+        .describe('Updated activation code: "1" for active or "0" for disabled.'),
       additionalFields: z
         .record(z.string(), z.string())
         .optional()
@@ -108,6 +124,10 @@ export let updateCategory = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       category: z.any().describe('The updated post type record.')
     })
   )
@@ -121,8 +141,8 @@ export let updateCategory = SlateTool.create(spec, {
       data_id: ctx.input.categoryId
     };
 
-    if (ctx.input.categoryName) data.category_name = ctx.input.categoryName;
-    if (ctx.input.categoryStatus) data.category_status = ctx.input.categoryStatus;
+    if (ctx.input.categoryName) data.data_name = ctx.input.categoryName;
+    if (ctx.input.categoryStatus) data.data_active = ctx.input.categoryStatus;
     if (ctx.input.additionalFields) {
       for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
         data[key] = value;
@@ -134,6 +154,7 @@ export let updateCategory = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         category: result.message
       },
       message: `Updated post type **${ctx.input.categoryId}**.`
@@ -157,6 +178,10 @@ export let deleteCategory = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       confirmation: z.string().describe('Confirmation message from the API.')
     })
   )
@@ -171,6 +196,7 @@ export let deleteCategory = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         confirmation:
           typeof result.message === 'string' ? result.message : JSON.stringify(result.message)
       },
@@ -199,6 +225,10 @@ export let searchCategories = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       categories: z.any().describe('The search results.')
     })
   )
@@ -221,6 +251,7 @@ export let searchCategories = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         categories: result.message
       },
       message: `Found post types matching the search criteria.`

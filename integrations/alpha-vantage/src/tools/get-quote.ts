@@ -1,19 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseRecord, responseText } from '../lib/response';
 import { spec } from '../spec';
 
 export let getQuote = SlateTool.create(spec, {
   name: 'Get Quote',
   key: 'get_quote',
-  description: `Retrieve the latest price and key trading information for a stock symbol. Returns current price, open, high, low, volume, previous close, and change metrics. Ideal for quick price checks without full historical data.`,
+  description: `Retrieve the latest price and key trading information for a stock symbol. By default quotes update at the end of the trading day. Optional premium entitlements return realtime or 15-minute delayed US quotes. Returns price, open, high, low, volume, previous close, and change metrics. Ideal for quick price checks without full historical data.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      symbol: z.string().describe('Stock ticker symbol, e.g. "AAPL", "MSFT"')
+      symbol: z.string().describe('Stock ticker symbol, e.g. "AAPL", "MSFT"'),
+      entitlement: z
+        .enum(['realtime', 'delayed'])
+        .optional()
+        .describe('US market data freshness; requires the corresponding premium entitlement')
     })
   )
   .output(
@@ -32,25 +37,28 @@ export let getQuote = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
-    let data = await client.globalQuote({ symbol: ctx.input.symbol });
-    let quote = data['Global Quote'] || {};
+    let data = await client.globalQuote({
+      symbol: ctx.input.symbol,
+      entitlement: ctx.input.entitlement
+    });
+    let quote = responseRecord(data['Global Quote'], 'quote');
 
     let output = {
-      symbol: quote['01. symbol'] || ctx.input.symbol,
-      open: quote['02. open'] || '',
-      high: quote['03. high'] || '',
-      low: quote['04. low'] || '',
-      price: quote['05. price'] || '',
-      volume: quote['06. volume'] || '',
-      latestTradingDay: quote['07. latest trading day'] || '',
-      previousClose: quote['08. previous close'] || '',
-      change: quote['09. change'] || '',
-      changePercent: quote['10. change percent'] || ''
+      symbol: responseText(quote['01. symbol'], 'symbol'),
+      open: responseText(quote['02. open'], ' open'),
+      high: responseText(quote['03. high'], ' high'),
+      low: responseText(quote['04. low'], ' low'),
+      price: responseText(quote['05. price'], ' price'),
+      volume: responseText(quote['06. volume'], ' volume'),
+      latestTradingDay: responseText(quote['07. latest trading day'], ' latest trading day'),
+      previousClose: responseText(quote['08. previous close'], ' previous close'),
+      change: responseText(quote['09. change'], ' change'),
+      changePercent: responseText(quote['10. change percent'], ' change percent')
     };
 
     return {
       output,
-      message: `**${output.symbol}** is at **$${output.price}** (${output.changePercent} change).`
+      message: `**${output.symbol}** is at **${output.price}** (${output.changePercent} change).`
     };
   })
   .build();

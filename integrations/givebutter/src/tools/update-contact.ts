@@ -1,7 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+
+let updateContactOutputSchema = z.object({
+  contactId: z.number().describe('ID of the updated contact'),
+  firstName: z.string().nullable().describe('First name'),
+  lastName: z.string().nullable().describe('Last name'),
+  primaryEmail: z.string().nullable().describe('Primary email'),
+  archivedAt: z.string().nullable().describe('When archived'),
+  updatedAt: z.string().nullable().describe('When last updated')
+});
 
 export let updateContact = SlateTool.create(spec, {
   name: 'Update Contact',
@@ -29,46 +38,50 @@ export let updateContact = SlateTool.create(spec, {
         .describe('Set to true to archive the contact, false to restore')
     })
   )
-  .output(
-    z.object({
-      contactId: z.number().describe('ID of the updated contact'),
-      firstName: z.string().nullable().describe('First name'),
-      lastName: z.string().nullable().describe('Last name'),
-      primaryEmail: z.string().nullable().describe('Primary email'),
-      archivedAt: z.string().nullable().describe('When archived'),
-      updatedAt: z.string().nullable().describe('When last updated')
-    })
-  )
+  .output(updateContactOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      ctx.input.archive !== undefined &&
+      Object.entries(ctx.input).some(
+        ([key, value]) => !['contactId', 'archive'].includes(key) && value !== undefined
+      )
+    )
+      throw createApiServiceError(
+        'Archive or restore must be performed separately from profile changes.'
+      );
+
     if (ctx.input.archive === true) {
       await client.archiveContact(ctx.input.contactId);
+      let c = await client.getContact(ctx.input.contactId);
       return {
-        output: {
-          contactId: ctx.input.contactId,
-          firstName: null,
-          lastName: null,
-          primaryEmail: null,
-          archivedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        message: `Archived contact **${ctx.input.contactId}**.`
+        output: client.output(updateContactOutputSchema, {
+          contactId: c.id,
+          firstName: c.first_name,
+          lastName: c.last_name,
+          primaryEmail: c.primary_email,
+          archivedAt: c.archived_at,
+          updatedAt: c.updated_at
+        }),
+        message: client.publicData(`Archived contact **${ctx.input.contactId}**.`)
       };
     }
 
     if (ctx.input.archive === false) {
       let c = await client.restoreContact(ctx.input.contactId);
       return {
-        output: {
+        output: client.output(updateContactOutputSchema, {
           contactId: c.id,
-          firstName: c.first_name ?? null,
-          lastName: c.last_name ?? null,
-          primaryEmail: c.primary_email ?? null,
-          archivedAt: c.archived_at ?? null,
-          updatedAt: c.updated_at ?? null
-        },
-        message: `Restored contact **${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.id}**.`
+          firstName: c.first_name,
+          lastName: c.last_name,
+          primaryEmail: c.primary_email,
+          archivedAt: c.archived_at,
+          updatedAt: c.updated_at
+        }),
+        message: client.publicData(
+          `Restored contact **${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.id}**.`
+        )
       };
     }
 
@@ -86,15 +99,17 @@ export let updateContact = SlateTool.create(spec, {
     let c = await client.updateContact(ctx.input.contactId, updateData);
 
     return {
-      output: {
+      output: client.output(updateContactOutputSchema, {
         contactId: c.id,
-        firstName: c.first_name ?? null,
-        lastName: c.last_name ?? null,
-        primaryEmail: c.primary_email ?? null,
-        archivedAt: c.archived_at ?? null,
-        updatedAt: c.updated_at ?? null
-      },
-      message: `Updated contact **${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.id}**.`
+        firstName: c.first_name,
+        lastName: c.last_name,
+        primaryEmail: c.primary_email,
+        archivedAt: c.archived_at,
+        updatedAt: c.updated_at
+      }),
+      message: client.publicData(
+        `Updated contact **${[c.first_name, c.last_name].filter(Boolean).join(' ') || c.id}**.`
+      )
     };
   })
   .build();

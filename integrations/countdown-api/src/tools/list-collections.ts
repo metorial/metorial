@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCollections = SlateTool.create(spec, {
@@ -70,6 +70,8 @@ export let listCollections = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new CountdownClient({ token: ctx.auth.token });
 
+    if (ctx.input.onlyWithResults && ctx.input.onlyWithoutResults)
+      throw createApiServiceError('Choose onlyWithResults or onlyWithoutResults, not both.');
     let result = await client.listCollections({
       status: ctx.input.status,
       searchTerm: ctx.input.searchTerm,
@@ -87,7 +89,7 @@ export let listCollections = SlateTool.create(spec, {
       sortDirection: ctx.input.sortDirection
     });
 
-    let collections = result.collections || [];
+    let collections = requireArray(result.collections, 'collections');
 
     return {
       output: {

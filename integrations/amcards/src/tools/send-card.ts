@@ -6,15 +6,11 @@ import { spec } from '../spec';
 export let sendCard = SlateTool.create(spec, {
   name: 'Send Card',
   key: 'send_card',
-  description: `Create and send a personalized physical greeting card to a recipient. Select a Quicksend Template from your AMcards account and provide recipient and sender address details. Cards are physically printed, stuffed, and mailed by AMcards, typically delivered in 2–5 business days.`,
+  description: `Create and send a personalized physical greeting card to a recipient. Select a Quicksend Template from your AMcards account and provide recipient and sender address details. AMcards prints and mails the card after accepting the request.`,
   instructions: [
-    'The quicksendTemplateId must reference a Quicksend Template configured in your AMcards account.',
+    'Call list_quicksend_templates to discover a Quicksend Template configured in your AMcards account.',
     'The initiator field identifies who triggered the card send and is required.',
-    'Provide a sendDate in YYYY-MM-DD format to schedule future delivery, or omit to send immediately.'
-  ],
-  constraints: [
-    'Card messages have a maximum of 700 characters.',
-    'Cards can only be edited until 11:59 PM on the same day they are sent.'
+    'Provide a sendDate in YYYY-MM-DD format to schedule mailing. If omitted, AMcards schedules it for the following day.'
   ],
   tags: {
     destructive: false,
@@ -25,7 +21,9 @@ export let sendCard = SlateTool.create(spec, {
     z.object({
       quicksendTemplateId: z
         .string()
-        .describe('ID of the Quicksend Template to use for the card.'),
+        .describe(
+          'Quicksend Template ID. Call list_quicksend_templates to discover templates.'
+        ),
       initiator: z
         .string()
         .describe(
@@ -34,11 +32,15 @@ export let sendCard = SlateTool.create(spec, {
       message: z
         .string()
         .optional()
-        .describe('Custom message to include on the card (max 700 characters).'),
+        .describe(
+          'Message added to the inside panel; this does not replace the template message.'
+        ),
       sendDate: z
         .string()
         .optional()
-        .describe('Scheduled send date in YYYY-MM-DD format. Omit to send immediately.'),
+        .describe(
+          'Scheduled send date in YYYY-MM-DD format. Omit to schedule for the following day.'
+        ),
       thirdPartyContactId: z
         .string()
         .optional()
@@ -59,7 +61,20 @@ export let sendCard = SlateTool.create(spec, {
       recipientPostalCode: z.string().describe('Recipient postal or zip code.'),
       recipientCountry: z.string().optional().describe('Recipient country (e.g. "US").'),
       fromFirstName: z.string().describe('Sender first name.'),
-      fromLastName: z.string().optional().describe('Sender last name.')
+      fromLastName: z.string().optional().describe('Sender last name.'),
+      fromAddressLine1: z
+        .string()
+        .optional()
+        .describe('Sender street address, overriding the account default.'),
+      fromAddressLine2: z.string().optional().describe('Sender second address line.'),
+      fromCity: z.string().optional().describe('Sender city.'),
+      fromState: z.string().optional().describe('Sender state, province, or region.'),
+      fromPostalCode: z.string().optional().describe('Sender postal code.'),
+      fromCountry: z.string().optional().describe('Sender country code.'),
+      extraData: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Custom merge fields for the template, keyed by field name.')
     })
   )
   .output(
@@ -71,42 +86,32 @@ export let sendCard = SlateTool.create(spec, {
       status: z.string().optional().describe('Current status of the card.'),
       recipientName: z.string().describe('Full name of the recipient.'),
       sendDate: z.string().optional().describe('Scheduled or actual send date.'),
+      totalCost: z.number().optional().describe('Cost charged in cents, when returned.'),
       rawResponse: z.any().optional().describe('Full response from the AMcards API.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.sendCard({
-      quicksendTemplateId: ctx.input.quicksendTemplateId,
-      initiator: ctx.input.initiator,
-      message: ctx.input.message,
-      sendDate: ctx.input.sendDate,
-      thirdPartyContactId: ctx.input.thirdPartyContactId,
-      recipientFirstName: ctx.input.recipientFirstName,
-      recipientLastName: ctx.input.recipientLastName,
-      recipientOrganization: ctx.input.recipientOrganization,
-      recipientAddressLine1: ctx.input.recipientAddressLine1,
-      recipientAddressLine2: ctx.input.recipientAddressLine2,
-      recipientCity: ctx.input.recipientCity,
-      recipientState: ctx.input.recipientState,
-      recipientPostalCode: ctx.input.recipientPostalCode,
-      recipientCountry: ctx.input.recipientCountry,
-      fromFirstName: ctx.input.fromFirstName,
-      fromLastName: ctx.input.fromLastName
-    });
+    let result = await client.sendCard(ctx.input);
 
     let recipientName = `${ctx.input.recipientFirstName} ${ctx.input.recipientLastName}`;
 
     return {
       output: {
-        cardId: result?.id != null ? String(result.id) : undefined,
-        status: result?.status ?? undefined,
+        cardId:
+          result.card != null
+            ? String(result.card)
+            : result.id != null
+              ? String(result.id)
+              : undefined,
+        status: result.status != null ? String(result.status) : undefined,
         recipientName,
-        sendDate: ctx.input.sendDate ?? undefined,
+        sendDate: result.send_date ?? ctx.input.sendDate,
+        totalCost: result.total_cost,
         rawResponse: result
       },
-      message: `Card sent to **${recipientName}** at ${ctx.input.recipientCity}, ${ctx.input.recipientState}${ctx.input.sendDate ? ` (scheduled for ${ctx.input.sendDate})` : ''}.`
+      message: `Card request accepted for **${recipientName}** at ${ctx.input.recipientCity}, ${ctx.input.recipientState}${ctx.input.sendDate ? ` (scheduled for ${ctx.input.sendDate})` : ''}.`
     };
   })
   .build();

@@ -8,7 +8,7 @@ export let getClickAnalytics = SlateTool.create(spec, {
   key: 'get_click_analytics',
   description: `Retrieves click analytics time-series data for one or more links. Returns click counts over time, optionally filtered by date range, country, browser, platform, referrer, or ISP. Can pivot data by link for comparison.`,
   instructions: [
-    'Use linkId for a single link or linkIds (comma-separated) for multiple links.',
+    'Use linkId for a single link or linkIds (comma- or hyphen-separated) for multiple links.',
     'Date format for start/end: YYYY-MM-DD.',
     'Set pivot to "link_id" to get per-link breakdowns in one request.',
     'Set unique to true to count only unique visitors.'
@@ -25,7 +25,10 @@ export let getClickAnalytics = SlateTool.create(spec, {
   .input(
     z.object({
       linkId: z.number().optional().describe('Filter by a single link ID'),
-      linkIds: z.string().optional().describe('Filter by multiple link IDs (comma-separated)'),
+      linkIds: z
+        .string()
+        .optional()
+        .describe('Filter by multiple link IDs (comma- or hyphen-separated)'),
       start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
       end: z.string().optional().describe('End date (YYYY-MM-DD)'),
       country: z.string().optional().describe('Filter by country (ISO 3166-1 alpha-2 code)'),
@@ -64,8 +67,8 @@ export let getClickAnalytics = SlateTool.create(spec, {
     let traffic: Array<{ date: string; clicks: any }> = [];
     if (Array.isArray(result.traffic)) {
       traffic = result.traffic.map((point: any) => ({
-        date: point.t || point.date,
-        clicks: point.y || point.clicks
+        date: point.t ?? point.date,
+        clicks: point.y ?? point.clicks
       }));
     } else if (Array.isArray(result.data)) {
       traffic = result.data.map((point: any) => ({
@@ -74,8 +77,8 @@ export let getClickAnalytics = SlateTool.create(spec, {
       }));
     } else if (Array.isArray(result)) {
       traffic = result.map((point: any) => ({
-        date: point.t || point.date,
-        clicks: point.y || point.clicks
+        date: point.t ?? point.date,
+        clicks: point.y ?? point.clicks
       }));
     }
 

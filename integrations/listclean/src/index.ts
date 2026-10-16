@@ -2,11 +2,15 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   downloadBulkResults,
+  downloadListResults,
   getAccount,
   getBulkListStatus,
+  getVerificationList,
   listBulkLists,
+  listVerificationLists,
   uploadBulkList,
-  verifyEmail
+  verifyEmail,
+  verifyEmailBatch
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -16,7 +20,11 @@ export let provider = Slate.create({
     uploadBulkList,
     getBulkListStatus,
     listBulkLists,
-    downloadBulkResults
+    downloadBulkResults,
+    verifyEmailBatch,
+    listVerificationLists,
+    getVerificationList,
+    downloadListResults
   ],
   triggers: []
 });

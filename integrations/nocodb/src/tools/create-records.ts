@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createRecords = SlateTool.create(spec, {
@@ -10,7 +11,7 @@ export let createRecords = SlateTool.create(spec, {
 Supports bulk insertion by passing multiple records at once.`,
   instructions: [
     'Each record object should use field titles as keys.',
-    'For linked fields, pass the linked record IDs.'
+    'Use link_records to change Links or LinkToAnotherRecord fields; record creation does not write these relationships.'
   ],
   tags: {
     destructive: false
@@ -31,17 +32,20 @@ Supports bulk insertion by passing multiple records at once.`,
     z.object({
       createdRecords: z
         .array(z.record(z.string(), z.any()))
-        .describe('Array of created record objects with their IDs')
+        .describe('Array of created record objects with their IDs'),
+      raw: z.any().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
 
     let result = await client.createRecords(ctx.input.tableId, ctx.input.records);
-    let createdRecords = Array.isArray(result) ? result : [result];
+    let createdRecords = (Array.isArray(result) ? result : [result]).map(record =>
+      requireRecord(record, 'record')
+    );
 
     return {
-      output: { createdRecords },
+      output: { createdRecords, raw: result },
       message: `Created **${createdRecords.length}** record(s) in table \`${ctx.input.tableId}\`.`
     };
   })

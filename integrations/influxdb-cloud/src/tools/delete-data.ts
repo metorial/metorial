@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let deleteData = SlateTool.create(spec, {
@@ -9,7 +10,8 @@ export let deleteData = SlateTool.create(spec, {
   description: `Delete time-series data points from an InfluxDB Cloud bucket within a specified time range.
 Optionally filter by a predicate expression to target specific measurements or tag values.`,
   instructions: [
-    'Provide RFC3339 timestamps for the start and stop time range.',
+    'Call list_organizations to discover orgId when organization scope is needed.',
+    'Provide RFC3339 timestamps for the start and stop time range. Cloud deletes are asynchronous; acceptance does not confirm immediate visibility.',
     'Optionally specify a predicate to filter which data to delete, e.g. `_measurement="cpu" AND host="server1"`.'
   ],
   tags: {
@@ -18,6 +20,7 @@ Optionally filter by a predicate expression to target specific measurements or t
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       bucket: z.string().describe('Name or ID of the bucket to delete data from'),
       start: z.string().describe('Start time (RFC3339 format, e.g. 2023-01-01T00:00:00Z)'),
       stop: z.string().describe('Stop time (RFC3339 format, e.g. 2023-12-31T23:59:59Z)'),
@@ -29,7 +32,7 @@ Optionally filter by a predicate expression to target specific measurements or t
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the delete operation succeeded')
+      success: z.boolean().describe('Whether the provider accepted the delete request')
     })
   )
   .handleInvocation(async ctx => {
@@ -44,7 +47,7 @@ Optionally filter by a predicate expression to target specific measurements or t
 
     return {
       output: { success: true },
-      message: `Successfully deleted data from bucket **${ctx.input.bucket}** between ${ctx.input.start} and ${ctx.input.stop}.`
+      message: `Accepted the delete request for bucket **${ctx.input.bucket}** between ${ctx.input.start} and ${ctx.input.stop}.`
     };
   })
   .build();

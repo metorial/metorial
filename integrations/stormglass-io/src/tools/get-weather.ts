@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getResponseRows } from '../lib/client';
 import { spec } from '../spec';
 
 let sourceValueSchema = z
@@ -12,15 +12,16 @@ export let getWeatherTool = SlateTool.create(spec, {
   key: 'get_weather',
   description: `Retrieve weather forecast or historical data for a specific location. Returns hourly weather data including air temperature, pressure, humidity, wind, precipitation, cloud cover, visibility, and more.
 
-Supports forecast up to 10 days ahead and historical data. Multiple data sources can be queried individually or use **"sg"** for Stormglass AI automatic best-source selection.`,
+Forecast horizon depends on the source; standard models offer up to 10 days and some AI models up to 15 days. Forecast records have a 14-day look-back period; use get_historical_weather for older data. Multiple data sources can be queried individually or use **"sg"** for Stormglass AI automatic best-source selection.`,
   instructions: [
     'Provide latitude and longitude for the target location.',
     'Specify at least one weather parameter to retrieve.',
     'Use source "sg" for automatic best-source selection, or specify individual sources like "noaa", "metno", "dwd", etc.',
-    'Times should be provided as ISO 8601 strings (e.g., "2024-01-15T00:00:00Z").'
+    'Times are interpreted as UTC; ISO timezone offsets are ignored by the provider.',
+    'Temperature is in degrees Celsius; wind/current speed in meters per second; precipitation in mm/hour; pressure in hPa; cloud cover/humidity in percent; visibility in kilometers.'
   ],
   constraints: [
-    'Forecast data is available up to 10 days ahead.',
+    'Forecast horizon and available parameters vary by source; query get_historical_weather for the historical archive.',
     'Each API request costs quota points based on the number of parameters and time range requested.'
   ],
   tags: {
@@ -34,19 +35,19 @@ Supports forecast up to 10 days ahead and historical data. Multiple data sources
       parameters: z
         .array(z.string())
         .describe(
-          'Weather parameters to retrieve (e.g., "airTemperature", "windSpeed", "windDirection", "windGust", "pressure", "humidity", "precipitation", "cloudCover", "visibility", "dewPoint", "gust", "snowDepth", "uvIndex")'
+          'Weather parameters to retrieve (e.g., "airTemperature", "windSpeed", "windDirection", "pressure", "humidity", "precipitation", "cloudCover", "visibility", "dewPointTemperature", "gust", "snowDepth", "uvIndex")'
         ),
       start: z
         .string()
         .optional()
         .describe(
-          'Start time in ISO 8601 or UNIX timestamp format. Defaults to today at 00:00 UTC.'
+          'Start time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets. Defaults to today at 00:00 UTC.'
         ),
       end: z
         .string()
         .optional()
         .describe(
-          'End time in ISO 8601 or UNIX timestamp format. Defaults to all available data.'
+          'End time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets. Defaults to all available data.'
         ),
       sources: z
         .array(z.string())
@@ -69,7 +70,11 @@ Supports forecast up to 10 days ahead and historical data. Multiple data sources
         .describe('Hourly weather data points'),
       meta: z
         .record(z.string(), z.any())
-        .describe('Request metadata including coordinates, quota, and request count')
+        .describe('Request metadata including coordinates, quota, and request count'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete original provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -84,14 +89,15 @@ Supports forecast up to 10 days ahead and historical data. Multiple data sources
       source: ctx.input.sources
     });
 
-    let hourCount = result.hours?.length ?? 0;
+    let hours = getResponseRows(result, 'hours', 'data');
 
     return {
       output: {
-        hours: result.hours ?? [],
-        meta: result.meta ?? {}
+        hours,
+        meta: result.meta,
+        raw: result
       },
-      message: `Retrieved **${hourCount}** hourly weather data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
+      message: `Retrieved **${hours.length}** hourly weather data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
     };
   })
   .build();

@@ -12,6 +12,7 @@ export let updateCustomer = SlateTool.create(spec, {
     z.object({
       customerId: z.string().describe('ID of the customer to update'),
       email: z.string().optional().describe('Updated email address'),
+      groupId: z.string().optional().describe('Group ID from list_customer_groups'),
       firstName: z.string().optional().describe('Updated first name'),
       lastName: z.string().optional().describe('Updated last name'),
       newsletter: z.boolean().optional().describe('Subscribe/unsubscribe from newsletter'),
@@ -24,6 +25,7 @@ export let updateCustomer = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       customerId: z.string(),
       email: z.string().optional(),
       firstName: z.string().optional(),
@@ -46,16 +48,23 @@ export let updateCustomer = SlateTool.create(spec, {
       attributes.banned_reason = ctx.input.bannedReason;
     if (ctx.input.note !== undefined) attributes.note = ctx.input.note;
 
-    let res = await client.updateCustomer(ctx.input.customerId, attributes);
+    let res = await client.updateCustomer(
+      ctx.input.customerId,
+      attributes,
+      ctx.input.groupId !== undefined
+        ? { group: { data: { type: 'customer-groups', id: ctx.input.groupId } } }
+        : undefined
+    );
     let c = res.data;
 
     return {
       output: {
+        raw: res,
         customerId: c.id,
-        email: c.attributes.email,
-        firstName: c.attributes.first_name,
-        lastName: c.attributes.last_name,
-        updatedAt: c.attributes.updated_at
+        email: c.attributes.email ?? undefined,
+        firstName: c.attributes.first_name ?? undefined,
+        lastName: c.attributes.last_name ?? undefined,
+        updatedAt: c.attributes.updated_at ?? undefined
       },
       message: `Updated customer **${c.attributes.email || c.id}**.`
     };

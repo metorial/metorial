@@ -1,3 +1,5 @@
+export * from './base-tools';
+export * from './count-records';
 export * from './create-records';
 export * from './create-table';
 export * from './delete-records';
@@ -10,4 +12,5 @@ export * from './list-tables';
 export * from './list-views';
 export * from './manage-field';
 export * from './manage-webhook';
+export * from './table-tools';
 export * from './update-records';

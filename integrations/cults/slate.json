@@ -1,17 +1,18 @@
 {
   "name": "@metorial/cults",
-  "description": "Search, browse, and manage 3D printing designs on the Cults3D marketplace. Query the catalog with filters by category, price, date, trending status, and AI-made flag. Publish new designs and update existing ones with titles, descriptions, tags, images, and file URLs. Track sales and revenue with currency conversion, access order history and download links for purchased models, and retrieve account data including printlists, likes, followers, and engagement metrics. Query the platform's category structure with localized names.",
+  "description": "Search and browse 3D printing designs on Cults3D, inspect creation details, publish designs from hosted image and model URLs, and update design metadata. Read your profile, creations, liked designs, sales, purchase history, and printlists. Manage printlists and their contents, apply discounts, and notify previous downloaders. Discover category IDs and license codes before publishing.",
   "categories": ["document-processing", "e-commerce-and-retail"],
   "skills": [
     "search 3D design catalog",
-    "publish and update designs",
+    "publish designs and update metadata",
     "track sales and revenue",
     "access order history",
     "retrieve download links",
-    "manage account data",
+    "retrieve account profiles",
     "browse design categories",
     "query creator statistics",
-    "manage printlists and likes",
-    "generate upload sharing links"
+    "manage printlists",
+    "list liked designs",
+    "discover license codes"
   ]
 }

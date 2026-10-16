@@ -1,82 +1,82 @@
-# Slates Specification for Polygon
+# Polygon API capabilities
 
-## Overview
+Polygon.io is now Massive. This read-only integration uses
+`https://api.massive.com` and bearer API-key authentication. Existing Polygon.io
+keys continue to work. There is no connection-level resource ID or OAuth token
+refresh. The public REST APIs do not provide a suitable current-account identity
+endpoint.
 
-Polygon.io (now rebranded as Massive) is a financial market data provider offering REST and WebSocket APIs for real-time and historical data across stocks, options, forex, crypto, and indices. Polygon.io provides comprehensive financial market data APIs for stocks, crypto, forex, options, and indices. The API is read-only and focused on market data retrieval, reference data, and technical analysis — it does not support placing trades.
+## Tools
 
-## Authentication
+| Tool | API coverage |
+| --- | --- |
+| `get_aggregate_bars` | `/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from}/{to}`; configurable intervals, adjustment, sorting, pagination |
+| `get_previous_close` | `/v2/aggs/ticker/{ticker}/prev` |
+| `get_grouped_daily_bars` | `/v2/aggs/grouped/locale/us/market/stocks/{date}`; market-wide daily bars, including ticker symbols |
+| `get_stock_snapshot` | Single or multiple stock snapshots |
+| `get_stock_trades_quotes` | Stock trade/quote history and last trade/NBBO; correct bid/ask mapping |
+| `get_market_movers` | Stock, forex, or crypto gainers and losers |
+| `get_options_chain` | Contract reference search or chain snapshots; expiry and strike filters, sort and pagination |
+| `get_forex_data` | Currency conversion, last quote, or single forex snapshot |
+| `get_forex_snapshots` | Multiple or all forex pair snapshots |
+| `get_crypto_data` | Single, multiple, or all crypto ticker snapshots |
+| `get_indices_snapshot` | Current index values, session metrics, timestamps, and per-index errors |
+| `get_technical_indicators` | SMA, EMA, RSI, MACD; windows, price series, date filters, and pagination |
+| `search_tickers` | Instrument discovery by name/symbol, market, exchange, type, and activity |
+| `get_ticker_details` | Company metadata and optional point-in-time lookup |
+| `get_reference_data` | Exchanges, ticker types, and trade/quote condition codes |
+| `get_market_news` | Ticker/date-filtered articles and sentiment, with pagination |
+| `get_market_status` | Current market/exchange status and optional upcoming holidays |
+| `get_unified_snapshot` | Cross-market snapshots with pagination and per-ticker error information |
+| `get_financial_statements` | Current `/stocks/financials/v1/` income statements, balance sheets, and cash flow statements |
+| `get_financial_ratios` | Latest daily `/stocks/financials/v1/ratios` records |
+| `get_corporate_actions` | Current `/stocks/v1/splits` and `/stocks/v1/dividends`, including adjustment factors |
+| `get_stock_financials` | Deprecated legacy `/vX/reference/financials`; original schemas and parsing retained |
+| `get_splits_dividends` | Deprecated legacy `/v3/reference/splits` and `/v3/reference/dividends`; original schemas and parsing retained |
 
-Polygon uses API key authentication. The Polygon Getting started documentation references that any API call to their platform requires you to send your API key in the headers or as a query parameter.
+The experimental financials endpoint was sunset on June 22, 2026. Its replacement
+uses different response records and timeframe values. Use
+`get_financial_statements` rather than relying on the legacy endpoint. Balance
+sheets support annual or quarterly periods; income and cash flow statements also
+support trailing twelve months. Financial statements and ratios require the
+appropriate plan or add-on. Ratios contain the latest snapshot, not historical
+series.
 
-**API Key:**
+## Responses and pagination
 
-- Obtain your API key by creating a Polygon.io account and navigating to the API Keys section of your dashboard. Go to polygon.io and create an account. Open your Dashboard and select API Keys to view your key.
-- The API key can be passed in two ways:
-  1. **Query parameter:** Append `apiKey=YOUR_KEY` as a query parameter to any request.
-  2. **Authorization header:** Send an `Authorization: Bearer <your_api_key>` header with each request.
-- The base URL is `https://api.polygon.io`.
-- For WebSocket connections, the default base URL for real-time data is `wss://socket.polygon.io`, with alternative endpoints such as `wss://delayed.polygon.io` for 15-minute delayed data and `wss://business.polygon.io` for Business tier features. When a connection opens, it immediately sends an authentication message with the provided API key.
+Existing summary fields retain their types and requiredness. Current tools also
+return `rawResponse`, preserving complete upstream data and null values. Optional
+summary values are omitted when unavailable. Tools returning complete records
+preserve the records directly, including null fields. Unified and index snapshots
+retain individual ticker errors instead of presenting failed tickers as successful
+market data.
 
-No OAuth or additional scopes are required. A single API key grants access based on the subscription plan tier.
+Where supported, `nextCursor` is extracted from the provider's `next_url`. Pass
+`cursor` to the same tool with the same ticker, data type, and filters to continue.
+Only the cursor is reused; requests stay on the configured provider base URL.
 
-## Features
+## Product areas and limits
 
-### Stock Market Data
+Tools are grouped into Stocks, Options, Forex, Crypto, and Indices categories.
+Cross-market tools can belong to multiple categories. Market status and news
+remain shared utilities.
 
-Access real-time and historical data for US equities. This includes trades, quotes (NBBO), and OHLCV aggregate bars at configurable time intervals (second, minute, hour, day, week, month, quarter, year). Access real-time and historical stock market data including trades, quotes, and market information. Snapshots provide a current overview of a ticker's market status including last trade, last quote, and daily performance. Results can be adjusted for stock splits.
+Entitlements determine coverage, history, and real-time versus delayed data.
+Options chain snapshots allow at most 250 results; contract reference searches
+allow 1000. Stock trade/quote history and aggregate base-bar queries allow 50000;
+indicator history allows 5000. The aggregate limit counts base bars used to
+construct the response, not necessarily returned bars.
 
-### Options Data
+REST access does not implement WebSocket subscriptions, placing trades, or
+flat-file downloads. The provider's streaming APIs are separate capabilities.
 
-Access options market data including contracts, trades, and chain information. Query option contracts by underlying ticker, expiration date, strike price, and contract type. Snapshots include Greeks, implied volatility, and break-even price. Fair market value is only available on Business plans. It's a proprietary algorithm to generate a real-time, accurate, fair market value of a tradable security.
+## Official references
 
-### Forex Data
-
-Access foreign exchange market data including quotes and currency conversion. Retrieve historical and real-time quotes, aggregate bars, and snapshots for currency pairs.
-
-### Crypto Data
-
-Access cryptocurrency market data including trades, quotes, and real-time information. Includes trades, quotes, aggregate bars, and snapshots. This client enables subscription to live trades, quotes, aggregates, and specialized data streams like Level 2 order book data for cryptocurrencies.
-
-### Indices Data
-
-Access market indices data including snapshots and technical indicators. Retrieve aggregate bars and snapshots for market indices such as the S&P 500 and others.
-
-### Technical Indicators
-
-Retrieve pre-computed technical indicators for stocks and indices. Technical Indicators (SMA, EMA, RSI, MACD) are available. Configurable parameters include window size, timespan (e.g., day, hour, minute), and the price series to use (open, close, high, low).
-
-### Reference Data
-
-Access reference and metadata including ticker details with company information, ticker symbols, exchanges, and historical events like stock splits and dividends, amongst other things. Also includes market holidays, market status (open/closed), trade conditions, and ticker types. Financial data from SEC filings is available for stocks.
-
-### Market News
-
-Retrieve ticker-related news articles with sentiment analysis. Articles can be filtered by ticker, publication date, and other parameters.
-
-### Unified Snapshots
-
-Retrieve unified snapshots of market data for multiple asset classes including stocks, options, forex, and cryptocurrencies in a single request. This endpoint consolidates key metrics such as last trade, last quote, open, high, low, close, and volume for a comprehensive view of current market conditions. By aggregating data from various sources into one response, users can efficiently monitor, compare, and act on information spanning multiple markets and asset types.
-
-## Events
-
-Polygon provides real-time data streaming via WebSocket connections rather than traditional webhook-based events. Polygon.io allows one simultaneous connection to one cluster at a time (clusters: stocks, options, forex, crypto). You can have up to 4 concurrent streams connected to 4 different clusters.
-
-### Stock Streams
-
-Aggregates (Per Minute): Stream real-time minute aggregates. Aggregates (Per Second): Stream real-time second aggregates. Trades: Stream real-time trades. Quotes: Stream real-time quotes. Subscribe to individual tickers or all tickers across the market.
-
-### Options Streams
-
-Trades: Stream every executed option trade in real-time, including price, size, and exchange details. This granular feed supports tick-level analyses, order flow modeling, and ultra-responsive trading algorithms. Quotes: Access NBBO quotes as they update across all U.S. options exchanges. Monitor evolving price landscapes, identify liquidity conditions, and make rapid, informed decisions. Aggregate bars (per minute and per second) are also available. Fair Market Value (FMV) is available exclusively to Business plan users. A limit of 1,000 simultaneous option contract subscriptions per connection applies.
-
-### Forex Streams
-
-Stream real-time trades, quotes, and aggregate bars for currency pairs. Subscribe by individual currency pair or across the entire forex market.
-
-### Crypto Streams
-
-Stream real-time trades, quotes, aggregate bars, and Level 2 order book data for cryptocurrencies. Subscribe by individual pair or across all crypto pairs.
-
-### Indices Streams
-
-Stream real-time aggregate bar values for market indices at second and minute intervals.
+- [REST quickstart and authentication](https://massive.com/docs/rest/quickstart)
+- [Brand and API-domain migration](https://www.massive.com/blog/polygon-is-now-massive)
+- [Stocks API](https://massive.com/docs/rest/stocks/overview)
+- [Financial statements](https://massive.com/docs/rest/stocks/fundamentals/income-statements)
+- [Financial ratios](https://massive.com/docs/rest/stocks/fundamentals/ratios)
+- [Splits](https://massive.com/docs/rest/stocks/corporate-actions/splits)
+- [Dividends](https://massive.com/docs/rest/stocks/corporate-actions/dividends)
+- [Provider changelog and financials sunset](https://massive.com/changelog)

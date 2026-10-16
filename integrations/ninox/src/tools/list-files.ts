@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listFiles = SlateTool.create(spec, {
@@ -13,9 +13,13 @@ export let listFiles = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database'),
-      tableId: z.string().describe('ID of the table (e.g. "A", "B")'),
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z
+        .string()
+        .describe('Database ID. Use list_databases to discover databases.'),
+      tableId: z
+        .string()
+        .describe('Table ID (e.g. "A", "B"). Use get_table_schema to discover tables.'),
       recordId: z.number().describe('Numeric ID of the record')
     })
   )
@@ -36,10 +40,7 @@ export let listFiles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let files = await client.listFiles(
       ctx.input.teamId,
@@ -54,7 +55,7 @@ export let listFiles = SlateTool.create(spec, {
           fileName: f.name,
           contentType: f.contentType,
           size: f.size,
-          modifiedDate: f.modifiedDate,
+          modifiedDate: f.modifiedDate === undefined ? undefined : String(f.modifiedDate),
           modifiedUser: f.modifiedUser
         })),
         count: files.length

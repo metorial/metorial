@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShortPixelClient } from '../lib/client';
+import { readOptionalNumber } from '../lib/responses';
 import { spec } from '../spec';
 
 export let optimizeImage = SlateTool.create(spec, {
@@ -10,9 +11,12 @@ export let optimizeImage = SlateTool.create(spec, {
 Supports batch processing of up to 100 image URLs in a single request. Results include download URLs for optimized images in various formats and compression levels, along with size statistics.
 If optimization is still processing (status code 1), re-invoke this tool with the same URLs to poll for results.`,
   instructions: [
+    'For a new single-image workflow that needs image content, choose optimize_image_file instead of starting this batch tool. Do not optimize the same work twice just to retrieve content.',
     'Provide publicly accessible image URLs. The images must be reachable from the internet.',
     'When status code is 1 (scheduled), wait a few seconds and call the tool again with the same URLs to get results.',
-    'Use convertTo to request additional formats like WebP or AVIF alongside the original format.'
+    'Use convertTo to request additional formats like WebP or AVIF alongside the original format.',
+    'Keep all processing options unchanged when polling and omit refresh to avoid restarting the optimization.',
+    'Download completed files promptly; ShortPixel retains optimized files for approximately two hours.'
   ],
   constraints: [
     'Maximum of 100 URLs per request.',
@@ -47,7 +51,7 @@ If optimization is still processing (status code 1), re-invoke this tool with th
         .enum(['none', 'outer', 'inner', 'smart_crop'])
         .optional()
         .describe(
-          'Resize mode: none (default), outer (fit within bounds), inner (fill bounds), smart_crop (AI-powered crop)'
+          'Resize mode: none (default), outer (contains the target rectangle), inner (fits within the target rectangle), smart_crop (AI-powered crop)'
         ),
       resizeWidth: z
         .number()
@@ -70,7 +74,7 @@ If optimization is still processing (status code 1), re-invoke this tool with th
         .string()
         .optional()
         .describe(
-          'Background removal: "transparent" for transparent background, a hex color like "#ff0000" for replacement, or a URL for a replacement image'
+          'Background removal: "transparent" for transparent background, a color such as "#ff0000FF" (RGBA hex) for replacement, or a URL for a replacement image'
         ),
       refresh: z
         .boolean()
@@ -136,6 +140,30 @@ If optimization is still processing (status code 1), re-invoke this tool with th
     })
   )
   .handleInvocation(async ctx => {
+    for (let value of ctx.input.urls) {
+      let url: URL;
+      try {
+        url = new URL(value);
+      } catch {
+        throw createApiServiceError('Provide valid HTTP or HTTPS image URLs.');
+      }
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw createApiServiceError('Image URLs must use HTTP or HTTPS.');
+      }
+    }
+    for (let dimension of [ctx.input.resizeWidth, ctx.input.resizeHeight]) {
+      if (dimension !== undefined && (!Number.isFinite(dimension) || dimension <= 0)) {
+        throw createApiServiceError('Resize dimensions must be positive pixel values.');
+      }
+    }
+    if (
+      ['inner', 'smart_crop'].includes(ctx.input.resize ?? '') &&
+      (ctx.input.resizeWidth === undefined || ctx.input.resizeHeight === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide both resizeWidth and resizeHeight for this resize mode.'
+      );
+    }
     let client = new ShortPixelClient({ token: ctx.auth.token });
 
     let rawResults = await client.optimizeByUrl({
@@ -163,9 +191,15 @@ If optimization is still processing (status code 1), re-invoke this tool with th
       webpLosslessUrl: 'WebPLosslessURL' in r ? r.WebPLosslessURL : undefined,
       avifLossyUrl: 'AVIFLossyURL' in r ? r.AVIFLossyURL : undefined,
       avifLosslessUrl: 'AVIFLosslessURL' in r ? r.AVIFLosslessURL : undefined,
-      originalSize: 'OriginalSize' in r ? r.OriginalSize : undefined,
-      lossySize: 'LossySize' in r ? r.LossySize : undefined,
-      losslessSize: 'LoselessSize' in r ? r.LoselessSize : undefined,
+      originalSize: readOptionalNumber(
+        'OriginalSize' in r ? r.OriginalSize : undefined,
+        'original size'
+      ),
+      lossySize: readOptionalNumber('LossySize' in r ? r.LossySize : undefined, 'lossy size'),
+      losslessSize: readOptionalNumber(
+        'LoselessSize' in r ? r.LoselessSize : undefined,
+        'lossless size'
+      ),
       timestamp: 'Timestamp' in r ? r.Timestamp : undefined
     }));
 

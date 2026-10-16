@@ -1,17 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ThanksIoClient } from '../lib/client';
+import { mapRadiusSearch, radiusSearchSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
   name: z.string().optional().describe('Recipient full name'),
   company: z.string().optional().describe('Recipient company name'),
-  address: z.string().describe('Street address'),
+  address: z.string().optional().describe('Street address'),
   address2: z.string().optional().describe('Address line 2'),
-  city: z.string().describe('City'),
-  province: z.string().describe('State/province code'),
-  postalCode: z.string().describe('ZIP/postal code'),
+  city: z.string().optional().describe('City'),
+  province: z.string().optional().describe('State/province code'),
+  postalCode: z.string().optional().describe('ZIP/postal code'),
   country: z.string().optional().describe('Country code (US or CA)'),
+  email: z
+    .string()
+    .optional()
+    .describe('Email for paid address lookup if no mailing address is supplied'),
+  phone: z.string().optional().describe('Recipient phone'),
   custom1: z.string().optional().describe('Custom field 1'),
   custom2: z.string().optional().describe('Custom field 2'),
   custom3: z.string().optional().describe('Custom field 3'),
@@ -35,13 +41,30 @@ Recipients can be specified inline, via mailing list IDs, or via radius search. 
 })
   .input(
     z.object({
+      creativeId: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Saved creative ID from list_creatives; omit design, message, handwriting, background and gift card settings when used'
+        ),
+      radiusSearch: radiusSearchSchema.optional(),
+      notificationEmails: z
+        .string()
+        .optional()
+        .describe('Comma-separated email addresses for order notifications'),
+      metadata: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Order metadata, at most 8192 JSON bytes'),
       frontImageUrl: z.string().optional().describe('URL of the exterior image'),
       imageTemplateId: z.number().optional().describe('ID of a saved image template'),
       message: z.string().optional().describe('Handwritten interior message'),
       messageTemplateId: z.number().optional().describe('ID of a saved message template'),
-      giftcardBrand: z.string().describe('Gift card brand code (e.g., "amazonus")'),
+      giftcardBrand: z.string().optional().describe('Gift card brand code (e.g., "amazonus")'),
       giftcardAmountInCents: z
         .number()
+        .optional()
         .describe('Gift card amount in cents (e.g., 2500 for $25)'),
       handwritingStyleId: z.number().optional().describe('Handwriting style ID'),
       handwritingColor: z.string().optional().describe('Ink color'),
@@ -70,6 +93,7 @@ Recipients can be specified inline, via mailing list IDs, or via radius search. 
       status: z.string().optional().describe('Order status'),
       totalRecipients: z.number().optional().describe('Estimated number of recipients'),
       authorizationTotal: z.number().optional().describe('Total cost in cents'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       previews: z.array(z.string()).optional().describe('Preview image URLs')
     })
   )
@@ -85,6 +109,8 @@ Recipients can be specified inline, via mailing list IDs, or via radius search. 
       province: r.province,
       postal_code: r.postalCode,
       country: r.country,
+      email: r.email,
+      phone: r.phone,
       custom1: r.custom1,
       custom2: r.custom2,
       custom3: r.custom3,
@@ -92,6 +118,10 @@ Recipients can be specified inline, via mailing list IDs, or via radius search. 
     }));
 
     let result = await client.sendGiftcard({
+      creativeId: ctx.input.creativeId,
+      radiusSearch: mapRadiusSearch(ctx.input.radiusSearch),
+      emailAdditional: ctx.input.notificationEmails,
+      metadata: ctx.input.metadata,
       frontImageUrl: ctx.input.frontImageUrl,
       imageTemplate: ctx.input.imageTemplateId,
       message: ctx.input.message,
@@ -114,7 +144,11 @@ Recipients can be specified inline, via mailing list IDs, or via radius search. 
     });
 
     let isPreview = ctx.input.preview === true;
-    let previews = isPreview ? ((result.data as any)?.previews as string[]) || [] : undefined;
+    let previewData = result.data as { previews?: string[] } | undefined;
+    let previews = isPreview ? previewData?.previews || [] : undefined;
+    for (let url of previews || []) {
+      await ctx.addAttachment({ type: 'url', url });
+    }
 
     return {
       output: {
@@ -122,11 +156,12 @@ Recipients can be specified inline, via mailing list IDs, or via radius search. 
         status: isPreview ? 'preview' : (result.status as string),
         totalRecipients: result.total_estimated_recipients as number | undefined,
         authorizationTotal: result.authorization_total as number | undefined,
-        previews
+        previews,
+        raw: result
       },
       message: isPreview
         ? `Generated **${previews?.length || 0}** gift card preview(s).`
-        : `Gift card order **#${result.id}** created (brand: **${ctx.input.giftcardBrand}**, amount: **$${(ctx.input.giftcardAmountInCents / 100).toFixed(2)}**) with status **${result.status}**.`
+        : `Gift card order **#${result.id}** created with status **${result.status}**.`
     };
   })
   .build();

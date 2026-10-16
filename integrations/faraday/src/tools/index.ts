@@ -1,5 +1,6 @@
 export * from './get-account';
 export * from './get-dependency-graph';
+export * from './lifecycle';
 export * from './list-streams';
 export * from './list-traits';
 export * from './lookup-prediction';

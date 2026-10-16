@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { getClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let uploadFile = SlateTool.create(spec, {
@@ -25,7 +25,9 @@ export let uploadFile = SlateTool.create(spec, {
       uploadedFile: z
         .object({
           url: z.string().describe('URL of the uploaded file on Baserow'),
-          name: z.string().describe('Original file name'),
+          name: z
+            .string()
+            .describe('Stored file name to use when assigning this file to a row'),
           size: z.number().optional().describe('File size in bytes'),
           mimeType: z.string().optional().describe('MIME type of the file'),
           isImage: z.boolean().optional().describe('Whether the file is an image')
@@ -35,26 +37,22 @@ export let uploadFile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      authType: ctx.auth.authType,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = getClient(ctx);
 
     let file = await client.uploadFileViaUrl(ctx.input.fileUrl);
 
     return {
       output: {
         uploadedFile: {
+          ...file,
           url: file.url,
-          name: file.original_name || file.name,
+          name: file.name,
           size: file.size,
           mimeType: file.mime_type,
-          isImage: file.is_image,
-          ...file
+          isImage: file.is_image
         }
       },
-      message: `Uploaded file **${file.original_name || file.name}** from URL.`
+      message: `Uploaded file **${file.original_name ?? file.name}** from URL.`
     };
   })
   .build();

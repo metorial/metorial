@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UserManagementClient } from '../lib/users';
 import { spec } from '../spec';
@@ -91,7 +91,7 @@ export let manageUsers = SlateTool.create(spec, {
         };
       }
       case 'getUser': {
-        if (!ctx.input.email) throw new Error('email is required for getUser');
+        if (!ctx.input.email) throw createApiServiceError('email is required for getUser');
         let result = await client.getUser(ctx.input.orgId, ctx.input.email);
         let user = result.user || result;
         return {
@@ -112,9 +112,11 @@ export let manageUsers = SlateTool.create(spec, {
         };
       }
       case 'createUser': {
-        if (!ctx.input.email) throw new Error('email is required for createUser');
-        if (!ctx.input.firstName) throw new Error('firstName is required for createUser');
-        if (!ctx.input.lastName) throw new Error('lastName is required for createUser');
+        if (!ctx.input.email) throw createApiServiceError('email is required for createUser');
+        if (!ctx.input.firstName)
+          throw createApiServiceError('firstName is required for createUser');
+        if (!ctx.input.lastName)
+          throw createApiServiceError('lastName is required for createUser');
         let result = await client.createUser(ctx.input.orgId, {
           email: ctx.input.email,
           firstName: ctx.input.firstName,
@@ -132,7 +134,7 @@ export let manageUsers = SlateTool.create(spec, {
         };
       }
       case 'removeUser': {
-        if (!ctx.input.email) throw new Error('email is required for removeUser');
+        if (!ctx.input.email) throw createApiServiceError('email is required for removeUser');
         let result = await client.removeUser(ctx.input.orgId, ctx.input.email);
         return {
           output: {
@@ -143,9 +145,10 @@ export let manageUsers = SlateTool.create(spec, {
         };
       }
       case 'addToProfile': {
-        if (!ctx.input.email) throw new Error('email is required for addToProfile');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required for addToProfile');
         if (!ctx.input.productProfiles?.length)
-          throw new Error('productProfiles is required for addToProfile');
+          throw createApiServiceError('productProfiles is required for addToProfile');
         let result = await client.addToProductProfile(
           ctx.input.orgId,
           ctx.input.email,
@@ -160,9 +163,10 @@ export let manageUsers = SlateTool.create(spec, {
         };
       }
       case 'removeFromProfile': {
-        if (!ctx.input.email) throw new Error('email is required for removeFromProfile');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required for removeFromProfile');
         if (!ctx.input.productProfiles?.length)
-          throw new Error('productProfiles is required for removeFromProfile');
+          throw createApiServiceError('productProfiles is required for removeFromProfile');
         let result = await client.removeFromProductProfile(
           ctx.input.orgId,
           ctx.input.email,

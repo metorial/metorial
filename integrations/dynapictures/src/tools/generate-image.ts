@@ -1,46 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getFileAuthHeaders, validateLayers } from '../lib/client';
+import { generatedPageSchema, layerParamsSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let layerParamsSchema = z.object({
-  name: z.string().describe('Name of the template layer to customize'),
-  text: z.string().optional().describe('Text content for a text layer'),
-  color: z.string().optional().describe('Text or foreground color (hex, rgb, or rgba)'),
-  backgroundColor: z.string().optional().describe('Background color (hex, rgb, or rgba)'),
-  borderColor: z.string().optional().describe('Border color (hex, rgb, or rgba)'),
-  borderWidth: z.string().optional().describe('Border width, e.g. "1px"'),
-  borderRadius: z.string().optional().describe('Border radius, e.g. "5px"'),
-  imageUrl: z.string().optional().describe('URL of an image to use for an image layer'),
-  imagePosition: z
-    .string()
-    .optional()
-    .describe(
-      'Image cropping mode: "cro" (crop), "ai_face" (AI face detection), "cov" (cover), or "align" (alignment-based)'
-    ),
-  imageAlignH: z
-    .string()
-    .optional()
-    .describe('Horizontal alignment: "left", "center", "right", or "full"'),
-  imageAlignV: z
-    .string()
-    .optional()
-    .describe('Vertical alignment: "top", "center", "bottom", or "full"'),
-  imageEffect: z
-    .string()
-    .optional()
-    .describe(
-      'CSS filter value for image effects, e.g. "grayscale(100%)", "blur(5px)", "sepia(100%)"'
-    ),
-  opacity: z
-    .number()
-    .optional()
-    .describe('Layer opacity from 0.0 (transparent) to 1.0 (opaque)'),
-  chartColor: z.string().optional().describe('Chart bar/line color (hex, rgb, or rgba)'),
-  chartLabelColor: z.string().optional().describe('Chart label color (hex, rgb, or rgba)'),
-  chartDataLabels: z.array(z.string()).optional().describe('Array of chart data labels'),
-  chartDataValues: z.array(z.number()).optional().describe('Array of chart data values')
-});
 
 let pageParamsSchema = z.object({
   index: z.number().optional().describe('Page index (0-based)'),
@@ -92,30 +54,60 @@ export let generateImage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      imageId: z.string().describe('ID of the generated image'),
+      imageId: z.string().optional().describe('ID of the generated image'),
       templateId: z.string().describe('Template ID used for generation'),
-      imageUrl: z.string().describe('URL of the generated image or PDF'),
-      thumbnailUrl: z.string().describe('URL of the thumbnail'),
+      imageUrl: z.string().optional().describe('URL of the generated image or PDF'),
+      thumbnailUrl: z.string().optional().describe('URL of the thumbnail'),
       retinaThumbnailUrl: z
         .string()
         .optional()
         .describe('URL of the retina-quality thumbnail'),
       pdfUrl: z.string().optional().describe('URL of the generated PDF (when format is pdf)'),
-      metadata: z.string().describe('Custom metadata attached to the image'),
-      width: z.number().describe('Image width in pixels'),
-      height: z.number().describe('Image height in pixels')
+      metadata: z.string().optional().describe('Custom metadata attached to the image'),
+      width: z.number().optional().describe('Image width in pixels'),
+      height: z.number().optional().describe('Image height in pixels'),
+      templateName: z
+        .string()
+        .optional()
+        .describe('Template name returned for multipage generation'),
+      pages: z
+        .array(generatedPageSchema)
+        .optional()
+        .describe('Generated images for a multipage template'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete generation response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let request: Record<string, unknown> = {};
-    if (ctx.input.format) request.format = ctx.input.format;
-    if (ctx.input.metadata) request.metadata = ctx.input.metadata;
-    if (ctx.input.params) request.params = ctx.input.params;
-    if (ctx.input.pages) request.pages = ctx.input.pages;
-
-    let result = await client.generateImage(ctx.input.templateId, request);
+    if (ctx.input.params !== undefined && ctx.input.pages !== undefined) {
+      throw createApiServiceError(
+        'Use params for a single-page request or pages for a multipage request, not both.'
+      );
+    }
+    validateLayers(ctx.input.params ?? []);
+    for (let page of ctx.input.pages ?? []) {
+      if (page.index !== undefined && (!Number.isInteger(page.index) || page.index < 0)) {
+        throw createApiServiceError('Page index must be a whole number starting at 0.');
+      }
+      validateLayers(page.layers);
+    }
+    let { templateId, ...request } = ctx.input;
+    let result = await client.generateImage(templateId, request);
+    let urls = new Set<string>();
+    let mainUrl = result.pdfUrl ?? result.imageUrl;
+    if (mainUrl) urls.add(mainUrl);
+    for (let page of result.pages ?? []) urls.add(page.imageUrl);
+    for (let url of urls) {
+      await ctx.addAttachment({
+        type: 'url',
+        url,
+        headers: getFileAuthHeaders(url, ctx.auth.token)
+      });
+    }
 
     return {
       output: {
@@ -125,11 +117,16 @@ export let generateImage = SlateTool.create(spec, {
         thumbnailUrl: result.thumbnailUrl,
         retinaThumbnailUrl: result.retinaThumbnailUrl,
         pdfUrl: result.pdfUrl,
-        metadata: result.metadata || '',
+        metadata: result.metadata,
         width: result.width,
-        height: result.height
+        height: result.height,
+        templateName: result.templateName,
+        pages: result.pages,
+        raw: result
       },
-      message: `Generated image **${result.id}** (${result.width}x${result.height}). [View image](${result.imageUrl})`
+      message: result.pages
+        ? `Generated **${result.pages.length}** image page(s).`
+        : `Generated ${ctx.input.format === 'pdf' ? 'PDF' : 'image'}${result.imageUrl ? `. [View file](${result.imageUrl})` : '.'}`
     };
   })
   .build();

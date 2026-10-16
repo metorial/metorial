@@ -1,6 +1,10 @@
-# <img src="logo.svg" height="20"> Smug Mug
+# <img src="logo.svg" height="20"> SmugMug
 
-Upload, organize, and manage photos and videos on SmugMug. Create and configure albums (galleries) with privacy, watermark, and download settings. Organize content into hierarchical folders and pages. Upload images from local files or URLs, replace existing images, and retrieve multiple size variants and EXIF metadata. Update image properties such as titles, captions, and keywords. Move and collect images across albums. Search across albums, images, and nodes. Manage user profiles, site settings, featured albums, and sharing URIs. Apply watermarks to albums and manage comments on albums and nodes.
+Manage SmugMug albums, images, folders, and page nodes. Upload photos or videos from a directly accessible URL, update captions and keywords, move or collect images, search content, and browse paginated album images, comments, and child nodes. Retrieve the authenticated account with `get_user` by omitting `nickname`.
+
+Read image metadata and available media-size details, export image details and EXIF metadata to a downloadable JSON file, update your public biography, list watermarks, and retrieve album sharing links. Media URLs returned by SmugMug can require OAuth access for private content; the metadata export does not download the photo or video itself.
+
+Connect through OAuth 1.0a with read-only, read-and-add, or full permissions, or supply an existing consumer key/secret and access token/secret. Access tokens do not expire unless revoked. The connection has no additional configuration fields.
 
 ## License
 

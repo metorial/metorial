@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapProject } from '../lib/response';
 import { spec } from '../spec';
 
 export let createProject = SlateTool.create(spec, {
@@ -22,6 +23,12 @@ export let createProject = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       projectId: z.string().describe('ID of the newly created project'),
       projectName: z.string().describe('Name of the newly created project'),
       workspaceId: z.string().optional().describe('ID of the workspace'),
@@ -51,22 +58,10 @@ export let createProject = SlateTool.create(spec, {
       templateId: ctx.input.templateId
     });
 
+    let output = mapProject(project);
     return {
-      output: {
-        projectId: project.projectId ?? '',
-        projectName: project.projectName ?? '',
-        workspaceId: project.workspaceId || undefined,
-        ownerId: project.ownerId || undefined,
-        description: project.description || undefined,
-        customerId: project.customerId || undefined,
-        startDate: project.startDate || undefined,
-        dueDate: project.dueDate || undefined,
-        favoriteUsers: Array.isArray(project.favoriteUsers)
-          ? project.favoriteUsers
-          : undefined,
-        projectUsers: Array.isArray(project.projectUsers) ? project.projectUsers : undefined
-      },
-      message: `Created project **${project.projectName}** (ID: ${project.projectId}).`
+      output,
+      message: `Created project **${output.projectName}** (ID: ${output.projectId}).`
     };
   })
   .build();

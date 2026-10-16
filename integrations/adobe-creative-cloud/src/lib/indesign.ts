@@ -1,4 +1,4 @@
-import { type AdobeAuthConfig, createAdobeAxios } from './client';
+import { type AdobeAuthConfig, createAdobeAxios, getAdobeJobUrl } from './client';
 
 let INDESIGN_BASE_URL = 'https://indesign.adobe.io';
 
@@ -63,7 +63,7 @@ export class InDesignClient {
   }
 
   async getJobStatus(jobUrl: string) {
-    let response = await this.http.get(jobUrl);
+    let response = await this.http.get(getAdobeJobUrl(jobUrl).toString(), { maxRedirects: 0 });
     return response.data;
   }
 }

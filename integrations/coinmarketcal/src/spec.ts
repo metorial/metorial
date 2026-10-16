@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'coinmarketcal',
   name: 'Coin Market Cal',
-  description: undefined,
+  description:
+    'Search the CoinMarketCal cryptocurrency event catalog, discover coins and event categories, and read API plan usage.',
   metadata: {},
   config,
   auth

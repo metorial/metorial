@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getModuleFileUrl } from '../lib/files';
 import { spec } from '../spec';
 
 export let textToImage = SlateTool.create(spec, {
@@ -37,6 +38,9 @@ Supports a wide range of styles and subjects — describe what you need and the 
     let result = await client.textToImage({
       prompt: ctx.input.prompt
     });
+
+    let fileUrl = getModuleFileUrl(result);
+    if (fileUrl) await ctx.addAttachment({ type: 'url', url: fileUrl });
 
     return {
       output: {

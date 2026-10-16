@@ -1,4 +1,4 @@
-# Slates Specification for Laposta
+# Laposta API Specification
 
 ## Overview
 
@@ -12,13 +12,13 @@ Laposta uses **API Key** authentication via **HTTP Basic Authentication**.
 - Each account has its own API key(s), which can be found in the account under Connect → API Keys.
 - If no key exists, a new one can be created. Immediately after creation, the key is displayed only once and should be copied for use.
 
-**Base URL:** `https://api.laposta.org/`  
+**Base URL:** `https://api.laposta.nl/`
 **Protocol:** HTTPS only
 
 **Example:**
 
 ```
-curl https://api.laposta.org/v2/list \
+curl https://api.laposta.nl/v2/list \
   -u YOUR_API_KEY:
 ```
 
@@ -51,7 +51,7 @@ Define and manage custom fields on lists. Fields support multiple data types: te
 
 ### Segments
 
-Create and manage segments within lists based on custom field conditions. Segments are defined using a JSON-formatted definition string that references field values.
+Create and manage segments within lists based on custom field conditions. Segments are defined using a Laposta expression that references field values.
 
 - Segment definitions are best composed in the Laposta UI first, then retrieved and reused via the API.
 
@@ -94,3 +94,14 @@ Fires when a subscriber is removed from a list. Includes additional context indi
 - Events are bundled and dispatched approximately every 5 seconds, with up to 1,000 events per request.
 - Each webhook has a unique secret. Requests include an `X-Laposta-Signature` header containing an HMAC-SHA256 signature of the body for verification.
 - Failed deliveries are retried up to 7 times with increasing intervals. If all retries fail, the webhook is automatically deleted.
+
+
+## Retrieval and compatibility
+
+Subscriber listing supports optional cursor pagination (1–1000 records), text search, one label filter, and sorting. Omit both `limit` and `cursor` for the complete list. Subscriber and campaign history use opaque cursors and respect account privacy settings. Imported campaign HTML and plaintext can be retrieved; drag-and-drop campaigns do not support content retrieval.
+
+Subscriber writes accept native string, number, and string-array values through `customFieldValues`, keyed by the field `custom_name` returned by `get_fields`. Values there override matching legacy `customFields` entries. On reads, `customFields` contains the string-valued projection; `customFieldValues` and `raw` preserve all actual values. Field option labels are keyed by their provider IDs from `options_full`. Campaign `listIds` lists target list IDs while `listSegments` preserves the provider list-to-segment mapping. Nullable timestamps are omitted from eligible string projections and remain unchanged in `raw`; absent campaign state or Mtrack statistics are not invented.
+
+Authentication uses API-key Basic authentication with no token refresh. The API documents no current-account/profile endpoint. Mtrack inputs are retained for compatibility, but the current official campaign API reference documents only Google Analytics; Mtrack support remains unverified.
+
+Official reference: https://api.laposta.nl/doc/index.nl.php

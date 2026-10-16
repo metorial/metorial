@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .enum(['test', 'live'])
       .default('test')
       .describe(
-        'Whether to use test or live mode. Determines which API keys and data are used.'
+        'Environment label for this connection. The API key selects test or live data; changing this label does not change the API key.'
       )
   })
 );

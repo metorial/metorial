@@ -1,6 +1,6 @@
 # Marketstack
 
-Retrieve real-time, intraday, and historical stock market data for 30,000+ tickers across 70+ global exchanges. Look up end-of-day and intraday prices, live stock quotes, commodity prices, government bond yields, ETF holdings, and stock market indices. Access company information, analyst ratings, stock splits, and dividend history. Search SEC EDGAR filings, company submissions, and XBRL financial data. Query reference data for exchanges, currencies, and timezones.
+Query stock prices, company information, corporate actions, commodities, government bonds, indices, ETF holdings, currencies, timezones, and SEC EDGAR data through the Marketstack v2 API. Download official ticker and commodity catalogs to discover identifiers. Plan access, endpoint rate limits, and legacy compatibility details are documented in [the specification](docs/SPEC.md).
 
 ## License
 

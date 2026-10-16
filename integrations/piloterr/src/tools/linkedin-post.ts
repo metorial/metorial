@@ -1,7 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
+
+let linkedinPostOutputSchema = z.object({
+  postId: z.string().optional(),
+  url: z.string().optional(),
+  text: z.string().optional(),
+  author: z
+    .object({
+      url: z.string().optional(),
+      fullName: z.string().optional(),
+      imageUrl: z.string().optional(),
+      profileType: z.string().optional()
+    })
+    .optional(),
+  likeCount: z.number().optional(),
+  commentsCount: z.number().optional(),
+  totalEngagement: z.number().optional(),
+  datePublished: z.string().optional(),
+  hashtags: z.array(z.string()).optional(),
+  images: z.array(z.string()).optional(),
+  raw: z.any().describe('Full raw response')
+});
 
 export let linkedinPost = SlateTool.create(spec, {
   name: 'LinkedIn Post',
@@ -16,34 +38,13 @@ export let linkedinPost = SlateTool.create(spec, {
       postIdOrUrl: z.string().describe('LinkedIn post ID or full post URL')
     })
   )
-  .output(
-    z.object({
-      postId: z.string().optional(),
-      url: z.string().optional(),
-      text: z.string().optional(),
-      author: z
-        .object({
-          url: z.string().optional(),
-          fullName: z.string().optional(),
-          imageUrl: z.string().optional(),
-          profileType: z.string().optional()
-        })
-        .optional(),
-      likeCount: z.number().optional(),
-      commentsCount: z.number().optional(),
-      totalEngagement: z.number().optional(),
-      datePublished: z.string().optional(),
-      hashtags: z.array(z.string()).optional(),
-      images: z.array(z.string()).optional(),
-      raw: z.any().describe('Full raw response')
-    })
-  )
+  .output(linkedinPostOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.getLinkedInPost({ query: ctx.input.postIdOrUrl });
 
     return {
-      output: {
+      output: normalizeOutput(linkedinPostOutputSchema, {
         postId: result.id,
         url: result.url,
         text: result.text,
@@ -51,7 +52,10 @@ export let linkedinPost = SlateTool.create(spec, {
           ? {
               url: result.author.url,
               fullName: result.author.full_name,
-              imageUrl: result.author.image_url,
+              imageUrl:
+                typeof result.author.image_url === 'string'
+                  ? result.author.image_url
+                  : undefined,
               profileType: result.author.profile_type
             }
           : undefined,
@@ -62,8 +66,8 @@ export let linkedinPost = SlateTool.create(spec, {
         hashtags: result.hashtags,
         images: result.images,
         raw: result
-      },
-      message: `Retrieved LinkedIn post by **${result.author?.full_name ?? 'Unknown'}** with **${result.like_count ?? 0} likes** and **${result.comments_count ?? 0} comments**.`
+      }),
+      message: 'Retrieved LinkedIn post data.'
     };
   })
   .build();

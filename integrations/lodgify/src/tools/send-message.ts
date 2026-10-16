@@ -76,7 +76,7 @@ export let sendMessage = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'The idempotency key the message was sent with, when one was supplied. Reuse it to retry the same call without creating a duplicate'
+          'The idempotency key the message was sent with, supplied by you or generated automatically. Reuse it to retry the same call without creating a duplicate'
         )
     })
   )
@@ -104,13 +104,14 @@ export let sendMessage = SlateTool.create(spec, {
       );
     }
 
+    let messageId = ctx.input.messageId ?? crypto.randomUUID();
     let payload: LodgifyMessage = {
       subject: ctx.input.subject,
       message: ctx.input.message,
       type: ctx.input.type,
       // Lodgify only honours the notification flag on Owner messages.
       send_notification: ctx.input.type === 'Owner' ? ctx.input.sendNotification : undefined,
-      message_id: ctx.input.messageId
+      message_id: messageId
     };
 
     if (bookingId !== undefined) {
@@ -126,7 +127,7 @@ export let sendMessage = SlateTool.create(spec, {
       success: true,
       bookingId,
       enquiryId,
-      messageId: ctx.input.messageId
+      messageId
     };
 
     if (ctx.input.type === 'Comment') {

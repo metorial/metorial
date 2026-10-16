@@ -23,6 +23,14 @@ export let listCustomers = SlateTool.create(spec, {
         .optional()
         .describe('Sort field'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort order'),
+      startingAfter: z
+        .string()
+        .optional()
+        .describe('Return records after this ID; mutually exclusive with endingBefore'),
+      endingBefore: z
+        .string()
+        .optional()
+        .describe('Return records before this ID; mutually exclusive with startingAfter'),
       page: z.number().optional().describe('Page number'),
       pageSize: z.number().optional().describe('Items per page (max 100)')
     })
@@ -38,8 +46,8 @@ export let listCustomers = SlateTool.create(spec, {
             email: z.string().nullable(),
             avatar: z.string().nullable(),
             country: z.string().nullable(),
-            sales: z.number(),
-            saleAmount: z.number(),
+            sales: z.number().optional(),
+            saleAmount: z.number().optional(),
             createdAt: z.string()
           })
         )
@@ -58,6 +66,8 @@ export let listCustomers = SlateTool.create(spec, {
       linkId: ctx.input.linkId,
       sortBy: ctx.input.sortBy,
       sortOrder: ctx.input.sortOrder,
+      startingAfter: ctx.input.startingAfter,
+      endingBefore: ctx.input.endingBefore,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
@@ -66,13 +76,13 @@ export let listCustomers = SlateTool.create(spec, {
       output: {
         customers: customers.map(c => ({
           customerId: c.id,
-          name: c.name,
+          name: c.name ?? null,
           externalId: c.externalId,
-          email: c.email,
-          avatar: c.avatar,
-          country: c.country,
-          sales: c.sales,
-          saleAmount: c.saleAmount,
+          email: c.email ?? null,
+          avatar: c.avatar ?? null,
+          country: c.country ?? null,
+          sales: c.sales ?? undefined,
+          saleAmount: c.saleAmount ?? undefined,
           createdAt: c.createdAt
         })),
         count: customers.length

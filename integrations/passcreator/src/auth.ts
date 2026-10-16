@@ -15,7 +15,7 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Passcreator API key. Found under Integrations → API Keys in the Passcreator dashboard.'
+          'Passcreator API key. Found under Settings → API Keys in the Passcreator dashboard.'
         )
     }),
     getOutput: async ctx => {

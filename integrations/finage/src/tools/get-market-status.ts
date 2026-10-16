@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import { finageRecord } from '../lib/response';
 import { spec } from '../spec';
 
 export let getMarketStatus = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let getMarketStatus = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       markets: z
         .record(z.string(), z.string())
         .describe('Map of market name to status (e.g. "open", "closed", "extended-hours")')
@@ -21,29 +23,23 @@ export let getMarketStatus = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-
     let data = await client.getMarketStatus();
-
+    let response = finageRecord(data);
     let markets: Record<string, string> = {};
-    if (typeof data === 'object' && data !== null) {
-      for (let [key, value] of Object.entries(data)) {
-        if (typeof value === 'string') {
-          markets[key] = value;
-        } else if (typeof value === 'object' && value !== null) {
-          markets[key] = (value as any).status ?? JSON.stringify(value);
-        }
+    if (typeof response.market === 'string') markets.market = response.market;
+    for (let key of ['exchanges', 'currencies']) {
+      if (response[key] === undefined || response[key] === null) continue;
+      for (let [name, status] of Object.entries(finageRecord(response[key], key))) {
+        if (typeof status !== 'string')
+          throw createApiServiceError('Finage returned an invalid market status.');
+        markets[name] = status;
       }
     }
-
-    let openMarkets = Object.entries(markets)
-      .filter(([, v]) => v === 'open')
-      .map(([k]) => k);
-    let statusSummary =
-      openMarkets.length > 0 ? `Open: ${openMarkets.join(', ')}` : 'All markets closed';
-
+    if (Object.keys(markets).length === 0)
+      throw createApiServiceError('Finage returned no market statuses.');
     return {
-      output: { markets },
-      message: `${statusSummary}`
+      output: { markets, raw: data },
+      message: `Retrieved status for **${Object.keys(markets).length}** markets.`
     };
   })
   .build();

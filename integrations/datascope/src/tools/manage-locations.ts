@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, expectArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let listLocations = SlateTool.create(spec, {
@@ -21,7 +21,7 @@ export let listLocations = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let results = await client.getLocations();
-    let locationsArray = Array.isArray(results) ? results : [];
+    let locationsArray = expectArray(results, 'locations');
 
     return {
       output: {

@@ -1,10 +1,13 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   checkReviewOptIn,
   getLocationDetails,
   getLocationPhotos,
   getLocationReviews,
+  listLocationMappings,
+  listReviewRequests,
   manageReviewRequest,
   mapLocation,
   searchLocations,
@@ -14,6 +17,7 @@ import {
 
 export let provider = Slate.create({
   spec,
+  toolCategories,
   tools: [
     searchLocations,
     searchNearbyLocations,
@@ -23,7 +27,9 @@ export let provider = Slate.create({
     mapLocation,
     sendReviewRequest,
     manageReviewRequest,
-    checkReviewOptIn
+    checkReviewOptIn,
+    listLocationMappings,
+    listReviewRequests
   ],
   triggers: []
 });

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,21 +30,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.redcircleapi.com'
-      });
-
-      let response = await axios.get('/account', {
-        params: {
-          api_key: ctx.output.token
-        }
-      });
-
-      let account = response.data?.account_info;
+      let data = await new Client({ token: ctx.output.token }).getAccount();
+      let account = data.account_info;
 
       return {
         profile: {
-          id: account?.api_key,
+          id: account?.email,
           email: account?.email,
           name: account?.name
         }

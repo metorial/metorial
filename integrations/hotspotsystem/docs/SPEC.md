@@ -1,4 +1,4 @@
-# Slates Specification for Hotspotsystem
+# HotspotSystem API Specification
 
 ## Overview
 
@@ -21,7 +21,7 @@ sn-apikey: your_api_key_here
 
 You can verify your credentials by calling `GET /me`, which returns your user ID and operator name.
 
-Note: API v1.0 used HTTP Basic Auth with the API key as the username, but v2.0 (current) uses the header-based approach described above.
+The v2 reference explicitly specifies the `sn-apikey` header and the official notes use it in both code examples. The notes also contain an inconsistent Basic Authentication paragraph; this integration follows the explicit v2 security definition and examples. API v1.0 is deprecated.
 
 ## Features
 
@@ -87,3 +87,45 @@ Webhook payloads are sent as HTTP POST requests with a JSON body. Each request i
 
 - **Event:** `transaction.social.create`
 - Triggered when a new social login access transaction is recorded.
+
+
+## Pagination And Provider Data
+
+List tools return one page. `limit` is a positive integer and `offset` is a
+non-negative integer identifying the starting item. The v2 notes illustrate
+`offset=0` followed by `offset=10` for `limit=10`, although the reference calls
+it a page number. The returned `linkHeader`, when supplied by the provider,
+preserves its exact `self`, `next`, and `prev` links for continuing the query.
+The `raw` result retains the complete original response, including metadata
+and original numeric field values.
+
+The `full` location format uses `/locations` and its provider `total_count`.
+The `options` format uses `/locations/options`, which documents no pagination
+parameters and returns the complete options array without metadata. Its
+`totalCount` is derived from that complete array's length. Pagination and sort
+inputs apply only to the full format.
+
+Voucher limits, simultaneous use, validity, and price, plus transaction IDs,
+location IDs, newsletter flags, and payment amounts, are numeric in the v2
+models. Existing tool outputs retain their string types by converting actual
+values to strings; zero remains `"0"` and negative limits remain negative.
+Missing required provider fields fail clearly instead of being replaced with
+empty strings or invented values. Optional MAC custom questions and answers
+preserve actual empty strings when the provider returns them.
+
+`verify_credentials` is the read-only identity operation backed by `/me`.
+It additionally checks `/ping`; `apiReachable` is false if that secondary check
+fails or does not return `pong`. No OAuth or token refresh is required.
+
+## Official Documentation And Scope
+
+- [v2 endpoint and response reference](https://www.hotspotsystem.com/apidocs/api/reference/)
+- [v2 authentication, dates, pagination, and v1 deprecation notes](https://www.hotspotsystem.com/apidocs/api/notes/)
+- [v2 release announcement, August 25, 2016](https://help.hotspotsystem.com/release-of-api-v2-0-webhooks)
+
+The public v2 reference is old and still contains TODO descriptions for
+transaction fields. It documents only the read operations exposed here.
+The deprecated v1 voucher-generation API is intentionally outside the v2
+surface. The reference's Swagger link resolves to a missing resource; no
+current machine-readable specification or authenticated provider behavior was
+verified during this update.

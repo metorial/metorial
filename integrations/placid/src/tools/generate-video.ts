@@ -114,6 +114,14 @@ export let generateVideo = SlateTool.create(spec, {
       passthrough: ctx.input.passthrough
     });
 
+    if (result.status === 'finished' && result.video_url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.video_url,
+        mimeType: 'video/mp4'
+      });
+    }
+
     return {
       output: {
         videoId: result.id,

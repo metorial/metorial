@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,22 +26,11 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://alttext.ai/api/v1'
-      });
-
-      let response = await client.get('/account', {
-        headers: {
-          'X-API-Key': ctx.output.token
-        }
-      });
-
-      let account = response.data;
+      let account = await new Client({ token: ctx.output.token }).getAccount();
 
       return {
         profile: {
-          name: account.display_name || account.email,
-          email: account.email
+          name: account.name
         }
       };
     }

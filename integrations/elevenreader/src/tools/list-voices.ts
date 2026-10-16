@@ -66,6 +66,7 @@ export let listVoicesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       voices: z.array(voiceSchema).describe('List of matching voices'),
       hasMore: z.boolean().describe('Whether more voices are available'),
       nextPageToken: z.string().optional().describe('Token to fetch the next page'),
@@ -86,29 +87,30 @@ export let listVoicesTool = SlateTool.create(spec, {
       includeTotalCount: true
     });
 
-    let voices = (result.voices || []).map((v: any) => ({
+    let voices = result.voices.map(v => ({
       voiceId: v.voice_id,
       name: v.name,
-      category: v.category,
-      description: v.description,
-      previewUrl: v.preview_url,
-      labels: v.labels,
+      category: v.category ?? undefined,
+      description: v.description ?? undefined,
+      previewUrl: v.preview_url ?? undefined,
+      labels: v.labels ?? undefined,
       settings: v.settings
         ? {
-            stability: v.settings.stability,
-            similarityBoost: v.settings.similarity_boost,
-            style: v.settings.style,
-            speed: v.settings.speed
+            stability: v.settings.stability ?? undefined,
+            similarityBoost: v.settings.similarity_boost ?? undefined,
+            style: v.settings.style ?? undefined,
+            speed: v.settings.speed ?? undefined
           }
         : undefined
     }));
 
     return {
       output: {
+        raw: result.raw,
         voices,
-        hasMore: result.has_more || false,
-        nextPageToken: result.next_page_token,
-        totalCount: result.total_count
+        hasMore: result.has_more,
+        nextPageToken: result.next_page_token ?? undefined,
+        totalCount: result.total_count ?? undefined
       },
       message: `Found ${voices.length} voices${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}${result.has_more ? ' (more available)' : ''}.`
     };

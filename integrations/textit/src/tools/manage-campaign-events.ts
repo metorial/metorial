@@ -55,6 +55,7 @@ export let manageCampaignEvents = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       eventUuid: z.string().optional().describe('UUID of the campaign event'),
       campaignUuid: z.string().optional(),
       campaignName: z.string().optional(),
@@ -78,7 +79,7 @@ export let manageCampaignEvents = SlateTool.create(spec, {
       };
     }
 
-    let event: any;
+    let event: Awaited<ReturnType<Client['createCampaignEvent']>>;
     if (ctx.input.action === 'create') {
       event = await client.createCampaignEvent({
         campaign: ctx.input.campaignUuid!,
@@ -102,6 +103,7 @@ export let manageCampaignEvents = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: event,
         eventUuid: event.uuid,
         campaignUuid: event.campaign.uuid,
         campaignName: event.campaign.name,

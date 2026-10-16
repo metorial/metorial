@@ -11,8 +11,10 @@ import {
   deleteSubscription,
   deleteTemplate,
   deleteUser,
+  deleteUserAlias,
   exportData,
   getApp,
+  getExportFileUrl,
   getTemplate,
   getUser,
   listApps,
@@ -24,6 +26,7 @@ import {
   updateSubscription,
   updateTemplate,
   updateUser,
+  updateUserAliases,
   viewNotifications
 } from './tools';
 export let provider = Slate.create({
@@ -35,7 +38,9 @@ export let provider = Slate.create({
     createUser,
     getUser,
     updateUser,
+    updateUserAliases,
     deleteUser,
+    deleteUserAlias,
     createSubscription,
     updateSubscription,
     deleteSubscription,
@@ -52,7 +57,8 @@ export let provider = Slate.create({
     getApp,
     createApp,
     updateApp,
-    exportData
+    exportData,
+    getExportFileUrl
   ],
   triggers: []
 });

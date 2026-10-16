@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,6 +33,7 @@ export let getBestHour = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       shouldActivateNow: z
         .boolean()
         .optional()
@@ -43,7 +44,7 @@ export let getBestHour = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let zip = ctx.input.zip || ctx.config.zip;
     if (!zip) {
-      throw new Error('A German postal code (zip) is required.');
+      throw createApiServiceError('A German postal code (zip) is required.');
     }
 
     let client = new Client({ token: ctx.auth.token });
@@ -54,10 +55,7 @@ export let getBestHour = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        shouldActivateNow: result.activated,
-        bestHour: result.bestHour
-      },
+      output: { raw: result, shouldActivateNow: result.activated, bestHour: result.bestHour },
       message: result.activated
         ? `**Now** is a good time to activate your device in **${zip}** — the grid has high renewable energy availability.`
         : `It is **not** the best time to activate. The optimal window for **${zip}** is upcoming.`

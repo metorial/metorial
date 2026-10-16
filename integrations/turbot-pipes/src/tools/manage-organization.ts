@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,10 +27,7 @@ export let getOrganization = SlateTool.create(spec, {
   )
   .output(orgOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
     let org = await client.getOrg(ctx.input.orgHandle);
 
@@ -54,10 +51,7 @@ export let createOrganization = SlateTool.create(spec, {
   )
   .output(orgOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
     let org = await client.createOrg({
       handle: ctx.input.handle,
@@ -85,10 +79,7 @@ export let updateOrganization = SlateTool.create(spec, {
   )
   .output(orgOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
     let org = await client.updateOrg(ctx.input.orgHandle, {
       handle: ctx.input.handle,
@@ -122,10 +113,7 @@ export let deleteOrganization = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
     let org = await client.deleteOrg(ctx.input.orgHandle);
 
@@ -139,7 +127,7 @@ export let deleteOrganization = SlateTool.create(spec, {
 let memberSchema = z.object({
   userId: z.string().describe('User identifier'),
   orgId: z.string().describe('Organization identifier'),
-  role: z.string().describe('Member role'),
+  role: z.string().optional().describe('Member role, when returned by the provider'),
   status: z.string().optional().describe('Member status'),
   displayName: z.string().optional().describe('Display name'),
   handle: z.string().optional().describe('User handle'),
@@ -169,10 +157,7 @@ export let listOrgMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listOrgMembers(ctx.input.orgHandle, {
       limit: ctx.input.limit,
@@ -192,7 +177,7 @@ export let listOrgMembers = SlateTool.create(spec, {
 export let manageOrgMember = SlateTool.create(spec, {
   name: 'Manage Organization Member',
   key: 'manage_org_member',
-  description: `Add, update, or remove a member from an organization. Use action "add" to invite a new member, "update" to change their role, or "remove" to remove them.`
+  description: `Add, update, or remove a member from an organization. Use action "add" to add an existing tenant user (custom tenants only), "update" to change their role, or "remove" to remove them.`
 })
   .input(
     z.object({
@@ -209,16 +194,15 @@ export let manageOrgMember = SlateTool.create(spec, {
   )
   .output(memberSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let member: any;
+    let member: Awaited<ReturnType<Client['addOrgMember']>>;
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.role) {
-        throw new Error('Role is required when adding a member');
+        throw createApiServiceError('Role is required when adding a member.', {
+          reason: 'invalid_input'
+        });
       }
       member = await client.addOrgMember(ctx.input.orgHandle, {
         handle: ctx.input.userHandle,
@@ -226,7 +210,9 @@ export let manageOrgMember = SlateTool.create(spec, {
       });
     } else if (ctx.input.action === 'update') {
       if (!ctx.input.role) {
-        throw new Error('Role is required when updating a member');
+        throw createApiServiceError('Role is required when updating a member.', {
+          reason: 'invalid_input'
+        });
       }
       member = await client.updateOrgMember(ctx.input.orgHandle, ctx.input.userHandle, {
         role: ctx.input.role

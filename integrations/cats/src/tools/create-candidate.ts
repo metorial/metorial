@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 let phoneSchema = z.object({
@@ -26,7 +27,7 @@ let addressSchema = z
 export let createCandidate = SlateTool.create(spec, {
   name: 'Create Candidate',
   key: 'create_candidate',
-  description: `Create a new candidate record in CATS. Supports setting contact info, address, employment details, skills, availability, and custom fields. Optionally checks for duplicates before creating.`,
+  description: `Create a new candidate record in CATS. Supports setting contact info, address, employment details, skills, and availability. Optionally checks for duplicates before creating.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -78,22 +79,22 @@ export let createCandidate = SlateTool.create(spec, {
       last_name: ctx.input.lastName
     };
 
-    if (ctx.input.middleName) body.middle_name = ctx.input.middleName;
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.emails) {
+    if (ctx.input.middleName !== undefined) body.middle_name = ctx.input.middleName;
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.emails !== undefined) {
       body.emails = ctx.input.emails.map(e => ({
         email: e.email,
         is_primary: e.isPrimary ?? false
       }));
     }
-    if (ctx.input.phones) {
+    if (ctx.input.phones !== undefined) {
       body.phones = ctx.input.phones.map(p => ({
         number: p.number,
         extension: p.extension,
-        type: p.type
+        type: p.type === 'cell' ? 'mobile' : p.type
       }));
     }
-    if (ctx.input.address) {
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -101,25 +102,25 @@ export let createCandidate = SlateTool.create(spec, {
         postal_code: ctx.input.address.postalCode
       };
     }
-    if (ctx.input.countryCode) body.country_code = ctx.input.countryCode;
-    if (ctx.input.website) body.website = ctx.input.website;
-    if (ctx.input.currentEmployer) body.current_employer = ctx.input.currentEmployer;
-    if (ctx.input.dateAvailable) body.date_available = ctx.input.dateAvailable;
-    if (ctx.input.currentPay) body.current_pay = ctx.input.currentPay;
-    if (ctx.input.desiredPay) body.desired_pay = ctx.input.desiredPay;
+    if (ctx.input.countryCode !== undefined) body.country_code = ctx.input.countryCode;
+    if (ctx.input.website !== undefined) body.website = ctx.input.website;
+    if (ctx.input.currentEmployer !== undefined)
+      body.current_employer = ctx.input.currentEmployer;
+    if (ctx.input.dateAvailable !== undefined) body.date_available = ctx.input.dateAvailable;
+    if (ctx.input.currentPay !== undefined) body.current_pay = ctx.input.currentPay;
+    if (ctx.input.desiredPay !== undefined) body.desired_pay = ctx.input.desiredPay;
     if (ctx.input.isWillingToRelocate !== undefined)
       body.is_willing_to_relocate = ctx.input.isWillingToRelocate;
-    if (ctx.input.keySkills) body.key_skills = ctx.input.keySkills;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
-    if (ctx.input.source) body.source = ctx.input.source;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.keySkills !== undefined) body.key_skills = ctx.input.keySkills;
+    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
+    if (ctx.input.source !== undefined) body.source = ctx.input.source;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
     if (ctx.input.isActive !== undefined) body.is_active = ctx.input.isActive;
     if (ctx.input.isHot !== undefined) body.is_hot = ctx.input.isHot;
 
     let result = await client.createCandidate(body, ctx.input.checkDuplicate);
 
-    let candidateId =
-      result?.id?.toString() ?? result?._links?.self?.href?.split('/').pop() ?? '';
+    let candidateId = requiredId(result?.id, 'created record');
 
     return {
       output: {

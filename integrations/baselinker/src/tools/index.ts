@@ -1,9 +1,12 @@
 export { addOrderPayment } from './add-order-payment';
 export { createOrder } from './create-order';
+export { downloadShippingLabel } from './download-shipping-label';
 export { getCouriers } from './get-couriers';
 export { getExternalStorages } from './get-external-storages';
 export { getInventories } from './get-inventories';
 export { getInventoryProducts } from './get-inventory-products';
+export { getOrderJournal } from './get-order-journal';
+export { getOrderReturnOptions } from './get-order-return-options';
 export { getOrderStatuses } from './get-order-statuses';
 export { getOrders } from './get-orders';
 export { manageCourierShipments } from './manage-courier-shipments';

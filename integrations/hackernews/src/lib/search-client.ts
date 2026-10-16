@@ -1,8 +1,8 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+import { z } from 'zod';
+import { parseResponse, validateInteger } from './validation';
 
-let algoliaAxios = createAxios({
-  baseURL: 'https://hn.algolia.com/api/v1'
-});
+let algoliaAxios = createAxios({ baseURL: 'https://hn.algolia.com/api/v1', timeout: 30_000 });
 
 export interface AlgoliaSearchParams {
   query?: string;
@@ -12,100 +12,112 @@ export interface AlgoliaSearchParams {
   page?: number;
 }
 
-export interface AlgoliaHit {
-  objectID: string;
-  title?: string;
-  url?: string;
-  author: string;
-  points?: number;
-  story_text?: string;
-  comment_text?: string;
-  num_comments?: number;
-  story_id?: number;
-  story_title?: string;
-  story_url?: string;
-  parent_id?: number;
-  created_at: string;
-  created_at_i: number;
-  _tags: string[];
-  _highlightResult?: Record<string, unknown>;
-}
+let hitSchema = z
+  .object({
+    objectID: z.string(),
+    title: z.string().nullish(),
+    url: z.string().nullish(),
+    author: z.string(),
+    points: z.number().nullish(),
+    story_text: z.string().nullish(),
+    comment_text: z.string().nullish(),
+    num_comments: z.number().nullish(),
+    story_id: z.number().nullish(),
+    story_title: z.string().nullish(),
+    story_url: z.string().nullish(),
+    parent_id: z.number().nullish(),
+    created_at: z.string(),
+    _tags: z.array(z.string())
+  })
+  .passthrough();
 
-export interface AlgoliaSearchResponse {
-  hits: AlgoliaHit[];
-  nbHits: number;
-  page: number;
-  nbPages: number;
-  hitsPerPage: number;
-  exhaustiveNbHits: boolean;
-  query: string;
-  params: string;
-}
+let searchSchema = z
+  .object({
+    hits: z.array(hitSchema),
+    nbHits: z.number(),
+    page: z.number(),
+    nbPages: z.number()
+  })
+  .passthrough();
 
-export interface AlgoliaItem {
+export interface AlgoliaItem extends Record<string, unknown> {
   id: number;
-  created_at: string;
-  created_at_i: number;
-  type: string;
-  author: string;
-  title?: string;
-  url?: string;
-  text?: string;
-  points?: number;
-  parent_id?: number;
-  story_id?: number;
+  created_at?: string | null;
+  created_at_i?: number | null;
+  type?: string;
+  author?: string | null;
+  title?: string | null;
+  url?: string | null;
+  text?: string | null;
+  points?: number | null;
+  parent_id?: number | null;
+  story_id?: number | null;
   children: AlgoliaItem[];
 }
 
-export interface AlgoliaUser {
-  username: string;
-  about?: string;
-  karma: number;
-  created_at: string;
-  created_at_i: number;
-  avg?: number;
-  delay?: number;
-  submitted: number;
-  updated_at: string;
-  submission_count: number;
-  comment_count: number;
-  objectID: string;
-}
+let itemSchema: z.ZodType<AlgoliaItem> = z.lazy(() =>
+  z
+    .object({
+      id: z.number(),
+      created_at: z.string().nullish(),
+      created_at_i: z.number().nullish(),
+      type: z.string().optional(),
+      author: z.string().nullish(),
+      title: z.string().nullish(),
+      url: z.string().nullish(),
+      text: z.string().nullish(),
+      points: z.number().nullish(),
+      parent_id: z.number().nullish(),
+      story_id: z.number().nullish(),
+      children: z.array(itemSchema)
+    })
+    .passthrough()
+);
+
+// Profile tools use Firebase; keep the existing Algolia user route available to client consumers.
+let userSchema = z
+  .object({ username: z.string(), about: z.string().nullish(), karma: z.number() })
+  .passthrough();
+
+export type AlgoliaHit = z.infer<typeof hitSchema>;
+export type AlgoliaSearchResponse = z.infer<typeof searchSchema>;
+export type AlgoliaUser = z.infer<typeof userSchema>;
 
 export class SearchClient {
-  async search(params: AlgoliaSearchParams): Promise<AlgoliaSearchResponse> {
-    let queryParams = new URLSearchParams();
-    if (params.query) queryParams.set('query', params.query);
-    if (params.tags) queryParams.set('tags', params.tags);
-    if (params.numericFilters) queryParams.set('numericFilters', params.numericFilters);
-    if (params.hitsPerPage !== undefined)
-      queryParams.set('hitsPerPage', String(params.hitsPerPage));
-    if (params.page !== undefined) queryParams.set('page', String(params.page));
+  private async get<T>(path: string, schema: z.ZodType<T>, params?: AlgoliaSearchParams) {
+    try {
+      let response = await algoliaAxios.get(path, { params });
+      return parseResponse(schema, response.data, 'search API');
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Hacker News search',
+        reason: 'hackernews_search_failed',
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+      });
+    }
+  }
 
-    let response = await algoliaAxios.get(`/search?${queryParams.toString()}`);
-    return response.data;
+  async search(params: AlgoliaSearchParams): Promise<AlgoliaSearchResponse> {
+    return this.get('/search', searchSchema, params);
   }
 
   async searchByDate(params: AlgoliaSearchParams): Promise<AlgoliaSearchResponse> {
-    let queryParams = new URLSearchParams();
-    if (params.query) queryParams.set('query', params.query);
-    if (params.tags) queryParams.set('tags', params.tags);
-    if (params.numericFilters) queryParams.set('numericFilters', params.numericFilters);
-    if (params.hitsPerPage !== undefined)
-      queryParams.set('hitsPerPage', String(params.hitsPerPage));
-    if (params.page !== undefined) queryParams.set('page', String(params.page));
-
-    let response = await algoliaAxios.get(`/search_by_date?${queryParams.toString()}`);
-    return response.data;
+    return this.get('/search_by_date', searchSchema, params);
   }
 
   async getItem(itemId: number): Promise<AlgoliaItem> {
-    let response = await algoliaAxios.get(`/items/${itemId}`);
-    return response.data;
+    validateInteger(itemId, 'storyId');
+    let item = await this.get(`/items/${itemId}`, itemSchema);
+    if (item.id !== itemId) {
+      throw createApiServiceError(
+        'Hacker News search returned a different item than requested.'
+      );
+    }
+    return item;
   }
 
   async getUser(username: string): Promise<AlgoliaUser> {
-    let response = await algoliaAxios.get(`/users/${username}`);
-    return response.data;
+    if (!username.trim()) throw createApiServiceError('Provide a Hacker News username.');
+    return this.get(`/users/${encodeURIComponent(username)}`, userSchema);
   }
 }

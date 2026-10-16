@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let listUsersTool = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `Retrieve all users in the Timelink workspace. Returns user details including names and email addresses. Useful for finding user IDs to assign to time entries or to see who is part of the team.`,
+  description: `DEPRECATED — use \`list_records\` instead. Retrieve all users in the Timelink workspace. Returns user details including names and email addresses. Useful for finding user IDs to assign to time entries or to see who is part of the team.`,
+  instructions: [
+    'Use list_records for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

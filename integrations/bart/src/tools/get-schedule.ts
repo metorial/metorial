@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BartClient } from '../lib/client';
+import { bartRecord, bartRecords, bartText } from '../lib/response';
 import { spec } from '../spec';
 
 let scheduleVersionSchema = z.object({
@@ -33,9 +34,9 @@ export let getSchedule = SlateTool.create(spec, {
   description: `Retrieve BART schedule information. Can list available schedule versions, get the full daily schedule for a specific station, or get the complete schedule for a specific route. Station schedules show all departures for the day; route schedules show every train run with all stop times.`,
   instructions: [
     'Use station abbreviation codes for station schedules (e.g., "12TH", "EMBR").',
-    'Route numbers range from 1-12 for route schedules.',
+    'Call get_route_info to discover route numbers for route schedules.',
     'Date format: "mm/dd/yyyy", "today", "now". For route schedules, also "wd" (weekday), "sa" (Saturday), "su" (Sunday).',
-    'Time format for route schedules: "h:mm am/pm" to filter by start time.'
+    'Omit time for route schedules: BART no longer supports a start-time filter. Use plan_trip for time-based itineraries.'
   ],
   tags: {
     readOnly: true
@@ -55,7 +56,7 @@ export let getSchedule = SlateTool.create(spec, {
       routeNumber: z
         .string()
         .optional()
-        .describe('Route number 1-12 (required when scheduleType is "route")'),
+        .describe('Route number from get_route_info (required when scheduleType is "route")'),
       date: z
         .string()
         .optional()
@@ -65,7 +66,9 @@ export let getSchedule = SlateTool.create(spec, {
       time: z
         .string()
         .optional()
-        .describe('Start time filter for route schedules in "h:mm am/pm" format')
+        .describe(
+          'Legacy field retained for compatibility. Omit for route schedules; BART no longer supports time filtering. Use plan_trip for time-based itineraries.'
+        )
     })
   )
   .output(
@@ -96,93 +99,72 @@ export let getSchedule = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new BartClient({ token: ctx.auth.token });
-
     if (ctx.input.scheduleType === 'versions') {
       let result = await client.getSchedules();
-      let schedData = result?.schedules?.schedule;
-      let schedules = Array.isArray(schedData) ? schedData : schedData ? [schedData] : [];
-
-      let mappedSchedules = schedules.map((s: any) => ({
-        scheduleId: s['@id'] || '',
-        effectiveDate: s['@effectivedate'] || ''
+      let schedules = bartRecords(bartRecord(result.schedules).schedule).map(s => ({
+        scheduleId: bartText(s['@id']),
+        effectiveDate: bartText(s['@effectivedate'])
       }));
-
       return {
-        output: { scheduleVersions: mappedSchedules },
-        message: `Retrieved **${mappedSchedules.length}** schedule version(s).`
+        output: { scheduleVersions: schedules },
+        message: `Retrieved **${schedules.length}** schedule version(s).`
       };
     }
-
     if (ctx.input.scheduleType === 'station') {
-      if (!ctx.input.stationAbbr) {
-        throw new Error('stationAbbr is required when scheduleType is "station"');
+      if (!ctx.input.stationAbbr?.trim()) {
+        throw createApiServiceError(
+          'stationAbbr is required when scheduleType is "station". Call get_station_info to find station abbreviations.'
+        );
       }
-
       let result = await client.getStationSchedule(ctx.input.stationAbbr, ctx.input.date);
-      let station = result?.station;
-      let itemData = station?.item;
-      let items = Array.isArray(itemData) ? itemData : itemData ? [itemData] : [];
-
-      let mappedItems = items.map((item: any) => ({
-        line: item['@line'] || '',
-        trainHeadStation: item['@trainHeadStation'] || '',
-        originTime: item['@origTime'] || '',
-        bikeflag: item['@bikeflag'] || '0',
-        platform: item['@platform'] || ''
+      let station = bartRecords(result.station)[0] ?? {};
+      let items = bartRecords(station.item).map(item => ({
+        line: bartText(item['@line']),
+        trainHeadStation: bartText(item['@trainHeadStation']),
+        originTime: bartText(item['@origTime']),
+        bikeflag: bartText(item['@bikeflag']) || '0',
+        platform: bartText(item['@platform'])
       }));
-
       return {
         output: {
           stationSchedule: {
-            stationName: station?.name || '',
-            stationAbbr: station?.abbr || '',
-            scheduleDate: result?.date || '',
-            scheduleNumber: result?.sched_num || '',
-            items: mappedItems
+            stationName: bartText(station.name),
+            stationAbbr: bartText(station.abbr),
+            scheduleDate: bartText(result.date),
+            scheduleNumber: bartText(result.sched_num),
+            items
           }
         },
-        message: `Retrieved **${mappedItems.length}** scheduled departures for **${station?.name || ctx.input.stationAbbr}**.`
+        message: `Retrieved **${items.length}** scheduled departures for **${bartText(station.name) || ctx.input.stationAbbr}**.`
       };
     }
-
-    // Route schedule
-    if (!ctx.input.routeNumber) {
-      throw new Error('routeNumber is required when scheduleType is "route"');
+    if (!ctx.input.routeNumber?.trim()) {
+      throw createApiServiceError(
+        'routeNumber is required when scheduleType is "route". Call get_route_info to discover route numbers.'
+      );
     }
-
     let result = await client.getRouteSchedule({
       route: ctx.input.routeNumber,
       date: ctx.input.date,
       time: ctx.input.time
     });
-
-    let route = result?.route;
-    let trainData = route?.train;
-    let trains = Array.isArray(trainData) ? trainData : trainData ? [trainData] : [];
-
-    let mappedTrains = trains.map((train: any) => {
-      let stopData = train.stop;
-      let stops = Array.isArray(stopData) ? stopData : stopData ? [stopData] : [];
-
-      return {
-        trainIndex: train['@index'] || '',
-        stops: stops.map((stop: any) => ({
-          station: stop['@station'] || '',
-          originTime: stop['@origTime'] || '',
-          bikeflag: stop['@bikeflag'] || '0'
-        }))
-      };
-    });
-
+    let trains = bartRecords(bartRecord(result.route).train).map(train => ({
+      trainIndex: bartText(train['@index']),
+      stops: bartRecords(train.stop).map(stop => ({
+        station: bartText(stop['@station']),
+        originTime: bartText(stop['@origTime']),
+        bikeflag: bartText(stop['@bikeflag']) || '0'
+      }))
+    }));
     return {
       output: {
         routeSchedule: {
-          scheduleDate: result?.date || '',
-          scheduleNumber: result?.sched_num || '',
-          trains: mappedTrains
+          scheduleDate: bartText(result.date),
+          scheduleNumber: bartText(result.sched_num),
+          trains
         }
       },
-      message: `Retrieved schedule with **${mappedTrains.length}** train run(s) for route **${ctx.input.routeNumber}**.`
+      message: `Retrieved schedule with **${trains.length}** train run(s) for route **${ctx.input.routeNumber}**.`
     };
   })
   .build();

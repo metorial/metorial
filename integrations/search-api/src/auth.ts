@@ -1,5 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createHash } from 'node:crypto';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { SearchApiClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -22,23 +24,12 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://www.searchapi.io/api/v1'
-      });
-
-      let response = await axios.get('/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let account = response.data;
+      await new SearchApiClient({ token: ctx.output.token }).getAccount();
 
       return {
         profile: {
-          id: account.email || account.api_key || 'unknown',
-          email: account.email,
-          name: account.name
+          id: createHash('sha256').update(ctx.output.token).digest('hex'),
+          name: 'SearchApi account'
         }
       };
     }

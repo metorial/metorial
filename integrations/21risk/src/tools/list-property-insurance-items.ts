@@ -23,6 +23,12 @@ export let listPropertyInsuranceItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation URL returned by this tool. Supply it alone to retrieve the next page.'
+        ),
       filter: z.string().optional().describe('OData $filter expression'),
       select: z.string().optional().describe('Comma-separated list of fields to return'),
       expand: z.string().optional().describe('Related entities to expand'),
@@ -34,13 +40,22 @@ export let listPropertyInsuranceItems = SlateTool.create(spec, {
   .output(
     z.object({
       items: z.array(propertyInsuranceItemSchema).describe('List of property insurance items'),
-      count: z.number().describe('Number of items returned')
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Provider continuation URL for the next page, when supplied'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total matching count, when supplied'),
+      count: z.number().describe('Number of items returned in this page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let items = await client.getPropertyInsuranceItems({
+      nextLink: ctx.input.nextLink,
       filter: ctx.input.filter,
       select: ctx.input.select,
       expand: ctx.input.expand,
@@ -49,12 +64,14 @@ export let listPropertyInsuranceItems = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let results = Array.isArray(items) ? items : [items];
+    let results = items.records;
 
     return {
       output: {
         items: results,
-        count: results.length
+        count: results.length,
+        nextLink: items.nextLink,
+        totalCount: items.totalCount
       },
       message: `Retrieved **${results.length}** property insurance item(s).`
     };

@@ -1,8 +1,39 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
 let api = createAxios({
   baseURL: 'https://api.skyfire.xyz'
 });
+
+api.interceptors.response.use(
+  response => response,
+  error => {
+    throw buildApiServiceError(error, {
+      providerLabel: 'Skyfire',
+      reason: 'skyfire_api_error',
+      extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+      extractUpstreamCode: (_input, response, helpers) =>
+        helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+          ? response.data.code
+          : undefined,
+      extractMessage: (input, helpers) => {
+        let response = helpers.getResponseWithBody(input);
+        let details: string[] = [];
+        let collect = (value: unknown) => {
+          if (!helpers.isRecord(value)) {
+            helpers.collectDetails(value, details);
+            return;
+          }
+          helpers.collectDetails(value, details, { detailKeys: ['message', 'code'] });
+          if (helpers.isRecord(value.details)) {
+            for (let detail of Object.values(value.details)) collect(detail);
+          }
+        };
+        collect(response?.data);
+        return details.length ? details.join('; ') : undefined;
+      }
+    });
+  }
+);
 
 export class SkyfireClient {
   private token: string;
@@ -21,7 +52,7 @@ export class SkyfireClient {
   // ─── Token APIs ───────────────────────────────────────────
 
   async createToken(params: {
-    type: 'kya' | 'pay' | 'kya+pay';
+    type: 'kya' | 'pay' | 'kya+pay' | 'kya-pay';
     tokenAmount?: string;
     sellerServiceId?: string;
     sellerDomainOrUrl?: string;
@@ -29,9 +60,13 @@ export class SkyfireClient {
     expiresAt?: number;
     identityPermissions?: string[];
   }): Promise<{ token: string }> {
-    let response = await api.post('/api/v1/tokens', params, {
-      headers: this.headers()
-    });
+    let response = await api.post(
+      '/api/v1/tokens',
+      { ...params, type: params.type === 'kya+pay' ? 'kya-pay' : params.type },
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
@@ -49,6 +84,8 @@ export class SkyfireClient {
     isValid: boolean;
     remainingBalance?: string;
     validationError?: string;
+    expiresAt?: number;
+    chargeableUntil?: number;
   }> {
     let response = await api.post(
       '/api/v1/tokens/introspect',
@@ -60,19 +97,12 @@ export class SkyfireClient {
     return response.data;
   }
 
-  async getTokenCharges(tokenId: string): Promise<{
-    charges: Array<{
-      audience: string;
-      value: string;
-      chargedAt: string;
-      claimId: string;
-      sellerServiceId: string;
-      settledAt: string;
-      subject: string;
-      tokenType: string;
-    }>;
-  }> {
+  async getTokenCharges(
+    tokenId: string,
+    pagination: { size?: number; pageCursor?: string } = {}
+  ): Promise<{ data: TokenCharge[]; nextPageCursor?: string }> {
     let response = await api.get(`/api/v1/tokens/${encodeURIComponent(tokenId)}/charges`, {
+      params: pagination,
       headers: this.headers()
     });
     return response.data;
@@ -124,7 +154,7 @@ export class SkyfireClient {
 
   // ─── Seller Service APIs ──────────────────────────────────
 
-  async getSellerServices(): Promise<SellerService[]> {
+  async getSellerServices(): Promise<{ data: SellerService[] }> {
     let response = await api.get('/api/v1/agents/seller-services', {
       headers: this.headers()
     });
@@ -142,9 +172,18 @@ export class SkyfireClient {
   }
 
   async createSellerService(params: CreateSellerServiceParams): Promise<SellerService> {
-    let response = await api.post('/api/v1/agents/seller-services', params, {
-      headers: this.headers()
-    });
+    let response = await api.post(
+      '/api/v1/agents/seller-services',
+      {
+        ...params,
+        acceptedTokens: params.acceptedTokens?.map(type =>
+          type === 'kya+pay' ? 'kya-pay' : type
+        )
+      },
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
@@ -154,7 +193,12 @@ export class SkyfireClient {
   ): Promise<void> {
     await api.patch(
       `/api/v1/agents/seller-services/${encodeURIComponent(sellerServiceId)}`,
-      params,
+      {
+        ...params,
+        acceptedTokens: params.acceptedTokens?.map(type =>
+          type === 'kya+pay' ? 'kya-pay' : type
+        )
+      },
       {
         headers: this.headers()
       }
@@ -237,9 +281,9 @@ export interface SellerService {
   price: string;
   priceModel: string;
   minimumTokenAmount: string;
-  buyerIdentityRequirement?: {
+  humanIdentityRequirement?: {
     identityLevels?: string[];
-    business?: string[];
+    organization?: string[];
     individual?: string[];
   };
   termsOfService?: {
@@ -249,13 +293,32 @@ export interface SellerService {
   seller: {
     id: string;
     name: string;
+    identityLevel?: string;
   };
   openApiSpecUrl?: string;
-  acceptedTokens: string[];
+  websiteUrl?: string;
+  mcpServerUrl?: string;
+  maxTokenTTLSeconds?: number;
+  acceptedTokens?: string[];
+  fetchAgentProfileUrl?: string;
   active: boolean;
   approved: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TokenCharge {
+  tokenId?: string;
+  chargeId?: string;
+  claimId: string;
+  value: string;
+  chargedAt: string;
+  settledAt?: string | null;
+  network?: string;
+  audience?: string;
+  subject?: string;
+  sellerServiceId?: string;
+  tokenType?: string;
 }
 
 export interface DirectoryService {
@@ -267,18 +330,22 @@ export interface DirectoryService {
   price: string;
   priceModel: string;
   minimumTokenAmount: string;
-  buyerIdentityRequirement?: {
+  humanIdentityRequirement?: {
     identityLevels?: string[];
-    business?: string[];
+    organization?: string[];
     individual?: string[];
   };
   seller: {
     id: string;
     name: string;
+    identityLevel?: string;
   };
   fetchAgentProfileUrl?: string;
   openApiSpecUrl?: string;
-  acceptedTokens: string[];
+  websiteUrl?: string;
+  mcpServerUrl?: string;
+  maxTokenTTLSeconds?: number;
+  acceptedTokens?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -297,6 +364,11 @@ export interface CreateSellerServiceParams {
   };
   acceptedTokens: string[];
   openApiSpecUrl?: string;
+  websiteUrl?: string;
+  mcpServerUrl?: string;
+  fetchAgentProfileUrl?: string;
+  humanIdentityRequirement?: { individual: string[]; organization: string[] };
+  maxTokenTTLSeconds?: number;
 }
 
 export interface UpdateSellerServiceParams {

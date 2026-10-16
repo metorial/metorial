@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let executeJavascript = SlateTool.create(spec, {
   name: 'Execute JavaScript',
   key: 'execute_javascript',
-  description: `Executes custom JavaScript code on the CustomJS platform and returns the result. Supports Node.js with full NPM module support including axios, moment, uuid, jsonwebtoken, crypto, openai, and many more. Use this for data transformations, calculations, API integrations, and custom business logic.`,
+  description: `Executes custom JavaScript code on the CustomJS platform and returns the result. Supports Node.js with available NPM modules including axios, moment, uuid, jsonwebtoken, crypto, openai, and many more. Use this for data transformations, calculations, API integrations, and custom business logic.`,
   instructions: [
     'The code must contain a `return` statement to produce output.',
     'Access input data via the `input` variable (always a string). Use `JSON.parse(input)` for structured data.',
@@ -48,8 +48,25 @@ export let executeJavascript = SlateTool.create(spec, {
       code: ctx.input.code,
       input: ctx.input.input,
       returnBinary: ctx.input.returnBinary,
-      origin: 'slates/executeJavascript'
+      origin: 'api/executeJavascript'
     });
+
+    if (ctx.input.returnBinary) {
+      let bytes = Buffer.from(result);
+      await ctx.addAttachment({
+        type: 'content',
+        content: bytes,
+        filename: 'result.bin',
+        mimeType: 'application/octet-stream'
+      });
+      // Keep the legacy raw output alongside the downloadable bytes.
+      result = bytes.toString('utf8');
+      try {
+        result = JSON.parse(result);
+      } catch {
+        /* Non-JSON responses remain text. */
+      }
+    }
 
     return {
       output: { result },

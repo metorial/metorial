@@ -39,34 +39,22 @@ export let validateUser = SlateTool.create(spec, {
       userKey: ctx.auth.userKey
     });
 
-    try {
-      let result = await client.validateUser({
-        userKey: ctx.input.userKey,
-        device: ctx.input.device
-      });
+    let result = await client.validateUser({
+      userKey: ctx.input.userKey,
+      device: ctx.input.device
+    });
 
-      return {
-        output: {
-          valid: result.status === 1,
-          isGroup: result.group === 1,
-          devices: result.devices ?? [],
-          licenses: result.licenses ?? []
-        },
-        message: `User key is **valid** with ${result.devices?.length ?? 0} device(s): ${(result.devices ?? []).join(', ')}.`
-      };
-    } catch (e: any) {
-      if (e?.response?.status === 400) {
-        return {
-          output: {
-            valid: false,
-            isGroup: false,
-            devices: [],
-            licenses: []
-          },
-          message: `User key is **invalid** or account is inactive.`
-        };
-      }
-      throw e;
-    }
+    return {
+      output: {
+        valid: result.status === 1,
+        isGroup: result.group === 1,
+        devices: result.devices ?? [],
+        licenses: result.licenses ?? []
+      },
+      message:
+        result.status === 1
+          ? `User key is **valid** with ${result.devices?.length ?? 0} device(s): ${(result.devices ?? []).join(', ')}.`
+          : 'User or group key is invalid, the account is inactive, or the requested device is unavailable.'
+    };
   })
   .build();

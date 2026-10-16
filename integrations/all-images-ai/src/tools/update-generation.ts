@@ -72,6 +72,10 @@ export let updateGeneration = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Comma-separated elements to exclude (simple mode)'),
+      referenceImageUrl: z
+        .string()
+        .optional()
+        .describe('URL of a reference image (simple mode)'),
       processMode: z
         .enum(['relax', 'fast'])
         .optional()
@@ -82,7 +86,7 @@ export let updateGeneration = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      generationId: z.string().describe('Generation ID'),
+      generationId: z.string().optional().describe('Generation ID'),
       name: z.string().describe('Generation name'),
       prompt: z.string().describe('The prompt'),
       status: z.number().describe('Status code'),
@@ -107,6 +111,7 @@ export let updateGeneration = SlateTool.create(spec, {
             titles: z.record(z.string(), z.string()).optional()
           })
         )
+        .optional()
         .describe('Generated images'),
       nbImages: z.number().optional(),
       tags: z.array(z.string()).optional(),
@@ -119,7 +124,8 @@ export let updateGeneration = SlateTool.create(spec, {
 
     let params: { name: string; value: string }[] = [];
 
-    if (ctx.input.photoType) params.push({ name: 'sujetMode', value: ctx.input.photoType });
+    if (ctx.input.photoType)
+      params.push({ name: 'templatePrompt', value: ctx.input.photoType });
     if (ctx.input.aspectRatio) params.push({ name: 'format', value: ctx.input.aspectRatio });
     if (ctx.input.weather) params.push({ name: 'weather', value: ctx.input.weather });
     if (ctx.input.timeOfDay) params.push({ name: 'time', value: ctx.input.timeOfDay });
@@ -130,6 +136,8 @@ export let updateGeneration = SlateTool.create(spec, {
       params.push({ name: 'stylize', value: String(ctx.input.stylize) });
     if (ctx.input.interdiction)
       params.push({ name: 'interdiction', value: ctx.input.interdiction });
+    if (ctx.input.referenceImageUrl)
+      params.push({ name: 'fromImageUrl', value: ctx.input.referenceImageUrl });
 
     let generation = await client.updateGeneration(ctx.input.generationId, {
       name: ctx.input.name,
@@ -145,7 +153,7 @@ export let updateGeneration = SlateTool.create(spec, {
 
     return {
       output: generation,
-      message: `Generation **"${generation.name}"** (\`${generation.generationId}\`) updated successfully. Status: **${generation.statusLabel}**.`
+      message: `Generation **"${generation.name}"**${generation.generationId ? ` (\`${generation.generationId}\`)` : ''} updated successfully. Status: **${generation.statusLabel}**.`
     };
   })
   .build();

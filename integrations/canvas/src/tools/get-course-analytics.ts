@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CanvasClient } from '../lib/client';
+import { createCanvasClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCourseAnalyticsTool = SlateTool.create(spec, {
@@ -24,16 +24,14 @@ export let getCourseAnalyticsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete Canvas response'),
       courseId: z.string().describe('Course ID'),
       analyticsType: z.string().describe('Type of analytics returned'),
       analyticsData: z.any().describe('Analytics data (format varies by type)')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CanvasClient({
-      token: ctx.auth.token,
-      canvasDomain: ctx.auth.canvasDomain
-    });
+    let client = createCanvasClient(ctx.auth, ctx.config);
 
     let data = await client.getCourseAnalytics(ctx.input.courseId, ctx.input.analyticsType);
 
@@ -48,6 +46,7 @@ export let getCourseAnalyticsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         courseId: ctx.input.courseId,
         analyticsType: ctx.input.analyticsType,
         analyticsData: data

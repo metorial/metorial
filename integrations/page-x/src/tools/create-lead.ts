@@ -8,7 +8,7 @@ export let createLead = SlateTool.create(spec, {
   key: 'create_lead',
   description: `Submit a new lead into PageXCRM from an external source. Use this to capture leads from websites, ad platforms, or other applications and feed them into your CRM for sales tracking and management.`,
   constraints: [
-    'This is a one-way ingestion endpoint — leads can only be created, not read, updated, or deleted via the API.',
+    'Submits a lead through the published lead-ingestion endpoint. Manage existing leads in PageXCRM.',
     'Requires both a PageXCRM API key and a RapidAPI subscription key.'
   ],
   tags: {
@@ -22,7 +22,7 @@ export let createLead = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'PageXCRM customer/account identifier. Overrides the default from configuration if provided.'
+          'Optional external customer identifier for the lead. Overrides the default from configuration if provided.'
         ),
       name: z.string().describe('Full name of the lead'),
       email: z.string().describe('Email address of the lead'),
@@ -31,7 +31,16 @@ export let createLead = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Source platform the lead originated from (e.g. website name, ad platform)'),
-      country: z.string().optional().describe('Country of the lead')
+      country: z
+        .string()
+        .optional()
+        .describe('Country of the lead, sent as the custom detail more.country'),
+      more: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Additional custom lead details, such as company or source. The country input also sets more.country.'
+        )
     })
   )
   .output(
@@ -46,12 +55,6 @@ export let createLead = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let customerId = ctx.input.customerId ?? ctx.config.customerId;
 
-    if (!customerId) {
-      throw new Error(
-        'A customer ID is required. Provide it in the tool input or set it in the global configuration.'
-      );
-    }
-
     let client = new Client({
       token: ctx.auth.token,
       rapidApiToken: ctx.auth.rapidApiToken
@@ -65,7 +68,8 @@ export let createLead = SlateTool.create(spec, {
       email: ctx.input.email,
       phone: ctx.input.phone,
       platform: ctx.input.platform,
-      country: ctx.input.country
+      country: ctx.input.country,
+      more: ctx.input.more
     });
 
     ctx.info('Lead submitted successfully.');
@@ -75,7 +79,7 @@ export let createLead = SlateTool.create(spec, {
         success: true,
         rawResponse: response
       },
-      message: `Lead **${ctx.input.name}** (${ctx.input.email}) was successfully submitted to PageXCRM.`
+      message: 'PageXCRM confirmed that the lead was successfully submitted.'
     };
   })
   .build();

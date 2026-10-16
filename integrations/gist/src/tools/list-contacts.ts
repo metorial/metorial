@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, responseList, validatePagination } from '../lib/response';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -27,14 +28,21 @@ export let listContacts = SlateTool.create(spec, {
       campaignId: z.string().optional().describe('Filter by campaign ID'),
       formId: z.string().optional().describe('Filter by form ID'),
       emailLike: z.string().optional().describe('Filter by email pattern (partial match)'),
+      createdWithinDays: z
+        .number()
+        .optional()
+        .describe('Filter contacts created within this number of days'),
       createdSince: z
         .string()
         .optional()
-        .describe('Filter contacts created after this UNIX timestamp')
+        .describe(
+          'Legacy UNIX timestamp cutoff; rounded up to whole days because Gist filters by age in days'
+        )
     })
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       contacts: z.array(
         z.object({
           contactId: z.string(),
@@ -51,8 +59,28 @@ export let listContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination({ page: ctx.input.page, perPage: ctx.input.perPage });
     let client = new GistClient({ token: ctx.auth.token });
 
+    let createdWithinDays = ctx.input.createdWithinDays;
+    if (ctx.input.createdSince !== undefined) {
+      if (createdWithinDays !== undefined)
+        throw createApiServiceError('Provide createdSince or createdWithinDays, not both.');
+      let timestamp = Number(ctx.input.createdSince);
+      if (
+        !ctx.input.createdSince.trim() ||
+        !Number.isFinite(timestamp) ||
+        timestamp < 0 ||
+        timestamp > Date.now() / 1000
+      )
+        throw createApiServiceError('createdSince must be a past UNIX timestamp in seconds.');
+      createdWithinDays = Math.ceil((Date.now() / 1000 - timestamp) / 86400);
+    }
+    if (
+      createdWithinDays !== undefined &&
+      (!Number.isSafeInteger(createdWithinDays) || createdWithinDays < 0)
+    )
+      throw createApiServiceError('createdWithinDays must be a non-negative integer.');
     let data = await client.listContacts({
       page: ctx.input.page,
       per_page: ctx.input.perPage,
@@ -64,25 +92,22 @@ export let listContacts = SlateTool.create(spec, {
       campaign_id: ctx.input.campaignId,
       form_id: ctx.input.formId,
       email_like: ctx.input.emailLike,
-      created_since: ctx.input.createdSince
+      created_since: createdWithinDays === undefined ? undefined : String(createdWithinDays)
     });
 
-    let contacts = (data.contacts || []).map((c: any) => ({
-      contactId: String(c.id),
+    let contacts = responseList(data.contacts).map((c: any) => ({
+      contactId: requiredId(c.id),
       type: c.type,
       name: c.name,
       email: c.email,
-      userId: c.user_id ? String(c.user_id) : undefined,
-      createdAt: c.created_at ? String(c.created_at) : undefined,
-      lastSeenAt: c.last_seen_at ? String(c.last_seen_at) : undefined,
+      userId: c.user_id !== undefined ? String(c.user_id) : undefined,
+      createdAt: c.created_at !== undefined ? String(c.created_at) : undefined,
+      lastSeenAt: c.last_seen_at !== undefined ? String(c.last_seen_at) : undefined,
       tags: c.tags
     }));
 
     return {
-      output: {
-        contacts,
-        pages: data.pages
-      },
+      output: { rawResponse: client.responses, contacts, pages: data.pages },
       message: `Found **${contacts.length}** contacts.`
     };
   })

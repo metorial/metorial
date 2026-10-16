@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let triggerCommand = SlateTool.create(spec, {
   name: 'Trigger Command',
   key: 'trigger_command',
-  description: `Remotely execute a command on one of your registered TRIGGERcmd computers. Specify the computer name and trigger name to run the command. Optionally pass parameters to the command if the command has parameter support enabled.`,
+  description: `Request execution of a command on one of your registered TRIGGERcmd computers. Use list_computers and list_commands to find the computer name and trigger name. Optionally pass parameters if the command has parameter support enabled. Acceptance does not confirm that the computer finished executing the command; use command_run_history to inspect subsequent status.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,8 +14,8 @@ export let triggerCommand = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      computer: z.string().describe('Name of the computer to run the command on'),
-      trigger: z.string().describe('Name of the command/trigger to execute'),
+      computer: z.string().describe('Computer name from list_computers or list_commands'),
+      trigger: z.string().describe('Trigger name from list_commands'),
       params: z
         .string()
         .optional()
@@ -38,13 +38,11 @@ export let triggerCommand = SlateTool.create(spec, {
       params: ctx.input.params
     });
 
-    let paramsInfo = ctx.input.params ? ` with params "${ctx.input.params}"` : '';
-
     return {
       output: {
         result
       },
-      message: `Triggered command **${ctx.input.trigger}** on computer **${ctx.input.computer}**${paramsInfo}.`
+      message: `Requested command **${ctx.input.trigger}** on computer **${ctx.input.computer}**. Check command_run_history for execution status.`
     };
   })
   .build();

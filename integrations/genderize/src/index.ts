@@ -1,9 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { predictGender } from './tools';
+import { predictGender, predictGenderBatch } from './tools';
 
 export let provider = Slate.create({
   spec,
-  tools: [predictGender],
+  tools: [predictGender, predictGenderBatch],
   triggers: []
 });

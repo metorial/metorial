@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getStockPrice = SlateTool.create(spec, {
   name: 'Get Stock Price',
   key: 'get_stock_price',
-  description: `Retrieve the current price of a stock or market index. Provide a ticker symbol (e.g. **AAPL**, **GOOGL**) or index symbol (e.g. **^DJI**, **^GSPC**) to get its latest price and trading volume.`,
+  description: `Retrieve the current price of a stock or market index. Provide a ticker symbol (e.g. **AAPL**, **GOOGL**) or index symbol (e.g. **^DJI**, **^GSPC**) to get its latest available price and trading volume. Free plans return the previous completed session; live prices require a premium plan.`,
   tags: {
     readOnly: true
   }
@@ -18,6 +18,7 @@ export let getStockPrice = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       ticker: z.string().describe('The queried ticker symbol'),
       name: z.string().optional().describe('Company or index name'),
       price: z.number().describe('Current stock price'),
@@ -33,13 +34,14 @@ export let getStockPrice = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         ticker: result.ticker ?? ctx.input.ticker,
-        name: result.name,
+        name: result.name ?? undefined,
         price: result.price,
-        exchange: result.exchange,
+        exchange: result.exchange ?? undefined,
         updated: result.updated,
-        currency: result.currency,
-        volume: result.volume
+        currency: result.currency ?? undefined,
+        volume: result.volume ?? undefined
       },
       message: `**${result.ticker ?? ctx.input.ticker}** is currently trading at **${result.price}**${result.currency ? ` ${result.currency}` : ''}.`
     };

@@ -24,27 +24,53 @@ export let getComparison = SlateTool.create(spec, {
       comparisonIdentifier: z.string().describe('Unique identifier of the comparison'),
       left: z.object({
         fileType: z.string().describe('File type of the left document'),
-        sourceUrl: z.string().nullable().describe('Source URL of the left document'),
-        displayName: z.string().nullable().describe('Display name of the left document')
+        sourceUrl: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Source URL of the left document'),
+        displayName: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Display name of the left document')
       }),
       right: z.object({
         fileType: z.string().describe('File type of the right document'),
-        sourceUrl: z.string().nullable().describe('Source URL of the right document'),
-        displayName: z.string().nullable().describe('Display name of the right document')
+        sourceUrl: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Source URL of the right document'),
+        displayName: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Display name of the right document')
       }),
       isPublic: z.boolean().describe('Whether the comparison is publicly accessible'),
       creationTime: z.string().describe('UTC timestamp when the comparison was created'),
       expiryTime: z
         .string()
         .nullable()
+        .optional()
         .describe('UTC timestamp when the comparison will expire'),
       ready: z.boolean().describe('Whether the comparison processing is complete'),
       readyTime: z
         .string()
         .nullable()
+        .optional()
         .describe('UTC timestamp when the comparison became ready'),
-      failed: z.boolean().nullable().describe('Whether the comparison processing failed'),
-      errorMessage: z.string().nullable().describe('Error message if the comparison failed')
+      failed: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe('Whether the comparison processing failed'),
+      errorMessage: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Error message if the comparison failed')
     })
   )
   .handleInvocation(async ctx => {

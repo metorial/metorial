@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import type { z } from 'zod';
 
 export interface PaginationInfo {
   hasNext: boolean;
@@ -9,7 +16,7 @@ export interface PaginationInfo {
 export interface PaginatedResponse<T> {
   data: T[];
   pagination: PaginationInfo;
-  sort: {
+  sort?: {
     fieldSort: string;
     sort: string;
   };
@@ -128,20 +135,78 @@ export interface ListParticipantsParams {
   fields?: string;
 }
 
+interface CurrentPageResponse {
+  data: Record<string, unknown>[];
+  pagination?: Record<string, unknown> | null;
+  sort?: Record<string, unknown> | null;
+}
+
 export class Client {
   private axios;
+  private currentAxios;
 
-  constructor(private token: string) {
-    this.axios = createAxios({
-      baseURL: 'https://api.sympla.com.br/public/v3',
-      headers: {
-        s_token: this.token,
-        'Content-Type': 'application/json'
-      }
+  constructor(token: string) {
+    if (typeof token !== 'string' || !token.trim()) {
+      throw createApiServiceError('A Sympla API token is required.', {
+        reason: 'sympla_missing_token'
+      });
+    }
+
+    let options = {
+      authHeader: { name: 's_token', value: token },
+      errorAdapter: (error: unknown) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Sympla',
+          reason: 'sympla_api_error',
+          extractResponse: (value, helpers) => helpers.getResponseWithBody(value),
+          detailKeys: [
+            'message',
+            'detail',
+            'title',
+            'error',
+            'error_description',
+            'violation'
+          ],
+          nestedKeys: ['errors', 'violations'],
+          extractUpstreamCode: (_error, response, helpers) => {
+            let body = response?.data;
+            if (!helpers.isRecord(body)) return undefined;
+            let code = body.code ?? body.type;
+            return typeof code === 'string' || typeof code === 'number'
+              ? String(code)
+              : undefined;
+          }
+        })
+    };
+    this.axios = createAuthenticatedAxios({
+      ...options,
+      baseURL: 'https://api.sympla.com.br/public/v3'
     });
+    this.currentAxios = createAuthenticatedAxios({
+      ...options,
+      baseURL: 'https://api.sympla.com.br/public/v1.6.0'
+    });
+
+    for (let client of [this.axios, this.currentAxios]) {
+      client.interceptors.response.use(response => {
+        let body: unknown = response.data;
+        if (
+          isApiErrorRecord(body) &&
+          (body.success === false ||
+            Boolean(body.error) ||
+            (typeof body.status === 'number' && body.status >= 400))
+        ) {
+          throw options.errorAdapter({
+            response: { status: response.status, data: body }
+          });
+        }
+        return response;
+      });
+    }
   }
 
   async listEvents(params: ListEventsParams = {}): Promise<PaginatedResponse<SymplaEvent>> {
+    this.validatePagination(params);
     let queryParams: Record<string, string | number | boolean | undefined> = {
       from: params.from,
       published: params.published,
@@ -152,20 +217,22 @@ export class Client {
       fields: params.fields
     };
 
-    let response = await this.axios.get('/events', { params: this.cleanParams(queryParams) });
+    let response = await this.axios.get('/events', { params: pickDefined(queryParams) });
     return this.mapPaginatedResponse(response.data);
   }
 
   async getEvent(eventId: number, fields?: string): Promise<SymplaEvent> {
     let params = fields ? { fields } : {};
+    this.validatePositiveInteger(eventId, 'eventId');
     let response = await this.axios.get(`/events/${eventId}`, { params });
-    return response.data.data;
+    return this.readRecord(response.data);
   }
 
   async listOrders(
     eventId: number,
     params: ListOrdersParams = {}
   ): Promise<PaginatedResponse<SymplaOrder>> {
+    this.validatePagination(params);
     let queryParams: Record<string, string | number | boolean | undefined> = {
       status: params.status,
       page_size: params.pageSize,
@@ -175,22 +242,29 @@ export class Client {
       fields: params.fields
     };
 
+    this.validatePositiveInteger(eventId, 'eventId');
     let response = await this.axios.get(`/events/${eventId}/orders`, {
-      params: this.cleanParams(queryParams)
+      params: pickDefined(queryParams)
     });
     return this.mapPaginatedResponse(response.data);
   }
 
   async getOrder(eventId: number, orderId: string, fields?: string): Promise<SymplaOrder> {
     let params = fields ? { fields } : {};
-    let response = await this.axios.get(`/events/${eventId}/orders/${orderId}`, { params });
-    return response.data.data;
+    this.validatePositiveInteger(eventId, 'eventId');
+    this.validateTextId(orderId, 'orderId');
+    let response = await this.axios.get(
+      `/events/${eventId}/orders/${encodeURIComponent(orderId)}`,
+      { params }
+    );
+    return this.readRecord(response.data);
   }
 
   async listParticipantsByEvent(
     eventId: number,
     params: ListParticipantsParams = {}
   ): Promise<PaginatedResponse<SymplaParticipant>> {
+    this.validatePagination(params);
     let queryParams: Record<string, string | number | boolean | undefined> = {
       ticket_number: params.ticketNumber,
       page_size: params.pageSize,
@@ -200,8 +274,9 @@ export class Client {
       fields: params.fields
     };
 
+    this.validatePositiveInteger(eventId, 'eventId');
     let response = await this.axios.get(`/events/${eventId}/participants`, {
-      params: this.cleanParams(queryParams)
+      params: pickDefined(queryParams)
     });
     return this.mapPaginatedResponse(response.data);
   }
@@ -211,6 +286,7 @@ export class Client {
     orderId: string,
     params: Omit<ListParticipantsParams, 'ticketNumber'> = {}
   ): Promise<PaginatedResponse<SymplaParticipant>> {
+    this.validatePagination(params);
     let queryParams: Record<string, string | number | boolean | undefined> = {
       page_size: params.pageSize,
       page: params.page,
@@ -219,9 +295,14 @@ export class Client {
       fields: params.fields
     };
 
-    let response = await this.axios.get(`/events/${eventId}/orders/${orderId}/participants`, {
-      params: this.cleanParams(queryParams)
-    });
+    this.validatePositiveInteger(eventId, 'eventId');
+    this.validateTextId(orderId, 'orderId');
+    let response = await this.axios.get(
+      `/events/${eventId}/orders/${encodeURIComponent(orderId)}/participants`,
+      {
+        params: pickDefined(queryParams)
+      }
+    );
     return this.mapPaginatedResponse(response.data);
   }
 
@@ -231,10 +312,12 @@ export class Client {
     fields?: string
   ): Promise<SymplaParticipant> {
     let params = fields ? { fields } : {};
+    this.validatePositiveInteger(eventId, 'eventId');
+    this.validatePositiveInteger(participantId, 'ticketId');
     let response = await this.axios.get(`/events/${eventId}/participants/${participantId}`, {
       params
     });
-    return response.data.data;
+    return this.readRecord(response.data);
   }
 
   async getParticipantByTicketNumber(
@@ -243,56 +326,218 @@ export class Client {
     fields?: string
   ): Promise<SymplaParticipant> {
     let params = fields ? { fields } : {};
+    this.validatePositiveInteger(eventId, 'eventId');
+    this.validateTextId(ticketNumber, 'ticketNumber');
     let response = await this.axios.get(
-      `/events/${eventId}/participants/ticketNumber/${ticketNumber}`,
+      `/events/${eventId}/participants/ticketNumber/${encodeURIComponent(ticketNumber)}`,
       { params }
     );
-    return response.data.data;
+    return this.readRecord(response.data);
   }
 
-  async checkinByTicketId(eventId: number, participantId: number): Promise<{ data: any }> {
+  async checkinByTicketId(eventId: number, participantId: number): Promise<{ data: unknown }> {
+    this.validatePositiveInteger(eventId, 'eventId');
+    this.validatePositiveInteger(participantId, 'ticketId');
     let response = await this.axios.post(
       `/events/${eventId}/participants/${participantId}/checkIn`
     );
     return response.data;
   }
 
-  async checkinByTicketNumber(eventId: number, ticketNumber: string): Promise<{ data: any }> {
+  async checkinByTicketNumber(
+    eventId: number,
+    ticketNumber: string
+  ): Promise<{ data: unknown }> {
+    this.validatePositiveInteger(eventId, 'eventId');
+    this.validateTextId(ticketNumber, 'ticketNumber');
     let response = await this.axios.post(
-      `/events/${eventId}/participants/ticketNumber/${ticketNumber}/checkIn`
+      `/events/${eventId}/participants/ticketNumber/${encodeURIComponent(ticketNumber)}/checkIn`
     );
     return response.data;
   }
 
   async listAffiliates(eventId: number): Promise<{ data: SymplaAffiliate[] }> {
+    this.validatePositiveInteger(eventId, 'eventId');
     let response = await this.axios.get(`/events/${eventId}/affiliates`);
-    return response.data;
+    let data = this.readList<SymplaAffiliate>(response.data);
+    return { data };
   }
 
-  private cleanParams(
-    params: Record<string, string | number | boolean | undefined>
-  ): Record<string, string | number | boolean> {
-    let cleaned: Record<string, string | number | boolean> = {};
-    for (let [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null) {
-        cleaned[key] = value;
+  async listCurrentEvents(params: {
+    published?: string;
+    from?: string;
+    timezone?: string;
+    sort?: string;
+    fieldSort?: string;
+    pageSize?: number;
+    cursor?: string;
+  }) {
+    this.validatePagination(params);
+    let response = await this.currentAxios.get<CurrentPageResponse>('/events', {
+      params: pickDefined({
+        published: params.published ?? 'published',
+        from: params.from,
+        timezone: params.timezone ?? 'America/Sao_Paulo',
+        sort: params.sort ?? 'asc',
+        field_sort: params.fieldSort,
+        page_size: params.pageSize,
+        cursor: params.cursor
+      })
+    });
+    this.validateCurrentPage(response.status, response.data);
+    return response;
+  }
+
+  async listPresentations(
+    eventIdHash: string,
+    params: {
+      published?: boolean;
+      from?: string;
+      timezone?: string;
+      sort?: string;
+      pageSize?: number;
+      cursor?: string;
+      filterOnlineSector?: boolean;
+    }
+  ) {
+    this.validateTextId(eventIdHash, 'eventIdHash');
+    this.validatePagination(params);
+    let response = await this.currentAxios.get<CurrentPageResponse>(
+      `/events/${encodeURIComponent(eventIdHash)}/presentations`,
+      {
+        params: pickDefined({
+          published: params.published ?? true,
+          from: params.from,
+          timezone: params.timezone ?? 'America/Sao_Paulo',
+          sort: params.sort ?? 'asc',
+          page_size: params.pageSize,
+          cursor: params.cursor,
+          filter_online_sector: params.filterOnlineSector
+        })
+      }
+    );
+    this.validateCurrentPage(response.status, response.data);
+    return response;
+  }
+
+  async getPresentation(eventIdHash: string, presentationId: number, timezone?: string) {
+    this.validateTextId(eventIdHash, 'eventIdHash');
+    this.validatePositiveInteger(presentationId, 'presentationId');
+    return this.currentAxios.get<Record<string, unknown>>(
+      `/events/${encodeURIComponent(eventIdHash)}/presentations/${presentationId}`,
+      { params: pickDefined({ timezone }) }
+    );
+  }
+
+  private validateCurrentPage(status: number, body: CurrentPageResponse) {
+    if (status !== 204 && (!isApiErrorRecord(body) || !Array.isArray(body.data))) {
+      throw createApiServiceError('Sympla returned a response without the requested list.', {
+        reason: 'sympla_invalid_response'
+      });
+    }
+  }
+
+  private validateTextId(value: string, field: string) {
+    if (!value.trim()) {
+      throw createApiServiceError(`${field} must not be empty.`, {
+        reason: 'sympla_invalid_identifier'
+      });
+    }
+  }
+
+  private validatePositiveInteger(value: number, field: string) {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw createApiServiceError(`${field} must be a positive whole number.`, {
+        reason: 'sympla_invalid_number'
+      });
+    }
+  }
+
+  private validatePagination(params: { page?: number; pageSize?: number }) {
+    if (params.page !== undefined) this.validatePositiveInteger(params.page, 'page');
+    if (params.pageSize !== undefined) {
+      this.validatePositiveInteger(params.pageSize, 'pageSize');
+      if (params.pageSize > 200) {
+        throw createApiServiceError('pageSize must not exceed 200.', {
+          reason: 'sympla_invalid_page_size'
+        });
       }
     }
-    return cleaned;
   }
 
-  private mapPaginatedResponse<T>(data: any): PaginatedResponse<T> {
+  private readData<T>(body: { data: T }): T {
+    if (!isApiErrorRecord(body) || !('data' in body) || body.data == null) {
+      throw createApiServiceError('Sympla returned a response without the requested data.', {
+        reason: 'sympla_invalid_response'
+      });
+    }
+    return body.data;
+  }
+
+  private readRecord<T>(body: { data: T }): T {
+    let data = this.readData(body);
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError('Sympla returned an invalid requested record.', {
+        reason: 'sympla_invalid_response'
+      });
+    }
+    return data;
+  }
+
+  private readList<T>(body: { data: T[] }): T[] {
+    let data = this.readData(body);
+    if (!Array.isArray(data) || data.some(item => !isApiErrorRecord(item))) {
+      throw createApiServiceError('Sympla returned an invalid requested record list.', {
+        reason: 'sympla_invalid_response'
+      });
+    }
+    return data;
+  }
+
+  private mapPaginatedResponse<T>(body: {
+    data: T[];
+    pagination: { has_next: boolean; quantity: number; offset: number };
+    sort?: { field_sort: string; sort: string };
+  }): PaginatedResponse<T> {
+    let data = this.readList(body);
+    if (
+      !isApiErrorRecord(body.pagination) ||
+      typeof body.pagination.has_next !== 'boolean' ||
+      typeof body.pagination.quantity !== 'number' ||
+      !Number.isFinite(body.pagination.quantity)
+    ) {
+      throw createApiServiceError('Sympla returned invalid required pagination metadata.', {
+        reason: 'sympla_invalid_response'
+      });
+    }
     return {
-      data: data.data || [],
+      data,
       pagination: {
-        hasNext: data.pagination?.has_next ?? false,
-        quantity: data.pagination?.quantity ?? 0,
-        offset: data.pagination?.offset ?? 0
+        hasNext: body.pagination?.has_next,
+        quantity: body.pagination?.quantity,
+        offset: body.pagination?.offset
       },
-      sort: {
-        fieldSort: data.sort?.field_sort ?? '',
-        sort: data.sort?.sort ?? ''
-      }
+      sort: body.sort ? { fieldSort: body.sort.field_sort, sort: body.sort.sort } : undefined
     };
   }
 }
+
+export let eventFlag = (value: number): boolean => {
+  if (value !== 0 && value !== 1) {
+    throw createApiServiceError('Sympla returned an invalid event status flag.', {
+      reason: 'sympla_invalid_response'
+    });
+  }
+  return value === 1;
+};
+
+export let validateSymplaOutput = <T>(schema: z.ZodType<T>, output: T): T => {
+  let result = schema.safeParse(output);
+  if (!result.success) {
+    let path = result.error.issues[0]?.path.map(String).join('.') || 'result';
+    throw createApiServiceError(`Sympla returned an invalid required result at ${path}.`, {
+      reason: 'sympla_invalid_response'
+    });
+  }
+  return output;
+};

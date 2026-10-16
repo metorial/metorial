@@ -1,6 +1,8 @@
-# <img src="logo.png" height="20"> Baselinker
+# <img src="logo.png" height="20"> BaseLinker
 
-Manage e-commerce operations across multiple sales channels. Create, update, and retrieve orders with filtering by date, status, email, or phone. Manage product catalogs including variants, images, prices, and descriptions. Track and update inventory stock levels across warehouses and external storages. Create courier shipments, generate shipping labels, and request parcel pickups. Process order returns and refunds. Manage purchase orders, suppliers, and inventory documents for stock movements. Poll order event journals to track order creation, status changes, and removals.
+Manage BaseLinker orders, products, inventory stock and prices, courier shipments, shipping label downloads, and order returns. Discover catalogs, warehouses, price groups, statuses and courier accounts, read external storage products, and retrieve recent order journal events.
+
+API tokens are generated in Account & other → My account → API. Journal access must be enabled in the account API settings. The legacy return update/delete modes retain their original API requests and require account-specific verification.
 
 ## License
 

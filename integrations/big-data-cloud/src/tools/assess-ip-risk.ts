@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,10 +8,10 @@ export let assessIpRiskTool = SlateTool.create(spec, {
   key: 'assess_ip_risk',
   description: `Assess the security risk and hazard profile of an IP address. Detects VPNs, proxies, Tor exit nodes, hosting networks, iCloud Private Relay, bogon addresses, and blacklist appearances.
 Returns a comprehensive hazard report with individual threat indicators and an overall security threat classification.
-If no IP is provided, the caller's own IP is assessed.`,
+If no IP is provided, the execution server's public IP is assessed.`,
   instructions: [
     'The hostingLikelihood score ranges from 0 (unlikely) to 10 (very likely).',
-    'securityThreat can be "low", "moderate", "high", or "unknown".'
+    'securityThreat is a provider-written threat summary, or unknown when no specific threat was identified.'
   ],
   tags: {
     readOnly: true
@@ -22,17 +22,26 @@ If no IP is provided, the caller's own IP is assessed.`,
       ip: z
         .string()
         .optional()
-        .describe("IPv4 or IPv6 address to assess. If omitted, the caller's IP is used.")
+        .describe(
+          "IPv4 or IPv6 address to assess. If omitted, the execution server's public IP is used."
+        )
     })
   )
   .output(
     z
       .object({
         ip: z.string().describe('The IP address assessed'),
+        raw: z
+          .object({ ip: z.string() })
+          .passthrough()
+          .optional()
+          .describe('Complete provider response with geographic and network context'),
         securityThreat: z
           .string()
           .optional()
-          .describe('Overall threat level: low, moderate, high, or unknown'),
+          .describe(
+            'Provider threat summary, or unknown when no specific threat is identified'
+          ),
         isKnownAsTorServer: z.boolean().optional(),
         isKnownAsVpn: z.boolean().optional(),
         isKnownAsProxy: z.boolean().optional(),
@@ -60,9 +69,12 @@ If no IP is provided, the caller's own IP is assessed.`,
 
     let result = await client.ipHazardReport({ ip: ctx.input.ip });
 
-    let ipAddr = result.ip || ctx.input.ip || 'caller IP';
-    let hazard = result.hazardReport || {};
-    let threat = result.securityThreat || 'unknown';
+    if (typeof result.ip !== 'string' || !result.ip) {
+      throw createApiServiceError('BigDataCloud did not return the assessed IP address.');
+    }
+    let ipAddr = result.ip;
+    let hazard = isApiErrorRecord(result.hazardReport) ? result.hazardReport : {};
+    let threat = result.securityThreat;
 
     let flags: string[] = [];
     if (hazard.isKnownAsVpn) flags.push('VPN');
@@ -80,10 +92,11 @@ If no IP is provided, the caller's own IP is assessed.`,
     return {
       output: {
         ip: ipAddr,
-        securityThreat: threat,
-        ...hazard
+        ...hazard,
+        ...pickDefined({ securityThreat: threat }),
+        raw: result
       },
-      message: `**${ipAddr}** risk assessment: threat level **${threat}**. Detected flags: ${flagsSummary}. Hosting likelihood: ${hazard.hostingLikelihood ?? 'N/A'}/10.`
+      message: `**${ipAddr}** risk assessment: threat level **${threat ?? 'not reported'}**. Detected flags: ${flagsSummary}. Hosting likelihood: ${hazard.hostingLikelihood ?? 'N/A'}/10.`
     };
   })
   .build();

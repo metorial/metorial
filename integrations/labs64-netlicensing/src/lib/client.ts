@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://go.netlicensing.io/core/v2/rest';
 
@@ -13,6 +18,7 @@ export interface NetLicensingItem {
 }
 
 export interface NetLicensingResponse {
+  ttl?: string;
   items?: {
     item?: NetLicensingItem[];
     pagenumber?: string;
@@ -26,13 +32,71 @@ export interface NetLicensingResponse {
   };
 }
 
+let textProperties = new Set([
+  'number',
+  'name',
+  'version',
+  'description',
+  'licensingInfo',
+  'licenseType',
+  'licensingModel',
+  'currency',
+  'tokenType',
+  'shopURL',
+  'expirationTime',
+  'productNumber',
+  'productModuleNumber',
+  'productModuleName',
+  'licenseTemplateNumber',
+  'licenseeNumber',
+  'vendorNumber',
+  'licenseTemplatesNumbers',
+  'status',
+  'source',
+  'dateCreated',
+  'dateClosed',
+  'paymentMethod',
+  'startDate',
+  'expires',
+  'evaluationExpires'
+]);
+
+let getProviderErrors = (data: unknown) => {
+  if (!isApiErrorRecord(data) || !isApiErrorRecord(data.infos)) return [];
+  let infos = data.infos.info;
+  return Array.isArray(infos)
+    ? infos.filter(info => isApiErrorRecord(info) && info.type === 'error')
+    : [];
+};
+
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'NetLicensing',
+    reason: 'upstream_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    extractMessage: (input, helpers) => {
+      let errors = getProviderErrors(helpers.getResponseWithBody(input)?.data);
+      let details = errors.map(info =>
+        [info.id, info.value].filter(value => typeof value === 'string').join(': ')
+      );
+      return details.length ? details.join('; ') : undefined;
+    },
+    extractUpstreamCode: (_input, response) => {
+      let first = getProviderErrors(response?.data)[0];
+      return typeof first?.id === 'string' ? first.id : undefined;
+    }
+  });
+
 export let parseItem = (item: NetLicensingItem): Record<string, any> => {
-  let result: Record<string, any> = {};
+  let result: Record<string, any> = Object.create(null);
 
   if (item.property) {
     for (let prop of item.property) {
       try {
-        result[prop.name] = JSON.parse(prop.value);
+        // Entity identifiers, names and other declared text fields are not JSON values.
+        result[prop.name] = textProperties.has(prop.name)
+          ? prop.value
+          : JSON.parse(prop.value);
       } catch {
         result[prop.name] = prop.value;
       }
@@ -45,16 +109,11 @@ export let parseItem = (item: NetLicensingItem): Record<string, any> => {
       if (!result[name]) {
         result[name] = [];
       }
-      let listObj: Record<string, any> = {};
-      if (listItem.property) {
-        for (let prop of listItem.property) {
-          try {
-            listObj[prop.name] = JSON.parse(prop.value);
-          } catch {
-            listObj[prop.name] = prop.value;
-          }
-        }
-      }
+      let listObj = parseItem({
+        type: item.type,
+        property: listItem.property ?? [],
+        list: listItem.list
+      });
       (result[name] as any[]).push(listObj);
     }
   }
@@ -98,16 +157,40 @@ export let buildFormData = (params: Record<string, any>): string => {
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(authToken: string) {
-    this.axios = createAxios({
+    if (!authToken) {
+      throw createApiServiceError('Connect a NetLicensing account before using this tool.', {
+        reason: 'missing_auth'
+      });
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      contentType: false,
+      authHeader: { value: `Basic ${authToken}` },
+      errorAdapter: apiError,
       headers: {
-        Authorization: `Basic ${authToken}`,
         Accept: 'application/json'
       }
     });
+    this.axios.interceptors.response.use(response => {
+      let errors = getProviderErrors(response.data);
+      if (errors.length) {
+        throw apiError({ response: { status: response.status, data: response.data } });
+      }
+      return response;
+    });
+  }
+
+  async listLicensingModels(): Promise<Record<string, any>[]> {
+    let res = await this.axios.get('/utility/licensingModels');
+    return parseItems(res.data, 'LicensingModelProperties');
+  }
+
+  async listLicenseTypes(): Promise<Record<string, any>[]> {
+    let res = await this.axios.get('/utility/licenseTypes');
+    return parseItems(res.data, 'LicenseType');
   }
 
   // --- Products ---

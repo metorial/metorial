@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PushoverClient } from '../lib/client';
+import { groupKeySchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageGroupMembers = SlateTool.create(spec, {
@@ -23,7 +24,7 @@ export let manageGroupMembers = SlateTool.create(spec, {
       action: z
         .enum(['add', 'remove', 'disable', 'enable'])
         .describe('The member operation to perform'),
-      groupKey: z.string().describe('Group key of the target group'),
+      groupKey: groupKeySchema,
       memberUserKey: z.string().describe('Pushover user key of the member'),
       device: z.string().optional().describe('Restrict operation to a specific device name'),
       memo: z
@@ -38,6 +39,13 @@ export let manageGroupMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.memo !== undefined && ctx.input.action !== 'add') {
+      throw createApiServiceError('memo is supported only for the add action.');
+    }
+    if (ctx.input.memo !== undefined && Array.from(ctx.input.memo).length > 200) {
+      throw createApiServiceError('memo must not exceed 200 characters.');
+    }
+
     let client = new PushoverClient({
       token: ctx.auth.token,
       userKey: ctx.auth.userKey

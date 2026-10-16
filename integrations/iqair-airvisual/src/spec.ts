@@ -4,9 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'iqair-airvisual',
-  name: 'Iqair Airvisual',
+  name: 'IQAir AirVisual',
   description:
-    'Access real-time, forecast, and historical air quality and weather data from IQAir AirVisual, covering 5,000+ cities across 100+ countries.',
+    'Read outdoor city and station air quality, weather, location directories, and plan-dependent forecasts and recent history from IQAir AirVisual.',
   metadata: {},
   config,
   auth

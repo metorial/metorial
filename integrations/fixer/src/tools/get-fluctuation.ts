@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let getFluctuation = SlateTool.create(spec, {
   name: 'Get Fluctuation',
   key: 'get_fluctuation',
-  description: `Retrieve currency fluctuation data between two dates. Shows how currencies changed day-to-day, including the absolute change and percentage change for each currency.`,
+  description: `Retrieve currency fluctuation data between two dates. Returns the start rate, end rate, absolute change, and percentage change for each currency across the requested period.`,
   instructions: [
     'Dates must be in YYYY-MM-DD format.',
     'Currency codes must be 3-letter ISO 4217 codes.'
   ],
-  constraints: ['Changing the base currency from EUR requires a paid Fixer plan.'],
+  constraints: [
+    'Endpoint availability and permitted base currencies depend on the subscription for the selected API host.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -52,7 +54,7 @@ export let getFluctuation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiHost: ctx.auth.apiHost });
 
     let base = ctx.input.baseCurrency || ctx.config.baseCurrency;
 

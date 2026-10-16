@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, contactBody } from '../lib/client';
+import { contactFields, contactOutput, mapContact } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let createContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...contactFields,
       lastName: z.string().describe('Last name / surname'),
       firstName: z.string().optional().describe('First name'),
       title: z.string().optional().describe('Title or salutation, e.g. "Prof.", "Dr."'),
@@ -21,51 +23,22 @@ export let createContact = SlateTool.create(spec, {
       street: z.string().describe('Street address'),
       zip: z.string().describe('ZIP / postal code'),
       city: z.string().describe('City'),
-      countryCode: z.string().optional().describe('Two-letter country code, e.g. "DE"')
+      countryCode: z
+        .string()
+        .optional()
+        .describe('Two-letter country code, e.g. "DE"; required by the current API')
     })
   )
-  .output(
-    z.object({
-      contactId: z.string().describe('ID of the newly created contact'),
-      lastName: z.string().optional().describe('Last name of the contact'),
-      firstName: z.string().optional().describe('First name of the contact'),
-      street: z.string().optional().describe('Street address'),
-      zip: z.string().optional().describe('ZIP / postal code'),
-      city: z.string().optional().describe('City')
-    })
-  )
+  .output(contactOutput)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    ctx.info({
-      message: 'Creating contact',
-      lastName: ctx.input.lastName,
-      city: ctx.input.city
-    });
-
-    let result = await client.createContact({
-      name: ctx.input.lastName,
-      first: ctx.input.firstName,
-      title: ctx.input.title,
-      company_name: ctx.input.companyName,
-      street: ctx.input.street,
-      zip: ctx.input.zip,
-      city: ctx.input.city,
-      country_code: ctx.input.countryCode
-    });
-
-    let contactId = result?.id?.toString();
+    let result = await client.save('POST', '/contacts', contactBody(ctx.input));
+    let output = mapContact(result);
 
     return {
-      output: {
-        contactId: contactId,
-        lastName: result?.name,
-        firstName: result?.first,
-        street: result?.street,
-        zip: result?.zip,
-        city: result?.city
-      },
-      message: `Contact **${ctx.input.firstName ? `${ctx.input.firstName} ` : ''}${ctx.input.lastName}** created with ID \`${contactId}\`.`
+      output,
+      message: `Contact created with ID \`${output.contactId}\`.`
     };
   })
   .build();

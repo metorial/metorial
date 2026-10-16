@@ -17,6 +17,7 @@ let repositorySchema = z
 
 let projectSchema = z.object({
   name: z.string().describe('Project name'),
+  projectIdentifier: z.string().optional().describe('Stable project identifier'),
   permalink: z.string().describe('URL-friendly project identifier (slug)'),
   zone: z.string().optional().describe('Deployment region'),
   lastDeployedAt: z.string().nullable().optional().describe('Timestamp of last deployment'),
@@ -49,17 +50,21 @@ export let listProjects = SlateTool.create(spec, {
 
     let mapped = projects.map((p: any) => ({
       name: p.name,
+      projectIdentifier: p.identifier,
       permalink: p.permalink,
       zone: p.zone,
-      lastDeployedAt: p.last_deployed_at ?? null,
+      lastDeployedAt: p.last_deployed_at,
       autoDeployUrl: p.auto_deploy_url,
-      repository: p.repository
-        ? {
-            scmType: p.repository.scm_type,
-            url: p.repository.url,
-            branch: p.repository.branch
-          }
-        : null
+      repository:
+        p.repository === null
+          ? null
+          : p.repository
+            ? {
+                scmType: p.repository.scm_type,
+                url: p.repository.url,
+                branch: p.repository.branch
+              }
+            : undefined
     }));
 
     return {

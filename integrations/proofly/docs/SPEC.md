@@ -1,65 +1,32 @@
-Now let me check what Zapier shows for Proofly's trigger (lead collection webhook):Now let me check the Proofly integrations/webhook page to confirm if they support webhooks natively:Now I have enough information to write the specification. Based on my research:
+# Proofly integration
 
-- Proofly (proofly.io) is a social proof notification platform
-- API uses API key authentication via `X-Api-Key` header
-- API base URL: `https://proofly.io/api`
-- API endpoints: user info, activity logs, campaigns list, campaign details, campaign toggle, notification data
-- Proofly supports webhooks for sending lead data to external systems
-- Zapier trigger: "new lead collected"
-- Pabbly actions: create conversion, find notification, update campaign status
-
-# Slates Specification for Proofly
-
-## Overview
-
-Proofly is a social proof notification platform that allows websites to display real-time customer activity notifications (such as recent purchases, signups, live visitor counts, and reviews) to increase conversions and build trust. It provides an API to manage campaigns and notifications, retrieve lead and conversion data, and automate marketing workflows.
+Proofly provides social proof widgets, campaign controls, notification statistics, and collected lead data.
 
 ## Authentication
 
-Proofly uses API key authentication. Pass the API key as a header `X-Api-Key` with every request.
+Use an API key in the `X-Api-Key` header. The key is available on the [developers page](https://proofly.io/developers) when signed in. The base URL is `https://proofly.io/api`. The API can report failures through an `ok: false` envelope even when the HTTP request succeeds. Token connections do not use OAuth or refresh tokens; configuration has no additional fields.
 
-- **API Base URL:** `https://proofly.io/api`
-- **Header:** `X-Api-Key: <your_api_key>`
-- The API key can be found on the Proofly developers page when logged in.
-- If authentication fails, the API returns `ok: false` with an error message such as "Authentication failed: give me a X-Api-Key header."
+## Tool surface
 
-**Example request:**
+| Tool | Operation |
+| --- | --- |
+| `get_user_info` | Read `/user`: account identity, registration date, login count, impression usage, pixel key and debug flag. |
+| `get_activity_logs` | Read `/activity`: activity type, timestamp and IP address. |
+| `list_campaigns` | Read `/campaigns`: campaign IDs, names, domains, enabled state and creation timestamps. |
+| `get_campaign_notifications` | Read `/campaign/{campaign_id}`: notification IDs, settings, enabled state, creation timestamps and statistics. |
+| `get_notification` | Read `/notification/{notification_id}`: return the provider's notification details without imposing an undocumented response model. |
+| `toggle_campaign` | Send `PUT /campaign/{campaign_id}` to invert campaign state. This is a toggle, so repeating a request can undo the previous result. |
+| `get_notification_data` | Read `/data/{notification_id}`: captured input, visitor details, location and collection time. Original collected data is retained. |
+| `create_conversion` | Retain `POST /notification/{notification_id}/conversion` for existing callers; the current official reference does not document this endpoint. Require an explicit `ok: true` acknowledgment. |
 
-```
-GET https://proofly.io/api/user
-Headers:
-  X-Api-Key: your_api_key_here
-```
+Start with `list_campaigns`, then call `get_campaign_notifications` for a selected campaign. Use the returned notification ID for notification details or captured data.
 
-## Features
+The [API reference](https://proofly.io/developers) documents `{ ok, status, data }` envelopes. The [REST API guide](https://proofly.io/helpdesk/proofly-rest-api) also lists single-notification retrieval and `POST /data/{notification_id}` lead ingestion. It does not publish the lead-ingestion request or response model, so that route is not used as a speculative replacement for conversion creation.
 
-### User Account Information
+## Boundaries
 
-Retrieve general account information including user name, email, login history, registration date, and impression statistics (both for the current period and total).
+No webhook trigger or registration lifecycle is exposed. [Incoming conversion webhooks](https://proofly.io/helpdesk/push-conversions-with-webhooks) use a notification-specific URL copied from its Data tab; the guide does not specify that URL's structure or a complete API registration contract. No file download or export endpoint is exposed by these tools.
 
-### Activity Logs
+Optional metrics remain absent when the provider does not return them. Missing resource IDs and malformed list responses fail with a structured error rather than becoming placeholder IDs or empty results. Existing tool keys and input/output field types are preserved.
 
-Access a chronological log of account activities such as successful logins and registrations, including timestamps and IP addresses.
-
-### Campaign Management
-
-- List all campaigns in the account, including campaign ID, name, associated domain, and enabled status.
-- Retrieve all notifications within a specific campaign, including notification type (e.g., `LATEST_CONVERSION`), display settings, trigger rules, and performance statistics (impressions, hovers, clicks, leads).
-- Toggle a campaign's active/inactive status using the campaign ID.
-
-### Notification Data Retrieval
-
-Retrieve leads, conversions, and collected data from an individual notification, including data type, submitted input (e.g., email), visitor IP, page URL, and geolocation (city, country).
-
-### External Conversions
-
-Add external leads, conversions, or sales to a Proofly notification, allowing data from third-party systems to be reflected in social proof widgets.
-
-## Events
-
-Proofly supports webhooks to send real-time lead data to any external system or receive incoming data to trigger custom workflows.
-
-### Lead Collection
-
-- Triggers when a new lead is collected through a Proofly notification widget (e.g., an email collector form).
-- Lead data includes the submitted input, visitor IP, source URL, and geolocation.
+Free accounts are documented as allowing ten API requests per minute. No automatic retry is added, particularly for campaign toggles or conversion writes. Runtime behavior requires a separate live verification pass.

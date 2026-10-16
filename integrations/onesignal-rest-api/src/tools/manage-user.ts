@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { appIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let userPropertiesSchema = z
@@ -45,6 +46,10 @@ let subscriptionOutputSchema = z.object({
 
 let userOutputSchema = z.object({
   onesignalId: z.string().optional().describe('OneSignal internal user ID'),
+  identity: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('User aliases and stable identity values'),
   externalId: z.string().optional().describe('External user ID'),
   properties: z
     .object({
@@ -62,7 +67,7 @@ let userOutputSchema = z.object({
 export let createUser = SlateTool.create(spec, {
   name: 'Create User',
   key: 'create_user',
-  description: `Create a new user in OneSignal with optional identity, properties (tags, language, country), and subscriptions (push, email, SMS). If a user with the given external ID already exists, it will be updated.`,
+  description: `Create a new user in OneSignal with optional identity, properties (tags, language, country), and subscriptions (push, email, SMS). Use update_user to change properties of an existing user. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -70,6 +75,7 @@ export let createUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       externalId: z.string().optional().describe('External user identifier'),
       properties: userPropertiesSchema.describe(
         'User properties like tags, language, country'
@@ -84,7 +90,7 @@ export let createUser = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let body: Record<string, any> = {};
@@ -96,11 +102,14 @@ export let createUser = SlateTool.create(spec, {
     if (ctx.input.properties) {
       let props: Record<string, any> = {};
       if (ctx.input.properties.tags) props.tags = ctx.input.properties.tags;
-      if (ctx.input.properties.language) props.language = ctx.input.properties.language;
-      if (ctx.input.properties.timezoneId) props.timezone_id = ctx.input.properties.timezoneId;
+      if (ctx.input.properties.language !== undefined)
+        props.language = ctx.input.properties.language;
+      if (ctx.input.properties.timezoneId !== undefined)
+        props.timezone_id = ctx.input.properties.timezoneId;
       if (ctx.input.properties.lat !== undefined) props.lat = ctx.input.properties.lat;
       if (ctx.input.properties.long !== undefined) props.long = ctx.input.properties.long;
-      if (ctx.input.properties.country) props.country = ctx.input.properties.country;
+      if (ctx.input.properties.country !== undefined)
+        props.country = ctx.input.properties.country;
       body.properties = props;
     }
 
@@ -120,13 +129,14 @@ export let createUser = SlateTool.create(spec, {
 export let getUser = SlateTool.create(spec, {
   name: 'Get User',
   key: 'get_user',
-  description: `Retrieve a user's profile, properties, identity, and all subscriptions by alias (external_id or onesignal_id).`,
+  description: `Retrieve a user's profile, properties, identity, and all subscriptions by alias (external_id or onesignal_id). Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       aliasLabel: z
         .string()
         .default('external_id')
@@ -138,7 +148,7 @@ export let getUser = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let result = await client.getUser(ctx.input.aliasLabel, ctx.input.aliasId);
@@ -153,7 +163,7 @@ export let getUser = SlateTool.create(spec, {
 export let updateUser = SlateTool.create(spec, {
   name: 'Update User',
   key: 'update_user',
-  description: `Update a user's properties such as tags, language, timezone, location, and country. Identify the user by alias label and alias ID.`,
+  description: `Update a user's properties such as tags, language, timezone, location, and country. Identify the user by alias label and alias ID. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -161,6 +171,7 @@ export let updateUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       aliasLabel: z
         .string()
         .default('external_id')
@@ -187,22 +198,25 @@ export let updateUser = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let props: Record<string, any> = {};
     if (ctx.input.properties.tags) props.tags = ctx.input.properties.tags;
-    if (ctx.input.properties.language) props.language = ctx.input.properties.language;
-    if (ctx.input.properties.timezoneId) props.timezone_id = ctx.input.properties.timezoneId;
+    if (ctx.input.properties.language !== undefined)
+      props.language = ctx.input.properties.language;
+    if (ctx.input.properties.timezoneId !== undefined)
+      props.timezone_id = ctx.input.properties.timezoneId;
     if (ctx.input.properties.lat !== undefined) props.lat = ctx.input.properties.lat;
     if (ctx.input.properties.long !== undefined) props.long = ctx.input.properties.long;
-    if (ctx.input.properties.country) props.country = ctx.input.properties.country;
+    if (ctx.input.properties.country !== undefined)
+      props.country = ctx.input.properties.country;
 
     let result = await client.updateUser(ctx.input.aliasLabel, ctx.input.aliasId, props);
 
     return {
       output: mapUser(result),
-      message: `User **${ctx.input.aliasId}** updated successfully.`
+      message: `User **${ctx.input.aliasId}** update accepted.`
     };
   })
   .build();
@@ -210,13 +224,14 @@ export let updateUser = SlateTool.create(spec, {
 export let deleteUser = SlateTool.create(spec, {
   name: 'Delete User',
   key: 'delete_user',
-  description: `Permanently delete a user and all associated data by alias.`,
+  description: `Permanently delete a user and all associated data by alias. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       aliasLabel: z
         .string()
         .default('external_id')
@@ -232,7 +247,7 @@ export let deleteUser = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let result = await client.deleteUser(ctx.input.aliasLabel, ctx.input.aliasId);
@@ -247,6 +262,7 @@ export let deleteUser = SlateTool.create(spec, {
   .build();
 
 let mapUser = (data: any) => ({
+  identity: data.identity,
   onesignalId: data.identity?.onesignal_id,
   externalId: data.identity?.external_id,
   properties: data.properties

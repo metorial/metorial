@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -31,15 +31,20 @@ export let manageApplication = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete application data returned by Amara'),
       totalCount: z.number().optional().describe('Total count (when listing)'),
       applications: z.array(
         z.object({
           applicationId: z.number().describe('Application ID'),
-          username: z.string().describe('Applicant username'),
+          username: z.string().optional().describe('Applicant username, when returned'),
+          userId: z.string().optional().describe('Stable applicant user ID'),
           note: z.string().describe('Application note'),
           status: z.string().describe('Application status'),
           created: z.string().describe('Created date'),
-          modified: z.string().describe('Modified date')
+          modified: z
+            .string()
+            .optional()
+            .describe('Modified date, when the application has been changed')
         })
       )
     })
@@ -50,7 +55,12 @@ export let manageApplication = SlateTool.create(spec, {
       username: ctx.auth.username
     });
 
-    if (ctx.input.applicationId && ctx.input.status) {
+    if (ctx.input.status && ctx.input.applicationId === undefined) {
+      throw createApiServiceError(
+        'applicationId is required when approving or denying an application.'
+      );
+    }
+    if (ctx.input.applicationId !== undefined && ctx.input.status) {
       let app = await client.updateApplication(
         ctx.input.teamSlug,
         ctx.input.applicationId,
@@ -58,37 +68,41 @@ export let manageApplication = SlateTool.create(spec, {
       );
       return {
         output: {
+          raw: app,
           applications: [
             {
               applicationId: app.id,
               username: app.user.username,
+              userId: app.user.id,
               note: app.note,
               status: app.status,
               created: app.created,
-              modified: app.modified
+              modified: app.modified ?? undefined
             }
           ]
         },
-        message: `**${ctx.input.status}** application #${app.id} from **${app.user.username}** for team \`${ctx.input.teamSlug}\`.`
+        message: `**${ctx.input.status}** application #${app.id} from **${app.user.username || app.user.id}** for team \`${ctx.input.teamSlug}\`.`
       };
     }
 
-    if (ctx.input.applicationId) {
+    if (ctx.input.applicationId !== undefined) {
       let app = await client.getApplication(ctx.input.teamSlug, ctx.input.applicationId);
       return {
         output: {
+          raw: app,
           applications: [
             {
               applicationId: app.id,
               username: app.user.username,
+              userId: app.user.id,
               note: app.note,
               status: app.status,
               created: app.created,
-              modified: app.modified
+              modified: app.modified ?? undefined
             }
           ]
         },
-        message: `Application #${app.id} from **${app.user.username}**: status **${app.status}**.`
+        message: `Application #${app.id} from **${app.user.username || app.user.id}**: status **${app.status}**.`
       };
     }
 
@@ -102,14 +116,16 @@ export let manageApplication = SlateTool.create(spec, {
     let applications = result.objects.map(a => ({
       applicationId: a.id,
       username: a.user.username,
+      userId: a.user.id,
       note: a.note,
       status: a.status,
       created: a.created,
-      modified: a.modified
+      modified: a.modified ?? undefined
     }));
 
     return {
       output: {
+        raw: result,
         totalCount: result.meta.total_count,
         applications
       },

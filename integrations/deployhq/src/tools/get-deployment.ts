@@ -22,7 +22,9 @@ export let getDeployment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       deploymentIdentifier: z.string().describe('The deployment identifier (UUID)')
     })
   )
@@ -40,7 +42,12 @@ export let getDeployment = SlateTool.create(spec, {
       startedAt: z.string().nullable().optional().describe('When the deployment started'),
       completedAt: z.string().nullable().optional().describe('When the deployment completed'),
       duration: z.number().nullable().optional().describe('Deployment duration in seconds'),
-      copyConfigFiles: z.boolean().optional().describe('Whether config files were copied')
+      copyConfigFiles: z.boolean().optional().describe('Whether config files were copied'),
+      durationText: z.string().optional().describe('Provider-formatted deployment duration'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response including steps and logs when available')
     })
   )
   .handleInvocation(async ctx => {
@@ -59,29 +66,47 @@ export let getDeployment = SlateTool.create(spec, {
       output: {
         deploymentIdentifier: d.identifier,
         status: d.status,
-        deployer: d.deployer,
+        deployer: typeof d.deployer === 'string' ? d.deployer : undefined,
         branch: d.branch,
-        startRevision: d.start_revision
-          ? {
-              ref: d.start_revision.ref,
-              message: d.start_revision.message,
-              author: d.start_revision.author
-            }
-          : null,
-        endRevision: d.end_revision
-          ? {
-              ref: d.end_revision.ref,
-              message: d.end_revision.message,
-              author: d.end_revision.author
-            }
-          : null,
-        queuedAt: d.queued_at,
-        startedAt: d.started_at ?? null,
-        completedAt: d.completed_at ?? null,
-        duration: d.duration ?? null,
-        copyConfigFiles: d.copy_config_files
+        startRevision:
+          d.start_revision === null
+            ? null
+            : d.start_revision
+              ? {
+                  ref: d.start_revision.ref,
+                  message: d.start_revision.message,
+                  author: d.start_revision.author
+                }
+              : undefined,
+        endRevision:
+          d.end_revision === null
+            ? null
+            : d.end_revision
+              ? {
+                  ref: d.end_revision.ref,
+                  message: d.end_revision.message,
+                  author: d.end_revision.author
+                }
+              : undefined,
+        queuedAt: d.timestamps?.queued_at ?? d.queued_at,
+        startedAt:
+          d.timestamps?.started_at !== undefined ? d.timestamps.started_at : d.started_at,
+        completedAt:
+          d.timestamps?.completed_at !== undefined
+            ? d.timestamps.completed_at
+            : d.completed_at,
+        duration:
+          d.timestamps?.duration === null
+            ? null
+            : typeof (d.timestamps?.duration ?? d.duration) === 'number'
+              ? (d.timestamps?.duration ?? d.duration)
+              : undefined,
+        durationText:
+          typeof d.timestamps?.duration === 'string' ? d.timestamps.duration : undefined,
+        raw: d,
+        copyConfigFiles: d.configuration?.copy_config_files ?? d.copy_config_files
       },
-      message: `Deployment \`${d.identifier}\` is **${d.status}**${d.duration ? ` (${d.duration}s)` : ''}.`
+      message: `Deployment \`${d.identifier}\` is **${d.status}**.`
     };
   })
   .build();

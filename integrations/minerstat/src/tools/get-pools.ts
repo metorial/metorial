@@ -1,7 +1,37 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DeveloperClient } from '../lib/client';
+import { parseMinerstatResponse } from '../lib/response';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  pools: z.array(
+    z.object({
+      poolId: z.string().describe('Unique pool identifier'),
+      name: z.string().describe('Pool display name'),
+      slug: z.string().describe('URL slug for the pool'),
+      description: z.string().describe('Pool overview'),
+      website: z.string().describe('Pool website URL'),
+      founded: z.string().describe('Year established'),
+      poolType: z.string().describe('Pool category'),
+      coins: z
+        .record(
+          z.string(),
+          z.object({
+            algorithm: z.string(),
+            payoutThreshold: z.string(),
+            rewardMethod: z.string(),
+            fee: z.string(),
+            anonymous: z.boolean(),
+            registration: z.boolean()
+          })
+        )
+        .describe('Supported coins with mining details')
+    })
+  ),
+  response: z.any().optional().describe('Original API response'),
+  totalCount: z.number().describe('Number of pools returned')
+});
 
 export let getPoolsTool = SlateTool.create(spec, {
   name: 'Get Pools',
@@ -21,38 +51,10 @@ export let getPoolsTool = SlateTool.create(spec, {
       poolType: z.string().optional().describe('Filter by pool category (e.g. "multipool")')
     })
   )
-  .output(
-    z.object({
-      pools: z.array(
-        z.object({
-          poolId: z.string().describe('Unique pool identifier'),
-          name: z.string().describe('Pool display name'),
-          slug: z.string().describe('URL slug for the pool'),
-          description: z.string().describe('Pool overview'),
-          website: z.string().describe('Pool website URL'),
-          founded: z.string().describe('Year established'),
-          poolType: z.string().describe('Pool category'),
-          coins: z
-            .record(
-              z.string(),
-              z.object({
-                algorithm: z.string(),
-                payoutThreshold: z.string(),
-                rewardMethod: z.string(),
-                fee: z.string(),
-                anonymous: z.boolean(),
-                registration: z.boolean()
-              })
-            )
-            .describe('Supported coins with mining details')
-        })
-      ),
-      totalCount: z.number().describe('Number of pools returned')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     if (!ctx.auth.developerApiKey) {
-      throw new Error(
+      throw createApiServiceError(
         'Developer API key is required to query pool data. Please provide it in your authentication credentials.'
       );
     }
@@ -77,16 +79,17 @@ export let getPoolsTool = SlateTool.create(spec, {
       coins: p.coins
     }));
 
-    let filterDesc: any[] = [];
+    let filterDesc: string[] = [];
     if (ctx.input.coin) filterDesc.push(`coin: ${ctx.input.coin}`);
     if (ctx.input.poolType) filterDesc.push(`type: ${ctx.input.poolType}`);
     let filterText = filterDesc.length > 0 ? ` (filtered by ${filterDesc.join(', ')})` : '';
 
     return {
-      output: {
+      output: parseMinerstatResponse(outputSchema, {
         pools: mapped,
-        totalCount: mapped.length
-      },
+        totalCount: mapped.length,
+        response: pools
+      }),
       message: `Retrieved **${mapped.length}** mining pools${filterText}.`
     };
   })

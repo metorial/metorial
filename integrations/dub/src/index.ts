@@ -3,18 +3,22 @@ import { spec } from './spec';
 import {
   createLink,
   deleteLink,
+  downloadQrCode,
   getAnalytics,
   getLink,
   getMetatags,
   listCustomers,
   listEvents,
   listLinks,
+  manageCustomer,
   manageDomains,
+  manageFolders,
   manageTags,
   trackLead,
   trackSale,
   updateLink,
-  upsertLink
+  upsertLink,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -32,7 +36,11 @@ export let provider = Slate.create({
     manageDomains,
     listCustomers,
     getMetatags,
-    listEvents
+    listEvents,
+    whoAmI,
+    manageFolders,
+    manageCustomer,
+    downloadQrCode
   ],
   triggers: []
 });

@@ -1,3 +1,5 @@
+export * from './discovery';
+export * from './football';
 export * from './get-coaches';
 export * from './get-countries';
 export * from './get-fixtures';
@@ -9,5 +11,7 @@ export * from './get-predictions';
 export * from './get-standings';
 export * from './get-team-statistics';
 export * from './get-transfers';
+export * from './mma';
+export * from './nba';
 export * from './search-leagues';
 export * from './search-teams';

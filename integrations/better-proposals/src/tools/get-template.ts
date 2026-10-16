@@ -30,7 +30,7 @@ export let getTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         template: result.data
       },
       message: `Retrieved template **${ctx.input.templateId}**.`

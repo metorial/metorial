@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { type ApiRecord, responseRecord } from './response';
 
 export interface ClientConfig {
   token: string;
@@ -73,6 +74,8 @@ export interface ProductDatabaseParams {
   maxWeight?: number;
   minSellers?: number;
   maxSellers?: number;
+  minUpdatedAt?: string;
+  maxUpdatedAt?: string;
   minLqs?: number;
   maxLqs?: number;
   sort?: string;
@@ -95,26 +98,112 @@ export class Client {
   private apiType: string;
 
   constructor(config: ClientConfig) {
+    if (!config.token?.trim() || /[\r\n]/.test(config.token)) {
+      throw createApiServiceError(
+        'Connect a Jungle Scout API key before querying marketplace data.',
+        {
+          reason: 'junglescout_missing_token'
+        }
+      );
+    }
     this.token = config.token;
     this.marketplace = config.marketplace;
     this.apiType = config.apiType;
   }
 
   private createAxiosInstance() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: 'https://developer.junglescout.com',
+      timeout: 30000,
+      authHeader: { value: this.token },
+      contentType: 'application/vnd.api+json',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Jungle Scout',
+          reason: 'junglescout_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          detailKeys: ['detail', 'title', 'message', 'code'],
+          nestedKeys: ['errors']
+        }),
       headers: {
-        Authorization: this.token,
         'X-API-Type': this.apiType,
-        Accept: 'application/vnd.junglescout.v1+json',
-        'Content-Type': 'application/vnd.api+json'
+        Accept: 'application/vnd.junglescout.v1+json'
       }
     });
   }
 
+  private validateRanges(params: object) {
+    let values = params as Record<string, unknown>;
+    for (let [key, value] of Object.entries(values)) {
+      if (typeof value !== 'number') continue;
+      if (!Number.isFinite(value) || (value < 0 && !key.endsWith('Net'))) {
+        throw createApiServiceError(`${key} must be a finite number in the supported range.`, {
+          reason: 'invalid_input'
+        });
+      }
+      if (
+        /^(min|max)(MonthlySearchVolume|WordCount|OrganicProductCount|Rank|Sales|Reviews|Sellers)/.test(
+          key
+        ) &&
+        !Number.isInteger(value)
+      ) {
+        throw createApiServiceError(`${key} must be a whole number.`, {
+          reason: 'invalid_input'
+        });
+      }
+      if (key.startsWith('min')) {
+        let maximum = values[`max${key.slice(3)}`];
+        if (typeof maximum === 'number' && value > maximum) {
+          throw createApiServiceError(`${key} must not exceed max${key.slice(3)}.`, {
+            reason: 'invalid_input'
+          });
+        }
+      }
+    }
+  }
+
+  private validateDate(value: string, label: string) {
+    let timestamp = Date.parse(`${value}T00:00:00Z`);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+      !Number.isFinite(timestamp) ||
+      new Date(timestamp).toISOString().slice(0, 10) !== value
+    ) {
+      throw createApiServiceError(`${label} must be a valid date in YYYY-MM-DD format.`, {
+        reason: 'invalid_input'
+      });
+    }
+    return timestamp;
+  }
+
+  private validateDateRange(startDate: string, endDate: string, historicalSales = false) {
+    let start = this.validateDate(startDate, 'startDate');
+    let end = this.validateDate(endDate, 'endDate');
+    if (start >= end || end - start > 366 * 86400000) {
+      throw createApiServiceError('startDate must precede endDate by no more than 366 days.', {
+        reason: 'invalid_input'
+      });
+    }
+    if (historicalSales && endDate >= new Date().toISOString().slice(0, 10)) {
+      throw createApiServiceError(
+        'endDate must be before the current date for sales estimates.',
+        { reason: 'invalid_input' }
+      );
+    }
+  }
+
   private buildPaginationParams(pagination?: PaginationOptions): Record<string, string> {
     let params: Record<string, string> = {};
-    if (pagination?.pageSize) {
+    if (pagination?.pageSize !== undefined) {
+      if (
+        !Number.isInteger(pagination.pageSize) ||
+        pagination.pageSize < 1 ||
+        pagination.pageSize > 100
+      ) {
+        throw createApiServiceError('pageSize must be a whole number between 1 and 100.', {
+          reason: 'invalid_input'
+        });
+      }
       params['page[size]'] = String(pagination.pageSize);
     }
     if (pagination?.pageCursor) {
@@ -123,10 +212,11 @@ export class Client {
     return params;
   }
 
-  async keywordsByAsin(params: KeywordsByAsinParams): Promise<any> {
+  async keywordsByAsin(params: KeywordsByAsinParams): Promise<ApiRecord> {
+    this.validateRanges(params);
     let http = this.createAxiosInstance();
 
-    let attributes: Record<string, any> = {
+    let attributes: Record<string, unknown> = {
       asins: params.asins
     };
 
@@ -164,13 +254,14 @@ export class Client {
       { params: queryParams }
     );
 
-    return response.data;
+    return responseRecord(response.data, 'API response');
   }
 
-  async keywordsByKeyword(params: KeywordsByKeywordParams): Promise<any> {
+  async keywordsByKeyword(params: KeywordsByKeywordParams): Promise<ApiRecord> {
+    this.validateRanges(params);
     let http = this.createAxiosInstance();
 
-    let attributes: Record<string, any> = {
+    let attributes: Record<string, unknown> = {
       search_terms: params.searchTerms
     };
 
@@ -207,10 +298,11 @@ export class Client {
       { params: queryParams }
     );
 
-    return response.data;
+    return responseRecord(response.data, 'API response');
   }
 
-  async historicalSearchVolume(params: HistoricalSearchVolumeParams): Promise<any> {
+  async historicalSearchVolume(params: HistoricalSearchVolumeParams): Promise<ApiRecord> {
+    this.validateDateRange(params.startDate, params.endDate);
     let http = this.createAxiosInstance();
 
     let response = await http.get('/api/keywords/historical_search_volume', {
@@ -222,13 +314,14 @@ export class Client {
       }
     });
 
-    return response.data;
+    return responseRecord(response.data, 'API response');
   }
 
-  async productDatabase(params: ProductDatabaseParams): Promise<any> {
+  async productDatabase(params: ProductDatabaseParams): Promise<ApiRecord> {
+    this.validateRanges(params);
     let http = this.createAxiosInstance();
 
-    let attributes: Record<string, any> = {};
+    let attributes: Record<string, unknown> = {};
 
     if (params.includeKeywords?.length) attributes.include_keywords = params.includeKeywords;
     if (params.excludeKeywords?.length) attributes.exclude_keywords = params.excludeKeywords;
@@ -257,6 +350,23 @@ export class Client {
     if (params.maxWeight !== undefined) attributes.max_weight = params.maxWeight;
     if (params.minSellers !== undefined) attributes.min_sellers = params.minSellers;
     if (params.maxSellers !== undefined) attributes.max_sellers = params.maxSellers;
+    if (params.minUpdatedAt !== undefined) {
+      this.validateDate(params.minUpdatedAt, 'minUpdatedAt');
+      attributes.min_updated_at = params.minUpdatedAt;
+    }
+    if (params.maxUpdatedAt !== undefined) {
+      this.validateDate(params.maxUpdatedAt, 'maxUpdatedAt');
+      attributes.max_updated_at = params.maxUpdatedAt;
+    }
+    if (
+      params.minUpdatedAt &&
+      params.maxUpdatedAt &&
+      params.minUpdatedAt > params.maxUpdatedAt
+    ) {
+      throw createApiServiceError('minUpdatedAt must not be after maxUpdatedAt.', {
+        reason: 'invalid_input'
+      });
+    }
     if (params.minLqs !== undefined) attributes.min_lqs = params.minLqs;
     if (params.maxLqs !== undefined) attributes.max_lqs = params.maxLqs;
 
@@ -277,10 +387,11 @@ export class Client {
       { params: queryParams }
     );
 
-    return response.data;
+    return responseRecord(response.data, 'API response');
   }
 
-  async salesEstimates(params: SalesEstimatesParams): Promise<any> {
+  async salesEstimates(params: SalesEstimatesParams): Promise<ApiRecord> {
+    this.validateDateRange(params.startDate, params.endDate, true);
     let http = this.createAxiosInstance();
 
     let response = await http.get('/api/sales_estimates_query', {
@@ -292,10 +403,10 @@ export class Client {
       }
     });
 
-    return response.data;
+    return responseRecord(response.data, 'API response');
   }
 
-  async shareOfVoice(params: ShareOfVoiceParams): Promise<any> {
+  async shareOfVoice(params: ShareOfVoiceParams): Promise<ApiRecord> {
     let http = this.createAxiosInstance();
 
     let response = await http.get('/api/share_of_voice', {
@@ -305,6 +416,6 @@ export class Client {
       }
     });
 
-    return response.data;
+    return responseRecord(response.data, 'API response');
   }
 }

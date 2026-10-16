@@ -5,10 +5,20 @@ import {
   getSummary,
   getTranscript,
   listMeetings,
+  listMeetingTypes,
+  listTeamMembers,
   listTeams
 } from './tools';
 export let provider = Slate.create({
   spec,
-  tools: [listMeetings, getMeetingDetails, getTranscript, getSummary, listTeams],
+  tools: [
+    listMeetings,
+    getMeetingDetails,
+    getTranscript,
+    getSummary,
+    listTeams,
+    listMeetingTypes,
+    listTeamMembers
+  ],
   triggers: []
 });

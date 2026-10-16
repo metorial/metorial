@@ -1,9 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { bulkLookupIps, checkThreat, lookupAsn, lookupIp } from './tools';
+import { bulkLookupIps, checkThreat, getUsage, lookupAsn, lookupIp } from './tools';
 
 export let provider = Slate.create({
   spec,
-  tools: [lookupIp, bulkLookupIps, lookupAsn, checkThreat],
+  tools: [lookupIp, bulkLookupIps, lookupAsn, checkThreat, getUsage],
   triggers: []
 });

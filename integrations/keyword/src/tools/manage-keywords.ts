@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getCollection, nullableNumber, requireOperationResponse } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageKeywords = SlateTool.create(spec, {
@@ -9,8 +10,8 @@ export let manageKeywords = SlateTool.create(spec, {
   description: `Add new keywords to track or delete existing keywords from a project. When adding, configure the domain, search region, language, device type, and tags for each keyword. Use this for bulk keyword management within a project.`,
   instructions: [
     'When adding keywords, each keyword needs at minimum a keyword text and a URL (domain) to track.',
-    'Region defaults to "google.com" and language to "en" if not specified.',
-    'Device defaults to "desktop" if not specified.'
+    'Every keyword also requires region and language; provide both explicitly.',
+    'Omitted optional tracking settings use the provider defaults.'
   ],
   tags: {
     destructive: true
@@ -39,7 +40,9 @@ export let manageKeywords = SlateTool.create(spec, {
             urlTrackingMethod: z
               .string()
               .optional()
-              .describe('URL tracking method (e.g., "exact", "domain")'),
+              .describe(
+                'URL tracking method: broad or exact. The legacy domain alias means broad.'
+              ),
             ignoreSubDomains: z
               .boolean()
               .optional()
@@ -67,7 +70,7 @@ export let manageKeywords = SlateTool.create(spec, {
 
     if (action === 'add') {
       if (!ctx.input.keywords || ctx.input.keywords.length === 0) {
-        throw new Error('Keywords array is required for the "add" action');
+        throw createApiServiceError('Keywords array is required for the "add" action');
       }
 
       let result = await client.addKeywords({
@@ -75,9 +78,8 @@ export let manageKeywords = SlateTool.create(spec, {
         keywords: ctx.input.keywords
       });
 
-      let addedCount = Array.isArray(result)
-        ? result.length
-        : (result?.keywords?.length ?? ctx.input.keywords.length);
+      getCollection(result, 'keywords');
+      let addedCount = nullableNumber(result?.meta?.counts?.added, 'added keyword count');
 
       return {
         output: {
@@ -85,13 +87,16 @@ export let manageKeywords = SlateTool.create(spec, {
           addedCount,
           rawResponse: result
         },
-        message: `Added **${addedCount}** keyword(s) to project **${projectName}**.`
+        message:
+          addedCount === null
+            ? `Keyword creation request completed for project **${projectName}**.`
+            : `Added **${addedCount}** keyword(s) to project **${projectName}**.`
       };
     }
 
     if (action === 'delete') {
       if (!ctx.input.keywordId) {
-        throw new Error('keywordId is required for the "delete" action');
+        throw createApiServiceError('keywordId is required for the "delete" action');
       }
 
       let result = await client.deleteKeyword({
@@ -99,6 +104,7 @@ export let manageKeywords = SlateTool.create(spec, {
         keywordId: ctx.input.keywordId
       });
 
+      requireOperationResponse(result, 'keyword deletion');
       return {
         output: {
           success: true,
@@ -109,6 +115,6 @@ export let manageKeywords = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +20,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Enter a Daffy API key from your account settings.');
+      }
       return {
         output: {
           token: ctx.input.token
@@ -27,15 +31,8 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://public.daffy.org/v1',
-        headers: {
-          'X-Api-Key': ctx.output.token
-        }
-      });
-
-      let response = await client.get('/users/me');
-      let user = response.data;
+      let client = new Client({ token: ctx.output.token });
+      let user = await client.getMe();
 
       return {
         profile: {

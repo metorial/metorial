@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { buildClientConfig, flattenSingleResource } from '../lib/helpers';
@@ -15,7 +15,9 @@ export let sendEmail = SlateTool.create(spec, {
   .input(
     z.object({
       orderId: z.string().describe('Order ID to send the email for'),
-      emailTemplateId: z.string().describe('Email template ID to use'),
+      emailTemplateId: z
+        .string()
+        .describe('Email template ID to use. Call list_email_templates to discover IDs.'),
       recipientEmail: z
         .string()
         .optional()
@@ -36,7 +38,22 @@ export let sendEmail = SlateTool.create(spec, {
       email_template_id: ctx.input.emailTemplateId
     };
 
-    if (ctx.input.recipientEmail) attributes.recipient = ctx.input.recipientEmail;
+    let order = flattenSingleResource(await client.getOrder(ctx.input.orderId));
+    if (order.customer_id) attributes.customer_id = order.customer_id;
+    if (ctx.input.recipientEmail !== undefined) {
+      attributes.recipients = ctx.input.recipientEmail;
+    } else {
+      if (!order.customer_id)
+        throw createApiServiceError(
+          'Provide recipientEmail because the order has no customer.'
+        );
+      let customer = flattenSingleResource(await client.getCustomer(order.customer_id));
+      if (!customer.email)
+        throw createApiServiceError(
+          'Provide recipientEmail because the customer has no email address.'
+        );
+      attributes.recipients = customer.email;
+    }
     if (ctx.input.documentIds) attributes.document_ids = ctx.input.documentIds;
 
     let response = await client.createEmail(attributes);
@@ -44,7 +61,7 @@ export let sendEmail = SlateTool.create(spec, {
 
     return {
       output: { email },
-      message: `Email sent for order ${ctx.input.orderId}.`
+      message: `Created email for order ${ctx.input.orderId} (sent: ${email?.sent === true}, has error: ${email?.has_error === true}).`
     };
   })
   .build();

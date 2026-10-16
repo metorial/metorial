@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
 import { spec } from '../spec';
 
 let activityLogSchema = z.object({
+  raw: z.unknown().optional().describe('Original metadata returned by Doppler'),
   logId: z.string().optional().describe('Activity log identifier'),
   text: z.string().optional().describe('Plain text description of the activity'),
   html: z.string().optional().describe('HTML-formatted activity description'),
@@ -49,6 +50,7 @@ export let activityLogs = SlateTool.create(spec, {
     let client = new DopplerClient({ token: ctx.auth.token });
 
     let mapLog = (l: any) => ({
+      raw: l,
       logId: l.id,
       text: l.text,
       html: l.html,
@@ -81,7 +83,7 @@ export let activityLogs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.logId) throw new Error('logId is required for "get" action');
+      if (!ctx.input.logId) throw createApiServiceError('logId is required for "get" action');
 
       let log = await client.getActivityLog(ctx.input.logId);
 
@@ -91,6 +93,6 @@ export let activityLogs = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

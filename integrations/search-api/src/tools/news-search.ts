@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let newsArticleSchema = z.object({
@@ -50,6 +50,7 @@ export let newsSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       totalResults: z.number().optional().describe('Total number of results'),
       articles: z.array(newsArticleSchema).describe('News articles'),
@@ -74,7 +75,7 @@ export let newsSearch = SlateTool.create(spec, {
       time_period_max: ctx.input.timePeriodMax
     });
 
-    let articles = (data.organic_results || []).map((r: any) => ({
+    let articles = resultArray(data.organic_results, 'organic_results').map((r: any) => ({
       position: r.position,
       title: r.title,
       link: r.link,
@@ -86,13 +87,14 @@ export let newsSearch = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         totalResults: data.search_information?.total_results,
         articles,
         currentPage: data.pagination?.current,
         nextPageLink: data.pagination?.next
       },
-      message: `Found ${articles.length} news article${articles.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
+      message: `Found on this page: ${articles.length} news article${articles.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
     };
   })
   .build();

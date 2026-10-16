@@ -1,6 +1,8 @@
-# <img src="logo.png" height="20"> Tpscheck
+# <img src="logo.svg" height="20" alt="TPSCheck"> TPSCheck
 
-Verify UK phone numbers against the Telephone Preference Service (TPS) and Corporate Telephone Preference Service (CTPS) registers. Check single or bulk batches of up to 100 numbers for TPS/CTPS registration status, line type, carrier, location, and reachability. Retrieve compliance risk scores (0–100) for each number. Monitor numbers with automated 28-day re-checks to maintain ICO compliance. Access audit logs and exportable compliance reports. Check API credit usage and remaining allowances.
+Verify UK phone numbers against the Telephone Preference Service (TPS) and Corporate Telephone Preference Service (CTPS) registers. Check a single number or a batch of up to 100 numbers, retrieve phone intelligence and available risk scores, inspect API credit usage, and check API health.
+
+See the [integration specification](docs/SPEC.md) for supported tools and the [official API reference](https://api.tpscheck.uk/documentation/) for provider details.
 
 ## License
 

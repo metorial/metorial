@@ -58,10 +58,10 @@ export let getWeather = SlateTool.create(spec, {
 
     let units = ctx.config.units === 'si' ? 'si' : undefined;
     let result = await client.getWeatherLatest(ctx.input.lat, ctx.input.lng, units);
-    let weather = result.data || {};
+    let weather = Array.isArray(result.data) ? (result.data[0] ?? {}) : (result.data ?? {});
 
     let summary = weather.summary
-      ? `Current weather at (${ctx.input.lat}, ${ctx.input.lng}): **${weather.summary}**, ${weather.temperature}°, humidity ${Math.round((weather.humidity || 0) * 100)}%.`
+      ? `Current weather at (${ctx.input.lat}, ${ctx.input.lng}): **${weather.summary}**.`
       : `Retrieved weather data for (${ctx.input.lat}, ${ctx.input.lng}).`;
 
     return {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AblyControlClient } from '../lib/control-client';
+import { accountIdInput, appIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageApps = SlateTool.create(spec, {
@@ -10,7 +11,7 @@ export let manageApps = SlateTool.create(spec, {
 Supports listing all apps in an account, creating new apps, updating app settings, and deleting apps.`,
   instructions: [
     'Requires Control API Token authentication.',
-    'Account ID is required for listing and creating apps (from config or input).',
+    'Call who_am_i to discover the account ID, then use list to discover app IDs. Saved config IDs remain fallbacks.',
     'App ID is required for update and delete operations.'
   ],
   tags: {
@@ -21,16 +22,8 @@ Supports listing all apps in an account, creating new apps, updating app setting
   .input(
     z.object({
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Operation to perform'),
-      accountId: z
-        .string()
-        .optional()
-        .describe(
-          'Ably Account ID. Required for list and create. Overrides config value if provided.'
-        ),
-      appId: z
-        .string()
-        .optional()
-        .describe('App ID. Required for update and delete operations.'),
+      accountId: accountIdInput,
+      appId: appIdInput,
       name: z
         .string()
         .optional()
@@ -47,12 +40,14 @@ Supports listing all apps in an account, creating new apps, updating app setting
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AblyControlClient(ctx.auth.token);
+    let client = new AblyControlClient(ctx.auth.token, ctx.auth.authType);
     let accountId = ctx.input.accountId || ctx.config.accountId;
 
     if (ctx.input.action === 'list') {
       if (!accountId)
-        throw new Error('accountId is required for listing apps. Set it in config or input.');
+        throw createApiServiceError(
+          'accountId is required for listing apps. Call who_am_i to discover it, then supply accountId.'
+        );
       let apps = await client.listApps(accountId);
       return {
         output: { apps },
@@ -62,8 +57,11 @@ Supports listing all apps in an account, creating new apps, updating app setting
 
     if (ctx.input.action === 'create') {
       if (!accountId)
-        throw new Error('accountId is required for creating apps. Set it in config or input.');
-      if (!ctx.input.name) throw new Error('name is required for creating an app.');
+        throw createApiServiceError(
+          'accountId is required for creating apps. Call who_am_i to discover it, then supply accountId.'
+        );
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for creating an app.');
       let app = await client.createApp(accountId, {
         name: ctx.input.name,
         status: ctx.input.status,
@@ -77,7 +75,7 @@ Supports listing all apps in an account, creating new apps, updating app setting
 
     if (ctx.input.action === 'update') {
       let appId = ctx.input.appId || ctx.config.appId;
-      if (!appId) throw new Error('appId is required for updating an app.');
+      if (!appId) throw createApiServiceError('appId is required for updating an app.');
       let app = await client.updateApp(appId, {
         name: ctx.input.name,
         status: ctx.input.status,
@@ -91,7 +89,7 @@ Supports listing all apps in an account, creating new apps, updating app setting
 
     if (ctx.input.action === 'delete') {
       let appId = ctx.input.appId || ctx.config.appId;
-      if (!appId) throw new Error('appId is required for deleting an app.');
+      if (!appId) throw createApiServiceError('appId is required for deleting an app.');
       await client.deleteApp(appId);
       return {
         output: { deleted: true },
@@ -99,6 +97,6 @@ Supports listing all apps in an account, creating new apps, updating app setting
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

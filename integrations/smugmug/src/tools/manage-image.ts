@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -74,23 +74,23 @@ export let getImageTool = SlateTool.create(spec, {
 
     return {
       output: {
-        imageKey: image?.ImageKey || ctx.input.imageKey,
-        title: image?.Title || undefined,
-        caption: image?.Caption || undefined,
-        keywords: image?.Keywords || undefined,
-        fileName: image?.FileName || undefined,
-        format: image?.Format || undefined,
-        webUri: image?.WebUri || undefined,
-        dateUploaded: image?.Date || undefined,
-        lastUpdated: image?.LastUpdated || undefined,
-        latitude: image?.Latitude || undefined,
-        longitude: image?.Longitude || undefined,
-        altitude: image?.Altitude || undefined,
-        hidden: image?.Hidden || undefined,
-        originalWidth: image?.OriginalWidth || undefined,
-        originalHeight: image?.OriginalHeight || undefined,
-        originalSize: image?.OriginalSize || undefined,
-        archivedUri: image?.ArchivedUri || undefined,
+        imageKey: image?.ImageKey,
+        title: image?.Title ?? undefined,
+        caption: image?.Caption ?? undefined,
+        keywords: image?.Keywords ?? undefined,
+        fileName: image?.FileName ?? undefined,
+        format: image?.Format ?? undefined,
+        webUri: image?.WebUri ?? undefined,
+        dateUploaded: image?.Date ?? undefined,
+        lastUpdated: image?.LastUpdated ?? undefined,
+        latitude: image?.Latitude ?? undefined,
+        longitude: image?.Longitude ?? undefined,
+        altitude: image?.Altitude ?? undefined,
+        hidden: image?.Hidden ?? undefined,
+        originalWidth: image?.OriginalWidth ?? undefined,
+        originalHeight: image?.OriginalHeight ?? undefined,
+        originalSize: image?.OriginalSize ?? undefined,
+        archivedUri: image?.ArchivedUri ?? undefined,
         metadata,
         sizes
       },
@@ -149,11 +149,11 @@ export let updateImageTool = SlateTool.create(spec, {
 
     return {
       output: {
-        imageKey: image?.ImageKey || ctx.input.imageKey,
-        title: image?.Title || undefined,
-        caption: image?.Caption || undefined,
-        keywords: image?.Keywords || undefined,
-        lastUpdated: image?.LastUpdated || undefined
+        imageKey: image?.ImageKey,
+        title: image?.Title ?? undefined,
+        caption: image?.Caption ?? undefined,
+        keywords: image?.Keywords ?? undefined,
+        lastUpdated: image?.LastUpdated ?? undefined
       },
       message: `Updated image **${image?.Title || ctx.input.imageKey}**`
     };
@@ -204,8 +204,8 @@ export let uploadImageTool = SlateTool.create(spec, {
   key: 'upload_image_from_url',
   description: `Upload an image or video to a SmugMug album from an external URL. The file is downloaded from the URL and uploaded to the specified album. Optionally set title, caption, keywords, and other metadata during upload.`,
   constraints: [
-    'The source URL must be publicly accessible.',
-    'Supported formats include JPEG, PNG, GIF, TIFF, BMP, and common video formats.'
+    'The source URL must be directly accessible over HTTP or HTTPS without redirects or embedded credentials.',
+    'The file format and size must be supported by the destination SmugMug account.'
   ],
   tags: {
     destructive: false
@@ -250,10 +250,10 @@ export let uploadImageTool = SlateTool.create(spec, {
 
     return {
       output: {
-        imageUri: result?.Image?.ImageUri || undefined,
-        albumImageUri: result?.Image?.AlbumImageUri || undefined,
-        imageUrl: result?.Image?.URL || undefined,
-        status: result?.stat || 'unknown'
+        imageUri: result?.Image?.ImageUri ?? undefined,
+        albumImageUri: result?.Image?.AlbumImageUri ?? undefined,
+        imageUrl: result?.Image?.URL ?? undefined,
+        status: result.stat
       },
       message: `Uploaded image to album${ctx.input.title ? ` with title **${ctx.input.title}**` : ''}`
     };
@@ -300,6 +300,12 @@ export let moveImagesTool = SlateTool.create(spec, {
       consumerKey: ctx.auth.consumerKey,
       consumerSecret: ctx.auth.consumerSecret
     });
+
+    if (!ctx.input.imageUris.length) {
+      throw createApiServiceError('Provide at least one image URI to move or collect.', {
+        reason: 'missing_images'
+      });
+    }
 
     if (ctx.input.action === 'collect') {
       for (let imageUri of ctx.input.imageUris) {

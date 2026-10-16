@@ -1,10 +1,11 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      sdkKey: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -12,6 +13,12 @@ export let auth = SlateAuth.create()
     name: 'Secret API Key',
     key: 'secret_api_key',
     inputSchema: z.object({
+      sdkKey: z
+        .string()
+        .optional()
+        .describe(
+          'Optional SDK/public key (pk_test_ or pk_live_) for direct card enrollment. Use the same environment as the secret key.'
+        ),
       token: z
         .string()
         .describe(
@@ -19,9 +26,14 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('A Fidel API secret key is required.');
+      if (ctx.input.sdkKey !== undefined && !ctx.input.sdkKey.trim())
+        throw createApiServiceError('Provide a non-empty SDK key or omit it.');
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          sdkKey: ctx.input.sdkKey
         }
       };
     }

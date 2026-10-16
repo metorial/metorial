@@ -38,7 +38,8 @@ Optionally specify a template ID to open the editor directly to that template, o
       editorURL: z.string().describe('URL to log the user into the Adrapid editor'),
       embeddedEditorURL: z
         .string()
-        .describe('URL to embed the Adrapid editor as an iframe in a host application')
+        .describe('URL to embed the Adrapid editor as an iframe in a host application'),
+      raw: z.record(z.string(), z.any()).describe('Complete provider access response')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,7 +53,8 @@ Optionally specify a template ID to open the editor directly to that template, o
     return {
       output: {
         editorURL: access.editorURL,
-        embeddedEditorURL: access.embeddedEditorURL
+        embeddedEditorURL: access.embeddedEditorURL,
+        raw: access.raw
       },
       message: `Access URLs generated for user **${ctx.input.userId}**.`
     };

@@ -27,7 +27,8 @@ export let verifySecurityCodeTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      verified: z.boolean().describe('Whether the security code is valid')
+      verified: z.boolean().describe('Whether the security code is valid'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -43,7 +44,8 @@ export let verifySecurityCodeTool = SlateTool.create(spec, {
 
     return {
       output: {
-        verified: result.verified ?? false
+        raw: result.raw,
+        verified: result.verified
       },
       message: result.verified
         ? `✅ Security code verified successfully.`

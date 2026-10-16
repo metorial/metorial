@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -58,6 +58,14 @@ export let manageDestinations = SlateTool.create(spec, {
           'S3 path prefix. Supports tokens: %COLLECTION_ID%, %COLLECTION_NAME%, %RESULT_SET_ID%, %DATE%.'
         ),
 
+      s3Endpoint: z
+        .string()
+        .optional()
+        .describe(
+          'S3-compatible storage endpoint, required when storageType is s3_compatible.'
+        ),
+      s3Region: z.string().optional().describe('Region for S3-compatible storage.'),
+
       // GCS
       gcsAccessKey: z.string().optional().describe('GCS HMAC access key.'),
       gcsSecretKey: z.string().optional().describe('GCS HMAC secret key.'),
@@ -87,6 +95,30 @@ export let manageDestinations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (['update', 'delete'].includes(ctx.input.action) && !ctx.input.destinationId?.trim()) {
+      throw createApiServiceError(
+        'Provide destinationId. Use manage_destinations with action list to find destinations.'
+      );
+    }
+    if (ctx.input.action === 'create') {
+      if (!ctx.input.name?.trim() || !ctx.input.storageType) {
+        throw createApiServiceError('Provide name and storageType to create a destination.');
+      }
+      let requiredCredentials = {
+        s3: ['s3AccessKeyId', 's3SecretAccessKey', 's3BucketName'],
+        s3_compatible: ['s3AccessKeyId', 's3SecretAccessKey', 's3BucketName', 's3Endpoint'],
+        gcs: ['gcsAccessKey', 'gcsSecretKey', 'gcsBucketName'],
+        azure: ['azureAccountName', 'azureAccountKey', 'azureContainerName'],
+        oss: ['ossAccessKey', 'ossSecretKey', 'ossBucketName', 'ossRegionId']
+      } as const;
+      for (let field of requiredCredentials[ctx.input.storageType]) {
+        if (!ctx.input[field]?.trim()) {
+          throw createApiServiceError(
+            `Provide ${field} for a ${ctx.input.storageType} destination.`
+          );
+        }
+      }
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
@@ -112,33 +144,40 @@ export let manageDestinations = SlateTool.create(spec, {
       let body: Record<string, any> = {};
       if (ctx.input.name) body.name = ctx.input.name;
       if (ctx.input.enabled !== undefined) body.enabled = ctx.input.enabled;
-      if (ctx.input.storageType) body.type = ctx.input.storageType;
+      if (ctx.input.storageType)
+        body.type =
+          ctx.input.storageType === 's3_compatible' ? 's3compatible' : ctx.input.storageType;
 
       // S3
       if (ctx.input.s3AccessKeyId) body.s3_access_key_id = ctx.input.s3AccessKeyId;
       if (ctx.input.s3SecretAccessKey) body.s3_secret_access_key = ctx.input.s3SecretAccessKey;
       if (ctx.input.s3BucketName) body.s3_bucket_name = ctx.input.s3BucketName;
-      if (ctx.input.s3PathPrefix) body.s3_path_prefix = ctx.input.s3PathPrefix;
+      if (ctx.input.s3PathPrefix !== undefined) body.s3_path_prefix = ctx.input.s3PathPrefix;
+      if (ctx.input.s3Endpoint) body.s3_endpoint = ctx.input.s3Endpoint;
+      if (ctx.input.s3Region) body.s3_region = ctx.input.s3Region;
 
       // GCS
       if (ctx.input.gcsAccessKey) body.gcs_access_key = ctx.input.gcsAccessKey;
       if (ctx.input.gcsSecretKey) body.gcs_secret_key = ctx.input.gcsSecretKey;
       if (ctx.input.gcsBucketName) body.gcs_bucket_name = ctx.input.gcsBucketName;
-      if (ctx.input.gcsPathPrefix) body.gcs_path_prefix = ctx.input.gcsPathPrefix;
+      if (ctx.input.gcsPathPrefix !== undefined)
+        body.gcs_path_prefix = ctx.input.gcsPathPrefix;
 
       // Azure
       if (ctx.input.azureAccountName) body.azure_account_name = ctx.input.azureAccountName;
       if (ctx.input.azureAccountKey) body.azure_account_key = ctx.input.azureAccountKey;
       if (ctx.input.azureContainerName)
         body.azure_container_name = ctx.input.azureContainerName;
-      if (ctx.input.azurePathPrefix) body.azure_path_prefix = ctx.input.azurePathPrefix;
+      if (ctx.input.azurePathPrefix !== undefined)
+        body.azure_path_prefix = ctx.input.azurePathPrefix;
 
       // Alibaba OSS
       if (ctx.input.ossAccessKey) body.oss_access_key = ctx.input.ossAccessKey;
       if (ctx.input.ossSecretKey) body.oss_secret_key = ctx.input.ossSecretKey;
       if (ctx.input.ossBucketName) body.oss_bucket_name = ctx.input.ossBucketName;
       if (ctx.input.ossRegionId) body.oss_region_id = ctx.input.ossRegionId;
-      if (ctx.input.ossPathPrefix) body.oss_path_prefix = ctx.input.ossPathPrefix;
+      if (ctx.input.ossPathPrefix !== undefined)
+        body.oss_path_prefix = ctx.input.ossPathPrefix;
 
       let data = await client.createDestination(body);
       return {
@@ -158,24 +197,29 @@ export let manageDestinations = SlateTool.create(spec, {
       if (ctx.input.s3AccessKeyId) body.s3_access_key_id = ctx.input.s3AccessKeyId;
       if (ctx.input.s3SecretAccessKey) body.s3_secret_access_key = ctx.input.s3SecretAccessKey;
       if (ctx.input.s3BucketName) body.s3_bucket_name = ctx.input.s3BucketName;
-      if (ctx.input.s3PathPrefix) body.s3_path_prefix = ctx.input.s3PathPrefix;
+      if (ctx.input.s3PathPrefix !== undefined) body.s3_path_prefix = ctx.input.s3PathPrefix;
+      if (ctx.input.s3Endpoint) body.s3_endpoint = ctx.input.s3Endpoint;
+      if (ctx.input.s3Region) body.s3_region = ctx.input.s3Region;
 
       if (ctx.input.gcsAccessKey) body.gcs_access_key = ctx.input.gcsAccessKey;
       if (ctx.input.gcsSecretKey) body.gcs_secret_key = ctx.input.gcsSecretKey;
       if (ctx.input.gcsBucketName) body.gcs_bucket_name = ctx.input.gcsBucketName;
-      if (ctx.input.gcsPathPrefix) body.gcs_path_prefix = ctx.input.gcsPathPrefix;
+      if (ctx.input.gcsPathPrefix !== undefined)
+        body.gcs_path_prefix = ctx.input.gcsPathPrefix;
 
       if (ctx.input.azureAccountName) body.azure_account_name = ctx.input.azureAccountName;
       if (ctx.input.azureAccountKey) body.azure_account_key = ctx.input.azureAccountKey;
       if (ctx.input.azureContainerName)
         body.azure_container_name = ctx.input.azureContainerName;
-      if (ctx.input.azurePathPrefix) body.azure_path_prefix = ctx.input.azurePathPrefix;
+      if (ctx.input.azurePathPrefix !== undefined)
+        body.azure_path_prefix = ctx.input.azurePathPrefix;
 
       if (ctx.input.ossAccessKey) body.oss_access_key = ctx.input.ossAccessKey;
       if (ctx.input.ossSecretKey) body.oss_secret_key = ctx.input.ossSecretKey;
       if (ctx.input.ossBucketName) body.oss_bucket_name = ctx.input.ossBucketName;
       if (ctx.input.ossRegionId) body.oss_region_id = ctx.input.ossRegionId;
-      if (ctx.input.ossPathPrefix) body.oss_path_prefix = ctx.input.ossPathPrefix;
+      if (ctx.input.ossPathPrefix !== undefined)
+        body.oss_path_prefix = ctx.input.ossPathPrefix;
 
       let data = await client.updateDestination(ctx.input.destinationId!, body);
       return {

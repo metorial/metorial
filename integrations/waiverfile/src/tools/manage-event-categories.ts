@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaiverFileClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,7 +36,10 @@ export let manageEventCategories = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      categories: z.any().optional().describe('Array of event categories (for list action)'),
+      categories: z
+        .any()
+        .optional()
+        .describe('Complete event category response (for list action)'),
       category: z
         .any()
         .optional()
@@ -54,29 +57,30 @@ export let manageEventCategories = SlateTool.create(spec, {
 
     if (action === 'list') {
       let categories = await client.getEventCategories(ctx.input.includeDisabled);
-      let results = Array.isArray(categories) ? categories : [categories];
       return {
-        output: { categories: results },
-        message: `Retrieved **${results.length}** event category/categories.`
+        output: { categories },
+        message: 'Retrieved the event category response.'
       };
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Category name is required for create action.');
+      if (!ctx.input.name)
+        throw createApiServiceError('Category name is required for create action.');
       let category = await client.insertEventCategory({
         name: ctx.input.name,
         active: ctx.input.active ?? true
       });
       return {
         output: { category },
-        message: `Created event category **${ctx.input.name}**.`
+        message: 'Received the event category creation response.'
       };
     }
 
     if (action === 'update') {
       if (!ctx.input.eventCategoryId)
-        throw new Error('eventCategoryId is required for update action.');
-      if (!ctx.input.name) throw new Error('Category name is required for update action.');
+        throw createApiServiceError('eventCategoryId is required for update action.');
+      if (!ctx.input.name)
+        throw createApiServiceError('Category name is required for update action.');
       let category = await client.updateEventCategory({
         eventCategoryId: ctx.input.eventCategoryId,
         name: ctx.input.name,
@@ -84,20 +88,20 @@ export let manageEventCategories = SlateTool.create(spec, {
       });
       return {
         output: { category },
-        message: `Updated event category **${ctx.input.name}** (${ctx.input.eventCategoryId}).`
+        message: 'Received the event category update response.'
       };
     }
 
     if (action === 'delete') {
       if (!ctx.input.eventCategoryId)
-        throw new Error('eventCategoryId is required for delete action.');
+        throw createApiServiceError('eventCategoryId is required for delete action.');
       let result = await client.deleteEventCategory(ctx.input.eventCategoryId);
       return {
         output: { result },
-        message: `Deleted event category **${ctx.input.eventCategoryId}**.`
+        message: 'Received the event category deletion response.'
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

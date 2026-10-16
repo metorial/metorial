@@ -28,7 +28,7 @@ export let getCurrencies = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let currencies = await client.getCurrencies();
 
-    let mapped = (currencies || []).map((c: any) => ({
+    let mapped = currencies.map((c: any) => ({
       currencyCode: c.currency_code,
       unit: c.unit
     }));

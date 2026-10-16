@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord } from '../lib/response';
 import { spec } from '../spec';
 
 export let getKeywordMetrics = SlateTool.create(spec, {
@@ -35,6 +36,7 @@ export let getKeywordMetrics = SlateTool.create(spec, {
       timeframe: ctx.input.timeframe
     });
 
+    requireRecord(data, 'keyword metrics');
     return {
       output: {
         metrics: data

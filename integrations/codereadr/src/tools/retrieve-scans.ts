@@ -26,6 +26,26 @@ export let retrieveScans = SlateTool.create(spec, {
         .optional()
         .describe('Filter by device ID (comma-separated for multiple)'),
       scanId: z.string().optional().describe('Retrieve specific scan ID(s)'),
+      uploadId: z
+        .string()
+        .optional()
+        .describe(
+          'Upload ID(s), comma-separated. Call list_scan_uploads to discover uploads.'
+        ),
+      response: z.string().optional().describe('Exact scan response text to match'),
+      responseLike: z.string().optional().describe('Partial scan response text to match'),
+      showProperties: z
+        .boolean()
+        .optional()
+        .describe('Include scan properties in the response (provider default: false)'),
+      includeProperty: z
+        .string()
+        .optional()
+        .describe('Only include scans with these comma-separated property names'),
+      excludeProperty: z
+        .string()
+        .optional()
+        .describe('Exclude scans with any of these comma-separated property names'),
       status: z
         .enum(['1', '0', '-1'])
         .optional()
@@ -90,6 +110,12 @@ export let retrieveScans = SlateTool.create(spec, {
       userId: ctx.input.userId,
       deviceId: ctx.input.deviceId,
       scanId: ctx.input.scanId,
+      uploadId: ctx.input.uploadId,
+      response: ctx.input.response,
+      responseLike: ctx.input.responseLike,
+      showProperties: ctx.input.showProperties,
+      includeProperty: ctx.input.includeProperty,
+      excludeProperty: ctx.input.excludeProperty,
       status: ctx.input.status,
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate,

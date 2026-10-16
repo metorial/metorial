@@ -1,17 +1,62 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let api = createAxios({
-  baseURL: 'https://www.poof.io'
+  baseURL: 'https://www.poof.io',
+  timeout: 30000,
+  validateStatus: () => true
 });
 
 export class PoofClient {
   private headers: Record<string, string>;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a Poof API key.');
+    }
     this.headers = {
       'Content-Type': 'application/json',
       Authorization: config.token
     };
+  }
+
+  private async post(path: string, body: Record<string, unknown>) {
+    try {
+      let response = await api.post(path, body, { headers: this.headers });
+      let data: unknown = response.data;
+      let bodyFailure =
+        isApiErrorRecord(data) &&
+        (data.success === false ||
+          data.status === 'error' ||
+          data.status === 'failed' ||
+          (typeof data.status === 'string' && /^failure\b/i.test(data.status)) ||
+          (typeof data.status === 'number' && data.status >= 400) ||
+          (typeof data.error === 'string' && data.error.trim().length > 0) ||
+          (isApiErrorRecord(data.error) && Object.keys(data.error).length > 0));
+      if (response.status < 200 || response.status >= 300 || bodyFailure) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'Poof',
+            reason: 'poof_api_error',
+            operation: path,
+            detailKeys: ['message', 'detail', 'error', 'error_description', 'status'],
+            nestedKeys: ['errors', 'error']
+          }
+        );
+      }
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Poof',
+        reason: 'poof_api_error',
+        operation: path
+      });
+    }
   }
 
   // === Checkout & Payment Collection ===
@@ -44,8 +89,7 @@ export class PoofClient {
     if (params.defaultValues) body.default = params.defaultValues;
     if (params.metadata) body.metadata = params.metadata;
 
-    let response = await api.post('/api/v1/checkout', body, { headers: this.headers });
-    return response.data;
+    return this.post('/api/v1/checkout', body);
   }
 
   // === Crypto Invoices ===
@@ -56,17 +100,12 @@ export class PoofClient {
     currency: string;
     redirect: string;
   }) {
-    let response = await api.post(
-      '/api/v1/create_invoice',
-      {
-        amount: params.amount,
-        crypto: params.crypto,
-        currency: params.currency,
-        redirect: params.redirect
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/create_invoice', {
+      amount: params.amount,
+      crypto: params.crypto,
+      currency: params.currency,
+      redirect: params.redirect
+    });
   }
 
   async createPaymentLink(params: {
@@ -80,8 +119,7 @@ export class PoofClient {
     };
     if (params.metadata) body.metadata = params.metadata;
 
-    let response = await api.post('/api/v2/create_invoice', body, { headers: this.headers });
-    return response.data;
+    return this.post('/api/v2/create_invoice', body);
   }
 
   // === Deposit Addresses / Charges ===
@@ -97,60 +135,39 @@ export class PoofClient {
     };
     if (params.metadata) body.metadata = params.metadata;
 
-    let response = await api.post('/api/v2/create_charge', body, { headers: this.headers });
-    return response.data;
+    return this.post('/api/v2/create_charge', body);
   }
 
   async createCryptoCharge(params: { currency: string; amount: number; crypto: string }) {
-    let response = await api.post(
-      '/api/v1/create_charge',
-      {
-        currency: params.currency,
-        amount: params.amount,
-        crypto: params.crypto
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/create_charge', {
+      currency: params.currency,
+      amount: params.amount,
+      crypto: params.crypto
+    });
   }
 
   // === Wallet Management ===
 
   async createWallet(params: { currency: string }) {
-    let response = await api.post(
-      '/api/v2/create_wallet',
-      {
-        currency: params.currency
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v2/create_wallet', {
+      currency: params.currency
+    });
   }
 
   async getBalance(params: { crypto: string }) {
-    let response = await api.post(
-      '/api/v1/balance',
-      {
-        crypto: params.crypto
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/balance', {
+      crypto: params.crypto
+    });
   }
 
   // === Payouts ===
 
   async sendPayout(params: { amount: number; crypto: string; address: string }) {
-    let response = await api.post(
-      '/api/v2/payouts',
-      {
-        amount: params.amount,
-        crypto: params.crypto,
-        address: params.address
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v2/payouts', {
+      amount: params.amount,
+      crypto: params.crypto,
+      address: params.address
+    });
   }
 
   // === Fiat Payments ===
@@ -162,18 +179,13 @@ export class PoofClient {
     redirectUrl: string;
     successUrl: string;
   }) {
-    let response = await api.post(
-      '/api/v1/create_fiat_invoice',
-      {
-        amount: params.amount,
-        payment: params.payment,
-        currency: params.currency,
-        redirect_url: params.redirectUrl,
-        success_url: params.successUrl
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/create_fiat_invoice', {
+      amount: params.amount,
+      payment: params.payment,
+      currency: params.currency,
+      redirect_url: params.redirectUrl,
+      success_url: params.successUrl
+    });
   }
 
   async createFiatCharge(params: {
@@ -183,115 +195,94 @@ export class PoofClient {
     redirectUrl: string;
     successUrl: string;
   }) {
-    let response = await api.post(
-      '/api/v1/create_fiat_charge',
-      {
-        amount: params.amount,
-        payment: params.payment,
-        currency: params.currency,
-        redirect_url: params.redirectUrl,
-        success_url: params.successUrl
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/create_fiat_charge', {
+      amount: params.amount,
+      payment: params.payment,
+      currency: params.currency,
+      redirect_url: params.redirectUrl,
+      success_url: params.successUrl
+    });
   }
 
   // === Transactions ===
 
   async getTransaction(params: { transactionId: string }) {
-    let response = await api.post(
-      '/api/v1/transaction',
-      {
-        transaction: params.transactionId
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/transaction', {
+      transaction: params.transactionId
+    });
   }
 
   async listTransactions() {
-    let response = await api.post('/api/v1/fetch_transactions', {}, { headers: this.headers });
-    return response.data;
+    return this.post('/api/v1/fetch_transactions', {});
   }
 
   async queryTransactions(params: { filter: string; search: string }) {
-    let response = await api.post(
-      '/api/v2/transaction_query',
-      {
-        filter: params.filter,
-        search: params.search
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v2/transaction_query', {
+      filter: params.filter,
+      search: params.search
+    });
   }
 
   // === Products ===
 
   async getProduct(params: { productId: string }) {
-    let response = await api.post(
-      '/api/v2/fetch_product',
-      {
-        product_id: params.productId
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v2/fetch_product', {
+      product_id: params.productId
+    });
   }
 
   // === Webhooks ===
 
   async createWebhook(params: { url: string }) {
-    let response = await api.post(
-      '/api/v1/create_webhook',
-      {
-        url: params.url
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/create_webhook', {
+      url: params.url
+    });
   }
 
   // === Crypto Rates & Pricing ===
 
   async getCryptoRates(params: { base: string }) {
-    let response = await api.post(
-      '/api/v1/fetch_crypto_rates',
-      {
-        base: params.base
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v1/fetch_crypto_rates', {
+      base: params.base
+    });
   }
 
   async getPrice(params: { crypto: string }) {
-    let response = await api.post(
-      '/api/v2/price',
-      {
-        crypto: params.crypto
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v2/price', {
+      crypto: params.crypto
+    });
   }
 
   async getGasPrice(params: { crypto: string }) {
-    let response = await api.post(
-      '/api/v2/gas_price',
-      {
-        crypto: params.crypto
-      },
-      { headers: this.headers }
-    );
-    return response.data;
+    return this.post('/api/v2/gas_price', {
+      crypto: params.crypto
+    });
   }
 
   // === ERC-20 Contracts ===
 
   async getContractList() {
-    let response = await api.post('/api/v2/contract_list', {}, { headers: this.headers });
-    return response.data;
+    return this.post('/api/v2/contract_list', {});
   }
 }
+
+export let getPoofPaymentUrl = (result: unknown, keys: string[]) => {
+  let candidates =
+    typeof result === 'string'
+      ? [result]
+      : isApiErrorRecord(result)
+        ? keys.map(key => result[key])
+        : [];
+  for (let candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    try {
+      let url = new URL(candidate);
+      if (url.protocol === 'https:' || url.protocol === 'http:') return candidate;
+    } catch {
+      // Try other existing response aliases before reporting an invalid payment URL.
+    }
+  }
+  throw createApiServiceError('Poof did not return a valid payment URL.', {
+    reason: 'poof_invalid_response'
+  });
+};

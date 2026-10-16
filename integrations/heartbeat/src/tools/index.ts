@@ -1,3 +1,6 @@
+export * from './community-content';
+export * from './community-groups';
+export * from './community-members';
 export * from './create-channel';
 export * from './create-comment';
 export * from './create-event';

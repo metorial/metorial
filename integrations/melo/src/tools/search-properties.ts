@@ -240,6 +240,16 @@ Results include price, location, photos, energy ratings, contact info, and nearb
         .boolean()
         .optional()
         .describe('Only include properties with virtual tours'),
+      withCoherentPrice: z
+        .boolean()
+        .optional()
+        .describe(
+          'True selects coherent prices; false selects incoherent prices. Both include unassessed prices.'
+        ),
+      energyCategories: z
+        .array(z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G']))
+        .optional()
+        .describe('Filter by energy efficiency categories'),
       expressions: z
         .array(z.string())
         .optional()
@@ -252,6 +262,14 @@ Results include price, location, photos, energy ratings, contact info, and nearb
         .string()
         .optional()
         .describe('Only properties created before this date (ISO 8601)'),
+      fromUpdatedAt: z
+        .string()
+        .optional()
+        .describe('Only properties updated on or after this date (ISO 8601)'),
+      toUpdatedAt: z
+        .string()
+        .optional()
+        .describe('Only properties updated on or before this date (ISO 8601)'),
       expired: z.boolean().optional().describe('Filter by expired status. null returns all.'),
       sortBy: z
         .enum(['createdAt', 'updatedAt', 'price', 'surface', 'pricePerMeter'])
@@ -318,9 +336,15 @@ Results include price, location, photos, energy ratings, contact info, and nearb
     if (ctx.input.furnished !== undefined) params.furnished = ctx.input.furnished;
     if (ctx.input.withVirtualTour !== undefined)
       params.withVirtualTour = ctx.input.withVirtualTour;
+    if (ctx.input.withCoherentPrice !== undefined)
+      params.withCoherentPrice = ctx.input.withCoherentPrice;
+    if (ctx.input.energyCategories !== undefined)
+      params['energyCategories[]'] = ctx.input.energyCategories;
     if (ctx.input.expressions) params['expressions[]'] = ctx.input.expressions;
     if (ctx.input.fromDate) params.fromDate = ctx.input.fromDate;
     if (ctx.input.toDate) params.toDate = ctx.input.toDate;
+    if (ctx.input.fromUpdatedAt !== undefined) params.fromUpdatedAt = ctx.input.fromUpdatedAt;
+    if (ctx.input.toUpdatedAt !== undefined) params.toUpdatedAt = ctx.input.toUpdatedAt;
     if (ctx.input.expired !== undefined) params.expired = ctx.input.expired;
     if (ctx.input.page !== undefined) params.page = ctx.input.page;
     if (ctx.input.itemsPerPage !== undefined) params.itemsPerPage = ctx.input.itemsPerPage;

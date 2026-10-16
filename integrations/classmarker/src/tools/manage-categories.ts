@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassMarkerClient } from '../lib/client';
+import { validateText, validateWholeNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 // ── List Categories ──
@@ -31,7 +32,8 @@ export let listCategories = SlateTool.create(spec, {
     z.object({
       parentCategories: z
         .array(parentCategorySchema)
-        .describe('List of parent categories with subcategories')
+        .describe('List of parent categories with subcategories'),
+      response: z.any().describe('Complete ClassMarker response')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,7 +56,7 @@ export let listCategories = SlateTool.create(spec, {
     }));
 
     return {
-      output: { parentCategories },
+      output: { parentCategories, response: data },
       message: `Found **${parentCategories.length}** parent category(ies).`
     };
   })
@@ -89,7 +91,13 @@ export let manageCategory = SlateTool.create(spec, {
       categoryId: z
         .number()
         .optional()
-        .describe('Required when updating a subcategory. The ID of the subcategory to update.')
+        .describe(
+          'Required when updating a subcategory. Call list_categories to discover category IDs.'
+        ),
+      verifyOnly: z
+        .boolean()
+        .optional()
+        .describe('Validate the request without creating or updating a category')
     })
   )
   .output(
@@ -104,29 +112,48 @@ export let manageCategory = SlateTool.create(spec, {
       apiSecret: ctx.auth.apiSecret
     });
 
-    let { action, level, name, parentCategoryId, categoryId } = ctx.input;
+    let { action, level, name, parentCategoryId, categoryId, verifyOnly } = ctx.input;
+    validateText(name, 'name');
+    validateWholeNumber(parentCategoryId, 'parentCategoryId');
+    validateWholeNumber(categoryId, 'categoryId');
+    if (categoryId !== undefined && !(action === 'update' && level === 'subcategory')) {
+      throw createApiServiceError('categoryId is only used when updating a subcategory.');
+    }
+    if (parentCategoryId !== undefined && action === 'create' && level === 'parent') {
+      throw createApiServiceError(
+        'parentCategoryId is not used when creating a parent category.'
+      );
+    }
     let data: any;
 
     if (action === 'create' && level === 'parent') {
-      data = await client.createParentCategory(name);
+      data = await client.createParentCategory(name, verifyOnly);
     } else if (action === 'create' && level === 'subcategory') {
-      if (!parentCategoryId) {
-        throw new Error('parentCategoryId is required when creating a subcategory');
+      if (parentCategoryId === undefined) {
+        throw createApiServiceError(
+          'parentCategoryId is required when creating a subcategory'
+        );
       }
-      data = await client.createSubcategory(name, parentCategoryId);
+      data = await client.createSubcategory(name, parentCategoryId, verifyOnly);
     } else if (action === 'update' && level === 'parent') {
-      if (!parentCategoryId) {
-        throw new Error('parentCategoryId is required when updating a parent category');
+      if (parentCategoryId === undefined) {
+        throw createApiServiceError(
+          'parentCategoryId is required when updating a parent category'
+        );
       }
-      data = await client.updateParentCategory(parentCategoryId, name);
+      data = await client.updateParentCategory(parentCategoryId, name, verifyOnly);
     } else if (action === 'update' && level === 'subcategory') {
-      if (!categoryId) {
-        throw new Error('categoryId is required when updating a subcategory');
+      if (categoryId === undefined) {
+        throw createApiServiceError('categoryId is required when updating a subcategory');
       }
-      data = await client.updateSubcategory(categoryId, {
-        categoryName: name,
-        parentCategoryId
-      });
+      data = await client.updateSubcategory(
+        categoryId,
+        {
+          categoryName: name,
+          parentCategoryId
+        },
+        verifyOnly
+      );
     }
 
     return {
@@ -134,7 +161,9 @@ export let manageCategory = SlateTool.create(spec, {
         status: data?.status || 'ok',
         response: data
       },
-      message: `Successfully ${action === 'create' ? 'created' : 'updated'} ${level} category **${name}**.`
+      message: verifyOnly
+        ? `Validated ${level} category **${name}** without saving changes.`
+        : `Successfully ${action === 'create' ? 'created' : 'updated'} ${level} category **${name}**.`
     };
   })
   .build();

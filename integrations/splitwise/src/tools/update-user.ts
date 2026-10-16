@@ -38,11 +38,12 @@ export let updateUser = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let params: Record<string, string> = {};
-    if (ctx.input.firstName) params.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) params.last_name = ctx.input.lastName;
-    if (ctx.input.email) params.email = ctx.input.email;
-    if (ctx.input.locale) params.locale = ctx.input.locale;
-    if (ctx.input.defaultCurrency) params.default_currency = ctx.input.defaultCurrency;
+    if (ctx.input.firstName !== undefined) params.first_name = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) params.last_name = ctx.input.lastName;
+    if (ctx.input.email !== undefined) params.email = ctx.input.email;
+    if (ctx.input.locale !== undefined) params.locale = ctx.input.locale;
+    if (ctx.input.defaultCurrency !== undefined)
+      params.default_currency = ctx.input.defaultCurrency;
 
     let user = await client.updateUser(ctx.input.userId, params);
 

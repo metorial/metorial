@@ -55,7 +55,7 @@ Use this to discover what data is available before querying it.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TablesClient({ apiKey: ctx.auth.token });
+    let client = new TablesClient({ apiKey: ctx.auth.token, authMethod: ctx.auth.authMethod });
 
     let response = await client.searchDatasets({
       query: ctx.input.query,
@@ -69,13 +69,13 @@ Use this to discover what data is available before querying it.`,
       datasetCode: ds.dataset_code,
       databaseCode: ds.database_code,
       name: ds.name,
-      description: ds.description || '',
-      refreshedAt: ds.refreshed_at || '',
-      newestDate: ds.newest_available_date || '',
-      oldestDate: ds.oldest_available_date || '',
-      columnNames: ds.column_names || [],
-      frequency: ds.frequency || '',
-      type: ds.type || '',
+      description: ds.description,
+      refreshedAt: ds.refreshed_at,
+      newestDate: ds.newest_available_date,
+      oldestDate: ds.oldest_available_date,
+      columnNames: ds.column_names,
+      frequency: ds.frequency,
+      type: ds.type,
       premium: ds.premium
     }));
 

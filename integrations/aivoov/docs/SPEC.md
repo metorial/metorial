@@ -1,40 +1,31 @@
-# Slates Specification for Aivoov
+# AiVOOV Specification
 
-## Overview
+## Authentication and API
 
-AiVOOV is a text-to-speech platform that provides a single interface to convert text to audio using AI voices from Google, Amazon, IBM, and Microsoft. It offers over 2300+ voices across 155+ languages, supporting MP3 and WAV output formats.
+Connect with an API key from **My Profile → API**. Requests use `X-API-KEY` and the documented `https://aivoov.com/api/v8` base URL. No additional connection configuration is required. API access requires an eligible account plan and character credit.
 
-## Authentication
+## Tools
 
-AiVOOV uses API key authentication.
+| Tool | API operation | Behavior |
+| --- | --- | --- |
+| `list_voices` | `GET /voices` | Returns voice IDs, names, and languages. Optional `languageCode` maps to the `language_code` query. |
+| `generate_audio` | `POST /create` | Sends aligned URL-encoded voice/text/SSML arrays. Provides a downloadable audio file and preserves the original `audioBase64` and provider `message` fields for existing workflows. |
+| `create_transcription` | `POST /speech` | Uploads binary audio as multipart form data with its language, returning the provider job ID, status, and character usage. |
+| `get_transcription` | `GET /job` | Looks up `job_id`; pending jobs report status, completed jobs provide downloadable transcript and SRT files, and failed jobs raise the provider failure reason. |
 
-- All requests must include your API key in the `X-API-KEY` header.
-- To access your credentials, make sure you're logged in to your aivoov.com account, then visit your Profile page → API.
-- The API is a premium feature and is available only with selected plans. You need to have an AiVOOV account with Characters Credit to be able to access the API.
+SSML controls accept integers: pitch -50 through 50, speaking rate 20 through 200, and volume -40 through 40. Omitted controls use the provider's `default` value. The API decides the generated format; the file's MIME type and extension are detected from its bytes, with a binary fallback for unrecognized content.
 
-Example header:
+Transcription accepts MP3, WAV, FLAC, and OGG files up to 10 MB. Supply Base64 audio without a data URL prefix, a matching filename, and the spoken language/locale. Job states are `QUEUED`, `IN_PROGRESS`, `FAILED`, and `COMPLETED`. Transcript text and SRT are required only for completed jobs; missing required success fields produce an error.
 
-```
-X-API-KEY: YOUR-API-KEY
-```
+## Limits and scope
 
-## Features
+The voice catalog has a 20-call daily limit. Audio generation allows 75 requests per minute and 5,000 per day; transcription submission allows 30 per minute and 1,000 per day. GET endpoints allow 100 requests per minute. Cache the voice catalog and poll jobs reasonably.
 
-### Text-to-Speech Generation
+Text-to-speech and speech-to-text tools have separate categories. The published API does not document a profile/account endpoint, webhooks, job deletion, or a generated-file GET download URL. Generated files therefore use the actual response content. There is no format selection parameter.
 
-Convert text into audio using AI voices. Supports multiple text segments with different voices in a single request, with optional SSML controls for pitch (-50 to 50), speaking rate (20 to 200), and volume (-40 to 40).
+## Official sources
 
-- **Voice selection**: Choose from 2300+ voices across providers (Google, Amazon, IBM, Microsoft). Multiple voices can be used within the same request to create conversational audio.
-- **SSML controls**: Adjust pitch, speaking rate, and volume per text segment, or use defaults.
-- Output is available in MP3 and WAV formats.
-
-### Voice Discovery
-
-Retrieve the list of available voice IDs, with optional filtering by language code (e.g., `en-US`).
-
-- Returns voice metadata including voice ID, name, and language.
-- Voices can be stored locally in your database for reuse.
-
-## Events
-
-The provider does not support events.
+- [Text-to-speech API reference](https://github.com/AiVOOV/aivoov-api)
+- [Official Postman collection](https://raw.githubusercontent.com/AiVOOV/aivoov-api/main/AiVOOV%20API.postman_collection.json)
+- [Speech-to-text API reference](https://github.com/AiVOOV/aivoov-api/blob/main/speech-to-text-api.md)
+- [API access overview](https://aivoov.com/text-to-speech-api)

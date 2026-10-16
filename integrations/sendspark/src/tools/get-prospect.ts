@@ -1,11 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let validationDetailSchema = z.object({
   validationField: z.string().optional(),
-  validationMessage: z.string().optional()
+  validationMessage: z.string().optional(),
+  validationCode: z.string().optional()
 });
 
 export let getProspect = SlateTool.create(spec, {
@@ -18,12 +20,22 @@ export let getProspect = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
+      include: z
+        .array(z.enum(['emailEmbedHTML', 'fields']))
+        .optional()
+        .describe('Additional prospect fields to retrieve'),
       campaignId: z.string().describe('ID of the dynamic video campaign'),
       email: z.string().describe('Email address of the prospect to look up')
     })
   )
   .output(
     z.object({
+      prospectId: z.string().optional().describe('Provider prospect ID'),
+      originalBackgroundUrl: z.string().optional(),
+      emailEmbedHTML: z.string().optional(),
+      fields: z.record(z.string(), z.unknown()).optional(),
+      raw: z.unknown().optional().describe('Complete provider response'),
       contactName: z.string().optional(),
       contactEmail: z.string().optional(),
       company: z.string().optional(),
@@ -47,16 +59,21 @@ export let getProspect = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret,
-      workspaceId: ctx.config.workspaceId
-    });
+    let client = createClient(ctx);
 
-    let prospect = await client.getProspect(ctx.input.campaignId, ctx.input.email);
+    let prospect = await client.getProspect(
+      ctx.input.campaignId,
+      ctx.input.email,
+      ctx.input.include?.join(',')
+    );
 
     return {
       output: {
+        prospectId: prospect.id ?? prospect._id,
+        originalBackgroundUrl: prospect.originalBackgroundUrl,
+        emailEmbedHTML: prospect.emailEmbedHTML,
+        fields: prospect.fields,
+        raw: prospect,
         contactName: prospect.contactName,
         contactEmail: prospect.contactEmail,
         company: prospect.company,
@@ -70,7 +87,7 @@ export let getProspect = SlateTool.create(spec, {
         shareUrl: prospect.shareUrl,
         validationErrors: prospect.validationDetails
       },
-      message: `Prospect **${prospect.contactName || ctx.input.email}** — status: **${prospect.status || 'unknown'}**${prospect.shareUrl ? `. Share URL: ${prospect.shareUrl}` : ''}.`
+      message: `Retrieved prospect **${prospect.contactName || ctx.input.email}**${prospect.status !== undefined ? ` — status: **${prospect.status}**` : ''}${prospect.shareUrl ? `. Share URL: ${prospect.shareUrl}` : ''}.`
     };
   })
   .build();

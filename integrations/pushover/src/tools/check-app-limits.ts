@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let checkAppLimits = SlateTool.create(spec, {
   name: 'Check App Limits',
   key: 'check_app_limits',
-  description: `Check the current monthly message usage and limits for the application. Returns the total message quota, remaining messages, and when the limit resets.`,
+  description: `Check the current monthly message usage and limits for the account or team owning the application. Returns the total message quota, remaining messages, and when the limit resets.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,7 +15,9 @@ export let checkAppLimits = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      monthlyLimit: z.number().describe('Total monthly message quota'),
+      monthlyLimit: z
+        .number()
+        .describe('Shared account or team monthly quota, including purchased capacity'),
       remaining: z.number().describe('Messages remaining this month'),
       resetAt: z.number().describe('Unix timestamp when the monthly limit resets')
     })

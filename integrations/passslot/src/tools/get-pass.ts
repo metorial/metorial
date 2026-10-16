@@ -34,10 +34,10 @@ export let getPass = SlateTool.create(spec, {
     let { passTypeIdentifier, serialNumber } = ctx.input;
 
     let [urlResult, values, statusResult, passJson] = await Promise.all([
-      client.getPassUrl(passTypeIdentifier, serialNumber).catch(() => null),
-      client.getPassValues(passTypeIdentifier, serialNumber).catch(() => null),
-      client.getPassStatus(passTypeIdentifier, serialNumber).catch(() => null),
-      client.getPassJson(passTypeIdentifier, serialNumber).catch(() => null)
+      client.getPassUrl(passTypeIdentifier, serialNumber),
+      client.getPassValues(passTypeIdentifier, serialNumber),
+      client.getPassStatus(passTypeIdentifier, serialNumber),
+      client.getPassJson(passTypeIdentifier, serialNumber)
     ]);
 
     return {

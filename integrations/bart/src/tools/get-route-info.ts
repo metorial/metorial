@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BartClient } from '../lib/client';
+import { bartRecord, bartRecords, bartStrings, bartText } from '../lib/response';
 import { spec } from '../spec';
 
 let routeSummarySchema = z.object({
@@ -8,7 +9,7 @@ let routeSummarySchema = z.object({
   routeAbbr: z.string().describe('Route abbreviation'),
   routeId: z.string().describe('Route identifier (e.g., "ROUTE 3")'),
   routeNumber: z.string().describe('Route number'),
-  color: z.string().describe('Line color name'),
+  color: z.string().describe('Provider line color value (may be a hex code)'),
   hexcolor: z.string().describe('Line color hex code'),
   direction: z.string().describe('Route direction')
 });
@@ -27,8 +28,8 @@ export let getRouteInfo = SlateTool.create(spec, {
   key: 'get_route_info',
   description: `Retrieve information about BART routes. Can list all active routes or get detailed information about a specific route including the ordered list of stations it serves, origin/destination, color, and direction.`,
   instructions: [
-    'Route numbers range from 1-12. Use "all" to get details for all routes.',
-    'Optionally specify a date to see routes for a particular schedule.'
+    'Call this tool without routeNumber to discover route numbers, including airport connector routes. Use "all" for all route details.',
+    'The date filter requires routeNumber (or "all" for all route details). Omit date when discovering current routes.'
   ],
   tags: {
     readOnly: true
@@ -39,11 +40,15 @@ export let getRouteInfo = SlateTool.create(spec, {
       routeNumber: z
         .string()
         .optional()
-        .describe('Route number (1-12) or "all". Omit to list all routes with basic info.'),
+        .describe(
+          'Route number from the route list or "all". Omit to list routes with basic info.'
+        ),
       date: z
         .string()
         .optional()
-        .describe('Schedule date in "mm/dd/yyyy" format, "today", or "now"')
+        .describe(
+          'Schedule date in "mm/dd/yyyy" format, "today", or "now". Requires routeNumber; date-filtered route discovery is unsupported.'
+        )
     })
   )
   .output(
@@ -62,58 +67,38 @@ export let getRouteInfo = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new BartClient({ token: ctx.auth.token });
-
+    let result = ctx.input.routeNumber
+      ? await client.getRouteInfo(ctx.input.routeNumber, ctx.input.date)
+      : await client.getRoutes(ctx.input.date);
+    let routes = bartRecords(bartRecord(result.routes).route);
+    let mapSummary = (r: Record<string, unknown>) => ({
+      routeName: bartText(r.name),
+      routeAbbr: bartText(r.abbr),
+      routeId: bartText(r.routeID),
+      routeNumber: bartText(r.number),
+      color: bartText(r.color),
+      hexcolor: bartText(r.hexcolor),
+      direction: bartText(r.direction)
+    });
     if (!ctx.input.routeNumber) {
-      let result = await client.getRoutes(ctx.input.date);
-      let routeData = result?.routes?.route;
-      let routes = Array.isArray(routeData) ? routeData : routeData ? [routeData] : [];
-
-      let mappedRoutes = routes.map((r: any) => ({
-        routeName: r.name || '',
-        routeAbbr: r.abbr || '',
-        routeId: r.routeID || '',
-        routeNumber: r.number || '',
-        color: r.color || '',
-        hexcolor: r.hexcolor || '',
-        direction: r.direction || ''
-      }));
-
       return {
-        output: { routes: mappedRoutes },
-        message: `Retrieved **${mappedRoutes.length}** BART routes.`
+        output: { routes: routes.map(mapSummary) },
+        message: `Retrieved **${routes.length}** BART routes.`
       };
     }
-
-    let result = await client.getRouteInfo(ctx.input.routeNumber, ctx.input.date);
-    let routeData = result?.routes?.route;
-    let routes = Array.isArray(routeData) ? routeData : routeData ? [routeData] : [];
-
-    let mappedRoutes = routes.map((r: any) => {
-      let stationData = r.config?.station;
-      let stations = Array.isArray(stationData)
-        ? stationData
-        : stationData
-          ? [stationData]
-          : [];
-
+    let routeDetails = routes.map(r => {
+      let stations = bartStrings(bartRecord(r.config).station);
       return {
-        routeName: r.name || '',
-        routeAbbr: r.abbr || '',
-        routeId: r.routeID || '',
-        routeNumber: r.number || '',
-        color: r.color || '',
-        hexcolor: r.hexcolor || '',
-        direction: r.direction || '',
-        origin: r.origin || '',
-        destination: r.destination || '',
-        stationCount: r.num_stns || String(stations.length),
+        ...mapSummary(r),
+        origin: bartText(r.origin),
+        destination: bartText(r.destination),
+        stationCount: bartText(r.num_stns) || String(stations.length),
         stations
       };
     });
-
     return {
-      output: { routeDetails: mappedRoutes },
-      message: `Retrieved details for **${mappedRoutes.length}** route(s).`
+      output: { routeDetails },
+      message: `Retrieved details for **${routeDetails.length}** route(s).`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoinrankingClient } from '../lib/client';
+import { rawDataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let coinResultSchema = z.object({
@@ -37,6 +38,24 @@ export let searchCoins = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      types: z
+        .array(
+          z.enum([
+            'coins',
+            'exchanges',
+            'markets',
+            'fiat',
+            'categories',
+            'commodities',
+            'indices',
+            'stocks',
+            'all'
+          ])
+        )
+        .optional()
+        .describe(
+          'Suggestion buckets to search; unrequested buckets are returned as empty arrays'
+        ),
       query: z
         .string()
         .describe('Search term - can be a partial name, symbol, or complete contract address'),
@@ -48,6 +67,9 @@ export let searchCoins = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: rawDataSchema
+        .optional()
+        .describe('Original provider data, including additional fields'),
       coins: z.array(coinResultSchema).describe('Matching cryptocurrencies'),
       exchanges: z.array(exchangeResultSchema).describe('Matching exchanges'),
       markets: z.array(marketResultSchema).describe('Matching markets')
@@ -61,36 +83,37 @@ export let searchCoins = SlateTool.create(spec, {
 
     let result = await client.search({
       query: ctx.input.query,
+      types: ctx.input.types,
       referenceCurrencyUuid: ctx.input.referenceCurrencyUuid
     });
 
     let data = result.data;
 
-    let coins = (data.coins || []).map((c: any) => ({
+    let coins = data.coins.map(c => ({
       coinUuid: c.uuid,
       symbol: c.symbol,
       name: c.name,
-      iconUrl: c.iconUrl || null,
-      price: c.price || null
+      iconUrl: c.iconUrl ?? null,
+      price: c.price ?? null
     }));
 
-    let exchanges = (data.exchanges || []).map((e: any) => ({
+    let exchanges = data.exchanges.map(e => ({
       exchangeUuid: e.uuid,
       name: e.name,
-      iconUrl: e.iconUrl || null,
+      iconUrl: e.iconUrl ?? null,
       recommended: e.recommended ?? null
     }));
 
-    let markets = (data.markets || []).map((m: any) => ({
+    let markets = data.markets.map(m => ({
       marketUuid: m.uuid,
-      baseSymbol: m.baseSymbol || '',
-      quoteSymbol: m.quoteSymbol || '',
-      exchangeName: m.exchangeName || null,
-      exchangeIconUrl: m.exchangeIconUrl || null
+      baseSymbol: m.baseSymbol,
+      quoteSymbol: m.quoteSymbol,
+      exchangeName: m.exchangeName ?? null,
+      exchangeIconUrl: m.exchangeIconUrl ?? null
     }));
 
     return {
-      output: { coins, exchanges, markets },
+      output: { coins, exchanges, markets, rawData: result.data },
       message: `Found **${coins.length}** coin(s), **${exchanges.length}** exchange(s), and **${markets.length}** market(s) matching "${ctx.input.query}".`
     };
   })

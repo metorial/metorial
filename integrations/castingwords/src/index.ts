@@ -2,9 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   cancelAudiofile,
+  downloadTranscript,
   getAudiofileStatus,
   getInvoice,
   getPrepayBalance,
+  getWebhook,
   orderTranscription,
   retrieveTranscript,
   upgradeAudiofile
@@ -15,10 +17,12 @@ export let provider = Slate.create({
     orderTranscription,
     getAudiofileStatus,
     retrieveTranscript,
+    downloadTranscript,
     upgradeAudiofile,
     cancelAudiofile,
     getInvoice,
-    getPrepayBalance
+    getPrepayBalance,
+    getWebhook
   ],
   triggers: []
 });

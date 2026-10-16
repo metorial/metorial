@@ -3,6 +3,7 @@ export * from './create-proposal';
 export * from './delete-client';
 export * from './delete-proposal';
 export * from './get-client';
+export * from './get-content-item';
 export * from './get-proposal';
 export * from './get-proposal-stats';
 export * from './list-clients';

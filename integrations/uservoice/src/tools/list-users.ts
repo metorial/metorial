@@ -8,12 +8,16 @@ let userSchema = z.object({
   name: z.string().nullable().describe('Display name'),
   email: z.string().nullable().describe('Email address'),
   avatarUrl: z.string().nullable().describe('URL of the user avatar'),
-  isAdmin: z.boolean().describe('Whether the user is an admin'),
-  state: z.string().describe('User state'),
-  supportedSuggestionsCount: z.number().describe('Number of suggestions the user supports'),
+  isAdmin: z.boolean().optional().describe('Whether the user is an admin'),
+  state: z.string().optional().describe('User state'),
+  supportedSuggestionsCount: z
+    .number()
+    .optional()
+    .describe('Number of suggestions the user supports'),
   satisfactionScore: z.number().nullable().describe('User satisfaction score'),
-  createdAt: z.string().describe('When the user was created'),
-  lastLogin: z.string().nullable().describe('Last login timestamp')
+  createdAt: z.string().optional().describe('When the user was created'),
+  lastLogin: z.string().nullable().describe('Last login timestamp'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listUsers = SlateTool.create(spec, {
@@ -35,15 +39,16 @@ export let listUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      users: z.array(userSchema),
-      totalRecords: z.number().describe('Total number of users'),
-      totalPages: z.number().describe('Total number of pages')
+      users: z.array(userSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of users'),
+      totalPages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let result = await client.listUsers({
@@ -53,26 +58,27 @@ export let listUsers = SlateTool.create(spec, {
       updatedAfter: ctx.input.updatedAfter
     });
 
-    let users = result.users.map((u: any) => ({
+    let users = result.users?.map((u: any) => ({
       userId: u.id,
-      name: u.name || null,
-      email: u.email_address || null,
-      avatarUrl: u.avatar_url || null,
-      isAdmin: u.is_admin ?? false,
-      state: u.state || 'active',
-      supportedSuggestionsCount: u.supported_suggestions_count || 0,
+      name: u.name ?? null,
+      email: u.email_address ?? null,
+      avatarUrl: u.avatar_url ?? null,
+      isAdmin: u.is_admin,
+      state: u.state ?? undefined,
+      supportedSuggestionsCount: u.supported_suggestions_count,
       satisfactionScore: u.satisfaction_score ?? null,
-      createdAt: u.created_at,
-      lastLogin: u.last_login || null
+      createdAt: u.created_at ?? undefined,
+      lastLogin: u.last_login ?? null,
+      raw: u
     }));
 
     return {
       output: {
         users,
-        totalRecords: result.pagination?.totalRecords || 0,
-        totalPages: result.pagination?.totalPages || 0
+        totalRecords: result.pagination?.totalRecords,
+        totalPages: result.pagination?.totalPages
       },
-      message: `Found **${users.length}** users (page ${result.pagination?.page || 1} of ${result.pagination?.totalPages || 1}).`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

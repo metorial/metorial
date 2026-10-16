@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URLS: Record<string, string> = {
   production: 'https://api.postalytics.com',
@@ -53,12 +58,36 @@ export interface WebhookRecord {
 }
 
 export class PostalyticsClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; environment: string }) {
     let baseURL = BASE_URLS[config.environment] || BASE_URLS.production;
 
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Postalytics API key is required. Reconnect your account.'
+      );
+    }
+
+    let adaptError = (error: unknown) =>
+      buildApiServiceError(error, {
+        providerLabel: 'Postalytics',
+        reason: 'postalytics_api_error',
+        extractResponse: (value, helpers) => helpers.getResponseWithBody(value),
+        nestedKeys: ['error', 'errors'],
+        formatMessage: ({ providerLabel, operation, statusLabel, message }) =>
+          `${providerLabel} API ${operation} failed: ${statusLabel}${message.split(config.token).join('[redacted]')}`,
+        extractStatus: (_error, response) => {
+          let body = response?.data;
+          let failure =
+            isApiErrorRecord(body) && isApiErrorRecord(body.error) ? body.error : undefined;
+          return typeof failure?.status_code === 'number'
+            ? failure.status_code
+            : response?.status;
+        }
+      });
+
+    this.axios = createAuthenticatedAxios({
       baseURL,
       headers: {
         'Content-Type': 'application/json'
@@ -66,20 +95,39 @@ export class PostalyticsClient {
       auth: {
         username: config.token,
         password: ''
-      }
+      },
+      errorAdapter: adaptError
     });
+    this.axios.interceptors.response.use(response => {
+      let body: unknown = response.data;
+      if (isApiErrorRecord(body) && isApiErrorRecord(body.error)) {
+        let status = body.error.status_code;
+        if (typeof status === 'number' && status >= 400) {
+          throw adaptError({ response: { status, data: body } });
+        }
+      }
+      return response;
+    });
+  }
+
+  private singleRecord(value: unknown, resource: string): Record<string, unknown> {
+    let record = Array.isArray(value) && value.length === 1 ? value[0] : value;
+    if (!isApiErrorRecord(record)) {
+      throw createApiServiceError(`Postalytics returned an invalid ${resource} response.`);
+    }
+    return record;
   }
 
   // ---- Account ----
 
   async getMyAccount(): Promise<Record<string, unknown>> {
     let response = await this.axios.get('/api/v1/account/me');
-    return response.data;
+    return this.singleRecord(response.data, 'current account');
   }
 
   async getAccount(accountId: string): Promise<Record<string, unknown>> {
     let response = await this.axios.get(`/api/v1/account/${accountId}`);
-    return response.data;
+    return this.singleRecord(response.data, 'account');
   }
 
   async createAccount(params: {
@@ -104,10 +152,22 @@ export class PostalyticsClient {
     if (params.emailAddress !== undefined) body.email_address = params.emailAddress;
     if (params.company !== undefined) body.company = params.company;
     if (params.phone !== undefined) body.phone = params.phone;
-    if (params.address !== undefined) body.address = params.address;
-    if (params.city !== undefined) body.city = params.city;
-    if (params.state !== undefined) body.state = params.state;
-    if (params.zip !== undefined) body.zip = params.zip;
+    if (params.address !== undefined) {
+      body.address = params.address;
+      body.address_street = params.address;
+    }
+    if (params.city !== undefined) {
+      body.city = params.city;
+      body.address_city = params.city;
+    }
+    if (params.state !== undefined) {
+      body.state = params.state;
+      body.address_state = params.state;
+    }
+    if (params.zip !== undefined) {
+      body.zip = params.zip;
+      body.address_zip = params.zip;
+    }
 
     let response = await this.axios.post('/api/v1/account', body);
     return response.data;
@@ -125,7 +185,7 @@ export class PostalyticsClient {
 
   async getIntegrations(): Promise<Record<string, unknown>> {
     let response = await this.axios.get('/api/v1/account/integrations');
-    return response.data;
+    return Array.isArray(response.data) ? { data: response.data } : response.data;
   }
 
   // ---- Contacts ----
@@ -237,19 +297,28 @@ export class PostalyticsClient {
 
   async getTemplate(templateId: string): Promise<Record<string, unknown>> {
     let response = await this.axios.get(`/api/v1/templates/${templateId}`);
-    return response.data;
+    return this.singleRecord(response.data, 'template');
   }
 
   async createTemplate(params: {
     name: string;
-    html: string;
+    html?: string;
+    front?: string;
+    back?: string;
     size: number;
+    isFullHtml?: boolean;
+    isProofed?: boolean;
   }): Promise<Record<string, unknown>> {
-    let response = await this.axios.post('/api/v1/templates', {
+    let body: Record<string, unknown> = {
       name: params.name,
-      html: params.html,
       size: params.size
-    });
+    };
+    if (params.html !== undefined) body.html = params.html;
+    if (params.front !== undefined) body.front = params.front;
+    if (params.back !== undefined) body.back = params.back;
+    if (params.isFullHtml !== undefined) body.is_full_html = params.isFullHtml;
+    if (params.isProofed !== undefined) body.is_proofed = params.isProofed;
+    let response = await this.axios.post('/api/v1/templates', body);
     return response.data;
   }
 
@@ -277,7 +346,7 @@ export class PostalyticsClient {
 
   async getCampaignStats(campaignId: string): Promise<Record<string, unknown>> {
     let response = await this.axios.get(`/api/v1/campaigns/${campaignId}`);
-    return response.data;
+    return this.singleRecord(response.data, 'campaign statistics');
   }
 
   async getCampaignEvents(
@@ -297,7 +366,7 @@ export class PostalyticsClient {
     if (params?.pageSize !== undefined) queryParams.PageSize = String(params.pageSize);
 
     let response = await this.axios.get(url, { params: queryParams });
-    return response.data;
+    return Array.isArray(response.data) ? { data: response.data } : response.data;
   }
 
   async createCampaign(params: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -404,7 +473,7 @@ export class PostalyticsClient {
 
   async getWebhook(webhookId: string): Promise<Record<string, unknown>> {
     let response = await this.axios.get(`/api/v1/webhooks/${webhookId}`);
-    return response.data;
+    return this.singleRecord(response.data, 'webhook');
   }
 
   async createWebhook(params: {
@@ -415,6 +484,7 @@ export class PostalyticsClient {
     let response = await this.axios.post('/api/v1/webhooks', {
       campaign_id: params.campaignId,
       is_enabled: params.isEnabled,
+      is_subscribed: params.isEnabled ? 1 : 0,
       url: params.url
     });
     return response.data;
@@ -430,7 +500,10 @@ export class PostalyticsClient {
   ): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = {};
     if (params.campaignId !== undefined) body.campaign_id = params.campaignId;
-    if (params.isEnabled !== undefined) body.is_enabled = params.isEnabled;
+    if (params.isEnabled !== undefined) {
+      body.is_enabled = params.isEnabled;
+      body.is_subscribed = params.isEnabled ? 1 : 0;
+    }
     if (params.url !== undefined) body.url = params.url;
 
     let response = await this.axios.put(`/api/v1/webhooks/${webhookId}`, body);
@@ -464,7 +537,68 @@ export class PostalyticsClient {
     if (contact.company !== undefined) body.company = contact.company;
     if (contact.addressStreet2 !== undefined) body.address_street2 = contact.addressStreet2;
 
+    Object.assign(body, {
+      FirstName: contact.firstName,
+      LastName: contact.lastName,
+      Address: contact.addressStreet,
+      City: contact.addressCity,
+      State: contact.addressState,
+      Zip: contact.addressZip
+    });
+    if (contact.company !== undefined) body.Company = contact.company;
+    if (contact.addressStreet2 !== undefined) body.Address2 = contact.addressStreet2;
+
     let response = await this.axios.post(`/api/v1/lists/suppression/contacts/${listId}`, body);
+    return response.data;
+  }
+
+  async getFlow(endpointId: string): Promise<Record<string, unknown>> {
+    let response = await this.axios.get(`/api/v1/flow/${encodeURIComponent(endpointId)}`);
+    return response.data;
+  }
+
+  async getSuppressionList(listId: string): Promise<Record<string, unknown>[]> {
+    let response = await this.axios.get(
+      `/api/v1/lists/suppression/${encodeURIComponent(listId)}`
+    );
+    return response.data;
+  }
+
+  async createSuppressionList(params: {
+    name?: string;
+    country?: string;
+  }): Promise<Record<string, unknown>[]> {
+    let body: Record<string, unknown> = {};
+    if (params.name !== undefined) body.Name = params.name;
+    if (params.country !== undefined) body.Country = params.country;
+    let response = await this.axios.post('/api/v1/lists/suppression', body);
+    return response.data;
+  }
+
+  async deleteSuppressionList(listId: string): Promise<Record<string, unknown>> {
+    let response = await this.axios.delete(
+      `/api/v1/lists/suppression/${encodeURIComponent(listId)}`
+    );
+    return response.data;
+  }
+
+  async getSuppressedContacts(
+    listId: string,
+    params: { offset?: number; contactId?: string }
+  ): Promise<Record<string, unknown>> {
+    let url = `/api/v1/lists/suppression/contacts/${encodeURIComponent(listId)}`;
+    if (params.contactId !== undefined) url += `/${encodeURIComponent(params.contactId)}`;
+    let response = await this.axios.get(url, { params: { offset: params.offset } });
+    return response.data;
+  }
+
+  async deleteSuppressedContact(
+    listId: string,
+    contactId: string
+  ): Promise<Record<string, unknown>> {
+    let response = await this.axios.delete(
+      `/api/v1/lists/suppression/contacts/${encodeURIComponent(listId)}/${encodeURIComponent(contactId)}`
+    );
     return response.data;
   }
 

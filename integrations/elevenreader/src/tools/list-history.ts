@@ -30,6 +30,7 @@ export let listHistoryTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       history: z
         .array(
           z.object({
@@ -73,25 +74,26 @@ export let listHistoryTool = SlateTool.create(spec, {
       search: ctx.input.search
     });
 
-    let history = (result.history || []).map((item: any) => ({
+    let history = result.history.map(item => ({
       historyItemId: item.history_item_id,
-      voiceId: item.voice_id,
-      voiceName: item.voice_name,
-      voiceCategory: item.voice_category,
-      modelId: item.model_id,
-      text: item.text,
+      voiceId: item.voice_id ?? undefined,
+      voiceName: item.voice_name ?? undefined,
+      voiceCategory: item.voice_category ?? undefined,
+      modelId: item.model_id ?? undefined,
+      text: item.text ?? undefined,
       dateUnix: item.date_unix,
-      characterCountChangeFrom: item.character_count_change_from,
-      characterCountChangeTo: item.character_count_change_to,
-      contentType: item.content_type,
-      source: item.source
+      characterCountChangeFrom: item.character_count_change_from ?? undefined,
+      characterCountChangeTo: item.character_count_change_to ?? undefined,
+      contentType: item.content_type ?? undefined,
+      source: item.source ?? undefined
     }));
 
     return {
       output: {
+        raw: result.raw,
         history,
-        hasMore: result.has_more || false,
-        lastHistoryItemId: result.last_history_item_id
+        hasMore: result.has_more,
+        lastHistoryItemId: result.last_history_item_id ?? undefined
       },
       message: `Retrieved ${history.length} history items${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}${result.has_more ? ' (more available)' : ''}.`
     };

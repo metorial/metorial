@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapSummary } from '../lib/response';
 import { spec } from '../spec';
 
 let keywordPositionSchema = z
@@ -56,7 +57,11 @@ export let analyzeKeywords = SlateTool.create(spec, {
       organic: keywordPositionSchema.optional(),
       organicPercentages: keywordPositionSchema.optional(),
       paid: keywordPositionSchema.optional(),
-      paidPercentages: keywordPositionSchema.optional()
+      paidPercentages: keywordPositionSchema.optional(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response with original keyword metrics and nulls')
     })
   )
   .handleInvocation(async ctx => {
@@ -69,40 +74,38 @@ export let analyzeKeywords = SlateTool.create(spec, {
       companyDomain: ctx.input.companyDomain
     });
 
-    let mapPositionData = (data: any) => {
-      if (!data) return undefined;
-      return {
-        pos1: data.pos_1 ?? data.pos1,
-        pos2_3: data.pos_2_3 ?? data.pos2_3,
-        pos4_10: data.pos_4_10 ?? data.pos4_10,
-        pos11_20: data.pos_11_20 ?? data.pos11_20,
-        pos21_30: data.pos_21_30 ?? data.pos21_30,
-        pos31_40: data.pos_31_40 ?? data.pos31_40,
-        pos41_50: data.pos_41_50 ?? data.pos41_50,
-        pos51_60: data.pos_51_60 ?? data.pos51_60,
-        pos61_70: data.pos_61_70 ?? data.pos61_70,
-        pos71_80: data.pos_71_80 ?? data.pos71_80,
-        pos81_90: data.pos_81_90 ?? data.pos81_90,
-        pos91_100: data.pos_91_100 ?? data.pos91_100,
-        count: data.count,
-        isNew: data.is_new ?? data.isNew,
-        isUp: data.is_up ?? data.isUp,
-        isDown: data.is_down ?? data.isDown,
-        isLost: data.is_lost ?? data.isLost,
-        estimatedTraffic: data.estimated_traffic ?? data.estimatedTraffic,
-        estimatedAdBudget: data.estimated_ad_budget ?? data.estimatedAdBudget,
-        estimatedAvgCpc: data.estimated_avg_cpc ?? data.estimatedAvgCpc
-      };
-    };
+    let mapPositionData = (data: unknown) =>
+      mapSummary(keywordPositionSchema, data, {
+        pos1: 'pos_1',
+        pos2_3: 'pos_2_3',
+        pos4_10: 'pos_4_10',
+        pos11_20: 'pos_11_20',
+        pos21_30: 'pos_21_30',
+        pos31_40: 'pos_31_40',
+        pos41_50: 'pos_41_50',
+        pos51_60: 'pos_51_60',
+        pos61_70: 'pos_61_70',
+        pos71_80: 'pos_71_80',
+        pos81_90: 'pos_81_90',
+        pos91_100: 'pos_91_100',
+        isNew: 'is_new',
+        isUp: 'is_up',
+        isDown: 'is_down',
+        isLost: 'is_lost',
+        estimatedTraffic: 'estimated_traffic',
+        estimatedAdBudget: 'estimated_ad_budget',
+        estimatedAvgCpc: 'estimated_avg_cpc'
+      });
 
     let organic = mapPositionData(response?.organic);
     let paid = mapPositionData(response?.paid);
 
-    let organicCount = organic?.count ?? 0;
-    let paidCount = paid?.count ?? 0;
-    let budget = paid?.estimatedAdBudget
-      ? `$${paid.estimatedAdBudget.toLocaleString()}`
-      : 'N/A';
+    let organicCount = organic?.count;
+    let paidCount = paid?.count;
+    let budget =
+      paid?.estimatedAdBudget !== undefined
+        ? `$${paid.estimatedAdBudget.toLocaleString()}`
+        : 'N/A';
 
     return {
       output: {
@@ -113,9 +116,10 @@ export let analyzeKeywords = SlateTool.create(spec, {
         paid,
         paidPercentages: mapPositionData(
           response?.paid_percentages ?? response?.paidPercentages
-        )
+        ),
+        rawResponse: response
       },
-      message: `Keyword analysis for **${ctx.input.companyDomain}**: **${organicCount}** organic keywords, **${paidCount}** paid keywords, estimated ad budget: **${budget}**.`
+      message: `Keyword analysis for **${ctx.input.companyDomain}**: **${organicCount ?? 'unavailable'}** organic keywords, **${paidCount ?? 'unavailable'}** paid keywords, estimated ad budget: **${budget}**.`
     };
   })
   .build();

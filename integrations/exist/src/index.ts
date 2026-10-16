@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   createAttributeTool,
   getAttributesTool,
+  getAttributeTemplatesTool,
   getAttributeValuesTool,
   getAveragesTool,
   getCorrelationsTool,
@@ -17,6 +18,7 @@ export let provider = Slate.create({
   tools: [
     getProfileTool,
     getAttributesTool,
+    getAttributeTemplatesTool,
     getAttributeValuesTool,
     updateAttributeValuesTool,
     incrementAttributeValuesTool,

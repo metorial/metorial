@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,8 +45,9 @@ export let manageMetadata = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'set') {
-      if (!ctx.input.key) throw new Error('key is required for set action');
-      if (ctx.input.value === undefined) throw new Error('value is required for set action');
+      if (!ctx.input.key) throw createApiServiceError('key is required for set action');
+      if (ctx.input.value === undefined)
+        throw createApiServiceError('value is required for set action');
       let updatedValue = await client.updateMetadataKey(
         ctx.input.fileId,
         ctx.input.key,
@@ -58,7 +59,7 @@ export let manageMetadata = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.key) throw new Error('key is required for delete action');
+    if (!ctx.input.key) throw createApiServiceError('key is required for delete action');
     await client.deleteMetadataKey(ctx.input.fileId, ctx.input.key);
     return {
       output: { deleted: true },

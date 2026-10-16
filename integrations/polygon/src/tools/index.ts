@@ -1,10 +1,17 @@
 export { getAggregateBars } from './get-aggregate-bars';
+export { getCorporateActions } from './get-corporate-actions';
 export { getCryptoData } from './get-crypto-data';
+export { getFinancialRatios } from './get-financial-ratios';
+export { getFinancialStatements } from './get-financial-statements';
 export { getForexData } from './get-forex-data';
+export { getForexSnapshots } from './get-forex-snapshots';
+export { getGroupedDailyBars } from './get-grouped-daily-bars';
+export { getIndicesSnapshot } from './get-indices-snapshot';
 export { getMarketNews } from './get-market-news';
 export { getMarketStatus } from './get-market-status';
 export { getOptionsChain } from './get-options-chain';
 export { getPreviousClose } from './get-previous-close';
+export { getReferenceData } from './get-reference-data';
 export { getSplitsDividends } from './get-splits-dividends';
 export { getStockFinancials } from './get-stock-financials';
 export { getStockMovers } from './get-stock-movers';

@@ -1,13 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import {
+  finageBar,
+  finageNumber,
+  finageRecord,
+  finageRecords,
+  finageSymbol,
+  validateFinageLimit,
+  validateFinageRange
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getForexAggregates = SlateTool.create(spec, {
   name: 'Get Forex OHLC Aggregates',
   key: 'get_forex_aggregates',
   description: `Retrieve historical OHLCV aggregate bars for a forex currency pair over a date range. Supports timeframes from minute to month. Useful for forex charting, trend analysis, and backtesting.`,
-  constraints: ['Maximum 50,000 results per request.', 'Multiplier values: 1, 3, 5, 15, 30.'],
+  constraints: [
+    'Maximum 50,000 results per request.',
+    'Use a positive whole-number time multiplier.'
+  ],
   tags: {
     readOnly: true
   }
@@ -28,6 +40,7 @@ export let getForexAggregates = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       symbol: z.string().describe('Forex pair symbol'),
       totalResults: z.number().optional().describe('Total number of results'),
       bars: z
@@ -46,33 +59,23 @@ export let getForexAggregates = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-    let symbol = ctx.input.symbol.toUpperCase();
+    let symbol = finageSymbol(ctx.input.symbol);
+    validateFinageRange(ctx.input.from, ctx.input.to);
+    validateFinageLimit(ctx.input.limit, 'Limit', 50000);
+    validateFinageLimit(ctx.input.multiplier, 'Multiplier');
 
     let data = await client.getForexAggregates({
-      symbol,
-      multiplier: ctx.input.multiplier,
-      timespan: ctx.input.timespan,
-      from: ctx.input.from,
-      to: ctx.input.to,
-      limit: ctx.input.limit,
-      sort: ctx.input.sort
+      ...ctx.input,
+      symbol
     });
-
-    let results = data.results || [];
-    let bars = results.map((r: any) => ({
-      open: r.o,
-      high: r.h,
-      low: r.l,
-      close: r.c,
-      volume: r.v,
-      timestamp: r.t
-    }));
-
+    let response = finageRecord(data);
+    let bars = finageRecords(data, ['results']).map(finageBar);
     return {
       output: {
         symbol,
-        totalResults: data.totalResults ?? bars.length,
-        bars
+        totalResults: finageNumber(response.totalResults),
+        bars,
+        raw: data
       },
       message: `Retrieved **${bars.length}** ${ctx.input.timespan} bars for **${symbol}** from ${ctx.input.from} to ${ctx.input.to}.`
     };

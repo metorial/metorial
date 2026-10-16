@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ReportingClient } from '../lib/client';
+import { resolveReportingConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let getContact = SlateTool.create(spec, {
   description: `Retrieves the full customer journey and details for a single contact from SegMetrics.
 Returns contact information including name, email, status, custom fields, and optionally their events, tags, orders, subscriptions, and list memberships.`,
   instructions: [
-    'Use extend to request additional data: events, tags, orders, subscriptions, lists.'
+    'Use extend to request additional data: events, tags, orders, subscriptions, lists, companies.'
   ],
   tags: {
     destructive: false,
@@ -20,7 +21,7 @@ Returns contact information including name, email, status, custom fields, and op
     z.object({
       contactIdOrEmail: z.string().describe('The contact ID or email address to look up.'),
       extend: z
-        .array(z.enum(['events', 'tags', 'orders', 'subscriptions', 'lists']))
+        .array(z.enum(['events', 'tags', 'orders', 'subscriptions', 'lists', 'companies']))
         .optional()
         .describe('Additional data dimensions to include.')
     })
@@ -33,10 +34,7 @@ Returns contact information including name, email, status, custom fields, and op
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ReportingClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
-    });
+    let client = new ReportingClient(resolveReportingConfig(ctx));
 
     let contact = await client.getContact({
       contactIdOrEmail: ctx.input.contactIdOrEmail,

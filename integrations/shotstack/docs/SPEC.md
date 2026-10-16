@@ -1,4 +1,4 @@
-# Slates Specification for Shotstack
+# Shotstack API Specification
 
 ## Overview
 
@@ -92,3 +92,23 @@ When a video or image is generated using the editing API, the file is copied to 
 ### Ingestion Completion
 
 You can request a webhook callback for ingestion events. The webhook callback is sent to your server with details of the ingested file transfer, direct upload or rendition status and whether it succeeds or fails.
+
+
+## Current Edit API Generation
+
+The current API reference exposes standalone media generation at
+`POST /edit/{version}/generate`, credit estimates at
+`POST /edit/{version}/generate/quote`, existing job status at
+`GET /edit/{version}/generate/{id}`, and model discovery at
+`GET /edit/{version}/models` and `GET /edit/{version}/models/{id}`.
+The integration retains the provider-based Create API workflow separately.
+
+Model availability can be unknown when the provider omits `available`; that must
+not be treated as permission to generate. Model option schemas are discovered
+from the API, and generation is charged according to current provider pricing.
+A quote does not create or reserve work.
+
+Completed render files expire after 24 hours. The status tools copy supported
+media while it is available, with a local 64 MiB delivery limit and a warning
+if the file cannot be prepared. Hosted CDN files can be retrieved separately
+when hosting is enabled. No status lookup recreates a paid render or generation.

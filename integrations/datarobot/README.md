@@ -1,6 +1,10 @@
-# <img src="logo.png" height="20"> Data Robot
+# <img src="logo.png" height="20"> DataRobot
 
-Create and manage machine learning projects, train predictive models, and deploy them to production. Run AutoML/Autopilot to automatically select and build best-fit models. Upload and manage datasets in the AI Catalog. Deploy custom models (Python, R, Java) as real-time or batch prediction endpoints. Monitor deployments for data drift, accuracy, and service health. Generate prediction explanations, feature impact scores, and compliance documentation. Manage registered models, credentials, and time series projects.
+Manage projects, start Autopilot, inspect trained models and feature impact, and manage datasets in the AI Catalog. Register and deploy model packages, run serverless or batch predictions, and inspect deployment health, accuracy, and drift. Discover prediction infrastructure and download persisted datasets, scored CSV files, and custom-task model artifacts.
+
+Connect with a DataRobot API key and your instance's HTTPS URL. The integration supports regional SaaS and self-managed instances. Available operations depend on your account permissions and enabled DataRobot features.
+
+See [the tool specification](docs/SPEC.md) for supported workflows and official API references.
 
 ## License
 

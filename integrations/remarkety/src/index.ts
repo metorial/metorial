@@ -5,6 +5,7 @@ import {
   manageNewsletterTool,
   manageProductTool,
   sendCustomEventTool,
+  unsubscribeContactTool,
   upsertCartTool,
   upsertCustomerTool,
   upsertOrderTool
@@ -18,6 +19,7 @@ export let provider = Slate.create({
     upsertCartTool,
     manageNewsletterTool,
     sendCustomEventTool,
+    unsubscribeContactTool,
     batchUploadContactsTool
   ],
   triggers: []

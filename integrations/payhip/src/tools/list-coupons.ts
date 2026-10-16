@@ -55,11 +55,17 @@ export let listCoupons = SlateTool.create(spec, {
               .nullable()
               .describe('Minimum purchase amount required'),
             usageLimit: z.number().nullable().describe('Maximum redemption count'),
-            notes: z.string().nullable().describe('Internal notes')
+            notes: z.string().nullable().describe('Internal notes'),
+            raw: z.record(z.string(), z.unknown()).describe('Original coupon details')
           })
         )
         .describe('List of coupons'),
-      total: z.number().describe('Total number of coupons available')
+      total: z
+        .number()
+        .describe(
+          'Provider total when available; otherwise the number of coupons in this page'
+        ),
+      raw: z.unknown().describe('Original paginated response')
     })
   )
   .handleInvocation(async ctx => {
@@ -72,7 +78,7 @@ export let listCoupons = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Found **${result.coupons.length}** coupons (total: ${result.total}).`
+      message: `Found **${result.coupons.length}** coupons in this page.`
     };
   })
   .build();

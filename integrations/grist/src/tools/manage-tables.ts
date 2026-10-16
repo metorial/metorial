@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GristClient } from '../lib/client';
+import { GristClient, getGristItems } from '../lib/client';
 import { spec } from '../spec';
 
 let tableSchema = z.object({
@@ -33,7 +33,7 @@ export let listTables = SlateTool.create(spec, {
     });
 
     let result = await client.listTables(ctx.input.documentId);
-    let tables = (result.tables || []).map((t: any) => ({
+    let tables = getGristItems(result, 'tables').map((t: any) => ({
       tableId: t.id,
       fields: t.fields
     }));
@@ -122,7 +122,7 @@ export let createTable = SlateTool.create(spec, {
     }));
 
     let result = await client.createTables(ctx.input.documentId, tablesToCreate);
-    let tables = (result.tables || []).map((t: any) => ({
+    let tables = getGristItems(result, 'tables').map((t: any) => ({
       tableId: t.id
     }));
 

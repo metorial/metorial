@@ -1,65 +1,27 @@
-# Slates Specification for Iqair Airvisual
-
-## Overview
-
-IQAir AirVisual is a Swiss air quality data platform that provides real-time, forecast, and historical air quality and weather data. The platform collects data from more than 30,000 ground-based air quality monitoring sensors worldwide, spanning more than 5,000 cities across 100+ countries. It reports on PM2.5, PM10, NO2, CO, SO2, and ozone, along with weather parameters.
+# IQAir AirVisual Specification
 
 ## Authentication
 
-The API uses **API key** authentication. The only thing you need to start using the service is an API key, which can be obtained for free at `https://www.iqair.com/dashboard/api`.
+Create an API key in the [IQAir dashboard](https://dashboard.iqair.com/). The integration sends it as the `key` query parameter over HTTPS. No account identifier or OAuth setup is required.
 
-To create an API key, sign in to your IQAir account (or register one). Click on the "Dashboard" button on the top-right corner of the IQAir website, or access it at `https://dashboard.iqair.com/`. Once signed in, click the "Air quality API" tab in the left menu bar.
+## Tools
 
-The API key is passed as a query parameter named `key` on every request. For example:
+- `list_locations` browses countries, states, cities, and stations. Supply each parent location before requesting its children.
+- `get_city_air_quality` reads a city selected from that directory.
+- `get_nearest_air_quality` finds the nearest city using paired GPS coordinates, or the API request server's IP location when both coordinates are omitted.
+- `get_station_air_quality` reads a named station using station, city, state, and country together, or finds the nearest station using paired coordinates or server IP location. Named and coordinate lookups are separate modes.
+- `get_city_ranking` compares global city AQI values where supported by the connected API plan.
 
-```
-https://api.airvisual.com/v2/nearest_city?key=YOUR_API_KEY
-```
+Observation tools preserve the existing current AQI, pollutant, location, weather, forecast, and history outputs. They additionally expose provider concentration units, daily forecasts, and felt temperature when available. Station observations also expose forecast and history records. Missing current air quality or weather produces a clear availability error; retry later or choose another location.
 
-There are three subscription plans — Community (free), Startup (subscription), and Enterprise (subscription) — with different features and levels of data. The Community API key is valid for 12 months, after which it will expire and must be regenerated.
+## Availability
 
-## Features
+Community supports current city AQI and weather. Startup adds station observations and pollutant concentrations. Enterprise adds daily and detailed forecasts and recent history. Forecast and history records are returned from the observation response; the tools do not query arbitrary historical date ranges. Data availability depends on the plan and reporting location.
 
-### Real-Time Air Quality by City
+The five tools cover the public outdoor v2 data routes. There is no documented current-user endpoint or webhook subscription. Device-specific API links use a separate access flow.
 
-Retrieve current air quality index (AQI) and weather conditions for a specific city. Returned data includes city name, GPS coordinates, AQI index, pollutant concentrations (PM2.5, PM10, SO2, CO, O3, NO2), humidity, pressure, wind speed and direction. Cities are queried by specifying a country, state, and city name.
+## References
 
-### Nearest City Air Quality
-
-Get air quality data for the nearest city to your location. Data can be collected via latitude/longitude or by IP-based geolocation. This is useful when the exact city name is unknown.
-
-### Station-Level Air Quality
-
-Fetch air quality and weather data for a specific monitoring station by ID, or find the nearest monitoring station to given GPS coordinates. Station-level data provides more granular readings than city-level data.
-
-- Available on Startup and Enterprise plans only.
-
-### Air Quality Forecasts
-
-Retrieve hourly and daily AQI forecasts for any supported city. This includes 72-hour hourly predictions and 7-day daily outlooks.
-
-- The 7-day AQI and weather forecast is available on the Enterprise plan.
-
-### Historical Air Quality Data
-
-Pull historical air quality readings for any city within a specified date range.
-
-- Enterprise plan provides 48-hour historical data for AQI, pollutant concentrations, temperature, and humidity.
-
-### Location Directory
-
-Browse supported locations hierarchically. You can list countries, states within a country, and cities within a state. This is useful to discover available locations before querying air quality data.
-
-### City AQI Rankings
-
-Retrieve a ranking of cities worldwide based on current AQI. This enables comparison of air quality across multiple cities globally.
-
-### Device/Node Data (AirVisual Pro)
-
-The AirVisual Pro air quality monitor comes with an inbuilt device API. You can use this to access your device's measurements. Data includes indoor PM2.5, PM10, CO2, temperature, and humidity readings in addition to nearby outdoor station data.
-
-- Requires an AirVisual Pro hardware device and its device-specific API link or Node ID.
-
-## Events
-
-The provider does not support events. IQAir AirVisual is a read-only data API with no webhook or event subscription mechanism.
+- [Official AirVisual API documentation](https://api-docs.iqair.com/)
+- [IQAir API plans](https://www.iqair.com/air-quality-monitors/api)
+- [Station-specific device links](https://www.iqair.com/support/knowledge-base/how-do-i-get-my-stations-data-through-api)

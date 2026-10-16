@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getPromotionLeadsTool = SlateTool.create(spec, {
   name: 'Get Promotion Leads',
   key: 'get_promotion_leads',
-  description: `Retrieve all leads collected from a specific Rafflys promotion (giveaway, fortune wheel, or contest). Returns lead details including contact information and registration timestamps. Use the **List Promotions** tool first to find the promotion ID.`,
+  description: `Retrieve leads collected from a Rafflys promotion. Returns the available contact information, registration timestamps, and custom fields. Use the **List Promotions** tool first to find the promotion ID.`,
   instructions: [
     'Provide the promotion ID to fetch leads for. Use the List Promotions tool to discover available promotion IDs.'
   ],
@@ -50,15 +50,14 @@ export let getPromotionLeadsTool = SlateTool.create(spec, {
     let mapped = leads.map(lead => {
       let { id, created, email, firstName, lastName, fullName, phone, ...rest } = lead;
       return {
-        leadId: id?.toString(),
+        leadId: id.toString(),
         createdAt: created,
         email,
         firstName,
         lastName,
         fullName,
         phone,
-        additionalFields:
-          Object.keys(rest).length > 0 ? (rest as Record<string, unknown>) : undefined
+        additionalFields: Object.keys(rest).length > 0 ? rest : undefined
       };
     });
 

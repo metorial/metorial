@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, numericId } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageChat = SlateTool.create(spec, {
@@ -20,6 +20,10 @@ export let manageChat = SlateTool.create(spec, {
     z.object({
       chatId: z.number().describe('Chat ID to manage'),
       name: z.string().optional().describe('New name for the chat (must be unique)'),
+      chatgptAutoresponseEnabled: z
+        .boolean()
+        .optional()
+        .describe('Enable or disable the built-in AI Agent for this chat'),
       responsible: z
         .string()
         .optional()
@@ -65,6 +69,7 @@ export let manageChat = SlateTool.create(spec, {
     let {
       chatId,
       name,
+      chatgptAutoresponseEnabled,
       responsible,
       closed,
       read,
@@ -75,6 +80,7 @@ export let manageChat = SlateTool.create(spec, {
     } = ctx.input;
 
     let hasUpdates =
+      chatgptAutoresponseEnabled !== undefined ||
       name !== undefined ||
       responsible !== undefined ||
       closed !== undefined ||
@@ -84,6 +90,8 @@ export let manageChat = SlateTool.create(spec, {
     if (hasUpdates) {
       let updatePayload: Record<string, any> = {};
       if (name !== undefined) updatePayload.name = name;
+      if (chatgptAutoresponseEnabled !== undefined)
+        updatePayload.chatgptAutoresponseEnabled = chatgptAutoresponseEnabled;
       if (responsible !== undefined) updatePayload.responsible = responsible;
       if (closed !== undefined) updatePayload.closed = closed;
       if (read !== undefined) updatePayload.read = read;
@@ -95,7 +103,7 @@ export let manageChat = SlateTool.create(spec, {
     }
 
     let currentLabels: string[] | undefined;
-    if (labels && labels.length > 0) {
+    if (labels !== undefined && (labels.length > 0 || labelAction === 'replace')) {
       let action = labelAction || 'add';
       let labelResult: any;
       if (action === 'replace') {
@@ -117,15 +125,16 @@ export let manageChat = SlateTool.create(spec, {
 
     let actions: string[] = [];
     if (hasUpdates) actions.push('updated');
-    if (labels && labels.length > 0) actions.push('labels modified');
+    if (labels !== undefined && (labels.length > 0 || labelAction === 'replace'))
+      actions.push('labels modified');
     if (noteText) actions.push('note added');
     if (actions.length === 0) actions.push('retrieved');
 
     return {
       output: {
-        chatId,
+        chatId: numericId(chatData?.id ?? chatData?.chat_id),
         name: chatData?.name,
-        responsible: chatData?.responsible,
+        responsible: chatData?.responsible_email ?? chatData?.responsible,
         isClosed: chatData?.closed,
         isRead: chatData?.read,
         labels: currentLabels || chatData?.labels,

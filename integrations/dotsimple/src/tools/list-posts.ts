@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DotSimpleClient } from '../lib/client';
+import { DotSimpleClient, getCollection } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPosts = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let listPosts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       page: z.number().optional().default(1).describe('Page number for pagination')
     })
   )
@@ -56,15 +58,15 @@ export let listPosts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DotSimpleClient({
       token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listPosts(ctx.input.page);
-    let posts = (result?.data ?? []).map((p: any) => ({
+    let posts = getCollection(result).map((p: any) => ({
       postId: p.id,
       postUuid: p.uuid,
       status: p.status,
-      scheduledAt: p.scheduled_at,
+      scheduledAt: p.scheduled_at ?? undefined,
       createdAt: p.created_at,
       accounts: p.accounts?.map((a: any) => ({
         accountId: a.id,

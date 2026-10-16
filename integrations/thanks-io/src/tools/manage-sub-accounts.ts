@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ThanksIoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageSubAccounts = SlateTool.create(spec, {
   name: 'Manage Sub-Accounts',
   key: 'manage_sub_accounts',
   description: `Create, list, retrieve, update, or delete sub-accounts for managing multiple clients or business units.
-Sub-accounts have their own return address, branding fields, and can be associated with mailing lists and orders. Deleting a sub-account moves its orders and mailing lists to the main account.`,
+Sub-accounts have their own return address, branding fields, and can be associated with mailing lists and orders. Deleting a sub-account moves its orders and mailing lists to the main account and deletes its templates and campaigns.`,
   instructions: [
     'Set action to "list", "create", "get", "update", or "delete".',
     'For "get", "update", or "delete", provide the subAccountId.'
@@ -40,6 +40,7 @@ Sub-accounts have their own return address, branding fields, and can be associat
         .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('List of sub-accounts'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       deleted: z.boolean().optional().describe('Whether the sub-account was deleted')
     })
   )
@@ -54,7 +55,7 @@ Sub-accounts have their own return address, branding fields, and can be associat
         unknown
       >[];
       return {
-        output: { subAccounts: data },
+        output: { subAccounts: data, raw: result },
         message: `Found **${data.length}** sub-account(s).`
       };
     }
@@ -72,27 +73,30 @@ Sub-accounts have their own return address, branding fields, and can be associat
       return {
         output: {
           subAccountId: result.id as number,
-          subAccountName: result.name as string | null
+          raw: result,
+          subAccountName: result.title as string | null
         },
-        message: `Created sub-account **#${result.id}**: "${result.name}".`
+        message: `Created sub-account **#${result.id}**: "${result.title}".`
       };
     }
 
     if (action === 'get') {
-      if (!ctx.input.subAccountId) throw new Error('subAccountId is required for get action');
+      if (!ctx.input.subAccountId)
+        throw createApiServiceError('subAccountId is required for get action');
       let result = await client.getSubAccount(ctx.input.subAccountId);
       return {
         output: {
           subAccountId: result.id as number,
-          subAccountName: result.name as string | null
+          raw: result,
+          subAccountName: result.title as string | null
         },
-        message: `Retrieved sub-account **#${result.id}**: "${result.name}".`
+        message: `Retrieved sub-account **#${result.id}**: "${result.title}".`
       };
     }
 
     if (action === 'update') {
       if (!ctx.input.subAccountId)
-        throw new Error('subAccountId is required for update action');
+        throw createApiServiceError('subAccountId is required for update action');
       let result = await client.updateSubAccount(ctx.input.subAccountId, {
         name: ctx.input.name,
         returnName: ctx.input.returnName,
@@ -105,7 +109,8 @@ Sub-accounts have their own return address, branding fields, and can be associat
       return {
         output: {
           subAccountId: result.id as number,
-          subAccountName: result.name as string | null
+          raw: result,
+          subAccountName: result.title as string | null
         },
         message: `Updated sub-account **#${result.id}**.`
       };
@@ -113,7 +118,7 @@ Sub-accounts have their own return address, branding fields, and can be associat
 
     if (action === 'delete') {
       if (!ctx.input.subAccountId)
-        throw new Error('subAccountId is required for delete action');
+        throw createApiServiceError('subAccountId is required for delete action');
       await client.deleteSubAccount(ctx.input.subAccountId);
       return {
         output: {
@@ -124,6 +129,6 @@ Sub-accounts have their own return address, branding fields, and can be associat
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

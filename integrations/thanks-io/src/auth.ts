@@ -1,12 +1,21 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let dashboardAxios = createAxios({
-  baseURL: 'https://dashboard.thanks.io'
-});
-
-let apiAxios = createAxios({
-  baseURL: 'https://api.thanks.io/api/v2'
+let dashboardAxios = createAuthenticatedAxios({
+  baseURL: 'https://dashboard.thanks.io',
+  contentType: 'application/x-www-form-urlencoded',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Thanks.io',
+      reason: 'thanks_io_oauth_failed',
+      operation: 'OAuth'
+    })
 });
 
 export let auth = SlateAuth.create()
@@ -22,30 +31,21 @@ export let auth = SlateAuth.create()
     name: 'Personal Access Token',
     key: 'personal_access_token',
     inputSchema: z.object({
-      token: z.string().describe('Thanks.io Personal Access Token from the API Settings page')
+      token: z.string().describe('Thanks.io Personal Access Token from Settings → API Access')
     }),
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await apiAxios.get('/mailing-lists/', {
-        params: { items_per_page: '1' },
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
+    getOutput: async ctx => ({ output: { token: ctx.input.token } }),
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let api = createAuthenticatedAxios({
+        baseURL: 'https://api.thanks.io/api/v2',
+        authHeader: { value: `Bearer ${ctx.output.token}` },
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Thanks.io',
+            reason: 'thanks_io_api_failed'
+          })
       });
-      return {
-        profile: {
-          id:
-            response.data?.meta?.total !== undefined
-              ? String(response.data.meta.total)
-              : undefined
-        }
-      };
+      await api.get('/mailing-lists/', { params: { items_per_page: 1 } });
+      return { profile: {} };
     }
   })
   .addOauth({
@@ -53,18 +53,14 @@ export let auth = SlateAuth.create()
     name: 'OAuth',
     key: 'oauth',
     scopes: [],
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
+    getAuthorizationUrl: async ctx => ({
+      url: `https://dashboard.thanks.io/oauth/authorize?${new URLSearchParams({
         response_type: 'code',
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         state: ctx.state
-      });
-
-      return {
-        url: `https://dashboard.thanks.io/oauth/authorize?${params.toString()}`
-      };
-    },
+      }).toString()}`
+    }),
     handleCallback: async ctx => {
       let response = await dashboardAxios.post(
         '/oauth/token',
@@ -74,52 +70,37 @@ export let auth = SlateAuth.create()
           client_secret: ctx.clientSecret,
           redirect_uri: ctx.redirectUri,
           code: ctx.code
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
+        }).toString()
       );
-
-      let data = response.data;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined
-        }
+        output: normalizeOAuthTokenResponse(response.data, { providerLabel: 'Thanks.io' })
       };
     },
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'Thanks.io refresh token is missing. Reconnect your account.'
+        );
+      }
       let response = await dashboardAxios.post(
         '/oauth/token',
         new URLSearchParams({
           grant_type: 'refresh_token',
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken || ''
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
+          refresh_token: ctx.output.refreshToken
+        }).toString()
       );
-
-      let data = response.data;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Thanks.io',
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     }
   });

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BitqueryClient } from '../lib/client';
+import { BitqueryClient, toBitqueryNumber } from '../lib/client';
 import { spec } from '../spec';
 
 let transferOutputSchema = z.object({
@@ -66,7 +66,7 @@ Use this to monitor wallet activity, track specific token movements, or analyze 
   .handleInvocation(async ctx => {
     let client = new BitqueryClient({
       token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion as 'v1' | 'v2'
+      apiVersion: ctx.auth.apiVersion
     });
 
     let { blockchain, tokenAddress, senderAddress, receiverAddress, since, till, limit } =
@@ -77,6 +77,7 @@ Use this to monitor wallet activity, track specific token movements, or analyze 
     let transfers: z.infer<typeof transferOutputSchema>[] = [];
 
     if (blockchain === 'solana') {
+      client.requireV2('Solana convenience queries');
       let query = buildSolanaTransfersQuery(
         tokenAddress,
         senderAddress,
@@ -95,18 +96,18 @@ Use this to monitor wallet activity, track specific token movements, or analyze 
       let raw = data?.Solana?.Transfers || [];
 
       transfers = raw.map((t: any) => ({
-        blockTime: t.Block?.Time || '',
+        blockTime: t.Block?.Time,
         blockNumber: t.Block?.Slot,
-        transactionHash: t.Transaction?.Signature || '',
-        amount: t.Transfer?.Amount,
-        amountInUsd: t.Transfer?.AmountInUSD,
+        transactionHash: t.Transaction?.Signature,
+        amount: toBitqueryNumber(t.Transfer?.Amount),
+        amountInUsd: toBitqueryNumber(t.Transfer?.AmountInUSD),
         tokenSymbol: t.Transfer?.Currency?.Symbol,
         tokenName: t.Transfer?.Currency?.Name,
         tokenAddress: t.Transfer?.Currency?.MintAddress,
-        sender: t.Transfer?.Sender,
-        receiver: t.Transfer?.Receiver
+        sender: t.Transfer?.Sender?.Address,
+        receiver: t.Transfer?.Receiver?.Address
       }));
-    } else if (ctx.config.apiVersion === 'v1') {
+    } else if (ctx.auth.apiVersion === 'v1') {
       let query = buildV1TransfersQuery(
         tokenAddress,
         senderAddress,
@@ -129,14 +130,14 @@ Use this to monitor wallet activity, track specific token movements, or analyze 
       let raw = data?.ethereum?.transfers || [];
 
       transfers = raw.map((t: any) => ({
-        blockTime: t.block?.timestamp?.iso8601 || '',
+        blockTime: t.block?.timestamp?.iso8601,
         blockNumber: t.block?.height,
-        transactionHash: t.transaction?.hash || '',
-        amount: t.amount,
+        transactionHash: t.transaction?.hash,
+        amount: toBitqueryNumber(t.amount),
         tokenSymbol: t.currency?.symbol,
         tokenName: t.currency?.name,
         tokenAddress: t.currency?.address,
-        tokenDecimals: t.currency?.decimals,
+        tokenDecimals: toBitqueryNumber(t.currency?.decimals),
         sender: t.sender?.address,
         receiver: t.receiver?.address
       }));
@@ -159,15 +160,15 @@ Use this to monitor wallet activity, track specific token movements, or analyze 
       let raw = data?.EVM?.Transfers || [];
 
       transfers = raw.map((t: any) => ({
-        blockTime: t.Block?.Time || '',
+        blockTime: t.Block?.Time,
         blockNumber: t.Block?.Number,
-        transactionHash: t.Transaction?.Hash || '',
-        amount: t.Transfer?.Amount,
-        amountInUsd: t.Transfer?.AmountInUSD,
+        transactionHash: t.Transaction?.Hash,
+        amount: toBitqueryNumber(t.Transfer?.Amount),
+        amountInUsd: toBitqueryNumber(t.Transfer?.AmountInUSD),
         tokenSymbol: t.Transfer?.Currency?.Symbol,
         tokenName: t.Transfer?.Currency?.Name,
         tokenAddress: t.Transfer?.Currency?.SmartContract,
-        tokenDecimals: t.Transfer?.Currency?.Decimals,
+        tokenDecimals: toBitqueryNumber(t.Transfer?.Currency?.Decimals),
         sender: t.Transfer?.Sender,
         receiver: t.Transfer?.Receiver,
         transferType: t.Transfer?.Type
@@ -192,7 +193,7 @@ let mapToV1Network = (chain: string): string => {
     arbitrum: 'arbitrum',
     base: 'base',
     optimism: 'optimism',
-    avalanche: 'avalanche_c',
+    avalanche: 'avalanche',
     fantom: 'fantom',
     cronos: 'cronos'
   };
@@ -209,7 +210,10 @@ let buildV1TransfersQuery = (
   let filters: string[] = [
     'options: {limit: $limit, offset: $offset, desc: "block.timestamp.iso8601"}'
   ];
-  if (since || till) filters.push('date: {since: $since, till: $till}');
+  if (since || till)
+    filters.push(
+      `date: {${since ? 'since: $since' : ''}${since && till ? ', ' : ''}${till ? 'till: $till' : ''}}`
+    );
   if (token) filters.push('currency: {is: $currency}');
   if (sender) filters.push('sender: {is: $sender}');
   if (receiver) filters.push('receiver: {is: $receiver}');
@@ -292,8 +296,8 @@ let buildSolanaTransfersQuery = (
 ): string => {
   let transferFilters: string[] = [];
   if (token) transferFilters.push('Currency: {MintAddress: {is: $tokenAddress}}');
-  if (sender) transferFilters.push('Sender: {is: $senderAddress}');
-  if (receiver) transferFilters.push('Receiver: {is: $receiverAddress}');
+  if (sender) transferFilters.push('Sender: {Address: {is: $senderAddress}}');
+  if (receiver) transferFilters.push('Receiver: {Address: {is: $receiverAddress}}');
 
   let transferFilter =
     transferFilters.length > 0 ? `Transfer: {${transferFilters.join(', ')}}` : '';
@@ -324,7 +328,7 @@ let buildSolanaTransfersQuery = (
       Transfer {
         Amount AmountInUSD
         Currency { Symbol Name MintAddress }
-        Sender Receiver
+        Sender { Address } Receiver { Address }
       }
     }
   }

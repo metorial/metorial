@@ -17,7 +17,10 @@ export let getContacts = SlateTool.create(spec, {
       email: z.string().optional().describe('Filter contacts by email address.'),
       firstName: z.string().optional().describe('Filter contacts by first name.'),
       lastName: z.string().optional().describe('Filter contacts by last name.'),
-      limit: z.number().optional().describe('Maximum number of contacts to return.'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum number of contacts in this page. Defaults to 25.'),
       skip: z.number().optional().describe('Number of contacts to skip for pagination.')
     })
   )
@@ -35,10 +38,13 @@ export let getContacts = SlateTool.create(spec, {
           })
         )
         .describe('List of matching contacts.'),
-      totalCount: z
+      totalCount: z.number().optional().describe('Number of contacts returned in this page.'),
+      providerTotalCount: z
         .number()
         .optional()
-        .describe('Total number of matching contacts, if available.')
+        .describe('Total matching contacts reported by AMcards.'),
+      nextSkip: z.number().optional().describe('Offset for the next page, when available.'),
+      rawResponse: z.any().optional().describe('Full response from the AMcards API.')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,19 +58,22 @@ export let getContacts = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let contacts = results.map((c: any) => ({
+    let contacts = results.items.map(c => ({
       contactId: c.id != null ? String(c.id) : undefined,
       firstName: c.first_name ?? undefined,
       lastName: c.last_name ?? undefined,
-      email: c.email ?? undefined,
-      createdAt: c.created_at ?? undefined,
-      updatedAt: c.updated_at ?? undefined
+      email: c.email_address ?? c.email ?? undefined,
+      createdAt: c.added ?? c.created_at ?? undefined,
+      updatedAt: c.updated ?? c.updated_at ?? undefined
     }));
 
     return {
       output: {
         contacts,
-        totalCount: contacts.length
+        totalCount: contacts.length,
+        providerTotalCount: results.providerTotalCount,
+        nextSkip: results.nextSkip,
+        rawResponse: results.rawResponse
       },
       message: `Found **${contacts.length}** contact(s)${ctx.input.email ? ` matching email "${ctx.input.email}"` : ''}${ctx.input.firstName ? ` with first name "${ctx.input.firstName}"` : ''}${ctx.input.lastName ? ` with last name "${ctx.input.lastName}"` : ''}.`
     };

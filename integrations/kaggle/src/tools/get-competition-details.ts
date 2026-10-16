@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import { kaggleList, kaggleRecord, kaggleSummary } from '../lib/responses';
 import { spec } from '../spec';
 
 let fileSchema = z
@@ -51,6 +52,22 @@ export let getCompetitionDetails = SlateTool.create(spec, {
         .describe(
           'The competition slug/name (e.g., "titanic", "house-prices-advanced-regression-techniques")'
         ),
+      filePageToken: z
+        .string()
+        .optional()
+        .describe('Token for the next page of competition files.'),
+      filePageSize: z
+        .number()
+        .optional()
+        .describe('Maximum number of competition files to return.'),
+      submissionPage: z
+        .number()
+        .optional()
+        .describe('Page of submission history, starting at 1.'),
+      submissionPageSize: z
+        .number()
+        .optional()
+        .describe('Maximum number of submissions to return.'),
       includeFiles: z
         .boolean()
         .optional()
@@ -67,6 +84,14 @@ export let getCompetitionDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextFilePageToken: z
+        .string()
+        .optional()
+        .describe('Token for the next page of data files.'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Original provider responses.'),
       files: z.array(fileSchema).optional().describe('Competition data files'),
       leaderboard: z
         .array(leaderboardEntrySchema)
@@ -80,24 +105,43 @@ export let getCompetitionDetails = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new KaggleClient(ctx.auth);
-    let result: Record<string, any> = {};
+    let result: Record<string, any> = { raw: {} };
     let parts: string[] = [];
 
     if (ctx.input.includeFiles !== false) {
-      let filesData = await client.listCompetitionFiles(ctx.input.competitionSlug);
-      result.files = filesData?.dataFiles ?? filesData ?? [];
+      let filesData = await client.listCompetitionFiles(ctx.input.competitionSlug, {
+        pageToken: ctx.input.filePageToken,
+        pageSize: ctx.input.filePageSize
+      });
+      result.raw.files = filesData;
+      result.files = kaggleList(filesData, ['dataFiles', 'files'], 'competition files').map(
+        item => kaggleSummary(item, 'competition file')
+      );
+      if (!Array.isArray(filesData)) {
+        let token = kaggleRecord(filesData, 'competition files').nextPageToken;
+        if (typeof token === 'string') result.nextFilePageToken = token;
+      }
       parts.push(`${(result.files as any[]).length} file(s)`);
     }
 
     if (ctx.input.includeLeaderboard) {
       let leaderboard = await client.viewCompetitionLeaderboard(ctx.input.competitionSlug);
-      result.leaderboard = leaderboard?.submissions ?? leaderboard ?? [];
+      result.raw.leaderboard = leaderboard;
+      result.leaderboard = kaggleList(leaderboard, ['submissions'], 'leaderboard').map(item =>
+        kaggleSummary(item, 'leaderboard entry')
+      );
       parts.push(`${(result.leaderboard as any[]).length} leaderboard entry(ies)`);
     }
 
     if (ctx.input.includeSubmissions) {
-      let submissions = await client.listCompetitionSubmissions(ctx.input.competitionSlug);
-      result.submissions = submissions ?? [];
+      let submissions = await client.listCompetitionSubmissions(ctx.input.competitionSlug, {
+        page: ctx.input.submissionPage,
+        pageSize: ctx.input.submissionPageSize
+      });
+      result.raw.submissions = submissions;
+      result.submissions = kaggleList(submissions, ['submissions'], 'submissions').map(item =>
+        kaggleSummary(item, 'submission')
+      );
       parts.push(`${(result.submissions as any[]).length} submission(s)`);
     }
 

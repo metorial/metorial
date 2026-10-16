@@ -1,0 +1,265 @@
+{
+  "base": "c455f13e5899b077e59260226c1c56dd9e41c158",
+  "tools": {
+    "manage_schedule": {
+      "replacement": "manage_recurring_schedule",
+      "file": "tools/manage-schedule.ts",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The unique ID of the Sensibo device"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["list", "create", "update", "delete"],
+            "description": "Action to perform"
+          },
+          "scheduleId": {
+            "description": "Schedule ID (required for update and delete)",
+            "type": "string"
+          },
+          "isEnabled": {
+            "description": "Whether the schedule is enabled (for create/update)",
+            "type": "boolean"
+          },
+          "recurOnDaysOfWeek": {
+            "description": "Days of week (e.g. [\"Monday\", \"Wednesday\", \"Friday\"])",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeOfDay": {
+            "description": "Time of day in HH:MM format (24-hour)",
+            "type": "string"
+          },
+          "acState": {
+            "description": "AC state to apply when the schedule fires",
+            "type": "object",
+            "properties": {
+              "on": {
+                "type": "boolean"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["cool", "heat", "fan", "dry", "auto"]
+              },
+              "targetTemperature": {
+                "type": "number"
+              },
+              "temperatureUnit": {
+                "type": "string",
+                "enum": ["C", "F"]
+              },
+              "fanLevel": {
+                "type": "string"
+              },
+              "swing": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["deviceId", "action"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The device the schedule(s) belong to"
+          },
+          "schedules": {
+            "description": "List of schedules (for list action)",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scheduleId": {
+                  "type": "string",
+                  "description": "Unique ID of the schedule"
+                },
+                "isEnabled": {
+                  "type": "boolean",
+                  "description": "Whether the schedule is enabled"
+                },
+                "recurOnDaysOfWeek": {
+                  "description": "Days of week the schedule recurs on",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "timeOfDay": {
+                  "description": "Time of day for the schedule (HH:MM)",
+                  "type": "string"
+                },
+                "acState": {
+                  "description": "AC state to apply when the schedule fires",
+                  "type": "object",
+                  "properties": {
+                    "on": {
+                      "type": "boolean"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["cool", "heat", "fan", "dry", "auto"]
+                    },
+                    "targetTemperature": {
+                      "type": "number"
+                    },
+                    "temperatureUnit": {
+                      "type": "string",
+                      "enum": ["C", "F"]
+                    },
+                    "fanLevel": {
+                      "type": "string"
+                    },
+                    "swing": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": ["scheduleId", "isEnabled"],
+              "additionalProperties": false
+            }
+          },
+          "schedule": {
+            "description": "The created/updated schedule",
+            "type": "object",
+            "properties": {
+              "scheduleId": {
+                "type": "string",
+                "description": "Unique ID of the schedule"
+              },
+              "isEnabled": {
+                "type": "boolean",
+                "description": "Whether the schedule is enabled"
+              },
+              "recurOnDaysOfWeek": {
+                "description": "Days of week the schedule recurs on",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "timeOfDay": {
+                "description": "Time of day for the schedule (HH:MM)",
+                "type": "string"
+              },
+              "acState": {
+                "description": "AC state to apply when the schedule fires",
+                "type": "object",
+                "properties": {
+                  "on": {
+                    "type": "boolean"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": ["cool", "heat", "fan", "dry", "auto"]
+                  },
+                  "targetTemperature": {
+                    "type": "number"
+                  },
+                  "temperatureUnit": {
+                    "type": "string",
+                    "enum": ["C", "F"]
+                  },
+                  "fanLevel": {
+                    "type": "string"
+                  },
+                  "swing": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["scheduleId", "isEnabled"],
+            "additionalProperties": false
+          },
+          "deleted": {
+            "description": "Whether the schedule was deleted",
+            "type": "boolean"
+          }
+        },
+        "required": ["deviceId"],
+        "additionalProperties": false
+      },
+      "handler": ".handleInvocation(async ctx => {\n    let client = new SensiboClient(ctx.auth.token);\n    let { deviceId, action } = ctx.input;\n\n    if (action === 'list') {\n      let schedules = await client.listSchedules(deviceId);\n      let mapped = (schedules || []).map((s: any) => ({\n        scheduleId: s.id,\n        isEnabled: s.isEnabled,\n        recurOnDaysOfWeek: s.recurOnDaysOfWeek,\n        timeOfDay: s.timeOfDay,\n        acState: s.acState\n          ? {\n              on: s.acState.on,\n              mode: s.acState.mode,\n              targetTemperature: s.acState.targetTemperature,\n              temperatureUnit: s.acState.temperatureUnit,\n              fanLevel: s.acState.fanLevel,\n              swing: s.acState.swing\n            }\n          : undefined\n      }));\n\n      return {\n        output: { deviceId, schedules: mapped },\n        message: `Found **${mapped.length}** schedule(s) for device **${deviceId}**.`\n      };\n    }\n\n    if (action === 'delete') {\n      await client.deleteSchedule(deviceId, ctx.input.scheduleId!);\n      return {\n        output: { deviceId, deleted: true },\n        message: `Deleted schedule **${ctx.input.scheduleId}** from device **${deviceId}**.`\n      };\n    }\n\n    if (action === 'create') {\n      let scheduleData: Record<string, any> = {\n        isEnabled: ctx.input.isEnabled ?? true,\n        recurOnDaysOfWeek: ctx.input.recurOnDaysOfWeek,\n        timeOfDay: ctx.input.timeOfDay,\n        acState: ctx.input.acState\n      };\n      let result = await client.createSchedule(deviceId, scheduleData);\n      return {\n        output: {\n          deviceId,\n          schedule: {\n            scheduleId: result.id,\n            isEnabled: result.isEnabled,\n            recurOnDaysOfWeek: result.recurOnDaysOfWeek,\n            timeOfDay: result.timeOfDay,\n            acState: result.acState\n          }\n        },\n        message: `Created schedule **${result.id}** on device **${deviceId}** for ${ctx.input.recurOnDaysOfWeek?.join(', ')} at ${ctx.input.timeOfDay}.`\n      };\n    }\n\n    // action === 'update'\n    let updateData: Record<string, any> = {};\n    if (ctx.input.isEnabled !== undefined) updateData.isEnabled = ctx.input.isEnabled;\n    if (ctx.input.recurOnDaysOfWeek)\n      updateData.recurOnDaysOfWeek = ctx.input.recurOnDaysOfWeek;\n    if (ctx.input.timeOfDay) updateData.timeOfDay = ctx.input.timeOfDay;\n    if (ctx.input.acState) updateData.acState = ctx.input.acState;\n\n    let result = await client.updateSchedule(deviceId, ctx.input.scheduleId!, updateData);\n    return {\n      output: {\n        deviceId,\n        schedule: {\n          scheduleId: result.id || ctx.input.scheduleId!,\n          isEnabled: result.isEnabled,\n          recurOnDaysOfWeek: result.recurOnDaysOfWeek,\n          timeOfDay: result.timeOfDay,\n          acState: result.acState\n        }\n      },\n      message: `Updated schedule **${ctx.input.scheduleId}** on device **${deviceId}**.`\n    };\n  })\n"
+    },
+    "get_door_sensor_events": {
+      "replacement": "get_door_sensor_history",
+      "file": "tools/get-door-sensor-events.ts",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The unique ID of the Sensibo device with a door/window sensor"
+          },
+          "days": {
+            "description": "Number of days of history to retrieve (1-7, default 1)",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 7
+          }
+        },
+        "required": ["deviceId"],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The device the sensor belongs to"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "eventId": {
+                  "description": "Unique event identifier",
+                  "type": "string"
+                },
+                "state": {
+                  "description": "Sensor state (open or closed)",
+                  "type": "string"
+                },
+                "timestamp": {
+                  "description": "ISO 8601 timestamp of the event",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "description": "List of door/window sensor events"
+          }
+        },
+        "required": ["deviceId", "events"],
+        "additionalProperties": false
+      },
+      "handler": ".handleInvocation(async ctx => {\n    let client = new SensiboClient(ctx.auth.token);\n    let days = ctx.input.days ?? 1;\n\n    let rawEvents = await client.getDoorSensorEvents(ctx.input.deviceId, days);\n\n    let events = (rawEvents || []).map((e: any) => ({\n      eventId: e.id,\n      state: e.state,\n      timestamp: e.time?.time || e.timestamp\n    }));\n\n    return {\n      output: {\n        deviceId: ctx.input.deviceId,\n        events\n      },\n      message: `Retrieved **${events.length}** door/window sensor event(s) from device **${ctx.input.deviceId}** over the last ${days} day(s).`\n    };\n  })\n"
+    }
+  },
+  "methods": {
+    "listSchedules": "  async listSchedules(deviceId: string): Promise<any[]> {\n    let response = await this.http.get(`/pods/${deviceId}/schedules`);\n    return response.data.result;\n  }",
+    "createSchedule": "  async createSchedule(deviceId: string, schedule: Record<string, any>): Promise<any> {\n    let response = await this.http.post(`/pods/${deviceId}/schedules`, schedule);\n    return response.data.result;\n  }",
+    "getSchedule": "  async getSchedule(deviceId: string, scheduleId: string): Promise<any> {\n    let response = await this.http.get(`/pods/${deviceId}/schedules/${scheduleId}`);\n    return response.data.result;\n  }",
+    "updateSchedule": "  async updateSchedule(\n    deviceId: string,\n    scheduleId: string,\n    schedule: Record<string, any>\n  ): Promise<any> {\n    let response = await this.http.put(`/pods/${deviceId}/schedules/${scheduleId}`, schedule);\n    return response.data.result;\n  }",
+    "deleteSchedule": "  async deleteSchedule(deviceId: string, scheduleId: string): Promise<void> {\n    await this.http.delete(`/pods/${deviceId}/schedules/${scheduleId}`);\n  }",
+    "getDoorSensorEvents": "  async getDoorSensorEvents(deviceId: string, days: number = 1): Promise<any[]> {\n    let response = await this.http.get(`/pods/${deviceId}/doorSensors/events`, {\n      params: { days }\n    });\n    return response.data.result;\n  }"
+  }
+}

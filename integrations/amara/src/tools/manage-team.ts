@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageTeam = SlateTool.create(spec, {
   key: 'manage_team',
   description: `Create a new team or update an existing team's settings including name, description, visibility, and membership/video policies. For creation, provide "name" and "slug". For updates, provide "teamSlug" and the fields to change.`,
   instructions: [
-    'To create a new team, provide name, slug, and optionally type. Team creation is restricted to Amara partners.',
+    'To create a new team, provide name, slug, and type. Team creation is restricted to Amara partners.',
     'To update a team, provide teamSlug with the fields you want to change.'
   ]
 })
@@ -23,7 +23,7 @@ export let manageTeam = SlateTool.create(spec, {
       type: z
         .enum(['default', 'simple', 'collaboration'])
         .optional()
-        .describe('Team type (only for creation)'),
+        .describe('Team type (required for creation)'),
       description: z.string().optional().describe('Team description'),
       teamVisibility: z
         .enum(['private', 'unlisted', 'public'])
@@ -62,8 +62,10 @@ export let manageTeam = SlateTool.create(spec, {
 
     let team: any;
     if (isCreate) {
-      if (!ctx.input.name || !ctx.input.slug) {
-        throw new Error('name and slug are required when creating a new team');
+      if (!ctx.input.name || !ctx.input.slug || !ctx.input.type) {
+        throw createApiServiceError(
+          'name, slug, and type are required when creating a new team'
+        );
       }
       team = await client.createTeam({
         name: ctx.input.name,

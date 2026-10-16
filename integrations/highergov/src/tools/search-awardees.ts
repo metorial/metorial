@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type PaginatedResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchAwardees = SlateTool.create(spec, {
@@ -31,7 +31,9 @@ export let searchAwardees = SlateTool.create(spec, {
       awardeeKeyParent: z
         .number()
         .optional()
-        .describe('HigherGov parent-level awardee key to find subsidiaries'),
+        .describe(
+          'HigherGov parent-level awardee key; finds subsidiaries for awardee lookups, or filters mentor/prime parents for relationship lookups'
+        ),
       primaryNaics: z.string().optional().describe('Primary NAICS code to filter by industry'),
       registrationLastUpdateDate: z
         .string()
@@ -46,6 +48,16 @@ export let searchAwardees = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('HigherGov awardee key for protege (mentor_protege only)'),
+      awardeeKeyMentorParent: z
+        .number()
+        .optional()
+        .describe(
+          'HigherGov parent mentor awardee key (mentor_protege only); must agree with awardeeKeyParent when both are provided'
+        ),
+      awardeeKeyProtegeParent: z
+        .number()
+        .optional()
+        .describe('HigherGov parent protege awardee key (mentor_protege only)'),
       // Partnership filters
       awardeeKeyPrime: z
         .number()
@@ -55,7 +67,20 @@ export let searchAwardees = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('HigherGov awardee key for subcontractor (partnership only)'),
-      ordering: z.string().optional().describe('Sort order for results'),
+      awardeeKeyPrimeParent: z
+        .number()
+        .optional()
+        .describe(
+          'HigherGov parent prime awardee key (partnership only); must agree with awardeeKeyParent when both are provided'
+        ),
+      awardeeKeySubParent: z
+        .number()
+        .optional()
+        .describe('HigherGov parent subcontractor awardee key (partnership only)'),
+      ordering: z
+        .string()
+        .optional()
+        .describe('Sort order for awardee lookups; omit for relationship lookups'),
       pageNumber: z.number().optional().describe('Page number for pagination (starts at 1)'),
       pageSize: z
         .number()
@@ -75,20 +100,67 @@ export let searchAwardees = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let input = ctx.input;
 
-    let response: any;
+    let branchFilters = {
+      awardee: ['uei', 'cageCode', 'primaryNaics', 'registrationLastUpdateDate', 'ordering'],
+      mentor_protege: [
+        'awardeeKeyMentor',
+        'awardeeKeyMentorParent',
+        'awardeeKeyProtege',
+        'awardeeKeyProtegeParent'
+      ],
+      partnership: [
+        'awardeeKeyPrime',
+        'awardeeKeyPrimeParent',
+        'awardeeKeySub',
+        'awardeeKeySubParent'
+      ]
+    } as const;
+    for (let [branch, fields] of Object.entries(branchFilters)) {
+      if (branch === input.lookupType) continue;
+      for (let field of fields) {
+        if (input[field] !== undefined)
+          throw createApiServiceError(
+            `${field} is supported only for ${branch} lookups. Choose that lookupType or omit this filter.`
+          );
+      }
+    }
+    if (
+      input.lookupType === 'mentor_protege' &&
+      input.awardeeKeyParent !== undefined &&
+      input.awardeeKeyMentorParent !== undefined &&
+      input.awardeeKeyParent !== input.awardeeKeyMentorParent
+    ) {
+      throw createApiServiceError(
+        'awardeeKeyParent and awardeeKeyMentorParent must agree when both are provided.'
+      );
+    }
+    if (
+      input.lookupType === 'partnership' &&
+      input.awardeeKeyParent !== undefined &&
+      input.awardeeKeyPrimeParent !== undefined &&
+      input.awardeeKeyParent !== input.awardeeKeyPrimeParent
+    ) {
+      throw createApiServiceError(
+        'awardeeKeyParent and awardeeKeyPrimeParent must agree when both are provided.'
+      );
+    }
+
+    let response: PaginatedResponse<Record<string, unknown>>;
     if (input.lookupType === 'mentor_protege') {
       response = await client.getAwardeeMentorProtege({
         awardeeKeyMentor: input.awardeeKeyMentor,
-        awardeeKeyMentorParent: input.awardeeKeyParent,
+        awardeeKeyMentorParent: input.awardeeKeyMentorParent ?? input.awardeeKeyParent,
         awardeeKeyProtege: input.awardeeKeyProtege,
+        awardeeKeyProtegeParent: input.awardeeKeyProtegeParent,
         pageNumber: input.pageNumber,
         pageSize: input.pageSize
       });
     } else if (input.lookupType === 'partnership') {
       response = await client.getAwardeePartnerships({
         awardeeKeyPrime: input.awardeeKeyPrime,
-        awardeeKeyPrimeParent: input.awardeeKeyParent,
+        awardeeKeyPrimeParent: input.awardeeKeyPrimeParent ?? input.awardeeKeyParent,
         awardeeKeySub: input.awardeeKeySub,
+        awardeeKeySubParent: input.awardeeKeySubParent,
         pageNumber: input.pageNumber,
         pageSize: input.pageSize
       });

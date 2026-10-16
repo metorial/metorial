@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -33,6 +34,7 @@ export let createContact = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.any()).optional().describe('Original provider response'),
       contactUuid: z.string().describe('UUID of the created/found contact'),
       email: z.string().optional().describe('Email address'),
       createdAt: z.string().optional().describe('ISO 8601 creation timestamp')
@@ -45,23 +47,25 @@ export let createContact = SlateTool.create(spec, {
     if (ctx.input.mode === 'anonymous') {
       result = await client.createAnonymousContact(ctx.input.contactIdentifierValue);
     } else if (ctx.input.mode === 'findOrCreate') {
-      if (!ctx.input.email) throw new Error('Email is required for findOrCreate mode');
+      if (!ctx.input.email)
+        throw createApiServiceError('Email is required for findOrCreate mode');
       result = await client.findOrCreateContact(ctx.input.email);
     } else {
-      if (!ctx.input.email) throw new Error('Email is required for create mode');
+      if (!ctx.input.email) throw createApiServiceError('Email is required for create mode');
       result = await client.createContact({
         email: ctx.input.email,
         referralCode: ctx.input.referralCode
       });
     }
 
-    let contact = result.data || result;
+    let contact = result.data;
 
     return {
       output: {
-        contactUuid: contact.uuid,
-        email: contact.email,
-        createdAt: contact.created_at
+        raw: contact,
+        contactUuid: requiredString(contact.uuid, 'contact UUID'),
+        email: contact.email ?? undefined,
+        createdAt: contact.created_at ?? contact.current_values?.created_at ?? undefined
       },
       message: `Contact **${contact.email || contact.uuid}** ${ctx.input.mode === 'findOrCreate' ? 'found or created' : 'created'} successfully.`
     };

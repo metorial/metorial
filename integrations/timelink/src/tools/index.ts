@@ -1,3 +1,4 @@
+export * from './current-records';
 export * from './list-users';
 export * from './manage-client';
 export * from './manage-project';

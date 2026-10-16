@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let organizerOutputSchema = z.object({
@@ -25,12 +26,7 @@ export let manageOrganizer = SlateTool.create(spec, {
     z.object({
       action: z.enum(['get', 'create']).describe('The action to perform.'),
       organizerId: z.string().optional().describe('The organizer ID (required for get).'),
-      organizationId: z
-        .string()
-        .optional()
-        .describe(
-          'The organization ID (required for create). Falls back to configured value.'
-        ),
+      organizationId: organizationIdSchema,
       name: z.string().optional().describe('Organizer name (required for create).'),
       description: z.string().optional().describe('HTML description of the organizer.'),
       website: z.string().optional().describe('External website URL.')
@@ -46,16 +42,17 @@ export let manageOrganizer = SlateTool.create(spec, {
 
     let mapOrganizer = (o: any) => ({
       organizerId: o.id,
-      name: o.name,
-      description: o.description?.html,
-      url: o.url,
-      website: o.website,
-      numPastEvents: o.num_past_events,
-      numFutureEvents: o.num_future_events
+      name: o.name ?? undefined,
+      description: o.description?.html ?? undefined,
+      url: o.url ?? undefined,
+      website: o.website ?? undefined,
+      numPastEvents: o.num_past_events ?? undefined,
+      numFutureEvents: o.num_future_events ?? undefined
     });
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.organizerId) throw new Error('Organizer ID is required for get.');
+      if (!ctx.input.organizerId)
+        throw createApiServiceError('Organizer ID is required for get.');
       let organizer = await client.getOrganizer(ctx.input.organizerId);
       return {
         output: { organizer: mapOrganizer(organizer) },
@@ -65,8 +62,8 @@ export let manageOrganizer = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       let orgId = ctx.input.organizationId || ctx.config.organizationId;
-      if (!orgId) throw new Error('Organization ID is required for create.');
-      if (!ctx.input.name) throw new Error('Organizer name is required.');
+      if (!orgId) throw createApiServiceError('Organization ID is required for create.');
+      if (!ctx.input.name) throw createApiServiceError('Organizer name is required.');
 
       let organizer = await client.createOrganizer(orgId, {
         name: ctx.input.name,
@@ -80,6 +77,6 @@ export let manageOrganizer = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

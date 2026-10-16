@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as dns from '../lib/dns';
 import { spec } from '../spec';
@@ -38,7 +38,8 @@ export let listDnsZones = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await dns.listDnsZones(
       ctx.auth,
@@ -103,9 +104,11 @@ export let manageDnsZone = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'create') {
       let folderId = ctx.input.folderId || ctx.config.folderId;
-      if (!folderId) throw new Error('folderId is required for DNS zone creation');
-      if (!ctx.input.name) throw new Error('name is required for DNS zone creation');
-      if (!ctx.input.zone) throw new Error('zone is required for DNS zone creation');
+      if (!folderId) throw createApiServiceError('folderId is required for DNS zone creation');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for DNS zone creation');
+      if (!ctx.input.zone)
+        throw createApiServiceError('zone is required for DNS zone creation');
 
       let result = await dns.createDnsZone(ctx.auth, {
         folderId,
@@ -125,19 +128,20 @@ export let manageDnsZone = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           dnsZoneId: result.metadata?.dnsZoneId,
-          done: result.done || false
+          done: result.done
         },
         message: `DNS zone **${ctx.input.name}** (${ctx.input.zone}) creation initiated.`
       };
     } else {
-      if (!ctx.input.dnsZoneId) throw new Error('dnsZoneId is required for deletion');
+      if (!ctx.input.dnsZoneId)
+        throw createApiServiceError('dnsZoneId is required for deletion');
 
       let result = await dns.deleteDnsZone(ctx.auth, ctx.input.dnsZoneId);
 
       return {
         output: {
           operationId: result.id,
-          done: result.done || false
+          done: result.done
         },
         message: `DNS zone **${ctx.input.dnsZoneId}** deletion initiated.`
       };
@@ -183,7 +187,7 @@ export let listRecordSets = SlateTool.create(spec, {
     let records = (result.recordSets || []).map((r: any) => ({
       name: r.name,
       type: r.type,
-      ttl: r.ttl ? Number(r.ttl) : undefined,
+      ttl: r.ttl !== undefined ? Number(r.ttl) : undefined,
       data: r.data
     }));
 
@@ -200,7 +204,7 @@ export let listRecordSets = SlateTool.create(spec, {
 export let upsertDnsRecords = SlateTool.create(spec, {
   name: 'Upsert DNS Records',
   key: 'upsert_dns_records',
-  description: `Create or update DNS record sets in a Yandex Cloud DNS zone. Uses upsert semantics — existing records with the same name and type are replaced.`,
+  description: `Create or merge DNS record sets in a Yandex Cloud DNS zone. Submits the provided record data as merges; it does not request whole-record-set replacement.`,
   tags: { destructive: true }
 })
   .input(
@@ -232,7 +236,7 @@ export let upsertDnsRecords = SlateTool.create(spec, {
     return {
       output: {
         operationId: result.id,
-        done: result.done || false
+        done: result.done
       },
       message: `Upserted ${ctx.input.records.length} record set(s) in DNS zone ${ctx.input.dnsZoneId}.`
     };

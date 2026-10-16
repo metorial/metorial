@@ -1,11 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  rawSchema,
+  requiredString,
+  responseArray,
+  responseData,
+  responseRecord
+} from '../lib/responses';
 import { spec } from '../spec';
 
 let boardSchema = z.object({
   boardId: z.string().describe('Board identifier to use when scheduling Pinterest posts'),
-  name: z.string().describe('Board display name')
+  name: z.string().describe('Board display name'),
+  raw: rawSchema
 });
 
 export let listPinterestBoards = SlateTool.create(spec, {
@@ -33,15 +41,17 @@ export let listPinterestBoards = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.getPinterestBoards(ctx.input.channelId);
-    let data = result.data || result;
-    let boards = (data.boards || data || []).map((b: any) => ({
-      boardId: b.value || b.id,
-      name: b.label || b.name
-    }));
-
-    return {
-      output: { boards },
-      message: `Found ${boards.length} Pinterest board(s).`
-    };
+    let data = responseData(await client.getPinterestBoards(ctx.input.channelId));
+    let values = Array.isArray(data)
+      ? data
+      : responseRecord(data, 'Pinterest response').boards;
+    let boards = responseArray(values, 'Pinterest boards').map(value => {
+      let board = responseRecord(value, 'Pinterest board');
+      return {
+        boardId: requiredString(board.value ?? board.id, 'board ID'),
+        name: requiredString(board.label ?? board.name, 'board name'),
+        raw: board
+      };
+    });
+    return { output: { boards }, message: `Found ${boards.length} Pinterest board(s).` };
   });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getAttributes, getResource, requireOperationResponse } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageProject = SlateTool.create(spec, {
@@ -61,11 +62,14 @@ export let manageProject = SlateTool.create(spec, {
         break;
     }
 
+    let attributes = action === 'create' ? getAttributes(getResource(result)) : undefined;
+    if (action !== 'create') requireOperationResponse(result, 'project operation');
+
     return {
       output: {
         success: true,
-        projectId: result?.project_id ? String(result.project_id) : null,
-        projectName: result?.category ?? projectName,
+        projectId: attributes?.project_id == null ? null : String(attributes.project_id),
+        projectName: attributes?.name ?? attributes?.category ?? null,
         rawResponse: result
       },
       message

@@ -55,19 +55,13 @@ export let shortenUrl = SlateTool.create(spec, {
       utmContent: ctx.input.utmContent
     });
 
-    let shortUrl = result.response?.data?.key
-      ? `https://l2s.is/${result.response.data.key}`
-      : undefined;
-
     return {
       output: {
         ok: result.ok,
-        message: result.response?.message ?? 'URL shortened',
+        message: result.response.message,
         urlData: result.response?.data
       },
-      message: shortUrl
-        ? `Shortened URL created: **${shortUrl}** pointing to ${ctx.input.url}`
-        : `URL shortening completed. Status: ${result.response?.message ?? 'success'}`
+      message: 'Shortened URL created.'
     };
   })
   .build();

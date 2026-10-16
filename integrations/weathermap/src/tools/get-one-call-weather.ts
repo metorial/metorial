@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpenWeatherClient } from '../lib/client';
+import { weatherArray, weatherString, weatherTimestamp } from '../lib/validation';
 import { spec } from '../spec';
 
 let weatherConditionSchema = z.object({
@@ -26,6 +27,8 @@ let currentWeatherSchema = z
     windSpeed: z.number().optional().describe('Wind speed'),
     windDirection: z.number().optional().describe('Wind direction in degrees'),
     windGust: z.number().optional().describe('Wind gust speed'),
+    rainLastHour: z.number().optional().describe('Rain precipitation in mm/h'),
+    snowLastHour: z.number().optional().describe('Snow precipitation in mm/h'),
     conditions: z.array(weatherConditionSchema).describe('Weather conditions')
   })
   .optional();
@@ -44,6 +47,8 @@ let hourlyForecastSchema = z.object({
   windDirection: z.number().optional().describe('Wind direction in degrees'),
   windGust: z.number().optional().describe('Wind gust speed'),
   precipitationProbability: z.number().optional().describe('Probability of precipitation'),
+  rainVolume: z.number().optional().describe('Rain forecast intensity in mm/h'),
+  snowVolume: z.number().optional().describe('Snow forecast intensity in mm/h'),
   conditionGroup: z.string().describe('Weather condition group'),
   conditionDescription: z.string().describe('Weather condition description')
 });
@@ -111,6 +116,15 @@ export let getOneCallWeather = SlateTool.create(spec, {
       timezone: z.string().describe('Timezone name (e.g. "America/New_York")'),
       timezoneOffset: z.number().describe('Shift in seconds from UTC'),
       current: currentWeatherSchema.describe('Current weather conditions'),
+      minutelyForecasts: z
+        .array(
+          z.object({
+            timestamp: z.string().describe('Forecast time (ISO 8601)'),
+            precipitation: z.number().describe('Precipitation in mm/h')
+          })
+        )
+        .optional()
+        .describe('Minute precipitation forecast for 1 hour, when provided'),
       hourlyForecasts: z
         .array(hourlyForecastSchema)
         .optional()
@@ -136,7 +150,7 @@ export let getOneCallWeather = SlateTool.create(spec, {
     );
 
     let mapConditions = (weather: any[]) =>
-      (weather || []).map((w: any) => ({
+      weatherArray(weather).map((w: any) => ({
         conditionId: w.id,
         group: w.main,
         description: w.description,
@@ -145,72 +159,79 @@ export let getOneCallWeather = SlateTool.create(spec, {
 
     let current = data.current
       ? {
-          timestamp: new Date(data.current.dt * 1000).toISOString(),
-          sunrise: data.current.sunrise
-            ? new Date(data.current.sunrise * 1000).toISOString()
-            : undefined,
-          sunset: data.current.sunset
-            ? new Date(data.current.sunset * 1000).toISOString()
-            : undefined,
+          timestamp: weatherTimestamp(data.current.dt),
+          sunrise: data.current.sunrise ? weatherTimestamp(data.current.sunrise) : undefined,
+          sunset: data.current.sunset ? weatherTimestamp(data.current.sunset) : undefined,
           temperature: data.current.temp,
           feelsLike: data.current.feels_like,
           pressure: data.current.pressure,
           humidity: data.current.humidity,
-          dewPoint: data.current.dew_point,
-          uvIndex: data.current.uvi,
-          cloudiness: data.current.clouds,
-          visibility: data.current.visibility,
-          windSpeed: data.current.wind_speed,
-          windDirection: data.current.wind_deg,
-          windGust: data.current.wind_gust,
+          dewPoint: data.current.dew_point ?? undefined,
+          uvIndex: data.current.uvi ?? undefined,
+          cloudiness: data.current.clouds ?? undefined,
+          visibility: data.current.visibility ?? undefined,
+          windSpeed: data.current.wind_speed ?? undefined,
+          windDirection: data.current.wind_deg ?? undefined,
+          windGust: data.current.wind_gust ?? undefined,
+          rainLastHour: data.current.rain?.['1h'] ?? undefined,
+          snowLastHour: data.current.snow?.['1h'] ?? undefined,
           conditions: mapConditions(data.current.weather)
         }
       : undefined;
 
+    let minutelyForecasts = data.minutely
+      ? data.minutely.map((entry: any) => ({
+          timestamp: weatherTimestamp(entry.dt),
+          precipitation: entry.precipitation
+        }))
+      : undefined;
+
     let hourlyForecasts = data.hourly
       ? data.hourly.map((h: any) => ({
-          timestamp: new Date(h.dt * 1000).toISOString(),
+          timestamp: weatherTimestamp(h.dt),
           temperature: h.temp,
           feelsLike: h.feels_like,
           pressure: h.pressure,
           humidity: h.humidity,
-          dewPoint: h.dew_point,
-          uvIndex: h.uvi,
-          cloudiness: h.clouds,
-          visibility: h.visibility,
-          windSpeed: h.wind_speed,
-          windDirection: h.wind_deg,
-          windGust: h.wind_gust,
-          precipitationProbability: h.pop,
-          conditionGroup: h.weather?.[0]?.main || '',
-          conditionDescription: h.weather?.[0]?.description || ''
+          dewPoint: h.dew_point ?? undefined,
+          uvIndex: h.uvi ?? undefined,
+          cloudiness: h.clouds ?? undefined,
+          visibility: h.visibility ?? undefined,
+          windSpeed: h.wind_speed ?? undefined,
+          windDirection: h.wind_deg ?? undefined,
+          windGust: h.wind_gust ?? undefined,
+          precipitationProbability: h.pop ?? undefined,
+          rainVolume: h.rain?.['1h'] ?? undefined,
+          snowVolume: h.snow?.['1h'] ?? undefined,
+          conditionGroup: weatherString(h.weather?.[0]?.main),
+          conditionDescription: weatherString(h.weather?.[0]?.description)
         }))
       : undefined;
 
     let dailyForecasts = data.daily
       ? data.daily.map((d: any) => ({
-          timestamp: new Date(d.dt * 1000).toISOString(),
-          sunrise: d.sunrise ? new Date(d.sunrise * 1000).toISOString() : undefined,
-          sunset: d.sunset ? new Date(d.sunset * 1000).toISOString() : undefined,
+          timestamp: weatherTimestamp(d.dt),
+          sunrise: d.sunrise ? weatherTimestamp(d.sunrise) : undefined,
+          sunset: d.sunset ? weatherTimestamp(d.sunset) : undefined,
           temperatureDay: d.temp.day,
           temperatureNight: d.temp.night,
           temperatureMin: d.temp.min,
           temperatureMax: d.temp.max,
-          temperatureMorning: d.temp.morn,
-          temperatureEvening: d.temp.eve,
-          pressure: d.pressure,
-          humidity: d.humidity,
-          dewPoint: d.dew_point,
-          windSpeed: d.wind_speed,
-          windDirection: d.wind_deg,
-          cloudiness: d.clouds,
-          uvIndex: d.uvi,
-          precipitationProbability: d.pop,
-          rainVolume: d.rain,
-          snowVolume: d.snow,
-          summary: d.summary,
-          conditionGroup: d.weather?.[0]?.main || '',
-          conditionDescription: d.weather?.[0]?.description || ''
+          temperatureMorning: d.temp.morn ?? undefined,
+          temperatureEvening: d.temp.eve ?? undefined,
+          pressure: d.pressure ?? undefined,
+          humidity: d.humidity ?? undefined,
+          dewPoint: d.dew_point ?? undefined,
+          windSpeed: d.wind_speed ?? undefined,
+          windDirection: d.wind_deg ?? undefined,
+          cloudiness: d.clouds ?? undefined,
+          uvIndex: d.uvi ?? undefined,
+          precipitationProbability: d.pop ?? undefined,
+          rainVolume: d.rain ?? undefined,
+          snowVolume: d.snow ?? undefined,
+          summary: d.summary ?? undefined,
+          conditionGroup: weatherString(d.weather?.[0]?.main),
+          conditionDescription: weatherString(d.weather?.[0]?.description)
         }))
       : undefined;
 
@@ -218,10 +239,10 @@ export let getOneCallWeather = SlateTool.create(spec, {
       ? data.alerts.map((a: any) => ({
           senderName: a.sender_name,
           eventName: a.event,
-          start: new Date(a.start * 1000).toISOString(),
-          end: new Date(a.end * 1000).toISOString(),
+          start: weatherTimestamp(a.start),
+          end: weatherTimestamp(a.end),
           description: a.description,
-          tags: a.tags
+          tags: a.tags ?? undefined
         }))
       : undefined;
 
@@ -231,6 +252,7 @@ export let getOneCallWeather = SlateTool.create(spec, {
       timezone: data.timezone,
       timezoneOffset: data.timezone_offset,
       current,
+      minutelyForecasts,
       hourlyForecasts,
       dailyForecasts,
       alerts
@@ -241,6 +263,8 @@ export let getOneCallWeather = SlateTool.create(spec, {
       parts.push(
         `Current: ${current.temperature}°, ${current.conditions.map((c: any) => c.description).join(', ')}`
       );
+    if (minutelyForecasts)
+      parts.push(`${minutelyForecasts.length} minute precipitation forecasts`);
     if (hourlyForecasts) parts.push(`${hourlyForecasts.length} hourly forecasts`);
     if (dailyForecasts) parts.push(`${dailyForecasts.length} daily forecasts`);
     if (alerts && alerts.length > 0) parts.push(`**${alerts.length} active alert(s)**`);

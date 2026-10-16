@@ -20,12 +20,14 @@ let photoSchema = z.object({
 export let getPlacePhotos = SlateTool.create(spec, {
   name: 'Get Place Photos',
   key: 'get_place_photos',
-  description: `Retrieve photos for a specific place. Returns photo metadata and assembled URLs. Photos can be filtered by classification and sorted by popularity or recency.`,
+  description: `DEPRECATED — use \`get_place_photos_current\` instead. Retrieve photos for a specific place. Returns photo metadata and assembled URLs. Photos can be filtered by classification and sorted by popularity or recency.`,
   instructions: [
+    'Use get_place_photos_current with a Places Service API Key. This legacy V3 tool retains its original request and schema.',
     'Use the classifications parameter to filter by type: "food", "indoor", "menu", "outdoor".',
     'Photo URLs are assembled as: prefix + "original" + suffix for full-size images, or prefix + "WIDTHxHEIGHT" + suffix for specific dimensions.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

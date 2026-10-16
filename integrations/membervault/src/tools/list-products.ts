@@ -6,9 +6,13 @@ import { spec } from '../spec';
 export let listProducts = SlateTool.create(spec, {
   name: 'List Products',
   key: 'list_products',
-  description: `Retrieve all products (courses, memberships, digital downloads, and other offers) from your MemberVault account. Returns product IDs, names, prices, URLs, and statuses. Use this to discover available products before adding or removing users.`,
+  description: `DEPRECATED — use \`get_courses\` instead. Retrieve all products (courses, memberships, digital downloads, and other offers) from your MemberVault account. Returns product IDs, names, prices, URLs, and statuses. Use this to discover available products before adding or removing users.`,
+  instructions: [
+    'Use get_courses for the currently documented product endpoint and its unmodified response. This tool retains its original request and response mapping for existing workflows; deprecation does not indicate that MemberVault has retired an endpoint.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(z.object({}))

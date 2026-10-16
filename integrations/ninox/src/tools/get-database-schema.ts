@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getDatabaseSchema = SlateTool.create(spec, {
@@ -13,13 +13,13 @@ export let getDatabaseSchema = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database')
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z.string().describe('Database ID. Use list_databases to discover databases.')
     })
   )
   .output(
     z.object({
-      databaseId: z.string().describe('Unique identifier of the database'),
+      databaseId: z.string().optional().describe('Unique identifier when returned by Ninox'),
       settings: z
         .record(z.string(), z.any())
         .describe('Database settings (name, icon, color, etc.)'),
@@ -31,10 +31,7 @@ export let getDatabaseSchema = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let db = await client.getDatabase(ctx.input.teamId, ctx.input.databaseId);
 
@@ -44,7 +41,7 @@ export let getDatabaseSchema = SlateTool.create(spec, {
         settings: db.settings,
         schema: db.schema
       },
-      message: `Retrieved schema for database **${db.id}**.`
+      message: `Retrieved schema for database **${ctx.input.databaseId}**.`
     };
   })
   .build();

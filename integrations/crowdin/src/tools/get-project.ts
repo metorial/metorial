@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getProjectTool = SlateTool.create(spec, {
@@ -13,11 +14,12 @@ export let getProjectTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID')
+      projectId: projectIdSchema
     })
   )
   .output(
     z.object({
+      raw: rawSchema,
       projectId: z.number().describe('Project ID'),
       name: z.string().describe('Project name'),
       identifier: z.string().describe('Project string identifier'),
@@ -32,7 +34,7 @@ export let getProjectTool = SlateTool.create(spec, {
       skipUntranslatedStrings: z.boolean().optional(),
       skipUntranslatedFiles: z.boolean().optional(),
       exportApprovedOnly: z.boolean().optional(),
-      createdAt: z.string().describe('Creation timestamp'),
+      createdAt: z.string().optional().describe('Creation timestamp when provided by Crowdin'),
       updatedAt: z.string().optional().describe('Last update timestamp')
     })
   )
@@ -42,22 +44,23 @@ export let getProjectTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: client.lastResponse,
         projectId: project.id,
         name: project.name,
         identifier: project.identifier,
         sourceLanguageId: project.sourceLanguageId,
         targetLanguageIds: project.targetLanguageIds || [],
         type: project.type,
-        description: project.description || undefined,
-        visibility: project.visibility || undefined,
+        description: project.description ?? undefined,
+        visibility: project.visibility ?? undefined,
         translateDuplicates: project.translateDuplicates,
         isMtAllowed: project.isMtAllowed,
         autoSubstitution: project.autoSubstitution,
         skipUntranslatedStrings: project.skipUntranslatedStrings,
         skipUntranslatedFiles: project.skipUntranslatedFiles,
         exportApprovedOnly: project.exportApprovedOnly,
-        createdAt: project.createdAt,
-        updatedAt: project.updatedAt || undefined
+        createdAt: project.createdAt ?? undefined,
+        updatedAt: project.updatedAt ?? undefined
       },
       message: `Retrieved project **${project.name}** (ID: ${project.id}).`
     };

@@ -1,16 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, rawSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let getListSubscribers = SlateTool.create(spec, {
   name: 'Get List Subscribers',
   key: 'get_list_subscribers',
-  description: `Retrieve subscribers from a specific list. Supports pagination and optional date range filtering.
+  description: `Retrieve subscribers from a specific list. Supports pagination. Date filters are not supported by this endpoint.
 Returns subscriber emails, custom fields, status, and engagement scores.`,
   constraints: [
-    'Maximum page size is 20 items per request.',
-    'Date filters must include timezone offset (e.g. 2024-01-01T00:00:00+00:00).'
+    'Maximum page size is 100 items per request.',
+    'Date filters are unsupported on this endpoint; use get_subscribers with updatedAfter.'
   ],
   tags: {
     destructive: false,
@@ -21,34 +21,40 @@ Returns subscriber emails, custom fields, status, and engagement scores.`,
     z.object({
       listId: z.number().describe('ID of the list to retrieve subscribers from'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      pageSize: z.number().optional().describe('Number of items per page (max 20)'),
+      pageSize: z.number().optional().describe('Number of items per page (max 100)'),
       from: z
         .string()
         .optional()
         .describe(
-          'Filter subscribers added from this date (ISO 8601 with timezone, e.g. 2024-01-01T00:00:00+00:00)'
+          'Legacy date filter. This endpoint does not support date filtering; omit this field and use get_subscribers with updatedAfter instead.'
         ),
       to: z
         .string()
         .optional()
-        .describe('Filter subscribers added up to this date (ISO 8601 with timezone)')
+        .describe(
+          'Legacy date filter. This endpoint does not support date filtering; omit this field.'
+        )
     })
   )
   .output(
     z.object({
+      raw: rawSchema
+        .optional()
+        .describe('Original provider response, with credentials removed'),
       subscribers: z
         .array(
           z.object({
             email: z.string().describe('Subscriber email address'),
-            status: z.string().describe('Subscriber status'),
-            score: z.number().describe('Engagement score'),
+            status: z.string().optional().describe('Subscriber status'),
+            score: z.number().optional().describe('Engagement score'),
             fields: z
               .array(
                 z.object({
                   name: z.string().describe('Field name'),
-                  value: z.string().describe('Field value')
+                  value: z.string().optional().describe('Field value')
                 })
               )
+              .optional()
               .describe('Custom field values')
           })
         )
@@ -71,15 +77,16 @@ Returns subscriber emails, custom fields, status, and engagement scores.`,
       to: ctx.input.to
     });
 
-    let subscribers = (result.items ?? []).map(s => ({
+    let subscribers = result.items.map(s => ({
       email: s.email,
       status: s.status,
       score: s.score,
-      fields: s.fields ?? []
+      fields: s.fields
     }));
 
     return {
       output: {
+        raw: result.raw,
         subscribers,
         totalCount: result.itemsCount,
         currentPage: result.currentPage,

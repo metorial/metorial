@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { buildClientConfig, flattenResourceList } from '../lib/helpers';
+import { buildClientConfig, flattenResourceList, getTotalCount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listLocations = SlateTool.create(spec, {
@@ -45,7 +45,7 @@ export let listLocations = SlateTool.create(spec, {
     return {
       output: {
         locations,
-        totalCount: response?.meta?.total_count
+        totalCount: getTotalCount(response)
       },
       message: `Found ${locations.length} location(s).`
     };

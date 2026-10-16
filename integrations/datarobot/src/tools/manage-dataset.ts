@@ -1,7 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  success: z.boolean().describe('Whether the operation succeeded'),
+  datasetId: z.string().optional().describe('ID of the affected dataset'),
+  name: z.string().optional().describe('Name of the dataset')
+});
 
 export let manageDataset = SlateTool.create(spec, {
   name: 'Create, Update, or Delete Dataset',
@@ -28,66 +35,63 @@ export let manageDataset = SlateTool.create(spec, {
         .describe('Categories for the dataset (used for create)')
     })
   )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
-      datasetId: z.string().optional().describe('ID of the affected dataset'),
-      name: z.string().optional().describe('Name of the dataset')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.url) {
-        throw new Error('URL is required to create a dataset');
+        throw createApiServiceError('URL is required to create a dataset');
       }
       let dataset = await client.createDatasetFromUrl({
         url: ctx.input.url,
+        name: ctx.input.name,
         categories: ctx.input.categories
       });
 
       return {
-        output: {
+        output: parseOutput(outputSchema, {
           success: true,
-          datasetId: dataset.datasetId || dataset.id,
-          name: dataset.name || ctx.input.name
-        },
-        message: `Dataset created from URL. ID: **${dataset.datasetId || dataset.id}**.`
+          datasetId: dataset.datasetId ?? dataset.id,
+          name: dataset.name
+        }),
+        message: `Dataset created from URL. ID: **${dataset.datasetId ?? dataset.id}**.`
       };
     }
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.datasetId) {
-        throw new Error('datasetId is required to delete a dataset');
+        throw createApiServiceError('datasetId is required to delete a dataset');
       }
       await client.deleteDataset(ctx.input.datasetId);
       return {
-        output: {
+        output: parseOutput(outputSchema, {
           success: true,
           datasetId: ctx.input.datasetId
-        },
+        }),
         message: `Dataset **${ctx.input.datasetId}** has been deleted.`
       };
     }
 
     // update
     if (!ctx.input.datasetId) {
-      throw new Error('datasetId is required to update a dataset');
+      throw createApiServiceError('datasetId is required to update a dataset');
     }
+    if (ctx.input.name === undefined)
+      throw createApiServiceError('Provide name to update the dataset.');
     let updated = await client.updateDataset(ctx.input.datasetId, {
       name: ctx.input.name
     });
 
     return {
-      output: {
+      output: parseOutput(outputSchema, {
         success: true,
         datasetId: ctx.input.datasetId,
-        name: updated.name || ctx.input.name
-      },
+        name: updated.name
+      }),
       message: `Dataset **${ctx.input.datasetId}** updated.`
     };
   })

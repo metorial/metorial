@@ -20,7 +20,7 @@ export let listNumericVariables = SlateTool.create(spec, {
             variableId: z.string().describe('Unique identifier of the numeric variable'),
             name: z.string().describe('Name of the numeric variable'),
             value: z.number().describe('Current numeric value'),
-            createdAt: z.string().describe('When the variable was created'),
+            createdAt: z.string().optional().describe('When the variable was created'),
             updatedAt: z.string().describe('When the variable was last updated')
           })
         )

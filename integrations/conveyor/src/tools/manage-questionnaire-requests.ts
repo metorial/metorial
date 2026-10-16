@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConveyorClient } from '../lib/client';
+import { createUpload } from '../lib/upload';
 import { spec } from '../spec';
 
 let questionnaireRequestSchema = z.object({
@@ -47,7 +48,13 @@ export let createQuestionnaireRequest = SlateTool.create(spec, {
       source: z
         .string()
         .optional()
-        .describe('Integration source name (e.g., "salesforce", "workato")')
+        .describe('Integration source name (e.g., "salesforce", "workato")'),
+      fileContentBase64: z
+        .string()
+        .optional()
+        .describe('Base64-encoded questionnaire file for intake analysis'),
+      fileName: z.string().optional().describe('Required filename when uploading content'),
+      contentType: z.string().optional().describe('Uploaded file MIME type')
     })
   )
   .output(
@@ -60,6 +67,13 @@ export let createQuestionnaireRequest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ConveyorClient({ token: ctx.auth.token });
 
+    if (Boolean(ctx.input.externalId) === Boolean(ctx.input.caseIds)) {
+      throw createApiServiceError('Provide exactly one of externalId or caseIds.');
+    }
+    if (!ctx.input.caseIds && !ctx.input.rawData) {
+      throw createApiServiceError('Provide rawData for requests identified by externalId.');
+    }
+
     let data = await client.createQuestionnaireRequest({
       submitterEmail: ctx.input.submitterEmail,
       submitterExternalId: ctx.input.submitterExternalId,
@@ -67,7 +81,8 @@ export let createQuestionnaireRequest = SlateTool.create(spec, {
       externalId: ctx.input.externalId,
       caseIds: ctx.input.caseIds,
       rawData: ctx.input.rawData,
-      source: ctx.input.source
+      source: ctx.input.source,
+      file: createUpload(ctx.input)
     });
 
     let requests = (data?._embedded?.questionnaire_requests || []).map((r: any) => ({
@@ -97,7 +112,13 @@ export let updateQuestionnaireRequest = SlateTool.create(spec, {
       externalId: z.string().optional().describe('External ticket ID to identify the request'),
       caseIds: z.string().optional().describe('Salesforce Case IDs'),
       rawData: z.string().optional().describe('Updated JSON context data'),
-      source: z.string().optional().describe('Integration source name')
+      source: z.string().optional().describe('Integration source name'),
+      fileContentBase64: z
+        .string()
+        .optional()
+        .describe('Base64-encoded questionnaire file for intake analysis'),
+      fileName: z.string().optional().describe('Required filename when uploading content'),
+      contentType: z.string().optional().describe('Uploaded file MIME type')
     })
   )
   .output(
@@ -110,11 +131,16 @@ export let updateQuestionnaireRequest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ConveyorClient({ token: ctx.auth.token });
 
+    if (Boolean(ctx.input.externalId) === Boolean(ctx.input.caseIds)) {
+      throw createApiServiceError('Provide exactly one of externalId or caseIds.');
+    }
+
     let data = await client.updateQuestionnaireRequest({
       externalId: ctx.input.externalId,
       caseIds: ctx.input.caseIds,
       rawData: ctx.input.rawData,
-      source: ctx.input.source
+      source: ctx.input.source,
+      file: createUpload(ctx.input)
     });
 
     let requests = (data?._embedded?.questionnaire_requests || []).map((r: any) => ({

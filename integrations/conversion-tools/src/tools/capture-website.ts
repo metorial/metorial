@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -93,20 +93,48 @@ This is a convenience wrapper around the conversion types \`convert.website_to_p
       options.sandbox = true;
     }
 
-    if (ctx.input.includeImages) options.images = ctx.input.includeImages;
-    if (ctx.input.includeBackground) options.background = ctx.input.includeBackground;
-    if (ctx.input.javascript) options.javascript = ctx.input.javascript;
-    if (ctx.input.viewportWidth) options.viewport_width = ctx.input.viewportWidth;
-    if (ctx.input.viewportHeight) options.viewport_height = ctx.input.viewportHeight;
-    if (ctx.input.deviceName) options.device = ctx.input.deviceName;
-    if (ctx.input.pageOrientation) options.orientation = ctx.input.pageOrientation;
-    if (ctx.input.pageSize) options.page_size = ctx.input.pageSize;
-    if (ctx.input.marginTop !== undefined) options.margin_top = ctx.input.marginTop;
-    if (ctx.input.marginBottom !== undefined) options.margin_bottom = ctx.input.marginBottom;
-    if (ctx.input.marginLeft !== undefined) options.margin_left = ctx.input.marginLeft;
-    if (ctx.input.marginRight !== undefined) options.margin_right = ctx.input.marginRight;
+    for (let [name, value] of Object.entries({
+      viewportWidth: ctx.input.viewportWidth,
+      viewportHeight: ctx.input.viewportHeight
+    })) {
+      if (value !== undefined && (!Number.isInteger(value) || value <= 0)) {
+        throw createApiServiceError(`${name} must be a positive integer in pixels.`);
+      }
+    }
+    for (let [name, value] of Object.entries({
+      marginTop: ctx.input.marginTop,
+      marginBottom: ctx.input.marginBottom,
+      marginLeft: ctx.input.marginLeft,
+      marginRight: ctx.input.marginRight
+    })) {
+      if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+        throw createApiServiceError(`${name} must be a non-negative number in millimeters.`);
+      }
+    }
+    if (ctx.input.includeImages) options.images = ctx.input.includeImages === 'yes';
+    if (ctx.input.includeBackground)
+      options.background = ctx.input.includeBackground === 'yes';
+    if (ctx.input.javascript) options.javascript = ctx.input.javascript === 'yes';
+    if (ctx.input.viewportWidth !== undefined)
+      options.viewport_width = ctx.input.viewportWidth;
+    if (ctx.input.viewportHeight !== undefined)
+      options.viewport_height = ctx.input.viewportHeight;
+    if (ctx.input.deviceName) options.emulate_device = ctx.input.deviceName;
+    if (ctx.input.pageOrientation)
+      options.orientation =
+        ctx.input.pageOrientation === 'portrait' ? 'Portrait' : 'Landscape';
+    if (ctx.input.pageSize) options.pagesize = ctx.input.pageSize;
+    // The public inputs use millimeters; the provider's margin options use CSS pixels.
+    if (ctx.input.marginTop !== undefined)
+      options.margin_top = (ctx.input.marginTop * 96) / 25.4;
+    if (ctx.input.marginBottom !== undefined)
+      options.margin_bottom = (ctx.input.marginBottom * 96) / 25.4;
+    if (ctx.input.marginLeft !== undefined)
+      options.margin_left = (ctx.input.marginLeft * 96) / 25.4;
+    if (ctx.input.marginRight !== undefined)
+      options.margin_right = (ctx.input.marginRight * 96) / 25.4;
 
-    ctx.progress(`Capturing ${ctx.input.url} as ${ctx.input.outputFormat.toUpperCase()}...`);
+    ctx.progress(`Capturing the website as ${ctx.input.outputFormat.toUpperCase()}...`);
 
     let taskResponse = await client.createTask(conversionType, options, ctx.input.callbackUrl);
     let taskId = taskResponse.task_id;
@@ -114,6 +142,13 @@ This is a convenience wrapper around the conversion types \`convert.website_to_p
     if (ctx.input.waitForCompletion) {
       ctx.progress('Waiting for capture to complete...');
       let finalStatus = await client.pollUntilComplete(taskId);
+      if (finalStatus.status === 'SUCCESS' && finalStatus.file_id) {
+        await ctx.addAttachment({
+          type: 'url',
+          url: client.fileDownloadUrl(finalStatus.file_id),
+          headers: { Authorization: `Bearer ${ctx.auth.token}` }
+        });
+      }
 
       return {
         output: {
@@ -130,6 +165,13 @@ This is a convenience wrapper around the conversion types \`convert.website_to_p
     }
 
     let currentStatus = await client.getTaskStatus(taskId);
+    if (currentStatus.status === 'SUCCESS' && currentStatus.file_id) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: client.fileDownloadUrl(currentStatus.file_id),
+        headers: { Authorization: `Bearer ${ctx.auth.token}` }
+      });
+    }
 
     return {
       output: {

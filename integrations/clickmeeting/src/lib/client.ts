@@ -1,227 +1,323 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
+
+type ApiRecord = Record<string, unknown>;
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A ClickMeeting API key is required.');
+    }
     this.axios = createAxios({
       baseURL: 'https://api.clickmeeting.com/v1/',
-      headers: {
-        'X-Api-Key': config.token
-      }
+      headers: { 'X-Api-Key': config.token }
     });
   }
 
-  // ──────────────────────────── Conferences ────────────────────────────
-
-  async listConferences(status: string = 'active') {
-    let response = await this.axios.get(`/conferences/${status}`);
-    return response.data;
+  private async request(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    url: string,
+    data?: unknown,
+    params?: ApiRecord
+  ) {
+    try {
+      let response = await this.axios.request({ method, url, data, params });
+      return response.data as unknown;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'ClickMeeting',
+        reason: 'clickmeeting_api_error',
+        operation: `${method} ${url}`,
+        extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+      });
+    }
   }
 
-  async getConference(roomId: string) {
-    let response = await this.axios.get(`/conferences/${roomId}`);
-    return response.data;
+  private async object(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    url: string,
+    data?: unknown
+  ) {
+    let result = await this.request(method, url, data);
+    if (!isApiErrorRecord(result)) {
+      throw createApiServiceError(
+        `ClickMeeting returned an invalid object response for ${method} ${url}.`
+      );
+    }
+    return result;
   }
 
-  async createConference(params: Record<string, unknown>) {
-    let response = await this.axios.post('/conferences', params);
-    return response.data;
+  private async list(url: string, params?: ApiRecord) {
+    let result = await this.request('GET', url, undefined, params);
+    if (!Array.isArray(result) || !result.every(isApiErrorRecord)) {
+      throw createApiServiceError(
+        `ClickMeeting returned an invalid list response for GET ${url}.`
+      );
+    }
+    return result as ApiRecord[];
   }
 
-  async updateConference(roomId: string, params: Record<string, unknown>) {
-    let response = await this.axios.put(`/conferences/${roomId}`, params);
-    return response.data;
+  private async confirmedPost(url: string, data: unknown) {
+    let result = await this.object('POST', url, data);
+    if (result.status !== 'OK') {
+      throw buildApiServiceError(
+        { response: { status: 200, data: result } },
+        {
+          providerLabel: 'ClickMeeting',
+          reason: 'clickmeeting_unconfirmed_operation',
+          operation: `POST ${url}`
+        }
+      );
+    }
+    return result;
   }
 
-  async deleteConference(roomId: string) {
-    let response = await this.axios.delete(`/conferences/${roomId}`);
-    return response.data;
+  private async confirm(
+    method: 'DELETE',
+    url: string,
+    field: string,
+    expected = 'OK',
+    data?: unknown
+  ) {
+    let result = await this.object(method, url, data);
+    if (result[field] !== expected) {
+      throw createApiServiceError(`ClickMeeting did not confirm the operation for ${url}.`);
+    }
+    return result;
   }
 
-  // ──────────────────────────── Access Tokens ────────────────────────────
+  listConferences(status = 'active', page?: number) {
+    return this.list(`/conferences/${encodeURIComponent(status)}`, { page });
+  }
+
+  getConference(roomId: string) {
+    return this.object('GET', `/conferences/${encodeURIComponent(roomId)}`);
+  }
+
+  createConference(params: ApiRecord) {
+    return this.object('POST', '/conferences', params);
+  }
+
+  updateConference(roomId: string, params: ApiRecord) {
+    return this.object('PUT', `/conferences/${encodeURIComponent(roomId)}`, params);
+  }
+
+  deleteConference(roomId: string) {
+    return this.confirm('DELETE', `/conferences/${encodeURIComponent(roomId)}`, 'result');
+  }
 
   async generateTokens(roomId: string, howMany: number) {
-    let response = await this.axios.post(`/conferences/${roomId}/tokens`, {
+    return this.object('POST', `/conferences/${encodeURIComponent(roomId)}/tokens`, {
       how_many: howMany
     });
-    return response.data;
   }
 
-  async getTokens(roomId: string) {
-    let response = await this.axios.get(`/conferences/${roomId}/tokens`);
-    return response.data;
+  getTokens(roomId: string) {
+    return this.object('GET', `/conferences/${encodeURIComponent(roomId)}/tokens`);
   }
 
   async getTokensByEmail(roomId: string, email: string) {
-    let response = await this.axios.post(`/conferences/${roomId}/token`, {
-      email
-    });
-    return response.data;
-  }
-
-  async deleteTokens(roomId: string) {
-    let response = await this.axios.delete(`/conferences/${roomId}/tokens`);
-    return response.data;
-  }
-
-  // ──────────────────────────── Registrations ────────────────────────────
-
-  async getRegistrations(roomId: string, status: string = 'active') {
-    let response = await this.axios.get(`/conferences/${roomId}/registrations/${status}`);
-    return response.data;
-  }
-
-  async getSessionRegistrations(roomId: string, sessionId: string) {
-    let response = await this.axios.get(
-      `/conferences/${roomId}/sessions/${sessionId}/registrations`
+    let result = await this.request(
+      'POST',
+      `/conferences/${encodeURIComponent(roomId)}/token`,
+      { email }
     );
-    return response.data;
+    if (!Array.isArray(result) || !result.every(value => typeof value === 'string')) {
+      throw createApiServiceError('ClickMeeting returned an invalid email-token response.');
+    }
+    return result as string[];
   }
 
-  async registerAttendee(
+  deleteTokens(roomId: string) {
+    return this.confirm(
+      'DELETE',
+      `/conferences/${encodeURIComponent(roomId)}/tokens`,
+      'status',
+      'deleted'
+    );
+  }
+
+  getRegistrations(roomId: string, status = 'active') {
+    return this.list(
+      `/conferences/${encodeURIComponent(roomId)}/registrations/${encodeURIComponent(status)}`
+    );
+  }
+
+  getSessionRegistrations(roomId: string, sessionId: string) {
+    return this.list(
+      `/conferences/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(sessionId)}/registrations`
+    );
+  }
+
+  registerAttendee(
     roomId: string,
-    registration: { firstName: string; lastName: string; email: string }
+    registration: { firstName: string; lastName: string; email: string; company?: string },
+    confirmation?: { enabled?: boolean; language?: string }
   ) {
-    let response = await this.axios.post(`/conferences/${roomId}/registration`, {
-      registration: {
-        1: registration.firstName,
-        2: registration.lastName,
-        3: registration.email
-      }
+    let body = new URLSearchParams({
+      'registration[1]': registration.firstName,
+      'registration[2]': registration.lastName,
+      'registration[3]': registration.email
     });
-    return response.data;
+    if (registration.company !== undefined) body.set('registration[10]', registration.company);
+    if (confirmation?.enabled !== undefined)
+      body.set('confirmation_email[enabled]', confirmation.enabled ? '1' : '0');
+    if (confirmation?.language !== undefined)
+      body.set('confirmation_email[lang]', confirmation.language);
+    return this.confirmedPost(`/conferences/${encodeURIComponent(roomId)}/registration`, body);
   }
 
-  // ──────────────────────────── Sessions & Attendees ────────────────────────────
-
-  async getSessions(roomId: string) {
-    let response = await this.axios.get(`/conferences/${roomId}/sessions`);
-    return response.data;
+  getSessions(roomId: string) {
+    return this.list(`/conferences/${encodeURIComponent(roomId)}/sessions`);
   }
 
-  async getSession(roomId: string, sessionId: string) {
-    let response = await this.axios.get(`/conferences/${roomId}/sessions/${sessionId}`);
-    return response.data;
-  }
-
-  async getSessionAttendees(roomId: string, sessionId: string) {
-    let response = await this.axios.get(
-      `/conferences/${roomId}/sessions/${sessionId}/attendees`
+  getSession(roomId: string, sessionId: string) {
+    return this.object(
+      'GET',
+      `/conferences/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(sessionId)}`
     );
-    return response.data;
   }
 
-  async generateSessionPdf(roomId: string, sessionId: string, lang: string = 'en') {
-    let response = await this.axios.get(
-      `/conferences/${roomId}/sessions/${sessionId}/generate-pdf/${lang}`
+  getSessionAttendees(roomId: string, sessionId: string) {
+    return this.list(
+      `/conferences/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(sessionId)}/attendees`
     );
-    return response.data;
   }
 
-  // ──────────────────────────── Invitations ────────────────────────────
-
-  async sendInvitations(roomId: string, lang: string, attendees: { email: string }[]) {
-    let response = await this.axios.post(`/conferences/${roomId}/invitation/email/${lang}`, {
-      attendees
-    });
-    return response.data;
+  generateSessionPdf(roomId: string, sessionId: string, lang = 'en') {
+    return this.object(
+      'GET',
+      `/conferences/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(sessionId)}/generate-pdf/${encodeURIComponent(lang)}`
+    );
   }
 
-  // ──────────────────────────── Auto-login URLs ────────────────────────────
-
-  async generateAutologinHash(
+  sendInvitations(
     roomId: string,
-    params: { email: string; nickname?: string; role: string }
+    lang: string,
+    attendees: { email: string }[],
+    options?: { template?: string; role?: string }
   ) {
-    let response = await this.axios.post(`/conferences/${roomId}/room/autologin_hash`, params);
-    return response.data;
+    return this.confirmedPost(
+      `/conferences/${encodeURIComponent(roomId)}/invitation/email/${encodeURIComponent(lang)}`,
+      { attendees, ...options }
+    );
   }
 
-  // ──────────────────────────── File Library ────────────────────────────
-
-  async listFiles() {
-    let response = await this.axios.get('/file-library');
-    return response.data;
+  generateAutologinHash(
+    roomId: string,
+    params: {
+      email: string;
+      nickname?: string;
+      role: string;
+      password?: string;
+      token?: string;
+    }
+  ) {
+    return this.object(
+      'POST',
+      `/conferences/${encodeURIComponent(roomId)}/room/autologin_hash`,
+      params
+    );
   }
 
-  async getFile(fileId: string) {
-    let response = await this.axios.get(`/file-library/${fileId}`);
-    return response.data;
+  listFiles() {
+    return this.list('/file-library');
   }
 
-  async deleteFile(fileId: string) {
-    let response = await this.axios.delete(`/file-library/${fileId}`);
-    return response.data;
+  getFile(fileId: string) {
+    return this.object('GET', `/file-library/${encodeURIComponent(fileId)}`);
   }
 
-  async getFileDownloadUrl(fileId: string) {
-    let response = await this.axios.get(`/file-library/${fileId}/download`);
-    return response.data;
+  deleteFile(fileId: string) {
+    return this.confirm('DELETE', `/file-library/${encodeURIComponent(fileId)}`, 'response');
   }
 
-  async listConferenceFiles(roomId: string) {
-    let response = await this.axios.get(`/file-library/conferences/${roomId}`);
-    return response.data;
+  listConferenceFiles(roomId: string) {
+    return this.list(`/file-library/conferences/${encodeURIComponent(roomId)}`);
   }
 
-  // ──────────────────────────── Recordings ────────────────────────────
-
-  async listRecordings(roomId: string) {
-    let response = await this.axios.get(`/conferences/${roomId}/recordings`);
-    return response.data;
+  uploadFile(data: FormData, roomId?: string) {
+    return this.object(
+      'POST',
+      roomId ? `/file-library/conferences/${encodeURIComponent(roomId)}` : '/file-library',
+      data
+    );
   }
 
-  async deleteAllRecordings(roomId: string) {
-    let response = await this.axios.delete(`/conferences/${roomId}/recordings`);
-    return response.data;
+  listAccountRecordings() {
+    return this.list('/conferences/recordings');
   }
 
-  async deleteRecording(roomId: string, recordingId: string) {
-    let response = await this.axios.delete(`/conferences/${roomId}/recordings/${recordingId}`);
-    return response.data;
+  listRecordings(roomId: string) {
+    return this.list(`/conferences/${encodeURIComponent(roomId)}/recordings`);
   }
 
-  // ──────────────────────────── Contacts ────────────────────────────
+  async publishRecording(roomId: string, recordingId: string, publish: boolean) {
+    let result = await this.request(
+      'POST',
+      `/conferences/${encodeURIComponent(roomId)}/recordings/${encodeURIComponent(recordingId)}/${publish ? 'publish' : 'unpublish'}`
+    );
+    if (typeof result !== 'string' || !result) {
+      throw createApiServiceError(
+        'ClickMeeting returned an invalid recording publication response.'
+      );
+    }
+    return result;
+  }
 
-  async addContact(params: {
+  deleteAllRecordings(roomId: string) {
+    return this.confirm(
+      'DELETE',
+      `/conferences/${encodeURIComponent(roomId)}/recordings`,
+      'STATUS'
+    );
+  }
+
+  deleteRecording(roomId: string, recordingId: string) {
+    return this.confirm(
+      'DELETE',
+      `/conferences/${encodeURIComponent(roomId)}/recordings/${encodeURIComponent(recordingId)}`,
+      'STATUS'
+    );
+  }
+
+  addContact(params: {
     email: string;
     firstname?: string;
     lastname?: string;
     phone?: string;
     company?: string;
+    country?: string;
   }) {
-    let response = await this.axios.post('/contacts', params);
-    return response.data;
+    return this.confirmedPost('/contacts', params);
   }
 
-  // ──────────────────────────── Chat ────────────────────────────
-
-  async listChats() {
-    let response = await this.axios.get('/chats');
-    return response.data;
+  listChats() {
+    return this.list('/chats');
   }
-
-  async getChatSession(sessionId: string) {
-    let response = await this.axios.get(`/chats/${sessionId}`);
-    return response.data;
-  }
-
-  // ──────────────────────────── Utility ────────────────────────────
 
   async getTimezones(country?: string) {
-    let path = country ? `/time_zone_list/${country}` : '/time_zone_list';
-    let response = await this.axios.get(path);
-    return response.data;
+    let result = await this.request(
+      'GET',
+      country ? `/time_zone_list/${encodeURIComponent(country)}` : '/time_zone_list'
+    );
+    if (!Array.isArray(result) || !result.every(value => typeof value === 'string')) {
+      throw createApiServiceError('ClickMeeting returned an invalid timezone list.');
+    }
+    return result as string[];
   }
 
-  async getPhoneGateways() {
-    let response = await this.axios.get('/phone_gateways');
-    return response.data;
+  getPhoneGateways() {
+    return this.list('/phone_gateways');
   }
 
-  async ping() {
-    let response = await this.axios.get('/ping');
-    return response.data;
+  ping() {
+    return this.object('GET', '/ping');
   }
 }

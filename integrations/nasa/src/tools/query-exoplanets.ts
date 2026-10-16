@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NasaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let queryExoplanets = SlateTool.create(spec, {
   key: 'query_exoplanets',
   description: `Query NASA's Exoplanet Archive for data on confirmed exoplanets, stellar hosts, and related survey results. Uses the TAP (Table Access Protocol) interface to run queries against archive tables.`,
   instructions: [
-    'Common tables: ps (planetary systems composite parameters), pscomppars (planetary systems composite parameters), stellarhosts (stellar hosts).',
+    'Common tables: ps (planetary systems), pscomppars (planetary systems composite parameters), stellarhosts (stellar hosts).',
     'Use SQL-like WHERE clauses for filtering (e.g., "pl_bmasse < 2" for planets less than 2 Earth masses).',
     'Common columns for "ps" table: pl_name, hostname, discoverymethod, disc_year, pl_orbper, pl_rade, pl_bmasse, pl_eqt, sy_dist.'
   ],
@@ -39,6 +39,7 @@ export let queryExoplanets = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       rows: z.array(z.record(z.string(), z.any())).describe('Query result rows'),
       rowCount: z.number().describe('Number of rows returned')
     })
@@ -53,10 +54,15 @@ export let queryExoplanets = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy
     });
 
-    let rows = Array.isArray(result) ? result : [];
+    if (!Array.isArray(result)) {
+      throw createApiServiceError(
+        'NASA Exoplanet Archive did not return JSON rows. Check the table, column names, and query expressions.'
+      );
+    }
+    let rows = result;
 
     return {
-      output: { rows, rowCount: rows.length },
+      output: { raw: result, rows, rowCount: rows.length },
       message: `Query returned **${rows.length}** rows from table "${ctx.input.table}".`
     };
   })

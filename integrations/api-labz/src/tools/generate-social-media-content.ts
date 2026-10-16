@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getModuleFileUrl } from '../lib/files';
 import { spec } from '../spec';
 
 export let generateSocialMediaContent = SlateTool.create(spec, {
@@ -35,6 +36,9 @@ Provide a product or service description and receive ready-to-publish social med
     let result = await client.generateSocialMediaContent({
       productDescription: ctx.input.productDescription
     });
+
+    let fileUrl = getModuleFileUrl(result);
+    if (fileUrl) await ctx.addAttachment({ type: 'url', url: fileUrl });
 
     return {
       output: {

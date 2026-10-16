@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'better-proposals',
   name: 'Better Proposals',
   description:
-    'Create, send, and track professional business proposals, contracts, and sales documents with digital signatures, payment collection, and analytics.',
+    'Create and edit business proposals, generate personal recipient links, track document status, and manage templates, covers, companies, quotes, currencies, and settings.',
   metadata: {},
   config,
   auth

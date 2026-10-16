@@ -14,7 +14,8 @@ export let listTemplates = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination')
+      page: z.number().optional().describe('Page number for pagination'),
+      perPage: z.number().optional().describe('Number of results per page')
     })
   )
   .output(
@@ -26,7 +27,7 @@ export let listTemplates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.listTemplates(ctx.input.page);
+    let result = await client.listTemplates(ctx.input.page, ctx.input.perPage);
     let templates = Array.isArray(result.data)
       ? result.data
       : result.data
@@ -35,7 +36,7 @@ export let listTemplates = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         templates
       },
       message: `Retrieved ${templates.length} template(s).`

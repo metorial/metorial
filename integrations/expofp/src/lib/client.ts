@@ -1,24 +1,201 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData
+} from 'slates';
+import { z } from 'zod';
 
 let http = createAxios({
-  baseURL: 'https://app.expofp.com/api/v1'
+  baseURL: 'https://app.expofp.com/api/v1',
+  timeout: 30_000
 });
 
-export class Client {
-  constructor(private token: string) {}
+let offlineHttp = createAxios({ baseURL: 'https://app.expofp.com', timeout: 30_000 });
 
-  private async post<T = any>(path: string, data: Record<string, any> = {}): Promise<T> {
-    let response = await http.post(path, {
-      ...data,
-      token: this.token
-    });
-    return response.data;
+let apiError = (error: unknown, operation: string) =>
+  buildApiServiceError(error, {
+    providerLabel: 'ExpoFP',
+    reason: 'expofp_api_error',
+    operation,
+    extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure),
+    detailKeys: ['message', 'Message', 'detail', 'title', 'error', 'code'],
+    nestedKeys: ['errors', 'error'],
+    extractUpstreamCode: (_failure, response, helpers) => {
+      let body = response?.data;
+      if (!helpers.isRecord(body)) return undefined;
+      let code = body.code ?? body.errorCode;
+      if (code === undefined && helpers.isRecord(body.error)) code = body.error.code;
+      return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
+    }
+  });
+
+let validateIds = (data: object) => {
+  for (let [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+    if (key === 'id' || (key.endsWith('Id') && key !== 'externalId')) {
+      if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
+        throw createApiServiceError(`${key} must be a positive whole-number ID.`);
+      }
+    } else if (Array.isArray(value)) {
+      if (key.endsWith('Ids') || key === 'ids' || key === 'categories') {
+        for (let id of value) validateIds({ id });
+      } else if (key === 'sessions' || key === 'tracks' || key === 'speakers') {
+        for (let item of value) validateIds(item);
+      }
+    }
+  }
+};
+
+let idSchema = z.object({ id: z.number() });
+let categorySchema = z.object({ id: z.number(), name: z.string() });
+let metadataSchema = z.record(z.string(), z.string());
+let exhibitorFields = {
+  id: z.number(),
+  name: z.string(),
+  externalId: z.string(),
+  boothNames: z.array(z.string())
+};
+
+// These checks preserve the existing tool output contracts without inventing
+// empty strings, zero IDs, false flags, or empty relationships for absent data.
+let responseSchemas: Record<string, z.ZodType> = {
+  '/list-events': z.array(
+    z.object({
+      id: z.number(),
+      name: z.string(),
+      expoKey: z.string(),
+      date: z.string(),
+      location: z.string()
+    })
+  ),
+  '/list-exhibitors': z.array(z.object(exhibitorFields)),
+  '/get-exhibitor': z.object({
+    ...exhibitorFields,
+    description: z.string(),
+    featured: z.boolean(),
+    advertised: z.boolean(),
+    country: z.string(),
+    address: z.string(),
+    city: z.string(),
+    state: z.string(),
+    zip: z.string(),
+    phone1: z.string(),
+    phone2: z.string(),
+    publicEmail: z.string(),
+    privateEmail: z.string(),
+    website: z.string(),
+    contactName: z.string(),
+    contactPhone: z.string(),
+    adminNotes: z.string(),
+    categories: z.array(z.number()),
+    tags: z.array(z.string()),
+    metadata: metadataSchema,
+    facebookUrl: z.string(),
+    twitterUrl: z.string(),
+    linkedInUrl: z.string(),
+    instagramUrl: z.string(),
+    youtubeUrl: z.string()
+  }),
+  '/get-exhibitor-id': idSchema,
+  '/add-exhibitor': idSchema,
+  '/list-booths': z.array(
+    z.object({
+      name: z.string(),
+      exhibitors: z.array(z.string()),
+      isSpecialSection: z.boolean()
+    })
+  ),
+  '/get-booth': z.object({
+    name: z.string(),
+    adminNotes: z.string(),
+    isOnHold: z.boolean(),
+    isSpecialSection: z.boolean(),
+    metadata: metadataSchema,
+    exhibitors: z.array(categorySchema)
+  }),
+  '/list-categories': z.array(categorySchema),
+  '/add-category': idSchema,
+  '/list-extras': z.array(
+    z.object({ id: z.number(), name: z.string(), price: z.number(), type: z.string() })
+  ),
+  '/list-exhibitor-extras': z.array(
+    z.object({ extraId: z.number(), name: z.string(), quantity: z.number() })
+  ),
+  '/sessions/get': z.array(
+    z.object({
+      id: z.number(),
+      externalId: z.string(),
+      name: z.string(),
+      description: z.string(),
+      dates: z.array(z.string()),
+      logo: z.string(),
+      boothId: z.number(),
+      boothName: z.string(),
+      speakerIds: z.array(z.number()),
+      trackIds: z.array(z.number())
+    })
+  ),
+  '/session-tracks/get': z.array(categorySchema),
+  '/session-speakers/get': z.array(
+    z.object({
+      id: z.number(),
+      name: z.string(),
+      company: z.string(),
+      jobTitle: z.string(),
+      position: z.string(),
+      photo: z.string(),
+      linkedInUrl: z.string(),
+      twitterUrl: z.string()
+    })
+  )
+};
+
+export class Client {
+  constructor(private token: string) {
+    if (typeof token !== 'string' || !token.trim()) {
+      throw createApiServiceError('Enter the API token from your ExpoFP profile page.');
+    }
+  }
+
+  private async post<T>(path: string, data: object = {}, validateFields = true): Promise<T> {
+    validateIds(data);
+    let result = await requestAxiosData<T>(
+      path,
+      () => http.post<T>(path, { ...data, token: this.token }),
+      apiError
+    );
+    let schema = validateFields ? responseSchemas[path] : undefined;
+    if (schema) {
+      let parsed = schema.safeParse(result);
+      if (!parsed.success) {
+        let fields = parsed.error.issues.map(issue => issue.path.join('.')).slice(0, 5);
+        throw createApiServiceError(
+          `ExpoFP returned an incomplete or invalid response for ${path}: ${fields.join(', ')}.`,
+          { reason: 'expofp_invalid_response' }
+        );
+      }
+    }
+    return result;
   }
 
   // --- Events ---
 
   async listEvents(): Promise<ExpoEvent[]> {
     return this.post<ExpoEvent[]>('/list-events');
+  }
+
+  async getEventCount(): Promise<number> {
+    let events = await this.post<unknown>('/list-events', {}, false);
+    if (!Array.isArray(events)) {
+      throw createApiServiceError(
+        'ExpoFP did not return an event list. Check your API token.',
+        {
+          reason: 'expofp_invalid_response'
+        }
+      );
+    }
+    return events.length;
   }
 
   // --- Exhibitors ---
@@ -168,6 +345,14 @@ export class Client {
     return this.post<void>('/set-webhook-url', { eventId, webhookUrl });
   }
 }
+
+export let getOfflinePlanState = (expoKey: string, prepare: boolean) => {
+  if (!expoKey.trim() || expoKey.includes('/') || expoKey === '.' || expoKey === '..') {
+    throw createApiServiceError('Use an ExpoFP expo key, such as demo, rather than a URL.');
+  }
+  let path = `/api/v2/expo-offline/${encodeURIComponent(expoKey)}/${prepare ? 'get-or-create' : 'get'}/latest`;
+  return requestAxiosData<unknown>(path, () => offlineHttp.get(path), apiError);
+};
 
 // --- Types ---
 

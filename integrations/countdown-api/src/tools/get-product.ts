@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { CountdownClient } from '../lib/client';
+import { CountdownClient, requireLookup, requireRecord } from '../lib/client';
 import { spec } from '../spec';
 
 export let getProduct = SlateTool.create(spec, {
@@ -55,7 +55,7 @@ export let getProduct = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Direct URL to an eBay product page. Takes precedence over epid and ebayDomain.'
+          'Direct URL to an eBay product page. Use without epid or gtin to avoid conflicting lookup parameters.'
         ),
       skipGtinCache: z
         .boolean()
@@ -90,6 +90,15 @@ export let getProduct = SlateTool.create(spec, {
     let client = new CountdownClient({ token: ctx.auth.token });
     let ebayDomain = ctx.input.ebayDomain || ctx.config.ebayDomain;
 
+    requireLookup(ctx.input);
+    if (
+      ctx.input.includePartsCompatibility &&
+      (!ctx.input.epid || ctx.input.url || !['ebay.com', 'ebay.co.uk'].includes(ebayDomain))
+    ) {
+      throw createApiServiceError(
+        'Parts compatibility requires epid on ebay.com or ebay.co.uk, without a URL.'
+      );
+    }
     let result = await client.getProduct({
       ebayDomain,
       epid: ctx.input.epid,
@@ -99,7 +108,7 @@ export let getProduct = SlateTool.create(spec, {
       includePartsCompatibility: ctx.input.includePartsCompatibility
     });
 
-    let product = result.product || {};
+    let product = requireRecord(result.product, 'product');
     let title = product.title || 'Unknown product';
 
     return {

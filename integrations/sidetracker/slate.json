@@ -1,10 +1,14 @@
 {
   "name": "@metorial/sidetracker",
-  "description": "Track and analyze marketing performance with cookie-free website analytics. Retrieve and manage conversion lists and their rows. Attach custom metadata to visitor sessions for cross-domain tracking enrichment. Add revenue data to sessions for marketing attribution. Update sales status on customer sessions to track pipeline progress. Track call-to-action events programmatically via the API.",
+  "description": "Track and analyze marketing performance with cookie-free website analytics. Inspect the connected account, create and delete conversion lists, and retrieve or manage list rows. Search converted sessions by date, sales status, tags, and update time. Enrich visitor sessions with metadata and notes, attribute revenue, update sales status, and execute call-to-action triggers.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
   "skills": [
+    "inspect connected account",
+    "create and delete conversion lists",
     "retrieve conversion lists",
     "manage list rows",
+    "search converted sessions",
+    "incremental conversion sync",
     "update session metadata",
     "attribute revenue to sessions",
     "update sales status",

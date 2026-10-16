@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listMembersTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listMembersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       search: z.string().optional().describe('Search by name or email'),
       role: z.string().optional().describe('Filter by role'),
       limit: z.number().optional(),
@@ -22,6 +23,7 @@ export let listMembersTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       members: z.array(
         z.object({
           memberId: z.number().describe('Member ID within the project'),
@@ -30,6 +32,7 @@ export let listMembersTool = SlateTool.create(spec, {
           fullName: z.string().optional().describe('Full name'),
           avatarUrl: z.string().optional().describe('Avatar URL'),
           role: z.string().optional().describe('Role in the project'),
+          roles: z.unknown().optional().describe('Provider role and permission entries'),
           joinedAt: z.string().optional().describe('When the member joined')
         })
       ),
@@ -50,16 +53,17 @@ export let listMembersTool = SlateTool.create(spec, {
 
     let members = result.data.map((item: any) => ({
       memberId: item.data.id,
-      userId: item.data.userId || undefined,
-      username: item.data.username || undefined,
-      fullName: item.data.fullName || undefined,
-      avatarUrl: item.data.avatarUrl || undefined,
-      role: item.data.role || undefined,
-      joinedAt: item.data.joinedAt || item.data.addedAt || undefined
+      userId: item.data.userId ?? item.data.id,
+      username: item.data.username ?? undefined,
+      fullName: item.data.fullName ?? undefined,
+      avatarUrl: item.data.avatarUrl ?? undefined,
+      role: item.data.role ?? undefined,
+      roles: item.data.roles,
+      joinedAt: item.data.joinedAt ?? item.data.addedAt ?? undefined
     }));
 
     return {
-      output: { members, pagination: result.pagination },
+      output: { raw: client.lastResponse, members, pagination: result.pagination },
       message: `Found **${members.length}** project members.`
     };
   })

@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
 let BASE_URL = 'https://newsapi.org/v2';
 
@@ -78,18 +78,47 @@ export class Client {
     });
   }
 
+  private async get<T>(path: string, params: object): Promise<T> {
+    try {
+      let response = await this.http.get<T & { status?: string }>(path, { params });
+      if (response.data.status === 'error') {
+        throw buildApiServiceError(
+          { response: { status: response.status, data: response.data } },
+          {
+            providerLabel: 'NewsAPI',
+            reason: 'newsapi_request_failed',
+            operation: path,
+            extractUpstreamCode: (_error, response, helpers) =>
+              helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+                ? response.data.code
+                : undefined
+          }
+        );
+      }
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'NewsAPI',
+        reason: 'newsapi_request_failed',
+        operation: path,
+        extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+        extractUpstreamCode: (_error, response, helpers) =>
+          helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+            ? response.data.code
+            : undefined
+      });
+    }
+  }
+
   async searchArticles(params: ArticleSearchParams): Promise<ArticlesResponse> {
-    let response = await this.http.get('/everything', { params });
-    return response.data;
+    return this.get('/everything', params);
   }
 
   async getTopHeadlines(params: TopHeadlinesParams): Promise<ArticlesResponse> {
-    let response = await this.http.get('/top-headlines', { params });
-    return response.data;
+    return this.get('/top-headlines', params);
   }
 
   async getSources(params: SourcesParams): Promise<SourcesResponse> {
-    let response = await this.http.get('/top-headlines/sources', { params });
-    return response.data;
+    return this.get('/top-headlines/sources', params);
   }
 }

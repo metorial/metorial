@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AlgoliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -33,7 +33,7 @@ export let manageRules = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .optional()
         .describe(
-          'Rule object to save (required for save). Should include condition, consequence, and optionally description, enabled, validity, etc.'
+          'Rule object to save (required for save). Include consequence and optional conditions, description, enabled, and validity. The ruleId supplies objectID. Legacy condition remains accepted.'
         ),
       rules: z
         .array(z.record(z.string(), z.any()))
@@ -45,6 +45,11 @@ export let manageRules = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Search query to filter rules (for search action)'),
+      page: z.number().optional().describe('Zero-based result page for search action.'),
+      hitsPerPage: z
+        .number()
+        .optional()
+        .describe('Results per page for search action, from 1 to 1000.'),
       forwardToReplicas: z
         .boolean()
         .optional()
@@ -77,7 +82,7 @@ export let manageRules = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'get') {
-      if (!ruleId) throw new Error('ruleId is required for get action');
+      if (!ruleId) throw createApiServiceError('ruleId is required for get action');
       let result = await client.getRule(indexName, ruleId);
       return {
         output: result,
@@ -88,6 +93,8 @@ export let manageRules = SlateTool.create(spec, {
     if (action === 'search') {
       let params: Record<string, any> = {};
       if (searchQuery !== undefined) params.query = searchQuery;
+      if (ctx.input.page !== undefined) params.page = ctx.input.page;
+      if (ctx.input.hitsPerPage !== undefined) params.hitsPerPage = ctx.input.hitsPerPage;
       let result = await client.searchRules(indexName, params);
       let count = result.hits?.length ?? 0;
       return {
@@ -97,8 +104,8 @@ export let manageRules = SlateTool.create(spec, {
     }
 
     if (action === 'save') {
-      if (!ruleId) throw new Error('ruleId is required for save action');
-      if (!rule) throw new Error('rule is required for save action');
+      if (!ruleId) throw createApiServiceError('ruleId is required for save action');
+      if (!rule) throw createApiServiceError('rule is required for save action');
       let result = await client.saveRule(indexName, ruleId, rule, forwardToReplicas);
       return {
         output: result,
@@ -108,7 +115,7 @@ export let manageRules = SlateTool.create(spec, {
 
     if (action === 'saveBatch') {
       if (!rules || rules.length === 0)
-        throw new Error('rules array is required for saveBatch action');
+        throw createApiServiceError('rules array is required for saveBatch action');
       let result = await client.saveRules(
         indexName,
         rules,
@@ -122,7 +129,7 @@ export let manageRules = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ruleId) throw new Error('ruleId is required for delete action');
+      if (!ruleId) throw createApiServiceError('ruleId is required for delete action');
       let result = await client.deleteRule(indexName, ruleId, forwardToReplicas);
       return {
         output: result,

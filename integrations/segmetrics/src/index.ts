@@ -10,6 +10,7 @@ import {
   identifyVisitor,
   manageTags,
   recordAdPerformance,
+  runReportQuery,
   upsertContact,
   upsertOrder,
   upsertProduct,
@@ -31,7 +32,8 @@ export let provider = Slate.create({
     getReport,
     getCustomerJourney,
     getContact,
-    identifyVisitor
+    identifyVisitor,
+    runReportQuery
   ],
   triggers: []
 });

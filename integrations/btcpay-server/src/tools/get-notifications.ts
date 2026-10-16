@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BTCPayClient } from '../lib/client';
+import { requireFields } from '../lib/values';
 import { spec } from '../spec';
 
 export let getNotifications = SlateTool.create(spec, {
@@ -33,6 +34,10 @@ export let getNotifications = SlateTool.create(spec, {
       notifications: z
         .array(
           z.object({
+            raw: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Complete notification data'),
             notificationId: z.string().describe('Notification ID'),
             body: z.string().optional().describe('Notification body text'),
             link: z.string().optional().nullable().describe('Notification link'),
@@ -52,6 +57,8 @@ export let getNotifications = SlateTool.create(spec, {
       instanceUrl: ctx.config.instanceUrl
     });
 
+    if (ctx.input.action !== 'list')
+      requireFields(ctx.input, ['notificationId'], ctx.input.action);
     if (ctx.input.action === 'mark_read') {
       await client.markNotificationRead(ctx.input.notificationId!);
       return {
@@ -76,6 +83,7 @@ export let getNotifications = SlateTool.create(spec, {
 
     let mapped = notifications.map(n => ({
       notificationId: n.id as string,
+      raw: n,
       body: n.body as string | undefined,
       link: n.link as string | undefined,
       seen: n.seen as boolean | undefined,

@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import {
+  FinmeiClient,
+  optionalString,
+  optionalTimestamp,
+  pagination,
+  readList,
+  requireId
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let listCustomers = SlateTool.create(spec, {
@@ -14,11 +21,11 @@ export let listCustomers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (default: 1)'),
+      page: z.number().optional().describe('Page number for pagination (1-based)'),
       perPage: z
         .number()
         .optional()
-        .describe('Number of customers per page (default: 20, max: 100)'),
+        .describe('Number of customers per page (the provider may use a fixed page size)'),
       search: z.string().optional().describe('Filter by name or email'),
       sort: z
         .string()
@@ -39,6 +46,7 @@ export let listCustomers = SlateTool.create(spec, {
           })
         )
         .describe('List of customers'),
+      rawResponse: z.any().optional().describe('Complete provider response'),
       total: z.number().optional().describe('Total number of customers'),
       page: z.number().optional().describe('Current page number'),
       totalPages: z.number().optional().describe('Total number of pages')
@@ -54,29 +62,24 @@ export let listCustomers = SlateTool.create(spec, {
       sort: ctx.input.sort
     });
 
-    let rawCustomers = result?.data ?? result?.customers ?? result ?? [];
-    let customersArray = Array.isArray(rawCustomers) ? rawCustomers : [];
-
-    let customers = customersArray.map((c: any) => ({
-      customerId: String(c.id),
-      name: c.name,
-      email: c.email,
-      phone: c.phone,
-      createdAt: c.created_at
+    let customers = readList(result, 'customers').map(c => ({
+      customerId: requireId(c.id, 'customer ID'),
+      ...pickDefined({
+        name: optionalString(c.name, 'customer name'),
+        email: optionalString(c.email, 'customer email'),
+        phone: optionalString(c.phone, 'customer phone'),
+        createdAt: optionalTimestamp(c.created_at, 'customer creation time')
+      })
     }));
 
-    let total = result?.total ?? result?.meta?.total;
-    let page = result?.page ?? result?.meta?.current_page ?? ctx.input.page;
-    let totalPages = result?.total_pages ?? result?.meta?.last_page;
-
+    let metadata = pagination(result);
     return {
       output: {
         customers,
-        total,
-        page,
-        totalPages
+        ...metadata,
+        rawResponse: result
       },
-      message: `Found **${customers.length}** customer(s)${total ? ` out of ${total} total` : ''}.`
+      message: `Found **${customers.length}** customer(s)${metadata.total !== undefined ? ` out of ${metadata.total} total` : ''}.`
     };
   })
   .build();

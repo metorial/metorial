@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface BooqableClientConfig {
   token: string;
@@ -11,75 +16,125 @@ export interface PaginationParams {
 }
 
 export interface FilterParams {
-  [key: string]: string | number | boolean | undefined;
+  [key: string]: string | number | boolean | string[] | undefined;
 }
 
+type ResourceOptions = {
+  pagination?: PaginationParams;
+  filters?: FilterParams;
+  include?: string[];
+  sort?: string;
+};
+
+export let normalizeCompanySlug = (value: string) => {
+  let slug = value.trim().toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) {
+    throw createApiServiceError('Enter the company slug from your Booqable account URL.');
+  }
+  return slug;
+};
+
+export let validateNumber = (
+  value: number | undefined,
+  name: string,
+  options: { integer?: boolean; min?: number; max?: number } = {}
+) => {
+  if (value === undefined) return;
+  if (
+    !Number.isFinite(value) ||
+    (options.integer && !Number.isSafeInteger(value)) ||
+    (options.min !== undefined && value < options.min) ||
+    (options.max !== undefined && value > options.max)
+  ) {
+    throw createApiServiceError(
+      `${name} must be ${options.integer ? 'a whole number' : 'a finite number'}${options.min !== undefined ? ` at least ${options.min}` : ''}${options.max !== undefined ? ` and at most ${options.max}` : ''}.`
+    );
+  }
+};
+
+export let requireValue = (value: string | undefined, name: string) => {
+  if (!value?.trim()) throw createApiServiceError(`${name} is required.`);
+  return value;
+};
+
+export let validatePeriod = (from?: string, till?: string) => {
+  for (let [name, value] of [
+    ['Start date', from],
+    ['End date', till]
+  ]) {
+    if (value !== undefined && !Number.isFinite(Date.parse(value))) {
+      throw createApiServiceError(`${name} must be a valid ISO 8601 date/time.`);
+    }
+  }
+  if (from && till && Date.parse(from) >= Date.parse(till)) {
+    throw createApiServiceError('The end date must be after the start date.');
+  }
+};
+
+let findErrorCode = (value: unknown): string | undefined => {
+  if (Array.isArray(value)) {
+    for (let item of value) {
+      let code = findErrorCode(item);
+      if (code) return code;
+    }
+  } else if (isApiErrorRecord(value)) {
+    if (typeof value.code === 'string' || typeof value.code === 'number') {
+      return String(value.code);
+    }
+    return findErrorCode(value.errors) ?? findErrorCode(value.error);
+  }
+  return undefined;
+};
+
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: BooqableClientConfig) {
-    this.axios = createAxios({
-      baseURL: `https://${config.companySlug}.booqable.com/api/4`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: `https://${normalizeCompanySlug(config.companySlug)}.booqable.com/api/4`,
+      authHeader: { value: `Bearer ${requireValue(config.token, 'Access token')}` },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Booqable',
+          reason: 'booqable_api_error',
+          detailKeys: ['message', 'detail', 'title', 'code', 'error_description'],
+          nestedKeys: ['errors', 'error'],
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          extractUpstreamCode: (_error, response) => findErrorCode(response?.data)
+        })
     });
   }
 
-  private buildQueryParams(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    fields?: Record<string, string[]>;
-    sort?: string;
-  }): Record<string, string> {
-    let params: Record<string, string> = {};
-
-    if (options?.pagination?.pageNumber) {
+  private buildQueryParams(options?: ResourceOptions): Record<string, string | string[]> {
+    validateNumber(options?.pagination?.pageNumber, 'Page number', { integer: true, min: 1 });
+    validateNumber(options?.pagination?.pageSize, 'Page size', {
+      integer: true,
+      min: 1,
+      max: 100
+    });
+    let params: Record<string, string | string[]> = {};
+    if (options?.pagination?.pageNumber !== undefined) {
       params['page[number]'] = String(options.pagination.pageNumber);
     }
-    if (options?.pagination?.pageSize) {
+    if (options?.pagination?.pageSize !== undefined) {
       params['page[size]'] = String(options.pagination.pageSize);
     }
-
-    if (options?.filters) {
-      for (let [key, value] of Object.entries(options.filters)) {
-        if (value !== undefined && value !== null) {
-          params[`filter[${key}]`] = String(value);
-        }
+    for (let [key, value] of Object.entries(options?.filters ?? {})) {
+      if (value !== undefined) {
+        let [field, ...operators] = key.split('[');
+        let suffix = operators.length ? `[${operators.join('[')}` : '';
+        params[`filter[${field}]${suffix}`] = Array.isArray(value) ? value : String(value);
       }
     }
-
-    if (options?.include?.length) {
-      params.include = options.include.join(',');
-    }
-
-    if (options?.fields) {
-      for (let [resource, fieldList] of Object.entries(options.fields)) {
-        params[`fields[${resource}]`] = fieldList.join(',');
-      }
-    }
-
-    if (options?.sort) {
-      params.sort = options.sort;
-    }
-
+    if (options?.include?.length) params.include = options.include.join(',');
+    if (options?.sort) params.sort = options.sort;
     return params;
   }
 
-  // ---- Generic resource methods ----
-
-  async listResource(
-    resource: string,
-    options?: {
-      pagination?: PaginationParams;
-      filters?: FilterParams;
-      include?: string[];
-      sort?: string;
-    }
-  ): Promise<any> {
+  async listResource(resource: string, options?: ResourceOptions): Promise<any> {
     let params = this.buildQueryParams(options);
+    params['meta[total][]'] = 'count';
     let response = await this.axios.get(`/${resource}`, { params });
     return response.data;
   }
@@ -87,31 +142,21 @@ export class Client {
   async getResource(
     resource: string,
     resourceId: string,
-    options?: {
-      include?: string[];
-    }
+    options?: { include?: string[] }
   ): Promise<any> {
-    let params = this.buildQueryParams({ include: options?.include });
-    let response = await this.axios.get(`/${resource}/${resourceId}`, { params });
+    requireValue(resourceId, 'Resource ID');
+    let response = await this.axios.get(`/${resource}/${encodeURIComponent(resourceId)}`, {
+      params: this.buildQueryParams({ include: options?.include })
+    });
     return response.data;
   }
 
   async createResource(
     resource: string,
     type: string,
-    attributes: Record<string, any>,
-    relationships?: Record<string, any>
+    attributes: Record<string, unknown>
   ): Promise<any> {
-    let body: any = {
-      data: {
-        type,
-        attributes
-      }
-    };
-    if (relationships) {
-      body.data.relationships = relationships;
-    }
-    let response = await this.axios.post(`/${resource}`, body);
+    let response = await this.axios.post(`/${resource}`, { data: { type, attributes } });
     return response.data;
   }
 
@@ -119,387 +164,110 @@ export class Client {
     resource: string,
     resourceId: string,
     type: string,
-    attributes: Record<string, any>,
-    relationships?: Record<string, any>
+    attributes: Record<string, unknown>
   ): Promise<any> {
-    let body: any = {
-      data: {
-        id: resourceId,
-        type,
-        attributes
-      }
-    };
-    if (relationships) {
-      body.data.relationships = relationships;
-    }
-    let response = await this.axios.patch(`/${resource}/${resourceId}`, body);
+    requireValue(resourceId, 'Resource ID');
+    if (!Object.keys(attributes).length)
+      throw createApiServiceError('Provide at least one field to update.');
+    let response = await this.axios.put(`/${resource}/${encodeURIComponent(resourceId)}`, {
+      data: { id: resourceId, type, attributes }
+    });
     return response.data;
   }
 
   async deleteResource(resource: string, resourceId: string): Promise<void> {
-    await this.axios.delete(`/${resource}/${resourceId}`);
+    requireValue(resourceId, 'Resource ID');
+    await this.axios.delete(`/${resource}/${encodeURIComponent(resourceId)}`);
   }
 
-  // ---- Customers ----
-
-  async listCustomers(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listCustomers(options?: ResourceOptions) {
     return this.listResource('customers', options);
   }
-
-  async getCustomer(customerId: string, include?: string[]) {
-    return this.getResource('customers', customerId, { include });
+  getCustomer(id: string, include?: string[]) {
+    return this.getResource('customers', id, { include });
   }
-
-  async createCustomer(attributes: Record<string, any>) {
+  createCustomer(attributes: Record<string, unknown>) {
     return this.createResource('customers', 'customers', attributes);
   }
-
-  async updateCustomer(customerId: string, attributes: Record<string, any>) {
-    return this.updateResource('customers', customerId, 'customers', attributes);
+  updateCustomer(id: string, attributes: Record<string, unknown>) {
+    return this.updateResource('customers', id, 'customers', attributes);
   }
-
-  async archiveCustomer(customerId: string) {
-    return this.deleteResource('customers', customerId);
+  archiveCustomer(id: string) {
+    return this.deleteResource('customers', id);
   }
-
-  // ---- Orders ----
-
-  async listOrders(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listOrders(options?: ResourceOptions) {
     return this.listResource('orders', options);
   }
-
-  async getOrder(orderId: string, include?: string[]) {
-    return this.getResource('orders', orderId, { include });
+  getOrder(id: string, include?: string[]) {
+    return this.getResource('orders', id, { include });
   }
-
-  async createOrder(attributes: Record<string, any>) {
+  createOrder(attributes: Record<string, unknown>) {
     return this.createResource('orders', 'orders', attributes);
   }
-
-  async updateOrder(orderId: string, attributes: Record<string, any>) {
-    return this.updateResource('orders', orderId, 'orders', attributes);
+  updateOrder(id: string, attributes: Record<string, unknown>) {
+    return this.updateResource('orders', id, 'orders', attributes);
   }
-
-  async archiveOrder(orderId: string) {
-    return this.deleteResource('orders', orderId);
-  }
-
-  // ---- Product Groups ----
-
-  async listProductGroups(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listProductGroups(options?: ResourceOptions) {
     return this.listResource('product_groups', options);
   }
-
-  async getProductGroup(productGroupId: string, include?: string[]) {
-    return this.getResource('product_groups', productGroupId, { include });
+  getProductGroup(id: string, include?: string[]) {
+    return this.getResource('product_groups', id, { include });
   }
-
-  async createProductGroup(attributes: Record<string, any>) {
+  createProductGroup(attributes: Record<string, unknown>) {
     return this.createResource('product_groups', 'product_groups', attributes);
   }
-
-  async updateProductGroup(productGroupId: string, attributes: Record<string, any>) {
-    return this.updateResource('product_groups', productGroupId, 'product_groups', attributes);
+  updateProductGroup(id: string, attributes: Record<string, unknown>) {
+    return this.updateResource('product_groups', id, 'product_groups', attributes);
   }
-
-  async archiveProductGroup(productGroupId: string) {
-    return this.deleteResource('product_groups', productGroupId);
-  }
-
-  // ---- Products ----
-
-  async listProducts(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
-    return this.listResource('products', options);
-  }
-
-  async getProduct(productId: string, include?: string[]) {
-    return this.getResource('products', productId, { include });
-  }
-
-  async createProduct(attributes: Record<string, any>) {
-    return this.createResource('products', 'products', attributes);
-  }
-
-  async updateProduct(productId: string, attributes: Record<string, any>) {
-    return this.updateResource('products', productId, 'products', attributes);
-  }
-
-  // ---- Bundles ----
-
-  async listBundles(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
-    return this.listResource('bundles', options);
-  }
-
-  async getBundle(bundleId: string, include?: string[]) {
-    return this.getResource('bundles', bundleId, { include });
-  }
-
-  async createBundle(attributes: Record<string, any>) {
-    return this.createResource('bundles', 'bundles', attributes);
-  }
-
-  async updateBundle(bundleId: string, attributes: Record<string, any>) {
-    return this.updateResource('bundles', bundleId, 'bundles', attributes);
-  }
-
-  async archiveBundle(bundleId: string) {
-    return this.deleteResource('bundles', bundleId);
-  }
-
-  // ---- Stock Items ----
-
-  async listStockItems(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listStockItems(options?: ResourceOptions) {
     return this.listResource('stock_items', options);
   }
-
-  async getStockItem(stockItemId: string, include?: string[]) {
-    return this.getResource('stock_items', stockItemId, { include });
-  }
-
-  async createStockItem(attributes: Record<string, any>) {
+  createStockItem(attributes: Record<string, unknown>) {
     return this.createResource('stock_items', 'stock_items', attributes);
   }
-
-  async updateStockItem(stockItemId: string, attributes: Record<string, any>) {
-    return this.updateResource('stock_items', stockItemId, 'stock_items', attributes);
+  updateStockItem(id: string, attributes: Record<string, unknown>) {
+    return this.updateResource('stock_items', id, 'stock_items', attributes);
   }
-
-  // ---- Documents (Invoices, Quotes, Contracts) ----
-
-  async listDocuments(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listDocuments(options?: ResourceOptions) {
     return this.listResource('documents', options);
   }
-
-  async getDocument(documentId: string, include?: string[]) {
-    return this.getResource('documents', documentId, { include });
+  getDocument(id: string, include?: string[]) {
+    return this.getResource('documents', id, { include });
   }
-
-  async createDocument(attributes: Record<string, any>) {
-    return this.createResource('documents', 'documents', attributes);
-  }
-
-  async updateDocument(documentId: string, attributes: Record<string, any>) {
-    return this.updateResource('documents', documentId, 'documents', attributes);
-  }
-
-  async archiveDocument(documentId: string) {
-    return this.deleteResource('documents', documentId);
-  }
-
-  // ---- Invoice Finalizations ----
-
-  async finalizeInvoice(attributes: Record<string, any>) {
-    return this.createResource('invoice_finalizations', 'invoice_finalizations', attributes);
-  }
-
-  // ---- Invoice Revisions ----
-
-  async reviseInvoice(attributes: Record<string, any>) {
-    return this.createResource('invoice_revisions', 'invoice_revisions', attributes);
-  }
-
-  // ---- Payments ----
-
-  async listPayments(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listPayments(options?: ResourceOptions) {
     return this.listResource('payments', options);
   }
-
-  async getPayment(paymentId: string, include?: string[]) {
-    return this.getResource('payments', paymentId, { include });
-  }
-
-  // ---- Payment Charges ----
-
-  async createPaymentCharge(attributes: Record<string, any>) {
+  createPaymentCharge(attributes: Record<string, unknown>) {
     return this.createResource('payment_charges', 'payment_charges', attributes);
   }
-
-  // ---- Payment Refunds ----
-
-  async createPaymentRefund(attributes: Record<string, any>) {
+  createPaymentRefund(attributes: Record<string, unknown>) {
     return this.createResource('payment_refunds', 'payment_refunds', attributes);
   }
-
-  // ---- Payment Authorizations ----
-
-  async createPaymentAuthorization(attributes: Record<string, any>) {
+  createPaymentAuthorization(attributes: Record<string, unknown>) {
     return this.createResource('payment_authorizations', 'payment_authorizations', attributes);
   }
-
-  // ---- Locations ----
-
-  async listLocations(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listLocations(options?: ResourceOptions) {
     return this.listResource('locations', options);
   }
-
-  async getLocation(locationId: string, include?: string[]) {
-    return this.getResource('locations', locationId, { include });
-  }
-
-  async createLocation(attributes: Record<string, any>) {
-    return this.createResource('locations', 'locations', attributes);
-  }
-
-  async updateLocation(locationId: string, attributes: Record<string, any>) {
-    return this.updateResource('locations', locationId, 'locations', attributes);
-  }
-
-  async archiveLocation(locationId: string) {
-    return this.deleteResource('locations', locationId);
-  }
-
-  // ---- Coupons ----
-
-  async listCoupons(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
+  listCoupons(options?: ResourceOptions) {
     return this.listResource('coupons', options);
   }
-
-  async getCoupon(couponId: string, include?: string[]) {
-    return this.getResource('coupons', couponId, { include });
-  }
-
-  async createCoupon(attributes: Record<string, any>) {
+  createCoupon(attributes: Record<string, unknown>) {
     return this.createResource('coupons', 'coupons', attributes);
   }
-
-  async updateCoupon(couponId: string, attributes: Record<string, any>) {
-    return this.updateResource('coupons', couponId, 'coupons', attributes);
+  updateCoupon(id: string, attributes: Record<string, unknown>) {
+    return this.updateResource('coupons', id, 'coupons', attributes);
   }
-
-  async archiveCoupon(couponId: string) {
-    return this.deleteResource('coupons', couponId);
+  archiveCoupon(id: string) {
+    return this.deleteResource('coupons', id);
   }
-
-  // ---- Emails ----
-
-  async listEmails(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-    sort?: string;
-  }) {
-    return this.listResource('emails', options);
-  }
-
-  async createEmail(attributes: Record<string, any>) {
+  createEmail(attributes: Record<string, unknown>) {
     return this.createResource('emails', 'emails', attributes);
   }
-
-  // ---- Tags ----
-
-  async listTags(options?: { pagination?: PaginationParams; filters?: FilterParams }) {
-    return this.listResource('tags', options);
-  }
-
-  // ---- Notes ----
-
-  async listNotes(options?: { pagination?: PaginationParams; filters?: FilterParams }) {
-    return this.listResource('notes', options);
-  }
-
-  async createNote(attributes: Record<string, any>) {
-    return this.createResource('notes', 'notes', attributes);
-  }
-
-  async deleteNote(noteId: string) {
-    return this.deleteResource('notes', noteId);
-  }
-
-  // ---- Webhook Endpoints ----
-
-  async listWebhookEndpoints(options?: { pagination?: PaginationParams }) {
-    return this.listResource('webhook_endpoints', options);
-  }
-
-  async createWebhookEndpoint(attributes: Record<string, any>) {
-    return this.createResource('webhook_endpoints', 'webhook_endpoints', attributes);
-  }
-
-  async updateWebhookEndpoint(webhookEndpointId: string, attributes: Record<string, any>) {
-    return this.updateResource(
-      'webhook_endpoints',
-      webhookEndpointId,
-      'webhook_endpoints',
-      attributes
-    );
-  }
-
-  async deleteWebhookEndpoint(webhookEndpointId: string) {
-    return this.deleteResource('webhook_endpoints', webhookEndpointId);
-  }
-
-  // ---- Inventory / Availability ----
-
-  async listInventoryLevels(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-  }) {
+  listInventoryLevels(options?: ResourceOptions) {
     return this.listResource('inventory_levels', options);
   }
-
-  async listInventoryBreakdowns(options?: {
-    pagination?: PaginationParams;
-    filters?: FilterParams;
-    include?: string[];
-  }) {
-    return this.listResource('inventory_breakdowns', options);
-  }
-
-  // ---- Companies ----
-
-  async getCompany() {
-    let response = await this.axios.get('/companies/current');
-    return response.data;
+  getCompany() {
+    return this.getResource('companies', 'current');
   }
 }

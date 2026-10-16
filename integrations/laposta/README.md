@@ -2,6 +2,9 @@
 
 Create, send, and track email newsletter campaigns. Manage mailing lists with subscriber counts and notification settings. Add, update, delete, and bulk-synchronize subscribers across lists with support for upsert and double opt-in control. Define custom fields (text, numeric, date, select) on lists and manage select options. Create segments based on custom field conditions. Build campaign content from HTML or URL import with optional CSS inlining, schedule or send campaigns immediately, and send test emails. Retrieve campaign performance reports including opens, clicks, bounces, and unsubscribes. Configure webhooks for subscriber events (subscribed, modified, deactivated).
 
+
+Subscriber listing supports cursor pagination, search, labels and sorting. Read subscriber or campaign event history with provider privacy settings respected. Retrieve imported campaign content and set inbox preview text. Native numeric and multiple-choice custom field values are available through `customFieldValues`; raw outputs retain provider fields and null values. Use field `custom_name` values from Get Fields for subscriber data.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

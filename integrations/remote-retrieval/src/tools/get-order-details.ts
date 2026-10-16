@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, mapOrderDetails } from '../lib/client';
 import { spec } from '../spec';
 
 let orderDetailSchema = z.object({
@@ -53,32 +53,7 @@ export let getOrderDetails = SlateTool.create(spec, {
 
     let result = await client.getOrderDetails(ctx.input.orderId);
 
-    let details = (Array.isArray(result) ? result : [result]).map((item: any) => ({
-      orderId: item.order_id,
-      employeeInfo: {
-        email: item.employee_info?.email || '',
-        name: item.employee_info?.name || '',
-        addressLine1: item.employee_info?.address_line_1 || '',
-        addressLine2: item.employee_info?.address_line_2 || undefined,
-        city: item.employee_info?.city || '',
-        state: item.employee_info?.state || '',
-        zip: item.employee_info?.zip || ''
-      },
-      companyInfo: {
-        email: item.company_info?.email || '',
-        name: item.company_info?.name || '',
-        addressLine1: item.company_info?.address_line_1 || '',
-        addressLine2: item.company_info?.address_line_2 || undefined,
-        city: item.company_info?.city || '',
-        state: item.company_info?.state || '',
-        zip: item.company_info?.zip || ''
-      },
-      shipments: {
-        deviceType: item.shipments?.device_type || '',
-        sendStatus: item.shipments?.send_status || '',
-        returnStatus: item.shipments?.return_status || ''
-      }
-    }));
+    let details = (Array.isArray(result) ? result : [result]).map(mapOrderDetails);
 
     return {
       output: {

@@ -32,17 +32,18 @@ export let getAudiofileStatus = SlateTool.create(spec, {
       qualityStars: z.number().optional().describe('Quality rating on a 5-star scale'),
       orderIds: z.array(z.string()).optional().describe('Associated order IDs'),
       invoiceIds: z.array(z.string()).optional().describe('Associated invoice IDs'),
-      cost: z.string().optional().describe('Total cost in USD')
+      cost: z.string().optional().describe('Total cost in USD'),
+      raw: z.unknown().describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let result = await client.getAudiofileDetails(ctx.input.audiofileId);
+    let { result, raw } = await client.getAudiofileDetails(ctx.input.audiofileId);
 
     let output = {
       audiofileId: result.id,
-      state: result.statename ?? 'Unknown',
+      state: result.statename,
       title: result.title,
       description: result.description,
       duration: result.duration,
@@ -52,7 +53,8 @@ export let getAudiofileStatus = SlateTool.create(spec, {
       qualityStars: result.quality_stars,
       orderIds: result.orders,
       invoiceIds: result.invoices,
-      cost: result.total
+      cost: result.total,
+      raw
     };
 
     return {

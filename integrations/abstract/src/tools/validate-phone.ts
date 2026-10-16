@@ -16,11 +16,19 @@ export let validatePhone = SlateTool.create(spec, {
     z.object({
       phone: z
         .string()
-        .describe('The phone number to validate (include country code, e.g. +14152007986)')
+        .describe('The phone number to validate (include country code, e.g. +14152007986)'),
+      country: z
+        .string()
+        .optional()
+        .describe('Two-letter country code for numbers without an international calling code')
     })
   )
   .output(
     z.object({
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including unavailable values'),
       phone: z.string().describe('The phone number that was validated'),
       isValid: z.boolean().optional().describe('Whether the phone number is valid'),
       country: z
@@ -35,6 +43,10 @@ export let validatePhone = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Line type (e.g. mobile, landline, voip, toll_free)'),
+      location: z
+        .string()
+        .optional()
+        .describe('Geographic location associated with the number'),
       carrier: z.string().optional().describe('Phone carrier/operator name'),
       internationalFormat: z
         .string()
@@ -47,10 +59,12 @@ export let validatePhone = SlateTool.create(spec, {
     let client = new AbstractClient(ctx.auth);
 
     let result = await client.validatePhone({
-      phone: ctx.input.phone
+      phone: ctx.input.phone,
+      country: ctx.input.country
     });
 
     let output = {
+      rawResponse: result,
       phone: result.phone ?? ctx.input.phone,
       isValid: result.valid ?? undefined,
       country: result.country
@@ -60,10 +74,12 @@ export let validatePhone = SlateTool.create(spec, {
             prefix: result.country.prefix ?? undefined
           }
         : undefined,
+      location: result.location ?? undefined,
       type: result.type ?? undefined,
       carrier: result.carrier ?? undefined,
-      internationalFormat: result.international_format ?? undefined,
-      localFormat: result.local_format ?? undefined
+      internationalFormat:
+        result.format?.international ?? result.international_format ?? undefined,
+      localFormat: result.format?.local ?? result.local_format ?? undefined
     };
 
     let validity = output.isValid ? 'valid' : output.isValid === false ? 'invalid' : 'unknown';

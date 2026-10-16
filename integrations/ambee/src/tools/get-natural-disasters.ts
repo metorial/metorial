@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -67,7 +67,9 @@ export let getNaturalDisasters = SlateTool.create(spec, {
     } else if (ctx.input.countryCode) {
       result = await client.getDisastersByCountryCode(ctx.input.countryCode, filterParams);
     } else {
-      throw new Error('Provide lat/lng coordinates, a continent code, or a country code.');
+      throw createApiServiceError(
+        'Provide lat/lng coordinates, a continent code, or a country code.'
+      );
     }
 
     let disasters = result.data || [];

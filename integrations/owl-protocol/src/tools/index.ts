@@ -4,3 +4,4 @@ export * from './manage-token';
 export * from './manage-token-template';
 export * from './manage-user';
 export * from './mint-tokens';
+export * from './project-discovery';

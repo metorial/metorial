@@ -44,7 +44,11 @@ export let discoverSources = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      sources: z.array(sourceSchema).describe('List of available news sources')
+      sources: z.array(sourceSchema).describe('List of available news sources'),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response with original source metadata and status')
     })
   )
   .handleInvocation(async ctx => {
@@ -75,7 +79,8 @@ export let discoverSources = SlateTool.create(spec, {
 
     return {
       output: {
-        sources
+        sources,
+        rawResponse: result
       },
       message: `Found **${sources.length}** news sources${filterDesc}.`
     };

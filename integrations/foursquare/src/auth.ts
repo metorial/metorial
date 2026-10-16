@@ -8,7 +8,8 @@ let apiAxios = createAxios({
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      credentialType: z.literal('service_key').optional()
     })
   )
   .addTokenAuth({
@@ -25,6 +26,21 @@ export let auth = SlateAuth.create()
         }
       };
     }
+  })
+  .addTokenAuth({
+    type: 'auth.token',
+    name: 'Places Service API Key',
+    key: 'service_api_key',
+    inputSchema: z.object({
+      serviceApiKey: z
+        .string()
+        .describe(
+          'Service API Key from the project settings in the Developer Console. Required for current Places tools; legacy API keys and V2 OAuth credentials are separate.'
+        )
+    }),
+    getOutput: async ctx => ({
+      output: { token: ctx.input.serviceApiKey, credentialType: 'service_key' as const }
+    })
   })
   .addOauth({
     type: 'auth.oauth',

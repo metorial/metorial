@@ -37,7 +37,8 @@ export let updateSuggestion = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let s = await client.updateSuggestion(ctx.input.suggestionId, {

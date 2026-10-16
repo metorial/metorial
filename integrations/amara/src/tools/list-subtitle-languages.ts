@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -49,17 +49,27 @@ export let listSubtitleLanguages = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let languages = result.objects.map(l => ({
-      languageCode: l.language_code,
-      name: l.name,
-      isPrimaryAudioLanguage: l.is_primary_audio_language,
-      isRtl: l.is_rtl,
-      subtitlesComplete: l.subtitles_complete,
-      subtitleCount: l.subtitle_count,
-      published: l.published,
-      versionCount: l.versions?.length ?? 0,
-      created: l.created
-    }));
+    let languages = result.objects.map(l => {
+      if (!Array.isArray(l?.versions)) {
+        throw createApiServiceError(
+          'Amara returned a subtitle language without a valid versions list.',
+          {
+            reason: 'amara_invalid_response'
+          }
+        );
+      }
+      return {
+        languageCode: l.language_code,
+        name: l.name,
+        isPrimaryAudioLanguage: l.is_primary_audio_language,
+        isRtl: l.is_rtl,
+        subtitlesComplete: l.subtitles_complete,
+        subtitleCount: l.subtitle_count,
+        published: l.published,
+        versionCount: l.versions.length,
+        created: l.created
+      };
+    });
 
     return {
       output: {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { pickWritable, requireForCreate } from '../lib/upsert';
 import { spec } from '../spec';
 
@@ -27,7 +27,7 @@ let mapModifier = (m: any) => ({
   modifierName: m.name,
   position: m.position,
   storeIds: m.stores ?? undefined,
-  options: (m.modifier_options ?? m.options ?? []).map((o: any) => ({
+  options: (m.modifier_options ?? m.options)?.map((o: any) => ({
     modifierOptionId: o.id,
     optionName: o.name,
     price: o.price,
@@ -46,6 +46,26 @@ export let listModifiers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      modifierIds: z
+        .array(z.string())
+        .optional()
+        .describe('Only return modifiers with these IDs'),
+      createdAtMin: z
+        .string()
+        .optional()
+        .describe('Only return modifiers created at or after this ISO 8601 UTC timestamp'),
+      createdAtMax: z
+        .string()
+        .optional()
+        .describe('Only return modifiers created at or before this ISO 8601 UTC timestamp'),
+      updatedAtMin: z
+        .string()
+        .optional()
+        .describe('Only return modifiers updated at or after this ISO 8601 UTC timestamp'),
+      updatedAtMax: z
+        .string()
+        .optional()
+        .describe('Only return modifiers updated at or before this ISO 8601 UTC timestamp'),
       limit: z.number().min(1).max(250).optional().describe('Number of modifiers to return'),
       cursor: z.string().optional().describe('Pagination cursor'),
       showDeleted: z
@@ -63,6 +83,11 @@ export let listModifiers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listModifiers({
+      modifierIds: joinIds(ctx.input.modifierIds),
+      createdAtMin: ctx.input.createdAtMin,
+      createdAtMax: ctx.input.createdAtMax,
+      updatedAtMin: ctx.input.updatedAtMin,
+      updatedAtMax: ctx.input.updatedAtMax,
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       showDeleted: ctx.input.showDeleted
@@ -153,6 +178,7 @@ export let createOrUpdateModifier = SlateTool.create(spec, {
         if (o.optionName !== undefined) opt.name = o.optionName;
         if (o.price !== undefined) opt.price = o.price;
         if (o.position !== undefined) opt.position = o.position;
+        requireForCreate(opt.name, 'optionName', 'modifier option');
         return opt;
       });
     }
@@ -161,7 +187,7 @@ export let createOrUpdateModifier = SlateTool.create(spec, {
 
     return {
       output: mapModifier(result),
-      message: `${isUpdate ? 'Updated' : 'Created'} modifier **${result.name}**.`
+      message: `${isUpdate ? 'Updated' : 'Created'} modifier **${result.name ?? result.id}**.`
     };
   })
   .build();

@@ -33,11 +33,14 @@ export let listSnapshots = SlateTool.create(spec, {
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user or org). Defaults to the authenticated user.'),
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        ),
       ownerType: z
         .enum(['user', 'org'])
         .default('user')
         .describe('Whether the owner is a user or organization'),
+      filter: z.string().optional().describe('Optional Pipes query-filter expression'),
       limit: z.number().optional().describe('Maximum number of results to return'),
       nextToken: z.string().optional().describe('Pagination cursor from a previous response')
     })
@@ -49,25 +52,20 @@ export let listSnapshots = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['listSnapshots']>>;
     if (ctx.input.ownerType === 'org') {
       result = await client.listOrgSnapshots(ownerHandle, ctx.input.workspaceHandle, {
+        where: ctx.input.filter,
         limit: ctx.input.limit,
         nextToken: ctx.input.nextToken
       });
     } else {
       result = await client.listSnapshots(ownerHandle, ctx.input.workspaceHandle, {
+        where: ctx.input.filter,
         limit: ctx.input.limit,
         nextToken: ctx.input.nextToken
       });
@@ -95,26 +93,29 @@ export let getSnapshot = SlateTool.create(spec, {
     z.object({
       workspaceHandle: z.string().describe('Handle of the workspace'),
       snapshotId: z.string().describe('Snapshot ID to retrieve'),
+      ownerType: z
+        .enum(['user', 'org'])
+        .optional()
+        .describe('Whether the owner is a user or organization'),
       ownerHandle: z
         .string()
         .optional()
-        .describe('Owner handle (user). Defaults to the authenticated user.')
+        .describe(
+          'Owner handle. Required for organizations; call list_organizations to discover organization handles. Defaults to the authenticated user for user scope.'
+        )
     })
   )
   .output(snapshotSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = Client.fromContext(ctx);
 
-    let ownerHandle = ctx.input.ownerHandle;
-    if (!ownerHandle) {
-      let actor = await client.getActor();
-      ownerHandle = actor.handle;
-    }
+    let ownerHandle = await client.resolveOwner(ctx.input.ownerType, ctx.input.ownerHandle);
 
-    let snapshot = await client.getSnapshot(
+    let readSnapshot =
+      ctx.input.ownerType === 'org'
+        ? client.getOrgSnapshot.bind(client)
+        : client.getSnapshot.bind(client);
+    let snapshot = await readSnapshot(
       ownerHandle,
       ctx.input.workspaceHandle,
       ctx.input.snapshotId
@@ -122,7 +123,7 @@ export let getSnapshot = SlateTool.create(spec, {
 
     return {
       output: snapshot,
-      message: `Snapshot **${snapshot.snapshotId}** (${snapshot.dashboardTitle || snapshot.dashboardName || 'untitled'}) - visibility: ${snapshot.visibility || 'unknown'}.`
+      message: `Retrieved snapshot **${snapshot.snapshotId}**.`
     };
   })
   .build();

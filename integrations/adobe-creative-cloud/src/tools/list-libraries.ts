@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { libraryTimestamp } from '../lib/client';
 import { LibrariesClient } from '../lib/libraries';
 import { spec } from '../spec';
 
@@ -50,16 +51,16 @@ export let listLibraries = SlateTool.create(spec, {
     let libraries = (result.libraries || result.elements || []).map((lib: any) => ({
       libraryId: lib.id || lib.library_urn,
       name: lib.name,
-      createdAt: lib.created_date || lib.created,
-      modifiedAt: lib.modified_date || lib.modified,
-      elementCount: lib.element_count || lib.total_elements_count
+      createdAt: libraryTimestamp(lib.created_date ?? lib.created),
+      modifiedAt: libraryTimestamp(lib.modified_date ?? lib.modified),
+      elementCount: lib.elements_count ?? lib.element_count ?? lib.total_elements_count
     }));
 
     return {
       output: {
         libraries,
         totalCount: result.total_count,
-        nextCursor: result._links?.next?.href
+        nextCursor: result._page?.next ?? result._links?.next?.href
       },
       message: `Found **${libraries.length}** libraries.${libraries.length > 0 ? ` Libraries: ${libraries.map((l: any) => `"${l.name}"`).join(', ')}` : ''}`
     };

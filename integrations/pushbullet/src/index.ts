@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createChannel,
   getChannelInfo,
+  getCurrentUser,
   listChats,
   listDevices,
   listPushes,
@@ -18,6 +20,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    createChannel,
     sendPush,
     listPushes,
     managePush,

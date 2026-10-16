@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageAccessTokens = SlateTool.create(spec, {
   description: `Generate, retrieve, or delete access tokens for a token-protected conference room (access_type=3). Tokens control participant access and can be used for paid events distributed via CRM or email.`,
   instructions: [
     'The conference room must have access_type=3 (token-protected) for tokens to work.',
-    'Use action "generate" to create new tokens, "list" to retrieve existing tokens, or "delete" to remove all tokens.'
+    'Use action "generate" to create new tokens, "list" to retrieve existing tokens, or "delete" to deactivate access tokens.'
   ]
 })
   .input(
@@ -42,15 +42,13 @@ export let manageAccessTokens = SlateTool.create(spec, {
     let { roomId, action, count } = ctx.input;
 
     if (action === 'generate') {
-      if (!count || count < 1) {
-        throw new Error('count is required and must be >= 1 when generating tokens');
+      if (count === undefined || !Number.isInteger(count) || count < 1 || count > 1000) {
+        throw createApiServiceError(
+          'count must be an integer from 1 to 1000 when generating tokens'
+        );
       }
       let result = await client.generateTokens(roomId, count);
-      let tokens = (result?.access_tokens || []).map((t: any) => ({
-        token: t.token,
-        sentToEmail: t.sent_to_email ?? null,
-        firstUseDate: t.first_use_date ?? null
-      }));
+      let tokens = mapTokens(result);
       return {
         output: { accessTokens: tokens },
         message: `Generated **${tokens.length}** access token(s) for room ${roomId}.`
@@ -59,11 +57,7 @@ export let manageAccessTokens = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.getTokens(roomId);
-      let tokens = (result?.access_tokens || []).map((t: any) => ({
-        token: t.token,
-        sentToEmail: t.sent_to_email ?? null,
-        firstUseDate: t.first_use_date ?? null
-      }));
+      let tokens = mapTokens(result);
       return {
         output: { accessTokens: tokens },
         message: `Found **${tokens.length}** access token(s) for room ${roomId}.`
@@ -74,7 +68,36 @@ export let manageAccessTokens = SlateTool.create(spec, {
     await client.deleteTokens(roomId);
     return {
       output: { deleted: true },
-      message: `Deleted all access tokens for room ${roomId}.`
+      message: `Deleted access tokens for room ${roomId}.`
     };
   })
   .build();
+
+function mapTokens(result: Record<string, unknown>) {
+  if (!Array.isArray(result.access_tokens)) {
+    throw createApiServiceError('ClickMeeting returned an invalid access token list.');
+  }
+  return result.access_tokens.map(token => {
+    if (
+      !isApiErrorRecord(token) ||
+      typeof token.token !== 'string' ||
+      (token.sent_to_email !== undefined &&
+        token.sent_to_email !== null &&
+        typeof token.sent_to_email !== 'string') ||
+      (token.first_use_date !== undefined &&
+        token.first_use_date !== null &&
+        typeof token.first_use_date !== 'string')
+    ) {
+      throw createApiServiceError('ClickMeeting returned an invalid access token.');
+    }
+    return {
+      token: token.token,
+      ...(token.sent_to_email !== undefined
+        ? { sentToEmail: token.sent_to_email as string | null }
+        : {}),
+      ...(token.first_use_date !== undefined
+        ? { firstUseDate: token.first_use_date as string | null }
+        : {})
+    };
+  });
+}

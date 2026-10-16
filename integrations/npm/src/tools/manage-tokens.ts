@@ -1,6 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NpmRegistryClient } from '../lib/client';
+import {
+  array,
+  optionalNumber,
+  optionalStrings,
+  optionalText,
+  record,
+  stringRecord,
+  text
+} from '../lib/response';
 import { spec } from '../spec';
 
 let tokenInfoSchema = z
@@ -21,7 +30,7 @@ export let manageTokens = SlateTool.create(spec, {
   instructions: [
     'Creating tokens requires a session token and the account password.',
     'Read-write tokens have a maximum 90-day lifetime; read-only tokens have no maximum.',
-    'If 2FA is enabled, provide the otp field with your one-time password.'
+    'If 2FA is enabled, provide an OTP from your configured method. Otherwise, omit otp on the first create request to trigger npm’s email challenge, then retry with the emailed code.'
   ],
   constraints: [
     'Token creation requires a session token (from npm login), not a granular token.',
@@ -41,16 +50,27 @@ export let manageTokens = SlateTool.create(spec, {
       page: z.number().optional().describe('Page number for listing (default 0)'),
       perPage: z.number().optional().describe('Results per page for listing (default 10)'),
       password: z.string().optional().describe('Account password (required for "create")'),
-      tokenName: z.string().optional().describe('Human-readable name for the new token'),
+      tokenName: z
+        .string()
+        .optional()
+        .describe('Human-readable name for the new token (required for create)'),
       tokenDescription: z.string().optional().describe('Description for the new token'),
       expiresIn: z
         .string()
         .optional()
         .describe('Expiration for new token (e.g. "7d", "30d", "90d", or ISO date)'),
+      orgPermission: z
+        .enum(['read-only', 'read-write', 'no-access'])
+        .optional()
+        .describe(
+          'Permission for the selected organizations. Defaults are determined by npm.'
+        ),
       permission: z
         .enum(['read-only', 'read-write'])
         .optional()
-        .describe('Permission level for new token (default "read-only")'),
+        .describe(
+          'Package and scope permission for the new token. npm defaults to read-only when packages/scopes are selected, otherwise no-access.'
+        ),
       cidrWhitelist: z
         .array(z.string())
         .optional()
@@ -65,7 +85,12 @@ export let manageTokens = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Allow token to bypass 2FA for automated workflows'),
-      otp: z.string().optional().describe('One-time password for 2FA verification'),
+      otp: z
+        .string()
+        .optional()
+        .describe(
+          'One-time password for 2FA or email verification. For accounts without 2FA, omit on the initial create request, then retry with the emailed code.'
+        ),
       tokenKey: z
         .string()
         .optional()
@@ -87,6 +112,17 @@ export let manageTokens = SlateTool.create(spec, {
         })
         .optional()
         .describe('Newly created token details (for "create" action)'),
+      rawResponse: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Unmodified provider token metadata. A created token value is included only in the creation response.'
+        ),
+      total: z.number().optional().describe('Total available tokens, when provided by npm'),
+      urls: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Pagination URLs provided by npm'),
       deleted: z.boolean().optional().describe('Whether the token was successfully deleted')
     })
   )
@@ -94,61 +130,88 @@ export let manageTokens = SlateTool.create(spec, {
     let client = new NpmRegistryClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let result = await client.listTokens(ctx.input.page, ctx.input.perPage);
-      let tokens = (result.objects || []).map((t: any) => ({
-        tokenKey: t.key || t.token,
-        tokenName: t.name,
-        created: t.created,
-        expires: t.expires,
-        readonly: t.readonly,
-        cidrWhitelist: t.cidr_whitelist
-      }));
+      let result = record(
+        await client.listTokens(ctx.input.page, ctx.input.perPage),
+        'token list'
+      );
+      let tokens = array(result.objects, 'token list entries').map(value => {
+        let token = record(value, 'token entry');
+        return {
+          tokenKey: text(token.key, 'token key'),
+          tokenName: optionalText(token.name, 'token name'),
+          created: optionalText(token.created, 'token creation date'),
+          expires: optionalText(token.expiry ?? token.expires, 'token expiry'),
+          readonly: typeof token.readonly === 'boolean' ? token.readonly : undefined,
+          cidrWhitelist: optionalStrings(
+            token.cidr ?? token.cidr_whitelist,
+            'token CIDR ranges'
+          )
+        };
+      });
       return {
-        output: { tokens },
-        message: `Found **${tokens.length}** access token(s).`
+        output: {
+          tokens,
+          rawResponse: result,
+          total: optionalNumber(result.total, 'token total'),
+          urls:
+            result.urls == null
+              ? undefined
+              : stringRecord(result.urls, 'token pagination URLs')
+        },
+        message: `Retrieved **${tokens.length}** access token(s).`
       };
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.password) throw new Error('Password is required to create a token.');
+      if (!ctx.input.password)
+        throw createApiServiceError('Password is required to create a token.');
 
-      let result = await client.createToken({
-        password: ctx.input.password,
-        name: ctx.input.tokenName,
-        description: ctx.input.tokenDescription,
-        expires: ctx.input.expiresIn,
-        cidrWhitelist: ctx.input.cidrWhitelist,
-        packages: ctx.input.packages,
-        scopes: ctx.input.scopes,
-        orgs: ctx.input.orgs,
-        permission: ctx.input.permission,
-        bypass2fa: ctx.input.bypass2fa,
-        otp: ctx.input.otp
-      });
+      if (!ctx.input.tokenName)
+        throw createApiServiceError('tokenName is required to create a token.');
+
+      let result = record(
+        await client.createToken({
+          password: ctx.input.password,
+          name: ctx.input.tokenName,
+          description: ctx.input.tokenDescription,
+          expires: ctx.input.expiresIn,
+          cidrWhitelist: ctx.input.cidrWhitelist,
+          packages: ctx.input.packages,
+          scopes: ctx.input.scopes,
+          orgs: ctx.input.orgs,
+          permission: ctx.input.permission,
+          orgPermission: ctx.input.orgPermission,
+          bypass2fa: ctx.input.bypass2fa,
+          otp: ctx.input.otp
+        }),
+        'created token'
+      );
 
       return {
         output: {
+          rawResponse: result,
           createdToken: {
-            tokenKey: result.key || result.id,
-            token: result.token,
-            created: result.created,
-            expires: result.expires
+            tokenKey: text(result.key ?? result.id, 'created token key'),
+            token: text(result.token, 'created token value'),
+            created: optionalText(result.created, 'token creation date'),
+            expires: optionalText(result.expiry ?? result.expires, 'token expiry')
           }
         },
-        message: `Created new **${ctx.input.permission || 'read-only'}** token${ctx.input.tokenName ? ` "${ctx.input.tokenName}"` : ''}.`
+        message: `Created new access token${ctx.input.tokenName ? ` "${ctx.input.tokenName}"` : ''}.`
       };
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.tokenKey) throw new Error('tokenKey is required to delete a token.');
+      if (!ctx.input.tokenKey)
+        throw createApiServiceError('tokenKey is required to delete a token.');
 
       await client.deleteToken(ctx.input.tokenKey, ctx.input.otp);
       return {
         output: { deleted: true },
-        message: `Deleted token \`${ctx.input.tokenKey}\`.`
+        message: 'Deleted the requested access token.'
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

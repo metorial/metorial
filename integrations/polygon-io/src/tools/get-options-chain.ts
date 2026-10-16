@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorInput, cursorOutput, nextCursor, responseRows } from '../lib/response';
 import { spec } from '../spec';
 
 let optionContractSchema = z.object({
@@ -68,14 +69,17 @@ let optionSnapshotSchema = z.object({
 export let getOptionsChain = SlateTool.create(spec, {
   name: 'Get Options Chain',
   key: 'get_options_chain',
-  description: `Retrieve options chain data for an underlying stock. Fetches available option contracts and optionally their live snapshots including Greeks, implied volatility, open interest, and quotes. Filter by contract type, expiration date, and strike price.`,
-  instructions: ['Set includeSnapshots to true to get live pricing data and Greeks.'],
+  description: `Retrieve options chain data for an underlying stock. Fetches available option contracts or their snapshots including Greeks, implied volatility, open interest, and quotes. Filter by contract type, expiration date, and strike price. Snapshot access and freshness depend on the subscription.`,
+  instructions: [
+    'Set includeSnapshots to true to get snapshot pricing and Greeks, subject to the subscription.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      cursor: cursorInput,
       underlyingTicker: z.string().describe('Underlying stock ticker (e.g., "AAPL")'),
       contractType: z.enum(['call', 'put']).optional().describe('Filter by call or put'),
       expirationDate: z.string().optional().describe('Exact expiration date (YYYY-MM-DD)'),
@@ -93,7 +97,9 @@ export let getOptionsChain = SlateTool.create(spec, {
         .boolean()
         .optional()
         .default(false)
-        .describe('Include live snapshot data with Greeks and quotes'),
+        .describe(
+          'Return snapshots instead of contract reference records, with available Greeks and quotes'
+        ),
       order: z.enum(['asc', 'desc']).optional().default('asc').describe('Sort order'),
       limit: z
         .number()
@@ -104,6 +110,7 @@ export let getOptionsChain = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursor: cursorOutput,
       contracts: z
         .array(optionContractSchema)
         .optional()
@@ -111,8 +118,8 @@ export let getOptionsChain = SlateTool.create(spec, {
       snapshots: z
         .array(optionSnapshotSchema)
         .optional()
-        .describe('Option contract snapshots with live data'),
-      count: z.number().describe('Number of results returned')
+        .describe('Option contract snapshots with available pricing data'),
+      count: z.number().optional().describe('Number of results returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -127,55 +134,57 @@ export let getOptionsChain = SlateTool.create(spec, {
         strikePriceGte: ctx.input.strikePriceFrom,
         strikePriceLte: ctx.input.strikePriceTo,
         order: ctx.input.order,
+        cursor: ctx.input.cursor,
         limit: ctx.input.limit
       });
 
-      let snapshots = (data.results || []).map((s: any) => ({
-        ticker: s.details?.ticker,
-        contractType: s.details?.contract_type,
-        expirationDate: s.details?.expiration_date,
-        strikePrice: s.details?.strike_price,
-        impliedVolatility: s.implied_volatility,
-        openInterest: s.open_interest,
+      let snapshots = responseRows(data.results)?.map((s: any) => ({
+        ticker: s.details?.ticker ?? undefined,
+        contractType: s.details?.contract_type ?? undefined,
+        expirationDate: s.details?.expiration_date ?? undefined,
+        strikePrice: s.details?.strike_price ?? undefined,
+        impliedVolatility: s.implied_volatility ?? undefined,
+        openInterest: s.open_interest ?? undefined,
         day: s.day
           ? {
-              open: s.day.open,
-              high: s.day.high,
-              low: s.day.low,
-              close: s.day.close,
-              volume: s.day.volume,
-              volumeWeighted: s.day.vwap,
-              lastUpdated: s.day.last_updated
+              open: s.day.open ?? undefined,
+              high: s.day.high ?? undefined,
+              low: s.day.low ?? undefined,
+              close: s.day.close ?? undefined,
+              volume: s.day.volume ?? undefined,
+              volumeWeighted: s.day.vwap ?? undefined,
+              lastUpdated: s.day.last_updated ?? undefined
             }
           : undefined,
         lastQuote: s.last_quote
           ? {
-              bidPrice: s.last_quote.bid,
-              bidSize: s.last_quote.bid_size,
-              askPrice: s.last_quote.ask,
-              askSize: s.last_quote.ask_size,
-              midpoint: s.last_quote.midpoint,
-              timestamp: s.last_quote.last_updated
+              bidPrice: s.last_quote.bid ?? undefined,
+              bidSize: s.last_quote.bid_size ?? undefined,
+              askPrice: s.last_quote.ask ?? undefined,
+              askSize: s.last_quote.ask_size ?? undefined,
+              midpoint: s.last_quote.midpoint ?? undefined,
+              timestamp: s.last_quote.last_updated ?? undefined
             }
           : undefined,
         greeks: s.greeks
           ? {
-              delta: s.greeks.delta,
-              gamma: s.greeks.gamma,
-              theta: s.greeks.theta,
-              vega: s.greeks.vega
+              delta: s.greeks.delta ?? undefined,
+              gamma: s.greeks.gamma ?? undefined,
+              theta: s.greeks.theta ?? undefined,
+              vega: s.greeks.vega ?? undefined
             }
           : undefined,
-        underlyingAssetPrice: s.underlying_asset?.price,
-        breakEvenPrice: s.break_even_price
+        underlyingAssetPrice: s.underlying_asset?.price ?? undefined,
+        breakEvenPrice: s.break_even_price ?? undefined
       }));
 
       return {
         output: {
+          nextCursor: nextCursor(data),
           snapshots,
-          count: snapshots.length
+          count: snapshots?.length ?? undefined
         },
-        message: `Retrieved **${snapshots.length}** options snapshot(s) for **${ctx.input.underlyingTicker}**${ctx.input.contractType ? ` (${ctx.input.contractType}s)` : ''}.`
+        message: `Retrieved **${snapshots?.length ?? 0}** options snapshot(s) for **${ctx.input.underlyingTicker}**${ctx.input.contractType ? ` (${ctx.input.contractType}s)` : ''}.`
       };
     }
 
@@ -188,28 +197,30 @@ export let getOptionsChain = SlateTool.create(spec, {
       strikePriceGte: ctx.input.strikePriceFrom,
       strikePriceLte: ctx.input.strikePriceTo,
       order: ctx.input.order,
+      cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
 
-    let contracts = (data.results || []).map((c: any) => ({
-      ticker: c.ticker,
-      underlyingTicker: c.underlying_ticker,
-      contractType: c.contract_type,
-      expirationDate: c.expiration_date,
-      strikePrice: c.strike_price,
-      exerciseStyle: c.exercise_style,
-      sharesPerContract: c.shares_per_contract,
-      cfi: c.cfi,
-      primaryExchange: c.primary_exchange,
-      additionalUnderlyings: c.additional_underlyings
+    let contracts = responseRows(data.results)?.map((c: any) => ({
+      ticker: c.ticker ?? undefined,
+      underlyingTicker: c.underlying_ticker ?? undefined,
+      contractType: c.contract_type ?? undefined,
+      expirationDate: c.expiration_date ?? undefined,
+      strikePrice: c.strike_price ?? undefined,
+      exerciseStyle: c.exercise_style ?? undefined,
+      sharesPerContract: c.shares_per_contract ?? undefined,
+      cfi: c.cfi ?? undefined,
+      primaryExchange: c.primary_exchange ?? undefined,
+      additionalUnderlyings: c.additional_underlyings ?? undefined
     }));
 
     return {
       output: {
+        nextCursor: nextCursor(data),
         contracts,
-        count: contracts.length
+        count: contracts?.length ?? undefined
       },
-      message: `Retrieved **${contracts.length}** options contract(s) for **${ctx.input.underlyingTicker}**${ctx.input.contractType ? ` (${ctx.input.contractType}s)` : ''}.`
+      message: `Retrieved **${contracts?.length ?? 0}** options contract(s) for **${ctx.input.underlyingTicker}**${ctx.input.contractType ? ` (${ctx.input.contractType}s)` : ''}.`
     };
   })
   .build();

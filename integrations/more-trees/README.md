@@ -1,6 +1,8 @@
 # <img src="logo.jpg" height="20"> More Trees
 
-Plant trees and purchase carbon credits through global reforestation projects. Retrieve account details, credit balances, and forest statistics including trees planted and CO2 captured. Browse active projects and available tree types, plant trees for yourself or gift them to others by email or account code, and track cumulative carbon offset figures.
+Plant trees through global reforestation projects. Retrieve account details, credit balances, and forest statistics, browse projects and tree types, and plant trees for yourself or gift them by email or account code. Account codes are supplied when calling account-specific tools; existing connections can keep using their saved account code.
+
+See the [API coverage notes](docs/SPEC.md) for supported workflows and the documentation limits of the retained carbon-offset and key-only credit-balance tools.
 
 ## License
 

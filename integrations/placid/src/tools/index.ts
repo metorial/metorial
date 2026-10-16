@@ -1,3 +1,4 @@
+export { deleteGeneration } from './delete-generation';
 export { generateImage } from './generate-image';
 export { generatePdf } from './generate-pdf';
 export { generateVideo } from './generate-video';

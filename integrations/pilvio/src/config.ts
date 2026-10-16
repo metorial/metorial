@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Datacenter location slug (e.g., "tll01", "jhvi", "jhv02"). If not set, the default location is used.'
+        'Datacenter location slug. Call list_platform_config with resource="locations" to discover available locations. If omitted, the default location is used.'
       )
   })
 );

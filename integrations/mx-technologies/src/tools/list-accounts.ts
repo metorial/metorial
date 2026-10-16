@@ -44,7 +44,7 @@ export let listAccounts = SlateTool.create(spec, {
       userGuid: z.string().describe('MX GUID of the user'),
       memberGuid: z.string().optional().describe('Optionally filter accounts by member GUID'),
       page: z.number().optional().describe('Page number for pagination'),
-      recordsPerPage: z.number().optional().describe('Records per page (max: 100)')
+      recordsPerPage: z.number().optional().describe('Records per page (max: 1000)')
     })
   )
   .output(
@@ -77,10 +77,10 @@ export let listAccounts = SlateTool.create(spec, {
     }
 
     let accounts = (result.accounts || []).map((a: any) => ({
-      guid: a.guid,
-      userGuid: a.user_guid,
+      guid: a.guid ?? undefined,
+      userGuid: a.user_guid ?? undefined,
       memberGuid: a.member_guid,
-      institutionCode: a.institution_code,
+      institutionCode: a.institution_code ?? undefined,
       name: a.name,
       type: a.type,
       subtype: a.subtype,
@@ -134,10 +134,10 @@ export let readAccount = SlateTool.create(spec, {
 
     return {
       output: {
-        guid: a.guid,
-        userGuid: a.user_guid,
+        guid: a.guid ?? undefined,
+        userGuid: a.user_guid ?? undefined,
         memberGuid: a.member_guid,
-        institutionCode: a.institution_code,
+        institutionCode: a.institution_code ?? undefined,
         name: a.name,
         type: a.type,
         subtype: a.subtype,
@@ -168,11 +168,21 @@ export let listAccountNumbers = SlateTool.create(spec, {
   .input(
     z.object({
       userGuid: z.string().describe('MX GUID of the user'),
-      accountGuid: z.string().describe('MX GUID of the account')
+      accountGuid: z.string().describe('MX GUID of the account'),
+      page: z.number().optional().describe('Page number, starting at 1'),
+      recordsPerPage: z.number().optional().describe('Records per page, from 10 to 1000')
     })
   )
   .output(
     z.object({
+      pagination: z
+        .object({
+          currentPage: z.number().optional(),
+          perPage: z.number().optional(),
+          totalEntries: z.number().optional(),
+          totalPages: z.number().optional()
+        })
+        .optional(),
       accountNumbers: z.array(
         z.object({
           guid: z.string().optional(),
@@ -189,16 +199,17 @@ export let listAccountNumbers = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MxClient({ token: ctx.auth.token, environment: ctx.config.environment });
-    let accountNumbers = await client.listAccountNumbers(
+    let result = await client.listAccountNumbers(
       ctx.input.userGuid,
-      ctx.input.accountGuid
+      ctx.input.accountGuid,
+      ctx.input
     );
 
-    let mapped = (accountNumbers || []).map((an: any) => ({
-      guid: an.guid,
-      accountGuid: an.account_guid,
-      memberGuid: an.member_guid,
-      userGuid: an.user_guid,
+    let mapped = result.accountNumbers.map((an: any) => ({
+      guid: an.guid ?? undefined,
+      accountGuid: an.account_guid ?? undefined,
+      memberGuid: an.member_guid ?? undefined,
+      userGuid: an.user_guid ?? undefined,
       accountNumber: an.account_number,
       routingNumber: an.routing_number,
       transitNumber: an.transit_number,
@@ -206,7 +217,17 @@ export let listAccountNumbers = SlateTool.create(spec, {
     }));
 
     return {
-      output: { accountNumbers: mapped },
+      output: {
+        accountNumbers: mapped,
+        pagination: result.pagination
+          ? {
+              currentPage: result.pagination.current_page,
+              perPage: result.pagination.per_page,
+              totalEntries: result.pagination.total_entries,
+              totalPages: result.pagination.total_pages
+            }
+          : undefined
+      },
       message: `Found **${mapped.length}** account number(s) for account ${ctx.input.accountGuid}.`
     };
   })

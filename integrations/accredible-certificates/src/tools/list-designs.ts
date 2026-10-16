@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listDesigns = SlateTool.create(spec, {
   name: 'List Designs',
   key: 'list_designs',
-  description: `List available certificate and badge design templates. Designs provide the visual specification for how credentials are rendered. Use the design ID when creating groups to associate a design template.`,
+  description: `List available certificate and badge design templates returned by Accredible. Designs provide the visual specification for how credentials are rendered. Use the design ID when creating groups to associate a design template. Page inputs select a portion of the returned set; the provider does not document whether that set is exhaustive.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,8 +14,14 @@ export let listDesigns = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number to retrieve'),
-      pageSize: z.number().optional().describe('Number of designs per page')
+      page: z
+        .number()
+        .optional()
+        .describe('Local page number within the designs returned by Accredible'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Number of returned designs per local page (default 50)')
     })
   )
   .output(
@@ -38,7 +44,7 @@ export let listDesigns = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment ?? (ctx.config as { environment?: string }).environment
     });
 
     let result = await client.listDesigns(ctx.input.page, ctx.input.pageSize);

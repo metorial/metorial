@@ -1,6 +1,6 @@
 {
   "name": "@metorial/nasa",
-  "description": "Access NASA's extensive collection of space and Earth science data, imagery, and metadata. Retrieve the Astronomy Picture of the Day (APOD) with explanations. Search near-Earth asteroid data including orbits and hazard assessments. Browse Mars rover photos filtered by sol, date, and camera. View Earth imagery from EPIC and satellite observations by coordinates. Track natural events (wildfires, storms, volcanoes) via EONET. Query space weather data including solar flares, coronal mass ejections, and geomagnetic storms from DONKI. Search NASA's image and video library. Look up satellite orbital elements (TLE), NASA technology projects (TechPort), space biology experiments (GeneLab), exoplanet archive data, and solar system dynamics. All APIs are read-only data retrieval services.",
+  "description": "Read NASA astronomy, asteroid, EPIC Earth imagery, natural event, space weather, media, technology project, exoplanet, and solar-system data. Search satellite TLE records through NASA's catalog-linked community service. Retrieve downloadable images, media, metadata, and video captions. Legacy Earth and Mars Rover APIs are archived; historical availability is not guaranteed. All tools are read-only.",
   "categories": ["apis-and-http-requests", "education-and-learning"],
   "skills": [
     "retrieve astronomy picture of day",

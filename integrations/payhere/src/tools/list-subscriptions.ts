@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listSubscriptions = SlateTool.create(spec, {
   name: 'List Subscriptions',
   key: 'list_subscriptions',
-  description: `Retrieve a paginated list of subscriptions, ordered chronologically with most recent first. Includes associated customer and plan data.`,
+  description: `Retrieve a paginated list of subscriptions, ordered by most recent payment first. Includes associated customer and plan data.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -23,8 +23,10 @@ export let listSubscriptions = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
       subscriptions: z.array(
         z.object({
+          raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
           subscriptionId: z.number().describe('Subscription identifier'),
           customerId: z.number().describe('Associated customer ID'),
           membershipPlanId: z.number().describe('Associated plan ID'),
@@ -60,6 +62,7 @@ export let listSubscriptions = SlateTool.create(spec, {
         })
       ),
       meta: z.object({
+        raw: z.record(z.string(), z.unknown()).optional().describe('Original provider data'),
         currentPage: z.number(),
         nextPage: z.number().nullable(),
         prevPage: z.number().nullable(),

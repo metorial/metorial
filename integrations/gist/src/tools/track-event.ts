@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requireValue } from '../lib/response';
 import { spec } from '../spec';
 
 export let trackEvent = SlateTool.create(spec, {
@@ -28,14 +29,17 @@ export let trackEvent = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       tracked: z.boolean().describe('Whether the event was successfully tracked')
     })
   )
   .handleInvocation(async ctx => {
     let client = new GistClient({ token: ctx.auth.token });
 
+    if (!ctx.input.email && !ctx.input.userId)
+      throw createApiServiceError('Provide email or userId.');
     let body: Record<string, any> = {
-      name: ctx.input.eventName
+      event_name: requireValue(ctx.input.eventName, 'Event name')
     };
     if (ctx.input.email) body.email = ctx.input.email;
     if (ctx.input.userId) body.user_id = ctx.input.userId;
@@ -45,7 +49,7 @@ export let trackEvent = SlateTool.create(spec, {
     await client.trackEvent(body);
 
     return {
-      output: { tracked: true },
+      output: { rawResponse: client.responses, tracked: true },
       message: `Tracked event **${ctx.input.eventName}** for contact ${ctx.input.email || ctx.input.userId}.`
     };
   })

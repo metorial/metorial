@@ -1,16 +1,27 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadFileTool,
+  getAssignmentTool,
+  getConversationTool,
   getCourseAnalyticsTool,
   getCourseTool,
+  getDiscussionTool,
+  getPageTool,
+  getQuizTool,
   gradeSubmissionTool,
+  listAssignmentGroupsTool,
   listAssignmentsTool,
   listCalendarEventsTool,
   listConversationsTool,
+  listCourseCreationAccountsTool,
   listCoursesTool,
+  listDiscussionsTool,
   listEnrollmentsTool,
   listFilesTool,
+  listModuleItemsTool,
   listModulesTool,
+  listPagesTool,
   listQuizzesTool,
   listSubmissionsTool,
   listUsersTool,
@@ -21,11 +32,24 @@ import {
   manageEnrollmentTool,
   manageModuleTool,
   managePageTool,
-  sendMessageTool
+  sendMessageTool,
+  whoAmITool
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmITool,
+    listCourseCreationAccountsTool,
+    getAssignmentTool,
+    listAssignmentGroupsTool,
+    listPagesTool,
+    getPageTool,
+    listDiscussionsTool,
+    getDiscussionTool,
+    listModuleItemsTool,
+    getConversationTool,
+    getQuizTool,
+    downloadFileTool,
     listCoursesTool,
     getCourseTool,
     manageCourseTool,

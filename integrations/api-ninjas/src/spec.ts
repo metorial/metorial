@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'api-ninjas',
   name: 'API Ninjas',
   description:
-    'Access 100+ production-ready REST APIs for finance, AI, places, text processing, health, entertainment, transportation, and more through a single unified interface.',
+    'Look up financial prices, currency conversions, weather, places, time, text analysis, nutrition, reference data, and contact validation through API Ninjas.',
   metadata: {},
   config,
   auth

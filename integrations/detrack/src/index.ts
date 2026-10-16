@@ -5,7 +5,10 @@ import {
   deleteJobTool,
   downloadPodTool,
   getJobTool,
+  getVehicleTool,
+  listDepotsTool,
   listJobsTool,
+  listRoutesTool,
   listVehiclesTool,
   manageVehicleTool,
   reattemptJobTool,
@@ -24,7 +27,10 @@ export let provider = Slate.create({
     reattemptJobTool,
     downloadPodTool,
     listVehiclesTool,
-    manageVehicleTool
+    manageVehicleTool,
+    getVehicleTool,
+    listDepotsTool,
+    listRoutesTool
   ],
   triggers: []
 });

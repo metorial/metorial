@@ -18,27 +18,30 @@ export let getConversationCounts = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       counts: z.any().describe('Conversation count data')
     })
   )
   .handleInvocation(async ctx => {
     let client = new GistClient({ token: ctx.auth.token });
 
-    let data: any;
     switch (ctx.input.scope) {
       case 'global':
-        data = await client.getConversationCountsGlobal();
+        await client.getConversationCountsGlobal();
         break;
       case 'teams':
-        data = await client.getConversationCountsTeams();
+        await client.getConversationCountsTeams();
         break;
       case 'teammates':
-        data = await client.getConversationCountsTeammates();
+        await client.getConversationCountsTeammates();
         break;
     }
 
     return {
-      output: { counts: data },
+      output: {
+        rawResponse: client.responses,
+        counts: client.responses[client.responses.length - 1]
+      },
       message: `Retrieved **${ctx.input.scope}** conversation counts.`
     };
   })

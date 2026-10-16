@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CultsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -79,7 +79,7 @@ export let getCreation = SlateTool.create(spec, {
     let c = await client.getCreation(ctx.input.slug);
 
     if (!c) {
-      throw new Error(`Creation with slug "${ctx.input.slug}" not found`);
+      throw createApiServiceError(`Creation with slug "${ctx.input.slug}" not found`);
     }
 
     let output = {
@@ -122,7 +122,7 @@ export let getCreation = SlateTool.create(spec, {
 
     return {
       output,
-      message: `Retrieved creation **${c.name ?? ctx.input.slug}** by ${c.creator?.nick ?? 'unknown'}. ${c.downloadsCount ?? 0} downloads, ${c.likesCount ?? 0} likes.`
+      message: `Retrieved creation **${c.name ?? ctx.input.slug}**.`
     };
   })
   .build();

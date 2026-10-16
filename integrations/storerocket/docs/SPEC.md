@@ -1,51 +1,45 @@
-# Slates Specification for Storerocket
-
-## Overview
-
-StoreRocket is a store locator software platform that enables businesses to add customizable, embeddable location finders to their websites. It provides a customizable and easy-to-install store locator solution for websites, enabling businesses to display their physical locations interactively. It is built for WordPress, Shopify, SquareSpace, Bigcommerce, Joomla and any other website.
+# StoreRocket integration specification
 
 ## Authentication
 
-StoreRocket uses API keys for authentication. All API requests use HTTPS with API key authentication. No OAuth flow or complex setup is required.
+Location API access requires the Business plan. Create a V2 token at **Dashboard → API Tokens** and store the value when shown. Tokens authorize the account's projects and need `location:read` for location reads or `location:update` for updates. Requests use `Authorization: Bearer <token>` and `Accept: application/json` against `https://storerocket.io/api/v2/`. JSON writes also use `Content-Type: application/json`. Blank tokens are rejected and surrounding whitespace is trimmed.
 
-The API token is passed as a Bearer token in the `Authorization` header:
+## Tools and API coverage
 
-```
-Authorization: Bearer {api_token}
-```
+| Tool | API route | Behavior |
+| --- | --- | --- |
+| `get_account_info` | `GET /user` | Reads the authenticated user profile and returns the complete response. |
+| `list_projects` | `GET /projects` | Returns the authorized project-list response for discovering public string IDs. |
+| `list_project_locations` | `GET /projects/{projectId}/locations` | Returns the complete location-list response for a project ID from `list_projects`. |
+| `update_location` | `PATCH /projects/{projectId}/locations/{locationId}` | Updates selected name, city, phone, visibility, or weekday hours. IDs come from the project tools. Returns the complete update response. |
+| `find_locations` | `GET /locations` | Retains the original, undocumented V2 location call and optional search/geographic/pagination inputs. |
+| `list_users` | `GET /users` | Retains the original, undocumented V2 user-list call and optional numeric limit/offset inputs. |
+| `health_check` | `GET /ping` | Retains the original, undocumented V2 ping; returns `healthy: false` on failure. Successful ping does not establish project access. |
 
-The base URL is `https://storerocket.io/api/v2/` and requests should include an `accept: application/json` header.
+The current reference confirms the first four routes. It does not list `/api/v2/locations`, `/api/v2/users`, or `/api/v2/ping`. Their runtime availability remains unverified; existing keys, inputs, parameter forwarding, and output contracts remain intact for compatibility. The documented V1 location route is `/api/locations`, uses a separate legacy token, and supports page/limit rather than the original tool's geographic/query/offset inputs. The retained `find_locations` call is not silently changed into that different V1 contract.
 
-API access availability depends on your StoreRocket plan. Check your StoreRocket account settings for API key availability.
+No project ID is required in connection configuration. The new project tools use public string IDs and add no unconfirmed location filters. Existing raw outputs and new provider responses preserve identifiers, provider envelopes, and nulls without guessed normalization. No existing output field becomes optional and no normalized nullable scalar fields are introduced.
 
-## Features
+## Partial updates
 
-### Account & User Management
+`update_location` sends only supplied fields. At least one update field is required at runtime. Omitted fields keep their saved values; `visible: false` is retained. Supplied name/city must be nonblank and at most 255 characters. `phone: null` clears the phone. Hours accept selected short weekday keys `mon` through `sun`, with a string such as `09:00-17:00`, `closed`, or null to clear one day. Empty hours preserve the schedule, omitted days are unchanged, and `hours: null` removes the schedule association. Null is not accepted for name, city, or visibility.
 
-Retrieve information about the authenticated StoreRocket account, including account details, plan information, and locator settings. The Get User Info endpoint returns account-level data including store configurations. The Get Users endpoint retrieves all users with pagination using limit and offset parameters. The Get Users endpoint returns all users associated with your StoreRocket account. The agent can list users with their roles and permissions, supporting team access audits.
+A valid PATCH returns HTTP 200 with the updated location; HTTP 422 field errors reject the whole update. The full response is returned under `location` without stripping its provider `data` wrapper. Other documented PATCH fields and create/delete operations remain outside this conservative tool surface; no PUT replacement semantics are inferred.
 
-### Location Management
+## Errors and transport
 
-While StoreRocket's API specifications are not publicly documented, endpoint information comes from third-party sources like Pipedream, which indicate they provide REST APIs for location management. Through the API, you can access location data including store addresses, phone numbers, operating hours, and other details. Location data can be filtered based on geographic proximity. When a customer provides a city, zip code, or address, it can be matched against store location records to present the nearest options with addresses and contact details.
+Requests use a 30-second timeout. Token/ID validation and upstream HTTP failures produce structured service errors. Error mapping preserves HTTP status and extracts body messages and field validation arrays even from SDK-wrapped failures. The health-check tool retains its existing false-on-request-failure behavior. The documented V2 statuses include 401 for invalid auth, 403 for unavailable API access/permission, 404 for inaccessible resources, 422 for invalid input, and 429 for rate limiting. Requests are not retried automatically.
 
-- Locations support custom fields, search filters (tags by type, product, or category), custom map markers, and images.
-- Locations can show if they are open or closed in real time, with reusable opening hours that can be assigned to multiple locations.
-- Bulk import of locations is available through CSV or via the Google Sheets sync tool.
+## Official sources
 
-**Limitations:** The API specifications are not publicly documented, so available endpoints beyond account/user management and location retrieval may be limited or undocumented. The API surface exposed through third-party integrations (such as Pipedream) currently focuses on reading account information and user data, with three known actions: get user info, get users, and a health check ping.
+Audited 2026-10-15 with a fresh read after review:
 
-### Google Sheets Sync
+- [Current API overview](https://docs.storerocket.io/api/introduction)
+- [Authentication and token permissions](https://docs.storerocket.io/api/authentication)
+- [Authenticated user profile](https://docs.storerocket.io/api/user)
+- [Partial location updates](https://docs.storerocket.io/api/locations/update)
+- [Legacy V1 contract](https://docs.storerocket.io/api/legacy)
+- [Legacy V1 locations](https://docs.storerocket.io/api/legacy-locations)
+- [REST API help guide](https://help.storerocket.io/en/articles/5579248-how-to-use-the-rest-api)
 
-StoreRocket's Google Sheets integration allows keeping locations tidy and organized and automatically syncing them to the store locator. This is a native sync capability managed through the StoreRocket dashboard rather than the REST API.
-
-### Analytics
-
-Visual analytics are provided within the StoreRocket backend in order to aid businesses in understanding how their customers interact with the store locator tool. Gain insight into customer behavior with analytics on how customers are interacting with the store locator tool. Find out which locations are most popular, which are not being searched for, and more. Analytics access appears to be limited to the dashboard; it is unclear whether analytics data is exposed through the REST API.
-
-### Lead Collection
-
-When users can't find any locations nearby, they can leave their information so the business can get in touch with them in the future for sales and offers.
-
-## Events
-
-The provider does not support events. StoreRocket's API specifications are not publicly documented, and there is no confirmed webhook or event subscription system available. Webhook availability for StoreRocket requires verification.
+No live account requests were made. Token validity, runtime responses, update acceptance, permissions, and the three undocumented inherited V2 endpoints remain unverified.

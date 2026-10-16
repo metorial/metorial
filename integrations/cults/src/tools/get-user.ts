@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CultsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,7 +35,7 @@ export let getUser = SlateTool.create(spec, {
     let user = await client.getUser(ctx.input.nick);
 
     if (!user) {
-      throw new Error(`User "${ctx.input.nick}" not found`);
+      throw createApiServiceError(`User "${ctx.input.nick}" not found`);
     }
 
     return {
@@ -47,7 +47,7 @@ export let getUser = SlateTool.create(spec, {
         followersCount: user.followersCount,
         creationsCount: user.creationsCount
       },
-      message: `User **${user.nick}**: ${user.creationsCount ?? 0} creations, ${user.followersCount ?? 0} followers.`
+      message: `Retrieved profile for **${user.nick}**.`
     };
   })
   .build();

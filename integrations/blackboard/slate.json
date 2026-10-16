@@ -1,6 +1,6 @@
 {
   "name": "@metorial/blackboard",
-  "description": "Manage courses, users, enrollments, grades, and content in the Blackboard Learn LMS. Create and update courses with enrollment settings and availability. Manage user accounts and enroll or unenroll users in courses with specific roles. Create and organize course content including documents, files, folders, and links. Manage assignments with instructions, due dates, and file attachments, and track student submissions. Record and retrieve grades through gradebook columns, including calculated columns and grade schemas. Post announcements at the system or course level. Track student attendance and tie attendance data to grades. Manage course groups, course messages, calendars, data sources, institutional hierarchy, and system-level settings such as terms and roles.",
+  "description": "Manage Blackboard Learn courses, users, enrollments, course content, grade columns, student grades and assignment attempts. Create course announcements, manage course groups and membership, track attendance, and list or create calendar events. Discover academic terms, calendars, and data sources, and inspect the current connection user.",
   "categories": ["document-processing", "education-and-learning", "email-and-messaging"],
   "skills": [
     "manage courses and enrollments",
@@ -8,11 +8,11 @@
     "record and retrieve grades",
     "manage user accounts",
     "track student attendance",
-    "manage assignments and submissions",
     "post course announcements",
     "manage course groups",
-    "send course messages",
-    "manage calendars and terms"
+    "manage calendars and terms",
+    "inspect assignment attempts",
+    "discover calendars and data sources"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/blackboard.jpg"
 }

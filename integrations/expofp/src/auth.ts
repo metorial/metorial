@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let http = createAxios({
-  baseURL: 'https://app.expofp.com/api/v1'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,19 +18,19 @@ export let auth = SlateAuth.create()
         .describe('API token from your ExpoFP account (Account → Profile → API Token)')
     }),
     getOutput: async ctx => {
+      let token = ctx.input.apiToken.trim();
+      new Client(token);
       return {
         output: {
-          token: ctx.input.apiToken
+          token
         }
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiToken: string } }) => {
-      let events = await http.post('/list-events', {
-        token: ctx.output.token
-      });
+      let count = await new Client(ctx.output.token).getEventCount();
       return {
         profile: {
-          name: `ExpoFP Account (${events.data?.length ?? 0} events)`
+          name: `ExpoFP Account (${count} events)`
         }
       };
     }

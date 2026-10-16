@@ -14,7 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('CoinMarketCal API key from https://developers.coinmarketcal.com')
+        .describe(
+          'CoinMarketCal V2 API key from https://coinmarketcal.com/developer/dashboard/keys. V1 keys must be replaced for V2 tools.'
+        )
     }),
     getOutput: async ctx => {
       return {

@@ -1,17 +1,33 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
 
 let BASE_URL = 'https://api.waiverfile.com/api/v1';
 
 export class WaiverFileClient {
   private apiKey: string;
   private siteId: string;
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(opts: { token: string; siteId: string }) {
     this.apiKey = opts.token;
     this.siteId = opts.siteId;
-    this.http = createAxios({
-      baseURL: BASE_URL
+    this.http = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      maxRedirects: 0,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'WaiverFile',
+          reason: 'waiverfile_api_error',
+          extractResponse: (failure, helpers) => helpers.getResponseWithBody(failure),
+          detailKeys: ['Message', 'ExceptionMessage', 'message', 'error', 'detail', 'code'],
+          nestedKeys: ['errors', 'ModelState'],
+          extractUpstreamCode: (_failure, response, helpers) => {
+            if (!helpers.isRecord(response?.data)) return undefined;
+            let code = response.data.Code ?? response.data.code;
+            return typeof code === 'string' || typeof code === 'number'
+              ? String(code)
+              : undefined;
+          }
+        })
     });
   }
 
@@ -205,22 +221,25 @@ export class WaiverFileClient {
     maxParticipants?: number;
     workflowIdList?: string;
   }) {
-    let { data } = await this.http.post('/InsertEvent', {
-      EventName: opts.eventName,
-      DateStart: opts.dateStart,
-      DateEnd: opts.dateEnd,
-      IsAllDay: opts.isAllDay ?? false,
-      EventCategoryID: opts.eventCategoryId ?? null,
-      ManagerEmailList: opts.managerEmailList ?? null,
-      ManagerEmailMessage: opts.managerEmailMessage ?? null,
-      WaiverFormIDList: opts.waiverFormIdList ?? null,
-      EventLocation: opts.eventLocation ?? null,
-      SigningCutoff: opts.signingCutoff ?? null,
-      MaxParticipants: opts.maxParticipants ?? null,
-      WorkflowIDList: opts.workflowIdList ?? null,
-      APIKey: this.apiKey,
-      SiteID: this.siteId
-    });
+    let { data } = await this.http.post(
+      '/InsertEvent',
+      pickDefined({
+        EventName: opts.eventName,
+        DateStart: opts.dateStart,
+        DateEnd: opts.dateEnd,
+        IsAllDay: opts.isAllDay ?? false,
+        EventCategoryID: opts.eventCategoryId,
+        ManagerEmailList: opts.managerEmailList,
+        ManagerEmailMessage: opts.managerEmailMessage,
+        WaiverFormIDList: opts.waiverFormIdList,
+        EventLocation: opts.eventLocation,
+        SigningCutoff: opts.signingCutoff,
+        MaxParticipants: opts.maxParticipants,
+        WorkflowIDList: opts.workflowIdList,
+        APIKey: this.apiKey,
+        SiteID: this.siteId
+      })
+    );
     return data;
   }
 

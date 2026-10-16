@@ -40,8 +40,13 @@ export let getShareUrisTool = SlateTool.create(spec, {
       for (let [key, value] of Object.entries(shareUris)) {
         if (typeof value === 'string') {
           uriMap[key] = value;
-        } else if (value && typeof value === 'object' && 'Uri' in (value as any)) {
-          uriMap[key] = (value as any).Uri;
+        } else if (
+          value &&
+          typeof value === 'object' &&
+          'Uri' in value &&
+          typeof value.Uri === 'string'
+        ) {
+          uriMap[key] = value.Uri;
         }
       }
     }

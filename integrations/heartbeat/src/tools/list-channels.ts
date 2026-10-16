@@ -7,6 +7,9 @@ export let listChannels = SlateTool.create(spec, {
   name: 'List Channels',
   key: 'list_channels',
   description: `Lists channels in your Heartbeat community with optional filtering by type or archived status.`,
+  instructions: [
+    'The current API documents an array response with provider types POSTS, CHAT, and VOICE, mapped to thread, chat, and voice. Existing type, archive, and pagination inputs are forwarded unchanged, but their effect is not documented or verified. Missing read-only, timestamp, and pagination metadata is omitted.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -41,14 +44,27 @@ export let listChannels = SlateTool.create(spec, {
           z.object({
             channelId: z.string().describe('Channel ID'),
             name: z.string().describe('Channel name'),
-            channelType: z.string().describe('Channel type (thread, chat, or voice)'),
+            channelType: z
+              .string()
+              .optional()
+              .describe('Channel type (thread, chat, or voice), when returned by Heartbeat'),
             emoji: z.string().describe('Channel emoji'),
-            isReadOnly: z.boolean().describe('Whether the channel is read-only'),
-            createdAt: z.string().describe('Creation timestamp')
+            isReadOnly: z
+              .boolean()
+              .optional()
+              .describe('Whether the channel is read-only, when returned by Heartbeat'),
+            createdAt: z
+              .string()
+              .optional()
+              .describe('Creation timestamp, when returned by Heartbeat')
           })
         )
         .describe('List of channels'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether more results are available, when returned by Heartbeat'),
+      raw: z.unknown().optional().describe('Complete provider list response')
     })
   )
   .handleInvocation(async ctx => {
@@ -73,7 +89,8 @@ export let listChannels = SlateTool.create(spec, {
     return {
       output: {
         channels,
-        hasMore: result.hasMore
+        hasMore: result.hasMore,
+        raw: result.raw
       },
       message: `Found ${channels.length} channel(s).${result.hasMore ? ' More results are available.' : ''}`
     };

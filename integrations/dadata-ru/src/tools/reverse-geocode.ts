@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuggestionsClient } from '../lib/client';
+import { readSuggestions } from '../lib/response';
 import { spec } from '../spec';
 
 let reverseGeoResultSchema = z.object({
-  value: z.string().describe('Formatted address'),
-  unrestrictedValue: z.string().describe('Full address with postal code'),
+  value: z.string().optional().describe('Formatted address'),
+  unrestrictedValue: z.string().optional().describe('Full address with postal code'),
   postalCode: z.string().nullable().describe('Postal code'),
   country: z.string().nullable().describe('Country'),
   region: z.string().nullable().describe('Region'),
@@ -45,11 +46,16 @@ Useful for determining the closest address to a GPS location.`,
         .number()
         .optional()
         .describe('Search radius in meters (max 1000, default 100)'),
+      division: z
+        .enum(['ADMINISTRATIVE', 'MUNICIPAL'])
+        .optional()
+        .describe('Administrative or municipal address division'),
       language: z.enum(['ru', 'en']).optional().describe('Response language')
     })
   )
   .output(
     z.object({
+      rawData: z.unknown().optional().describe('Complete unmodified provider response'),
       addresses: z
         .array(reverseGeoResultSchema)
         .describe('Nearby addresses ordered by distance')
@@ -66,12 +72,13 @@ Useful for determining the closest address to a GPS location.`,
       lon: ctx.input.longitude,
       count: ctx.input.count,
       radiusMeters: ctx.input.radiusMeters,
-      language: ctx.input.language || ctx.config.language
+      division: ctx.input.division,
+      language: ctx.input.language ?? ctx.config.language
     });
 
-    let addresses = (data.suggestions || []).map((s: any) => ({
-      value: s.value || '',
-      unrestrictedValue: s.unrestricted_value || '',
+    let addresses = readSuggestions(data).map((s: any) => ({
+      value: s.value ?? undefined,
+      unrestrictedValue: s.unrestricted_value ?? undefined,
       postalCode: s.data?.postal_code ?? null,
       country: s.data?.country ?? null,
       region: s.data?.region ?? null,
@@ -86,7 +93,10 @@ Useful for determining the closest address to a GPS location.`,
     }));
 
     return {
-      output: { addresses },
+      output: {
+        rawData: data,
+        addresses
+      },
       message:
         addresses.length > 0
           ? `Found **${addresses.length}** address(es) near (${ctx.input.latitude}, ${ctx.input.longitude}): ${addresses[0]?.value || 'N/A'}`

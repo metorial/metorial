@@ -1,75 +1,32 @@
-# Slates Specification for Search api
+# Search API Specification
 
-## Overview
+SearchApi.io returns structured search results. Connect using an API key, which is sent in the documented Bearer authorization header. No additional connection settings or OAuth scopes are required.
 
-SearchApi (searchapi.io) is a real-time SERP (Search Engine Results Page) scraping service that returns structured JSON data from multiple search engines including Google, Bing, Baidu, Yahoo, Yandex, DuckDuckGo, and others. The platform delivers structured JSON from Google, Bing, Baidu, Yahoo, and other major engines. It handles proxy management, CAPTCHA solving, and JavaScript rendering behind the scenes.
+## Tools
 
-## Authentication
+- `web_search`: Google, Google Light, Bing, Baidu, Yahoo, Yandex, DuckDuckGo, and Naver search. Localization, content filtering, date filtering, and pagination follow each engine's supported parameters. Bing and DuckDuckGo expose continuation tokens. Google currently returns 10 results per page regardless of `num`.
+- `news_search`: Google News with location, recency, date-range, sorting, and page controls.
+- `image_search`: Google Images with size, color, type, rights, and recency filters. Legacy size names map to current provider names; `10mp` retains its original forwarded value because the current documentation does not establish a compatible replacement; its current provider behavior is unverified.
+- `video_search`: Google Videos with duration, quality, source, recency, and captions. Dailymotion, Twitch, and Vimeo use the documented `site:` query operator.
+- `shopping_search`: Google Shopping with prices, condition, sale, delivery, and sorting controls.
+- `scholar_search`: Google Scholar query, citation, or cluster lookup. Year filters cannot be combined with date sorting; at most 20 results are requested per page.
+- `maps_search`: Google Maps businesses and places with coordinates and page controls.
+- `trends_search`: Interest over time, regional interest, related queries, and related topics. Regional comparisons expose separate values for each term.
+- `jobs_search`: Google Jobs with application links, highlights, and continuation tokens.
+- `youtube_search`: YouTube videos with filtering and continuation tokens. A continuation token replaces the initial filter parameter when requesting the next page.
+- `autocomplete`: Google suggestion text and type codes, represented as strings for compatibility.
+- `lookup_locations`: Canonical location names and coordinates; accepts an optional limit of 1 to 100.
+- `get_account`: Current account usage, remaining credits, hourly limits, and subscription period from `/api/v1/me`.
+- `list_search_history`: Saved searches from the past 90 days with parameters, status, timing, and provider result links. Requires an active subscription; accepts date, engine, and continuation filters.
 
-SearchApi uses **API key** authentication. Use it as a query parameter (`https://www.searchapi.io/api/v1/search?api_key=YOUR_API_KEY`) or in the Authorization header (`Bearer YOUR_API_KEY`).
+All tools preserve the complete JSON provider response in `raw`. Search-result media URLs and saved-result links remain provider links. These tools do not download media or promise permanent file availability.
 
-- The API key is obtained by signing up at searchapi.io.
-- No OAuth or other authentication methods are supported.
-- The API key is used across all endpoints (search, locations, search history, account).
+## Errors and identity
 
-## Features
+Validation and provider failures return structured service errors. Provider error bodies and HTTP status are retained by the API error adapter. Invalid account or saved-search response structures fail explicitly rather than reporting invented usage or identifiers.
 
-### Multi-Engine Web Search
-
-Perform real-time searches across many search engines by specifying the `engine` parameter. The Google Search API provides data including organic search results, paid search results, knowledge graph entries, local map listings, featured snippets, and related search queries. Supported engines include Google (standard and light), Bing, Baidu, Yahoo, Yandex, DuckDuckGo, and Naver. Results are returned as structured JSON with organic results, ads, knowledge graphs, "People Also Ask" sections, and more.
-
-- **Localization**: Searches can be localized by geographic location, language (`hl`), country (`gl`), and search domain. You can track keywords for specific locations, devices, and languages.
-- **Device targeting**: Results can be requested for desktop or mobile.
-- **SafeSearch**: Configurable content filtering (active, blur, off).
-
-### Google Vertical Search Engines
-
-SearchApi supports specialized Google verticals including:
-
-- **Google Images, Videos, Shorts** — media search results
-- **Google News** — real-time news scraping with historical article search using time range filters, access to top stories and headlines.
-- **Google Shopping** — product listings, offers, reviews, and product details
-- **Google Maps / Local** — local business search results with location data
-- **Google Scholar** — academic paper results
-- **Google Trends** — trending topics and interest-over-time data
-- **Google Flights / Hotels** — travel search results and fare calendars
-- **Google Jobs, Events, Finance, Patents** — specialized result types
-- **Google Autocomplete** — search suggestion completions
-- **Google Lens** — visual/image-based search
-- **Google AI Overview / AI Mode** — Google's AI-generated summaries directly from search results.
-- **Google Ads Transparency** — track ads, see where they appear, and learn more about advertisers.
-
-### Non-Google Search Engines and Platforms
-
-SearchApi also supports scraping results from platforms beyond traditional search engines:
-
-- **YouTube Search** — video search results
-- **Amazon, Walmart, Shein, eBay Search** — e-commerce product listings
-- **Apple App Store, Google Play** — app store search results
-- **Airbnb, Tripadvisor** — travel/accommodation listings
-- **Ad libraries**: Meta Ad Library, LinkedIn Ad Library, Reddit Ad Library, TikTok Ads Library
-- **Social profiles**: TikTok Profile, Instagram Profile, Facebook Business Page
-
-### Google Rank Tracking
-
-A dedicated engine for SEO rank tracking, supporting up to 100 results per query for monitoring keyword positions over time.
-
-### Geo-Targeting with Locations API
-
-Retrieves the top 10 largest locations matching a given term, returning canonical names that can be used as the `location` parameter in search queries. Returns metadata including coordinates, country codes, and population reach.
-
-### Search History
-
-Retrieves past searches from your account history, with pagination via `next_page_token`. Each entry includes the engine used, parameters, status, and links to the cached HTML/JSON responses.
-
-### Account Information
-
-Provides general account usage data including total searches performed this month, maximum allowable searches per month, and remaining search credits.
-
-### Zero Retention Mode
-
-Setting `zero_retention` to true disables all logging and persistent storage. No request parameters, HTML, or JSON responses are stored or logged, suitable for high-compliance use cases. This is an Enterprise-only feature.
+The account endpoint exposes usage rather than an email or provider user ID. Connection profiles use a hash of the API key as a local connection identifier and a generic account label; the API key itself is never used as a public profile identifier.
 
 ## Events
 
-The provider does not support events. SearchApi is a request-response API for real-time search data retrieval and does not offer webhooks, event subscriptions, or any push-based notification mechanism.
+No webhook or polling triggers are registered. The integration is a read-only request-response search interface; search operations can consume provider credits.

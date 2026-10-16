@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { FinmeiClient } from '../lib/client';
+import { FinmeiClient, optionalString, requireId, requireRecord } from '../lib/client';
 import { spec } from '../spec';
 
 export let getProfile = SlateTool.create(spec, {
   name: 'Get Profile',
   key: 'get_profile',
-  description: `Retrieve the authenticated user's profile information from Finmei, including business details and account info.`,
+  description: `Retrieve the connected business profile from Finmei, including business details and account info.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,10 +15,12 @@ export let getProfile = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      userId: z.string().optional().describe('User ID'),
+      userId: z.string().optional().describe('Connected business ID'),
       name: z.string().optional().describe('User or business name'),
       email: z.string().optional().describe('Email address'),
       businessName: z.string().optional().describe('Business name'),
+      businessId: z.string().optional().describe('Connected business ID'),
+      businessType: z.string().optional().describe('Company or individual business'),
       rawProfile: z.any().optional().describe('Full profile data from API')
     })
   )
@@ -26,17 +28,24 @@ export let getProfile = SlateTool.create(spec, {
     let client = new FinmeiClient(ctx.auth.token);
 
     let result = await client.getProfile();
-    let profile = result?.data ?? result;
+    let envelope = requireRecord(result, 'profile');
+    let profile = requireRecord('data' in envelope ? envelope.data : envelope, 'profile');
+    let businessId = requireId(profile.business_id ?? profile.id, 'business ID');
 
     return {
-      output: {
-        userId: profile?.id ? String(profile.id) : undefined,
-        name: profile?.name,
-        email: profile?.email,
-        businessName: profile?.business_name ?? profile?.company_name,
+      output: pickDefined({
+        userId: businessId,
+        name: optionalString(profile.business_title ?? profile.name, 'profile name'),
+        email: optionalString(profile.email, 'profile email'),
+        businessName: optionalString(
+          profile.company_name ?? profile.business_name,
+          'business name'
+        ),
+        businessId,
+        businessType: optionalString(profile.business_type, 'business type'),
         rawProfile: profile
-      },
-      message: `Retrieved profile for **${profile?.name ?? profile?.email ?? 'current user'}**.`
+      }),
+      message: `Retrieved profile for **${profile.business_title ?? profile.name ?? businessId}**.`
     };
   })
   .build();

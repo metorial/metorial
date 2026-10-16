@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ShortLink } from '../lib/client';
+import { domainIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getLink = SlateTool.create(spec, {
@@ -16,6 +17,7 @@ export let getLink = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      domainId: domainIdSchema.optional(),
       linkId: z.string().optional().describe('The link ID to look up directly.'),
       domain: z
         .string()
@@ -50,19 +52,19 @@ export let getLink = SlateTool.create(spec, {
       redirectType: z.number().nullable().describe('HTTP redirect status code.'),
       createdAt: z.string().describe('Creation timestamp.'),
       updatedAt: z.string().describe('Last updated timestamp.'),
-      domainId: z.number().describe('The domain ID the link belongs to.')
+      domainId: domainIdSchema
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let link: any;
+    let link: ShortLink;
 
     if (ctx.input.linkId) {
-      link = await client.getLink(ctx.input.linkId);
-    } else if (ctx.input.path) {
+      link = await client.getLink(ctx.input.linkId, ctx.input.domainId ?? ctx.config.domainId);
+    } else if (ctx.input.path !== undefined) {
       let domain = ctx.input.domain || ctx.config.domain;
       if (!domain) {
-        throw new Error(
+        throw createApiServiceError(
           'Domain is required for path lookup. Provide it in the input or set a default in config.'
         );
       }
@@ -70,13 +72,13 @@ export let getLink = SlateTool.create(spec, {
     } else if (ctx.input.originalURL) {
       let domain = ctx.input.domain || ctx.config.domain;
       if (!domain) {
-        throw new Error(
+        throw createApiServiceError(
           'Domain is required for original URL lookup. Provide it in the input or set a default in config.'
         );
       }
       link = await client.getLinkByOriginalUrl(domain, ctx.input.originalURL);
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide either linkId, domain + path, or domain + originalURL to look up a link.'
       );
     }

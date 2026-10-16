@@ -44,6 +44,7 @@ Use this to retrieve full page HTML for parsing, content analysis, or data extra
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       htmlContent: z.string().describe('Raw HTML content of the page'),
       requestInfo: z
         .object({
@@ -68,14 +69,16 @@ Use this to retrieve full page HTML for parsing, content analysis, or data extra
       acceptLang: ctx.input.acceptLang
     });
 
-    let contentLength = result.htmlContent?.length ?? 0;
+    let contentLength = result.htmlContent.length;
     let host = result.requestInfo?.host ?? ctx.input.url;
 
     return {
       output: {
+        raw: result,
         htmlContent: result.htmlContent,
         requestInfo: result.requestInfo
       },
       message: `Scraped HTML from \`${host}\` — **${contentLength.toLocaleString()}** characters of HTML content retrieved.`
     };
-  });
+  })
+  .build();

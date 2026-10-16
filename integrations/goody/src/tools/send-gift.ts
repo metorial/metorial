@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoodyClient } from '../lib/client';
+import { createGoodyClient } from '../lib/client';
 import { spec } from '../spec';
 
 let recipientInputSchema = z.object({
@@ -39,12 +39,14 @@ let orderPreviewSchema = z.object({
 export let sendGift = SlateTool.create(spec, {
   name: 'Send Gift',
   key: 'send_gift',
-  description: `Create a gift order batch to send products to one or more recipients. Generates gift links that recipients use to accept gifts, choose options, and enter their address. Supports email/SMS notifications or link-only delivery.`,
+  description: `Create a gift order batch to send products to one or more recipients. Generates gift links that recipients use to accept gifts, choose options, and enter their address. Supports email/SMS notifications or link-only delivery. Call list_workspaces to discover a workspace when targeting a specific team.`,
   instructions: [
     'Use "email_and_link" send method to have Goody send email/SMS notifications to recipients. Requires email for each recipient.',
     'Use "link_multiple_custom_list" to get gift links without Goody sending notifications — you deliver the links yourself.',
     'Use scheduledSendOn (ISO 8601) to schedule gifts for future delivery.',
-    'Set swap to "disabled" to prevent recipients from swapping the gift for another product.'
+    'Set swap to "disabled" to prevent recipients from swapping the gift for another product. Gift collections must allow swapping.',
+    'When supplying a message, select a cardId with list_cards.',
+    'Use customerReferenceId to prevent duplicate batches when retrying. Goody rejects references that already exist.'
   ],
   constraints: [
     'The "direct_send" method requires approved partner access.',
@@ -71,7 +73,31 @@ export let sendGift = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID (defaults to oldest accessible)'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover accessible workspaces; defaults to the oldest accessible workspace.'
+        ),
+      customerReferenceId: z
+        .string()
+        .optional()
+        .describe(
+          'Unique client reference to prevent duplicate batches. Reusing an existing reference is rejected by Goody.'
+        ),
+      commerceEndUserId: z
+        .string()
+        .optional()
+        .describe('Your app user ID; required when charging a Commerce User Payment Method'),
+      internationalShippingTier: z
+        .enum(['disabled', 'standard', 'full'])
+        .optional()
+        .describe(
+          'International gifting: disabled for US only, standard for eligible international gift cards, or full for the global product catalog'
+        ),
+      internationalGiftCardsEnabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Enable international gift cards when internationalShippingTier is standard'
+        ),
       scheduledSendOn: z
         .string()
         .optional()
@@ -96,14 +122,16 @@ export let sendGift = SlateTool.create(spec, {
         .boolean()
         .describe('Whether the batch is scheduled for future delivery'),
       orders: z.array(orderPreviewSchema).describe('Preview of orders (first 10)'),
-      referenceId: z.string().describe('Display reference ID')
+      referenceId: z.string().describe('Display reference ID'),
+      customerReferenceId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Client reference used to prevent duplicate batches')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GoodyClient({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = createGoodyClient(ctx);
 
     let result = await client.createOrderBatch({
       from_name: ctx.input.fromName,
@@ -129,7 +157,11 @@ export let sendGift = SlateTool.create(spec, {
       workspace_id: ctx.input.workspaceId,
       scheduled_send_on: ctx.input.scheduledSendOn,
       expires_at: ctx.input.expiresAt,
-      swap: ctx.input.swap
+      swap: ctx.input.swap,
+      customer_reference_id: ctx.input.customerReferenceId,
+      commerce_end_user_id: ctx.input.commerceEndUserId,
+      international_shipping_tier: ctx.input.internationalShippingTier,
+      international_gift_cards_enabled: ctx.input.internationalGiftCardsEnabled
     });
 
     let orders = (result.orders_preview || []).map((o: any) => ({
@@ -137,8 +169,8 @@ export let sendGift = SlateTool.create(spec, {
       status: o.status,
       giftLink: o.individual_gift_link,
       recipientFirstName: o.recipient_first_name,
-      recipientLastName: o.recipient_last_name,
-      recipientEmail: o.recipient_email
+      recipientLastName: o.recipient_last_name ?? null,
+      recipientEmail: o.recipient_email ?? null
     }));
 
     return {
@@ -148,7 +180,8 @@ export let sendGift = SlateTool.create(spec, {
         ordersCount: result.orders_count,
         isScheduledSend: result.is_scheduled_send,
         orders,
-        referenceId: result.reference_id
+        referenceId: result.reference_id,
+        customerReferenceId: result.customer_reference_id ?? null
       },
       message: `Gift batch **${result.reference_id}** created with **${result.orders_count}** order(s). Status: **${result.send_status}**.`
     };

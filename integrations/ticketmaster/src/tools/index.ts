@@ -1,6 +1,7 @@
 export { browseClassificationsTool } from './browse-classifications';
 export { checkInventoryStatusTool } from './check-inventory-status';
 export { getAttractionDetailsTool } from './get-attraction-details';
+export * from './get-classification-details';
 export { getEventDetailsTool } from './get-event-details';
 export { getEventOffersTool } from './get-event-offers';
 export { getVenueDetailsTool } from './get-venue-details';

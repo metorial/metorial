@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
+  raw: z.unknown().optional().describe('Original metadata returned by Doppler'),
   projectId: z.string().optional().describe('Unique project identifier'),
   slug: z.string().optional().describe('URL-friendly project slug'),
   name: z.string().optional().describe('Project display name'),
@@ -56,6 +57,7 @@ export let manageProjects = SlateTool.create(spec, {
     let client = new DopplerClient({ token: ctx.auth.token });
 
     let mapProject = (p: any) => ({
+      raw: p,
       projectId: p.id,
       slug: p.slug,
       name: p.name,
@@ -79,7 +81,8 @@ export let manageProjects = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.project) throw new Error('project is required for "get" action');
+      if (!ctx.input.project)
+        throw createApiServiceError('project is required for "get" action');
 
       let project = await client.getProject(ctx.input.project);
 
@@ -90,7 +93,7 @@ export let manageProjects = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for "create" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "create" action');
 
       let project = await client.createProject(ctx.input.name, ctx.input.description);
 
@@ -101,8 +104,9 @@ export let manageProjects = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.project) throw new Error('project is required for "update" action');
-      if (!ctx.input.name) throw new Error('name is required for "update" action');
+      if (!ctx.input.project)
+        throw createApiServiceError('project is required for "update" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "update" action');
 
       let project = await client.updateProject(
         ctx.input.project,
@@ -117,7 +121,8 @@ export let manageProjects = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.project) throw new Error('project is required for "delete" action');
+      if (!ctx.input.project)
+        throw createApiServiceError('project is required for "delete" action');
 
       await client.deleteProject(ctx.input.project);
 
@@ -127,6 +132,6 @@ export let manageProjects = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,7 @@ export let deleteCustomer = SlateTool.create(spec, {
       resolvedId = customer.id;
     }
     if (!resolvedId) {
-      throw new Error('Either customerId or internalId must be provided');
+      throw createApiServiceError('Either customerId or internalId must be provided');
     }
 
     await client.deleteCustomer(resolvedId);

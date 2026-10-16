@@ -1,6 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaggleClient } from '../lib/client';
+import {
+  kaggleSummary,
+  requireKagglePositiveNumber,
+  requireKaggleText
+} from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageModelVariation = SlateTool.create(spec, {
@@ -79,11 +84,39 @@ export let manageModelVariation = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KaggleClient(ctx.auth);
     let { action, ownerSlug, modelSlug, framework, variationSlug } = ctx.input;
+    requireKaggleText(framework, 'Model framework');
+
+    if (action === 'create_instance') {
+      requireKaggleText(ctx.input.instanceSlug, 'New variation slug');
+      requireKaggleText(ctx.input.licenseName, 'Variation license');
+    } else {
+      requireKaggleText(variationSlug, 'Variation slug');
+    }
+    if (action === 'create_version' && !ctx.input.files?.length)
+      throw createApiServiceError(
+        'At least one uploaded file is required to create a version.'
+      );
+    for (let file of ctx.input.files ?? [])
+      requireKaggleText(file.fileToken, 'File upload token');
+    if (action === 'delete_version')
+      requireKagglePositiveNumber(ctx.input.versionNumber, 'Version number');
+    if (
+      action === 'update_instance' &&
+      ![
+        ctx.input.overview,
+        ctx.input.licenseName,
+        ctx.input.fineTunable,
+        ctx.input.trainingData,
+        ctx.input.modelInstanceType,
+        ctx.input.externalUrl
+      ].some(value => value !== undefined)
+    )
+      throw createApiServiceError('Provide at least one variation field to update.');
 
     if (action === 'create_instance') {
       let result = await client.createModelInstance(ownerSlug, modelSlug, {
         framework,
-        overview: ctx.input.overview ?? '',
+        overview: ctx.input.overview,
         instanceSlug: ctx.input.instanceSlug!,
         licenseName: ctx.input.licenseName,
         fineTunable: ctx.input.fineTunable,
@@ -92,7 +125,7 @@ export let manageModelVariation = SlateTool.create(spec, {
         externalUrl: ctx.input.externalUrl
       });
       return {
-        output: { success: true, ...(result ?? {}) },
+        output: { success: true, ...kaggleSummary(result, 'model variation operation') },
         message: `Created model variation **${framework}/${ctx.input.instanceSlug}** for ${ownerSlug}/${modelSlug}.`
       };
     }
@@ -113,7 +146,7 @@ export let manageModelVariation = SlateTool.create(spec, {
         }
       );
       return {
-        output: { success: true, ...(result ?? {}) },
+        output: { success: true, ...kaggleSummary(result, 'model variation operation') },
         message: `Updated model variation **${framework}/${variationSlug}** for ${ownerSlug}/${modelSlug}.`
       };
     }
@@ -126,7 +159,7 @@ export let manageModelVariation = SlateTool.create(spec, {
         variationSlug!
       );
       return {
-        output: { success: true, ...(result ?? {}) },
+        output: { success: true, ...kaggleSummary(result, 'model variation operation') },
         message: `Deleted model variation **${framework}/${variationSlug}** from ${ownerSlug}/${modelSlug}.`
       };
     }
@@ -147,7 +180,7 @@ export let manageModelVariation = SlateTool.create(spec, {
         }
       );
       return {
-        output: { success: true, ...(result ?? {}) },
+        output: { success: true, ...kaggleSummary(result, 'model variation operation') },
         message: `Created new version of variation **${framework}/${variationSlug}** for ${ownerSlug}/${modelSlug}.`
       };
     }
@@ -161,7 +194,7 @@ export let manageModelVariation = SlateTool.create(spec, {
       ctx.input.versionNumber!
     );
     return {
-      output: { success: true, ...(result ?? {}) },
+      output: { success: true, ...kaggleSummary(result, 'model variation operation') },
       message: `Deleted version ${ctx.input.versionNumber} of variation **${framework}/${variationSlug}** from ${ownerSlug}/${modelSlug}.`
     };
   })

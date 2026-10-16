@@ -1,4 +1,4 @@
-# Slates Specification for Amara
+# Amara Integration Specification
 
 ## Overview
 
@@ -26,7 +26,7 @@ Add, list, view, and delete videos on the Amara platform. Videos can be added by
 
 ### Subtitle Management
 
-Create, fetch, update, and delete subtitles for videos in any supported language. Subtitles can be uploaded and downloaded in multiple formats including DFXP, SRT, VTT, SSA, and SBV. Subtitle languages can be configured with soft limits for characters per line, characters per second, max/min duration, and max lines to guide editors. Each subtitle language maintains a version history with author tracking.
+Create, fetch, update, and delete subtitles for videos in any supported language. Subtitles can be uploaded and downloaded in multiple formats including DFXP, SRT, VTT, SSA, and SBV. List subtitle languages and inspect the version history for one language. Get Subtitles retains the content and metadata and provides a downloadable file for non-JSON formats.
 
 ### Subtitle Workflow Actions
 
@@ -42,15 +42,15 @@ Create, list, and view teams. Teams support configurable membership policies (op
 
 ### Team Member Management
 
-Add, update, and remove team members with role-based access control. Supported roles include owner, admin, manager, project/language manager, contributor, and limited contributor. Project/language managers can be scoped to specific projects and languages.
+Add, update, and remove team members with role-based access control. Supported roles include owner, admin, manager, contributor, and limited contributor. Adding members directly requires a partner account or a user created through the API.
 
 ### Project Management
 
-Organize team videos into projects with names, descriptions, and guidelines. Projects can optionally have task workflows enabled.
+Organize team videos into projects with names, descriptions, and guidelines. The project response includes whether task workflows are enabled; this integration does not change workflow configuration.
 
 ### Team Applications
 
-List, view, approve, or deny membership applications for teams that use application-based membership policies. Applications can be filtered by status, date range, and user.
+List, view, approve, or deny membership applications for teams that use application-based membership policies. Applications can be filtered by status and user.
 
 ### Team Language Preferences
 
@@ -58,7 +58,7 @@ Configure preferred languages (which auto-create tasks for new videos) and black
 
 ### Subtitle Requests
 
-Track and manage subtitle work through structured requests on collaboration teams. Requests support a multi-stage workflow: subtitling → review → approval → complete. Assignees (subtitler, reviewer, approver) can be managed, and due dates can be set for each stage. Multi-team collaboration is supported, where a source team, work team, and up to three evaluation teams can participate in a single request.
+Track and manage subtitle work through structured requests on collaboration teams. Requests support a multi-stage workflow: subtitling → review → approval → complete. Assignees (subtitler, reviewer, approver), workflow stages, and overall/per-stage due dates can be managed. Cross-team evaluation is not currently exposed as tool inputs.
 
 ### Activity Tracking
 
@@ -66,7 +66,7 @@ View activity logs scoped to a video, team, or user. Activity types include vide
 
 ### User Management
 
-Create new users, view user profiles, and update account details. User creation supports options like auto-login tokens and automatic username deduplication. Users can be referenced by username or user ID.
+View user profiles by username or user ID. Embedded user references return stable IDs and may omit usernames. There is no documented current-user endpoint; the username entered at setup is used to fetch the connection profile.
 
 ### Messaging
 
@@ -100,3 +100,8 @@ Notifications related to team membership changes:
 - **member-profile-changed**: Fired when a team member's profile information is updated.
 
 Each notification includes an incrementing `number` field that can be used to track notification ordering and detect missed notifications. Notification history can be retrieved and inspected via the team notifications API endpoint.
+
+
+## Official Reference
+
+[Amara API documentation](https://apidocs.amara.org/) covers authentication, videos, subtitles, teams, requests, activity, and supported languages. Only the API key header is required for API authentication; the setup username identifies the connection profile.

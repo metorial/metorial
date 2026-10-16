@@ -1,6 +1,6 @@
 {
   "name": "@metorial/logodev",
-  "description": "Retrieve company logos, brand data, and enrichment information from a database of tens of millions of companies. Look up logo images by domain, stock ticker, cryptocurrency symbol, ISIN, or company name with configurable format, size, theme, and greyscale options. Search for company domains by brand name with autocomplete support. Retrieve comprehensive brand enrichment data including company descriptions, brand colors, blurhash placeholders, and social media links across platforms like LinkedIn, Twitter/X, GitHub, and more.",
+  "description": "Look up company brand profiles, colors, social links, and logo metadata by domain, stock ticker, cryptocurrency symbol, ISIN, or company name. Search for company domains, create logo display URLs, and download logo or brandmark files with configurable format, size, and theme.",
   "categories": ["apis-and-http-requests", "document-processing"],
   "skills": [
     "retrieve company logos",
@@ -10,7 +10,10 @@
     "enrich brand data",
     "extract brand colors",
     "retrieve social media links",
-    "generate logo placeholders"
+    "generate logo placeholders",
+    "download logo files",
+    "download brandmark files",
+    "look up stable brand IDs"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/logo-dev.svg"
 }

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let translationStatusTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let translationStatusTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID'),
+      projectId: projectIdSchema,
       scope: z
         .enum(['project', 'file', 'branch', 'language'])
         .default('project')
@@ -30,6 +31,7 @@ export let translationStatusTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawSchema,
       progress: z.array(
         z.object({
           languageId: z.string().optional().describe('Language code'),
@@ -56,19 +58,21 @@ export let translationStatusTool = SlateTool.create(spec, {
     let result: any;
 
     if (scope === 'file') {
-      if (!ctx.input.fileId) throw new Error('fileId is required for file scope');
+      if (!ctx.input.fileId) throw createApiServiceError('fileId is required for file scope');
       result = await client.getFileProgress(projectId, ctx.input.fileId, {
         limit: ctx.input.limit,
         offset: ctx.input.offset
       });
     } else if (scope === 'branch') {
-      if (!ctx.input.branchId) throw new Error('branchId is required for branch scope');
+      if (!ctx.input.branchId)
+        throw createApiServiceError('branchId is required for branch scope');
       result = await client.getBranchProgress(projectId, ctx.input.branchId, {
         limit: ctx.input.limit,
         offset: ctx.input.offset
       });
     } else if (scope === 'language') {
-      if (!ctx.input.languageId) throw new Error('languageId is required for language scope');
+      if (!ctx.input.languageId)
+        throw createApiServiceError('languageId is required for language scope');
       result = await client.getLanguageProgress(projectId, ctx.input.languageId, {
         limit: ctx.input.limit,
         offset: ctx.input.offset
@@ -81,8 +85,8 @@ export let translationStatusTool = SlateTool.create(spec, {
     }
 
     let progress = result.data.map((item: any) => ({
-      languageId: item.data.languageId || undefined,
-      fileId: item.data.fileId || undefined,
+      languageId: item.data.languageId ?? undefined,
+      fileId: item.data.fileId ?? undefined,
       words: item.data.words,
       phrases: item.data.phrases,
       translationProgress: item.data.translationProgress,
@@ -90,7 +94,7 @@ export let translationStatusTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { progress },
+      output: { raw: client.lastResponse, progress },
       message: `Retrieved translation progress for **${progress.length}** ${scope === 'language' ? 'files' : 'languages'}.`
     };
   })

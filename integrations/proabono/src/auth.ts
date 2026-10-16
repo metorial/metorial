@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -19,7 +19,15 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let encoded = btoa(`${ctx.input.agentKey}:${ctx.input.apiKey}`);
+      if (!ctx.input.agentKey.trim() || !ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Both the ProAbono Agent Key and API Key are required.');
+      }
+      if (ctx.input.agentKey.includes(':')) {
+        throw createApiServiceError('The ProAbono Agent Key cannot contain a colon.');
+      }
+      let encoded = Buffer.from(`${ctx.input.agentKey}:${ctx.input.apiKey}`, 'utf8').toString(
+        'base64'
+      );
       return {
         output: {
           token: encoded

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,10 @@ export let assignThread = SlateTool.create(spec, {
   .input(
     z.object({
       threadId: z.string().describe('Plain thread ID'),
-      userId: z.string().optional().describe('User ID to assign the thread to'),
+      userId: z
+        .string()
+        .optional()
+        .describe('User ID from list_users to assign the thread to'),
       unassign: z.boolean().optional().describe('Set to true to unassign the thread')
     })
   )
@@ -28,6 +31,9 @@ export let assignThread = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (ctx.input.unassign && ctx.input.userId !== undefined) {
+      throw createApiServiceError('Provide userId or unassign: true, but not both');
+    }
 
     let thread: any;
     if (ctx.input.unassign) {
@@ -37,7 +43,7 @@ export let assignThread = SlateTool.create(spec, {
       let res = await client.assignThread(ctx.input.threadId, ctx.input.userId);
       thread = res.thread;
     } else {
-      throw new Error('Provide userId to assign, or set unassign to true');
+      throw createApiServiceError('Provide userId to assign, or set unassign to true');
     }
 
     return {

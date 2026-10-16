@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { OwlClient } from '../lib/client';
+import {
+  OwlClient,
+  owlObject,
+  owlString,
+  requireChainId,
+  requireInput,
+  requireMetadata,
+  requireOwlString
+} from '../lib/client';
+import { listInputSchema, rawSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let templateMetadataSchema = z.object({
@@ -19,6 +28,7 @@ let templateMetadataSchema = z.object({
 });
 
 let templateOutputSchema = z.object({
+  raw: rawSchema,
   templateId: z.string().describe('Template ID'),
   contractAddress: z.string().optional().describe('Associated collection contract address'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Template metadata')
@@ -44,6 +54,11 @@ Templates simplify batch minting by providing predefined metadata (name, descrip
         .string()
         .optional()
         .describe('Contract address to bind this template to a specific collection'),
+      chainId: z.number().optional().describe('Chain ID for the associated collection.'),
+      externalId: z
+        .string()
+        .optional()
+        .describe('Your external identifier for this template.'),
       metadata: templateMetadataSchema.describe(
         'Default metadata for tokens created with this template'
       )
@@ -58,18 +73,24 @@ Templates simplify batch minting by providing predefined metadata (name, descrip
       contractAddress: ctx.input.contractAddress
     });
 
+    requireMetadata(ctx.input.metadata);
     let result = await client.createTokenTemplate({
       contractAddress: ctx.input.contractAddress,
+      chainId: ctx.input.chainId === undefined ? undefined : requireChainId(ctx.input.chainId),
+      externalId: ctx.input.externalId,
       metadata: ctx.input.metadata
     });
 
+    let templateId = requireOwlString(result.id, 'template ID');
+
     return {
       output: {
-        templateId: result.id,
-        contractAddress: result.address,
-        metadata: result.metadata
+        raw: result,
+        templateId,
+        contractAddress: owlString(result.address),
+        metadata: owlObject(result.metadata)
       },
-      message: `Created token template \`${result.id}\`${ctx.input.contractAddress ? ` for collection \`${ctx.input.contractAddress}\`` : ''}.`
+      message: `Created token template \`${templateId}\`${ctx.input.contractAddress ? ` for collection \`${ctx.input.contractAddress}\`` : ''}.`
     };
   })
   .build();
@@ -92,17 +113,24 @@ export let getTokenTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
+    requireInput(ctx.input.templateId, 'templateId');
     let result = await client.getTokenTemplate({
       templateId: ctx.input.templateId
     });
 
+    let templateId =
+      result.id === undefined
+        ? ctx.input.templateId
+        : requireOwlString(result.id, 'template ID');
+
     return {
       output: {
-        templateId: result.id,
-        contractAddress: result.address,
-        metadata: result.metadata
+        raw: result,
+        templateId,
+        contractAddress: owlString(result.address),
+        metadata: owlObject(result.metadata)
       },
-      message: `Retrieved token template \`${result.id}\`.`
+      message: `Retrieved token template \`${templateId}\`.`
     };
   })
   .build();
@@ -110,15 +138,16 @@ export let getTokenTemplate = SlateTool.create(spec, {
 export let listTokenTemplates = SlateTool.create(spec, {
   name: 'List Token Templates',
   key: 'list_token_templates',
-  description: `List all token templates in the project. Returns template IDs and metadata for each template.`,
+  description: `List a page of token templates in the project. Returns template IDs and metadata for each template.`,
   tags: {
     destructive: false,
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(listInputSchema)
   .output(
     z.object({
+      raw: rawSchema,
       templates: z
         .array(
           z.object({
@@ -139,19 +168,16 @@ export let listTokenTemplates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OwlClient({ token: ctx.auth.token });
 
-    let result = await client.listTokenTemplates();
-    let templates = Array.isArray(result) ? result : (result.items ?? []);
+    let templates = await client.listTokenTemplates(ctx.input);
 
-    let mapped = templates.map(
-      (t: { id: string; address?: string; metadata?: Record<string, unknown> }) => ({
-        templateId: t.id,
-        contractAddress: t.address,
-        metadata: t.metadata
-      })
-    );
+    let mapped = templates.map(t => ({
+      templateId: requireOwlString(t.id, 'template ID'),
+      contractAddress: owlString(t.address),
+      metadata: owlObject(t.metadata)
+    }));
 
     return {
-      output: { templates: mapped },
+      output: { templates: mapped, raw: templates },
       message: `Found **${mapped.length}** token template(s).`
     };
   })
@@ -178,18 +204,26 @@ export let updateTokenTemplate = SlateTool.create(spec, {
 
     ctx.info({ message: 'Updating token template', templateId: ctx.input.templateId });
 
+    requireInput(ctx.input.templateId, 'templateId');
+    requireMetadata(ctx.input.metadata);
     let result = await client.patchTokenTemplate({
       templateId: ctx.input.templateId,
       metadata: ctx.input.metadata
     });
 
+    let templateId =
+      result.id === undefined
+        ? ctx.input.templateId
+        : requireOwlString(result.id, 'template ID');
+
     return {
       output: {
-        templateId: result.id,
-        contractAddress: result.address,
-        metadata: result.metadata
+        raw: result,
+        templateId,
+        contractAddress: owlString(result.address),
+        metadata: owlObject(result.metadata)
       },
-      message: `Updated token template \`${result.id}\`.`
+      message: `Updated token template \`${templateId}\`.`
     };
   })
   .build();

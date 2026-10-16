@@ -43,7 +43,7 @@ export let manageUserProfile = SlateTool.create(spec, {
       ctx.input.lastName !== undefined ||
       ctx.input.email !== undefined;
 
-    let profile: any;
+    let profile: Awaited<ReturnType<Client['getUserProfile']>>;
     if (hasUpdates) {
       profile = await client.updateUserProfile({
         firstName: ctx.input.firstName,

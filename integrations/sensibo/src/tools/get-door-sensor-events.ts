@@ -12,11 +12,15 @@ let doorSensorEventSchema = z.object({
 export let getDoorSensorEventsTool = SlateTool.create(spec, {
   name: 'Get Door Sensor Events',
   key: 'get_door_sensor_events',
-  description: `Retrieve open/close events from a Sensibo Door/Window Sensor. Returns timestamped state transitions showing when the door or window was opened or closed.`,
+  description: `DEPRECATED — use get_door_sensor_history instead. Retrieve open/close events from a Sensibo Door/Window Sensor. Returns timestamped state transitions showing when the door or window was opened or closed.`,
+  instructions: [
+    'Use get_door_sensor_history with a ds_ sensor ID; this legacy tool retains its original device-based route.'
+  ],
   constraints: [
     'Events are available for a configurable number of past days (default 1, max 7).'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

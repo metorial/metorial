@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DopplerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,6 +35,7 @@ export let shareSecret = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original share result returned by Doppler'),
       url: z.string().describe('Shareable URL for the secret'),
       expiresAt: z.string().optional().describe('Expiration timestamp')
     })
@@ -42,17 +43,43 @@ export let shareSecret = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DopplerClient({ token: ctx.auth.token });
 
+    if (
+      ctx.input.expireViews !== undefined &&
+      (!Number.isInteger(ctx.input.expireViews) ||
+        (ctx.input.expireViews !== -1 &&
+          (ctx.input.expireViews < 1 || ctx.input.expireViews > 50)))
+    ) {
+      throw createApiServiceError(
+        'expireViews must be an integer from 1 to 50, or -1 for unlimited views.'
+      );
+    }
+    if (
+      ctx.input.expireDays !== undefined &&
+      (!Number.isInteger(ctx.input.expireDays) ||
+        ctx.input.expireDays < 1 ||
+        ctx.input.expireDays > 90)
+    ) {
+      throw createApiServiceError('expireDays must be an integer from 1 to 90.');
+    }
+
     let result = await client.shareSecretPlainText(ctx.input.secret, {
       expireViews: ctx.input.expireViews,
       expireDays: ctx.input.expireDays
     });
+    let url = result.url || result.authenticated_url;
+    if (typeof url !== 'string' || !url) {
+      throw createApiServiceError(
+        'Doppler accepted the request but did not return a share URL.'
+      );
+    }
 
     return {
       output: {
-        url: result.url || result.authenticated_url || '',
+        raw: result,
+        url,
         expiresAt: result.expires_at
       },
-      message: `Created shareable secret link: ${result.url || result.authenticated_url || 'unknown'}`
+      message: `Created shareable secret link: ${url}`
     };
   })
   .build();

@@ -14,7 +14,12 @@ export let addOrderPayment = SlateTool.create(spec, {
   .input(
     z.object({
       orderId: z.number().describe('Order ID to record payment for'),
-      paymentDone: z.number().describe('Amount paid'),
+      paymentDone: z
+        .number()
+        .describe(
+          'Total paid amount; replaces the existing paid amount rather than adding to it'
+        ),
+      externalPaymentId: z.string().optional().describe('External payment gateway identifier'),
       paymentDate: z.number().optional().describe('Payment date as unix timestamp'),
       paymentComment: z.string().optional().describe('Payment comment or reference')
     })
@@ -31,7 +36,8 @@ export let addOrderPayment = SlateTool.create(spec, {
       orderId: ctx.input.orderId,
       paymentDone: ctx.input.paymentDone,
       paymentDate: ctx.input.paymentDate,
-      paymentComment: ctx.input.paymentComment
+      paymentComment: ctx.input.paymentComment,
+      externalPaymentId: ctx.input.externalPaymentId
     });
 
     return {

@@ -32,7 +32,7 @@ export let createDepartment = SlateTool.create(spec, {
     return {
       output: {
         departmentId: response.data.id,
-        name: ctx.input.name,
+        name: response.data.name,
         rawResponse: response
       },
       message: `Successfully created department **${ctx.input.name}**.`

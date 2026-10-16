@@ -1,18 +1,34 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.raisely.com/v3';
 
 export class RaiselyClient {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Raisely API key is required. Reconnect your account.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Raisely',
+          reason: 'raisely_api_error',
+          extractResponse: (value, helpers) => helpers.getResponseWithBody(value),
+          extractUpstreamCode: (_error, response, helpers) =>
+            helpers.isRecord(response?.data) && typeof response.data.code === 'string'
+              ? response.data.code
+              : undefined
+        })
     });
+  }
+
+  async authenticate() {
+    let response = await this.axios.get('/authenticate');
+    return response.data;
   }
 
   // ── Campaigns ──────────────────────────────────────────────
@@ -59,7 +75,7 @@ export class RaiselyClient {
     return response.data;
   }
 
-  async getProfile(profileUuid: string, params?: { private?: boolean }) {
+  async getProfile(profileUuid: string, params?: { private?: boolean; campaign?: string }) {
     let response = await this.axios.get(`/profiles/${profileUuid}`, { params });
     return response.data;
   }
@@ -192,7 +208,13 @@ export class RaiselyClient {
   }
 
   async upsertUser(data: Record<string, any>) {
-    let response = await this.axios.post('/users/upsert', { data });
+    let response = await this.axios.post(
+      '/users/upsert',
+      { data },
+      {
+        params: { campaign: data.campaignUuid }
+      }
+    );
     return response.data;
   }
 

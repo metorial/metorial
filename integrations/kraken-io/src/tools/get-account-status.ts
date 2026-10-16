@@ -19,7 +19,11 @@ export let getAccountStatusTool = SlateTool.create(spec, {
       planName: z.string().describe('Name of the current subscription plan'),
       quotaTotal: z.number().describe('Total quota allocation in bytes'),
       quotaUsed: z.number().describe('Quota consumed in bytes'),
-      quotaRemaining: z.number().describe('Available quota remaining in bytes')
+      quotaRemaining: z.number().describe('Available quota remaining in bytes'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete account status response')
     })
   )
   .handleInvocation(async ctx => {
@@ -30,10 +34,6 @@ export let getAccountStatusTool = SlateTool.create(spec, {
     });
 
     let status = await client.getUserStatus();
-
-    if (!status.success) {
-      throw new Error('Failed to retrieve account status');
-    }
 
     let usedPercent =
       status.quota_total > 0
@@ -48,7 +48,8 @@ export let getAccountStatusTool = SlateTool.create(spec, {
         planName: status.plan_name,
         quotaTotal: status.quota_total,
         quotaUsed: status.quota_used,
-        quotaRemaining: status.quota_remaining
+        quotaRemaining: status.quota_remaining,
+        raw: status
       },
       message: `Account **${status.plan_name}** is ${status.active ? 'active' : 'inactive'}. Quota: **${usedPercent}%** used, **${remainingMb} MB** remaining.`
     };

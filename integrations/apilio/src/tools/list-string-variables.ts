@@ -23,7 +23,7 @@ export let listStringVariables = SlateTool.create(spec, {
               .string()
               .nullable()
               .describe('Current value of the variable, or null if cleared'),
-            createdAt: z.string().describe('When the variable was created'),
+            createdAt: z.string().optional().describe('When the variable was created'),
             updatedAt: z.string().describe('When the variable was last updated')
           })
         )

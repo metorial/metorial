@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let channelSchema = z.object({
+export let channelSchema = z.object({
   channelId: z.number().describe('Unique channel (stream) ID'),
   name: z.string().describe('Channel name'),
   description: z.string().describe('Channel description'),
@@ -13,7 +13,9 @@ let channelSchema = z.object({
     .number()
     .nullable()
     .optional()
-    .describe('Message retention policy in days, null means use organization default')
+    .describe('Message retention policy in days, null means use organization default'),
+  isArchived: z.boolean().optional().describe('Whether the channel is archived'),
+  raw: z.any().optional().describe('Complete provider channel metadata')
 });
 
 export let listChannels = SlateTool.create(spec, {
@@ -27,6 +29,14 @@ export let listChannels = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      includeWebPublic: z
+        .boolean()
+        .optional()
+        .describe('Include channels accessible to anyone on the web'),
+      excludeArchived: z
+        .boolean()
+        .optional()
+        .describe('Exclude archived channels. Defaults to true'),
       includePublic: z
         .boolean()
         .optional()
@@ -51,17 +61,12 @@ export let listChannels = SlateTool.create(spec, {
 
     let result = await client.getChannels({
       includePublic: ctx.input.includePublic,
-      includeSubscribed: ctx.input.includeSubscribed
+      includeSubscribed: ctx.input.includeSubscribed,
+      includeWebPublic: ctx.input.includeWebPublic,
+      excludeArchived: ctx.input.excludeArchived
     });
 
-    let channels = (result.streams || []).map((s: any) => ({
-      channelId: s.stream_id,
-      name: s.name,
-      description: s.description || '',
-      isPrivate: s.invite_only,
-      dateCreated: s.date_created,
-      messageRetentionDays: s.message_retention_days
-    }));
+    let channels = (result.streams || []).map(mapChannel);
 
     return {
       output: { channels },
@@ -69,3 +74,14 @@ export let listChannels = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let mapChannel = (s: any) => ({
+  channelId: s.stream_id,
+  name: s.name,
+  description: s.description || '',
+  isPrivate: s.invite_only,
+  dateCreated: s.date_created,
+  messageRetentionDays: s.message_retention_days,
+  isArchived: s.is_archived,
+  raw: s
+});

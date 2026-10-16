@@ -1,6 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BidsketchClient } from '../lib/client';
+import {
+  readBidsketchBoolean,
+  readBidsketchNumber,
+  readBidsketchString
+} from '../lib/response';
 import { spec } from '../spec';
 
 let proposalSummarySchema = z.object({
@@ -53,16 +58,21 @@ export let listProposals = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BidsketchClient(ctx.auth.token);
 
-    let data = ctx.input.clientId
-      ? await client.getClientProposals(ctx.input.clientId, ctx.input.page, ctx.input.perPage)
-      : await client.listProposals(ctx.input.page, ctx.input.perPage);
+    let data =
+      ctx.input.clientId !== undefined
+        ? await client.getClientProposals(
+            ctx.input.clientId,
+            ctx.input.page,
+            ctx.input.perPage
+          )
+        : await client.listProposals(ctx.input.page, ctx.input.perPage);
 
-    let proposals = (Array.isArray(data) ? data : []).map((p: any) => ({
-      proposalId: p.id,
-      name: p.name,
+    let proposals = data.map((p: any) => ({
+      proposalId: readBidsketchNumber(p.id, 'id'),
+      name: readBidsketchString(p.name, 'name'),
       description: p.description ?? null,
-      status: p.status,
-      isDraft: p.is_draft,
+      status: readBidsketchString(p.status, 'status'),
+      isDraft: readBidsketchBoolean(p.is_draft, 'is_draft'),
       currency: p.currency ?? null,
       total: p.total ?? null,
       monthlyFees: p.monthly_fees ?? null,
@@ -71,16 +81,16 @@ export let listProposals = SlateTool.create(spec, {
       user: p.user ?? null,
       client: p.client
         ? {
-            clientId: p.client.id,
-            name: p.client.name,
-            url: p.client.url,
-            appUrl: p.client.app_url
+            clientId: readBidsketchNumber(p.client.id, 'client id'),
+            name: readBidsketchString(p.client.name, 'client name'),
+            url: readBidsketchString(p.client.url, 'client url'),
+            appUrl: readBidsketchString(p.client.app_url, 'client app_url')
           }
         : null,
-      url: p.url,
-      appUrl: p.app_url,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at
+      url: readBidsketchString(p.url, 'url'),
+      appUrl: readBidsketchString(p.app_url, 'app_url'),
+      createdAt: readBidsketchString(p.created_at, 'created_at'),
+      updatedAt: readBidsketchString(p.updated_at, 'updated_at')
     }));
 
     return {

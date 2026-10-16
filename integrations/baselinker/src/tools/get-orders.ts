@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BaseLinkerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -96,6 +96,30 @@ export let getOrders = SlateTool.create(spec, {
         .describe('Include unconfirmed orders in results'),
       statusId: z.number().optional().describe('Filter by order status ID'),
       filterEmail: z.string().optional().describe('Filter by buyer email address'),
+      filterShopOrderId: z
+        .number()
+        .optional()
+        .describe(
+          'Filter by original store order ID; cannot be combined with filterExternalOrderId'
+        ),
+      filterExternalOrderId: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by original marketplace/store order ID; cannot be combined with filterShopOrderId'
+        ),
+      includeCommissions: z
+        .boolean()
+        .optional()
+        .describe('Include marketplace commissions in raw response'),
+      includeConnectData: z
+        .boolean()
+        .optional()
+        .describe('Include Base Connect details in raw response'),
+      includeDiscountsData: z
+        .boolean()
+        .optional()
+        .describe('Include applied discounts in raw response'),
       filterOrderSource: z
         .string()
         .optional()
@@ -109,10 +133,25 @@ export let getOrders = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      orders: z.array(orderSchema).describe('List of orders matching the filter criteria')
+      orders: z.array(orderSchema).describe('List of orders matching the filter criteria'),
+      raw: z
+        .any()
+        .optional()
+        .describe(
+          'Unmodified provider response, including requested custom fields, commissions, discounts and delivery point details'
+        )
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.filterShopOrderId !== undefined &&
+      ctx.input.filterExternalOrderId !== undefined
+    ) {
+      throw createApiServiceError('Use filterShopOrderId or filterExternalOrderId, not both.');
+    }
+    if (ctx.input.filterOrderSourceId !== undefined && !ctx.input.filterOrderSource) {
+      throw createApiServiceError('filterOrderSource is required with filterOrderSourceId.');
+    }
     let client = new BaseLinkerClient({ token: ctx.auth.token });
 
     let result = await client.getOrders({
@@ -123,76 +162,81 @@ export let getOrders = SlateTool.create(spec, {
       getUnconfirmedOrders: ctx.input.getUnconfirmedOrders,
       statusId: ctx.input.statusId,
       filterEmail: ctx.input.filterEmail,
+      filterShopOrderId: ctx.input.filterShopOrderId,
+      filterExternalOrderId: ctx.input.filterExternalOrderId,
+      includeCommissions: ctx.input.includeCommissions,
+      includeConnectData: ctx.input.includeConnectData,
+      includeDiscountsData: ctx.input.includeDiscountsData,
       filterOrderSource: ctx.input.filterOrderSource,
       filterOrderSourceId: ctx.input.filterOrderSourceId,
       includeCustomExtraFields: ctx.input.includeCustomExtraFields
     });
 
-    let orders = (result.orders || []).map((o: any) => ({
+    let orders = result.orders.map((o: any) => ({
       orderId: o.order_id,
       shopOrderId: o.shop_order_id,
-      externalOrderId: o.external_order_id || '',
-      orderSource: o.order_source || '',
+      externalOrderId: o.external_order_id,
+      orderSource: o.order_source,
       orderSourceId: o.order_source_id,
-      orderSourceInfo: o.order_source_info || '',
+      orderSourceInfo: o.order_source_info,
       orderStatusId: o.order_status_id,
-      confirmed: !!o.confirmed,
+      confirmed: o.confirmed,
       dateAdd: o.date_add,
       dateConfirmed: o.date_confirmed,
       dateInStatus: o.date_in_status,
-      currency: o.currency || '',
-      paymentMethod: o.payment_method || '',
-      paymentMethodCod: o.payment_method_cod || '0',
-      paymentDone: o.payment_done || 0,
-      email: o.email || '',
-      phone: o.phone || '',
-      userLogin: o.user_login || '',
-      userComments: o.user_comments || '',
-      adminComments: o.admin_comments || '',
-      deliveryMethod: o.delivery_method || '',
-      deliveryPrice: o.delivery_price || 0,
-      deliveryFullname: o.delivery_fullname || '',
-      deliveryCompany: o.delivery_company || '',
-      deliveryAddress: o.delivery_address || '',
-      deliveryPostcode: o.delivery_postcode || '',
-      deliveryCity: o.delivery_city || '',
-      deliveryState: o.delivery_state || '',
-      deliveryCountryCode: o.delivery_country_code || '',
-      invoiceFullname: o.invoice_fullname || '',
-      invoiceCompany: o.invoice_company || '',
-      invoiceNip: o.invoice_nip || '',
-      invoiceAddress: o.invoice_address || '',
-      invoicePostcode: o.invoice_postcode || '',
-      invoiceCity: o.invoice_city || '',
-      invoiceCountryCode: o.invoice_country_code || '',
-      wantInvoice: o.want_invoice || '0',
-      extraField1: o.extra_field_1 || '',
-      extraField2: o.extra_field_2 || '',
-      orderPage: o.order_page || '',
-      pickState: o.pick_state || 0,
-      packState: o.pack_state || 0,
-      products: (o.products || []).map((p: any) => ({
+      currency: o.currency,
+      paymentMethod: o.payment_method,
+      paymentMethodCod: o.payment_method_cod,
+      paymentDone: o.payment_done,
+      email: o.email,
+      phone: o.phone,
+      userLogin: o.user_login,
+      userComments: o.user_comments,
+      adminComments: o.admin_comments,
+      deliveryMethod: o.delivery_method,
+      deliveryPrice: o.delivery_price,
+      deliveryFullname: o.delivery_fullname,
+      deliveryCompany: o.delivery_company,
+      deliveryAddress: o.delivery_address,
+      deliveryPostcode: o.delivery_postcode,
+      deliveryCity: o.delivery_city,
+      deliveryState: o.delivery_state,
+      deliveryCountryCode: o.delivery_country_code,
+      invoiceFullname: o.invoice_fullname,
+      invoiceCompany: o.invoice_company,
+      invoiceNip: o.invoice_nip,
+      invoiceAddress: o.invoice_address,
+      invoicePostcode: o.invoice_postcode,
+      invoiceCity: o.invoice_city,
+      invoiceCountryCode: o.invoice_country_code,
+      wantInvoice: o.want_invoice,
+      extraField1: o.extra_field_1,
+      extraField2: o.extra_field_2,
+      orderPage: o.order_page,
+      pickState: o.pick_state,
+      packState: o.pack_state,
+      products: o.products.map((p: any) => ({
         orderProductId: p.order_product_id,
-        storage: p.storage || '',
-        storageId: p.storage_id || 0,
-        productId: p.product_id || '',
-        variantId: p.variant_id || '',
-        name: p.name || '',
-        sku: p.sku || '',
-        ean: p.ean || '',
-        location: p.location || '',
-        warehouseId: p.warehouse_id || 0,
-        attributes: p.attributes || '',
-        priceBrutto: p.price_brutto || 0,
-        taxRate: p.tax_rate || 0,
-        quantity: p.quantity || 0,
-        weight: p.weight || 0
+        storage: p.storage,
+        storageId: p.storage_id,
+        productId: p.product_id,
+        variantId: p.variant_id,
+        name: p.name,
+        sku: p.sku,
+        ean: p.ean,
+        location: p.location,
+        warehouseId: p.warehouse_id,
+        attributes: p.attributes,
+        priceBrutto: p.price_brutto,
+        taxRate: p.tax_rate,
+        quantity: p.quantity,
+        weight: p.weight
       }))
     }));
 
     let count = orders.length;
     return {
-      output: { orders },
+      output: { orders, raw: result },
       message: `Retrieved **${count}** order${count !== 1 ? 's' : ''}${ctx.input.orderId ? ` (order #${ctx.input.orderId})` : ''}.`
     };
   })

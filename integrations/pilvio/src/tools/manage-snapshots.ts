@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let replicaSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   replicaUuid: z.string().describe('Replica/snapshot UUID'),
   replicaType: z.string().optional().describe('Type of replica (snapshot or backup)'),
   createdAt: z.string().optional().describe('Creation timestamp'),
@@ -42,6 +43,7 @@ export let manageSnapshots = SlateTool.create(spec, {
         .array(replicaSchema)
         .optional()
         .describe('List of replicas (for "list" action)'),
+      raw: z.unknown().optional().describe('Complete provider operation response'),
       success: z.boolean().describe('Whether the operation succeeded'),
       vmUuid: z.string().optional().describe('UUID of the affected VM')
     })
@@ -57,11 +59,12 @@ export let manageSnapshots = SlateTool.create(spec, {
     switch (action) {
       case 'list': {
         let data = await client.listReplicas(vmUuid, ctx.input.replicaType);
-        let replicas = (Array.isArray(data) ? data : []).map((r: any) => ({
+        let replicas = data.map((r: any) => ({
           replicaUuid: r.uuid || r.replica_uuid,
           replicaType: r.r_type || r.type,
-          createdAt: r.created_at,
-          sizeGb: r.size_gb
+          createdAt: r.created_at ?? undefined,
+          sizeGb: r.size ?? r.size_gb,
+          raw: r
         }));
         return {
           output: { replicas, success: true, vmUuid },
@@ -70,16 +73,16 @@ export let manageSnapshots = SlateTool.create(spec, {
       }
 
       case 'create': {
-        let _result = await client.createReplica(vmUuid);
+        let result = await client.createReplica(vmUuid);
         return {
-          output: { success: true, vmUuid },
+          output: { success: true, vmUuid, raw: result },
           message: `Created snapshot for VM **${vmUuid}**.`
         };
       }
 
       case 'delete': {
         if (!ctx.input.replicaUuid) {
-          throw new Error('replicaUuid is required for delete action');
+          throw createApiServiceError('replicaUuid is required for delete action');
         }
         await client.deleteReplica(ctx.input.replicaUuid);
         return {
@@ -90,7 +93,7 @@ export let manageSnapshots = SlateTool.create(spec, {
 
       case 'restore': {
         if (!ctx.input.replicaUuid) {
-          throw new Error('replicaUuid is required for restore action');
+          throw createApiServiceError('replicaUuid is required for restore action');
         }
         await client.rebuildFromReplica(vmUuid, ctx.input.replicaUuid);
         return {

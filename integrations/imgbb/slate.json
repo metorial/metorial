@@ -1,6 +1,6 @@
 {
   "name": "@metorial/imgbb",
-  "description": "Upload images to ImgBB and receive publicly accessible hosted URLs. Supports uploading via binary file, base64-encoded data, or image URL. Set optional auto-expiration times for temporary hosting. Returns multiple image variants including original, thumbnail, and medium-sized versions with direct, viewer, display, and delete URLs.",
+  "description": "Upload images to ImgBB from base64-encoded data or an image URL and receive a downloadable image with publicly accessible hosted URLs. Set optional auto-expiration times for temporary hosting. Returns original and thumbnail URLs, a medium-sized URL when available, and viewer, display, and delete URLs.",
   "categories": ["apis-and-http-requests", "document-processing"],
   "skills": [
     "upload images",

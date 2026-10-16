@@ -4,8 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'castingwords',
-  name: 'Castingwords',
-  description: undefined,
+  name: 'CastingWords',
+  description:
+    'Order transcriptions, follow audiofile progress, download transcripts and captions, and check invoices and balance.',
   metadata: {},
   config,
   auth

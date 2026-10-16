@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateSymplaOutput } from '../lib/client';
 import { spec } from '../spec';
 
 let orderSchema = z.object({
@@ -15,6 +15,12 @@ let orderSchema = z.object({
   buyerFirstName: z.string().describe('Buyer first name'),
   buyerLastName: z.string().describe('Buyer last name'),
   buyerEmail: z.string().describe('Buyer email address')
+});
+
+let outputSchema = z.object({
+  orders: z.array(orderSchema).describe('List of orders'),
+  hasNextPage: z.boolean().describe('Whether more pages are available'),
+  totalQuantity: z.number().describe('Total number of results')
 });
 
 export let listOrdersTool = SlateTool.create(spec, {
@@ -40,13 +46,7 @@ export let listOrdersTool = SlateTool.create(spec, {
       sort: z.enum(['ASC', 'DESC']).optional().describe('Sort direction')
     })
   )
-  .output(
-    z.object({
-      orders: z.array(orderSchema).describe('List of orders'),
-      hasNextPage: z.boolean().describe('Whether more pages are available'),
-      totalQuantity: z.number().describe('Total number of results')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
@@ -59,25 +59,25 @@ export let listOrdersTool = SlateTool.create(spec, {
     });
 
     let orders = result.data.map(o => ({
-      orderId: o.id ?? '',
-      eventId: o.event_id ?? 0,
-      orderDate: o.order_date ?? '',
-      orderStatus: o.order_status ?? '',
-      updatedDate: o.updated_date ?? '',
-      discountCode: o.discount_code ?? '',
-      transactionType: o.transaction_type ?? '',
-      totalSalePrice: o.order_total_sale_price ?? 0,
-      buyerFirstName: o.buyer_first_name ?? '',
-      buyerLastName: o.buyer_last_name ?? '',
-      buyerEmail: o.buyer_email ?? ''
+      orderId: o.id,
+      eventId: o.event_id,
+      orderDate: o.order_date,
+      orderStatus: o.order_status,
+      updatedDate: o.updated_date,
+      discountCode: o.discount_code,
+      transactionType: o.transaction_type,
+      totalSalePrice: o.order_total_sale_price,
+      buyerFirstName: o.buyer_first_name,
+      buyerLastName: o.buyer_last_name,
+      buyerEmail: o.buyer_email
     }));
 
     return {
-      output: {
+      output: validateSymplaOutput(outputSchema, {
         orders,
         hasNextPage: result.pagination.hasNext,
         totalQuantity: result.pagination.quantity
-      },
+      }),
       message: `Found **${orders.length}** orders for event ${ctx.input.eventId}.${result.pagination.hasNext ? ' More pages available.' : ''}`
     };
   })

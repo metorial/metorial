@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { bannerOutputSchema, mapBanner } from '../lib/banner';
 import { AbyssaleClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -32,50 +33,42 @@ export let generateImage = SlateTool.create(spec, {
           'Element overrides keyed by layer name. Each value is an object with element properties like payload, color, image_url, etc.'
         ),
       imageFileType: z
-        .enum(['png', 'jpeg', 'webp', 'avif', 'pdf'])
+        .enum(['png', 'jpeg', 'webp', 'avif', 'pdf', 'auto'])
         .optional()
         .describe(
           'Override default output file type. Default: PNG for transparent backgrounds, JPEG for opaque.'
-        )
+        ),
+      fileCompressionLevel: z
+        .number()
+        .optional()
+        .describe('Output quality from 1 to 100; 100 is best quality.'),
+      originalVisualId: z
+        .string()
+        .optional()
+        .describe('Existing visual ID to regenerate in place, preserving its share URL.')
     })
   )
-  .output(
-    z.object({
-      bannerId: z.string().describe('ID of the generated banner'),
-      fileType: z.string().describe('Type of the generated file (jpeg, png, etc.)'),
-      fileUrl: z.string().describe('URL where the generated image is stored'),
-      cdnUrl: z.string().describe('CDN URL for high-speed access'),
-      filename: z.string().describe('Generated filename'),
-      formatName: z.string().describe('Format name used'),
-      width: z.number().describe('Width of generated image in pixels'),
-      height: z.number().describe('Height of generated image in pixels'),
-      templateId: z.string().describe('Template UUID used for generation'),
-      templateName: z.string().describe('Template name used for generation')
-    })
-  )
+  .output(bannerOutputSchema)
   .handleInvocation(async ctx => {
     let client = new AbyssaleClient({ token: ctx.auth.token });
 
     let result = await client.generateSingleImage(ctx.input.designId, {
       templateFormatName: ctx.input.templateFormatName,
       elements: ctx.input.elements,
-      imageFileType: ctx.input.imageFileType
+      imageFileType: ctx.input.imageFileType,
+      fileCompressionLevel: ctx.input.fileCompressionLevel,
+      originalVisualId: ctx.input.originalVisualId
+    });
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.file.url,
+      filename: result.file.filename
     });
 
     return {
-      output: {
-        bannerId: result.id,
-        fileType: result.file.type,
-        fileUrl: result.file.url,
-        cdnUrl: result.file.cdn_url,
-        filename: result.file.filename,
-        formatName: result.format.id,
-        width: result.format.width,
-        height: result.format.height,
-        templateId: result.template.id,
-        templateName: result.template.name
-      },
-      message: `Generated **${result.file.type.toUpperCase()}** image (${result.format.width}x${result.format.height}) from template **${result.template.name}** in format \`${result.format.id}\`. [CDN URL](${result.file.cdn_url})`
+      output: mapBanner(result),
+      message: `Generated ${result.file.type.toUpperCase()} file with ID \`${result.id}\`.`
     };
   })
   .build();

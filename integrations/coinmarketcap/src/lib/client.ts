@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 let BASE_URLS = {
   production: 'https://pro-api.coinmarketcap.com',
@@ -102,7 +108,7 @@ export interface CryptocurrencyInfo {
   symbol: string;
   slug: string;
   category: string;
-  description: string;
+  description: string | null;
   dateAdded: string;
   dateLaunched: string | null;
   logo: string;
@@ -139,7 +145,7 @@ export interface MarketPair {
       price: number | null;
       volume24h: number | null;
       lastUpdated: string | null;
-      effectiveLiquidity: number | null;
+      effectiveLiquidity: number | string | null;
     }
   >;
 }
@@ -160,17 +166,17 @@ export interface GlobalMetrics {
   totalExchanges: number;
   ethDominance: number;
   btcDominance: number;
-  ethDominanceYesterday: number;
-  btcDominanceYesterday: number;
-  defiVolume24h: number;
+  ethDominanceYesterday?: number;
+  btcDominanceYesterday?: number;
+  defiVolume24h?: number;
   defiVolume24hReported: number;
-  defiMarketCap: number;
+  defiMarketCap?: number;
   defi24hPercentageChange: number;
-  stablecoinVolume24h: number;
+  stablecoinVolume24h?: number;
   stablecoinVolume24hReported: number;
-  stablecoinMarketCap: number;
+  stablecoinMarketCap?: number;
   stablecoin24hPercentageChange: number;
-  derivativesVolume24h: number;
+  derivativesVolume24h?: number;
   derivativesVolume24hReported: number;
   derivatives24hPercentageChange: number;
   lastUpdated: string;
@@ -218,9 +224,10 @@ export interface ExchangeMapEntry {
   id: number;
   name: string;
   slug: string;
-  isActive: number;
-  firstHistoricalData: string | null;
-  lastHistoricalData: string | null;
+  isActive?: number;
+  status?: string;
+  firstHistoricalData?: string | null;
+  lastHistoricalData?: string | null;
 }
 
 export interface ExchangeListing {
@@ -249,7 +256,7 @@ export interface ExchangeInfo {
   id: number;
   name: string;
   slug: string;
-  description: string;
+  description: string | null;
   dateLaunched: string | null;
   logo: string;
   urls: {
@@ -261,58 +268,150 @@ export interface ExchangeInfo {
   };
 }
 
-// Helper to transform camelCase keys to snake_case for API params
-let toSnakeCase = (str: string): string => {
-  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+export interface KeyInfo {
+  plan: {
+    creditLimitMonthly: number;
+    creditLimitMonthlyReset: string;
+    creditLimitMonthlyResetTimestamp: string;
+    rateLimitMinute: number;
+  };
+  usage: {
+    currentMinute: { requestsMade: number; requestsLeft: number };
+    currentDay: { creditsUsed: number; creditsLeft: number };
+    currentMonth: { creditsUsed: number; creditsLeft: number };
+  };
+}
+
+export let coinMarketCapError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'CoinMarketCap',
+    reason: 'coinmarketcap_api_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    detailKeys: ['error_message'],
+    nestedKeys: ['status'],
+    extractUpstreamCode: (_error, response, helpers) => {
+      let body = response?.data;
+      let status =
+        helpers.isRecord(body) && helpers.isRecord(body.status) ? body.status : undefined;
+      let code = status?.error_code;
+      return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
+    }
+  });
+
+// CMC uses numeric word boundaries too: volume24hMin is volume_24h_min.
+let toSnakeCase = (key: string) =>
+  key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`).replace(/([a-z])(\d)/g, '$1_$2');
+
+let toSnakeCaseParams = (params: Record<string, unknown>) =>
+  Object.fromEntries(
+    Object.entries(pickDefined(params)).map(([key, value]) => [toSnakeCase(key), value])
+  );
+
+let transformKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(transformKeys);
+  if (!isApiErrorRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key.replace(/_([a-z0-9])/g, (_, letter: string) => letter.toUpperCase()),
+      transformKeys(item)
+    ])
+  );
 };
 
-let toSnakeCaseParams = (params: Record<string, any>): Record<string, any> => {
-  let result: Record<string, any> = {};
-  for (let [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) {
-      result[toSnakeCase(key)] = value;
+let requireIdentifier = (params: Record<string, unknown>, keys: string[], single = false) => {
+  for (let key of keys) {
+    if (
+      params[key] !== undefined &&
+      (typeof params[key] !== 'string' || !(params[key] as string).trim())
+    ) {
+      throw createApiServiceError(
+        `${key} must be a non-empty currency or exchange identifier.`
+      );
     }
   }
-  return result;
-};
-
-// Helper to transform snake_case response keys to camelCase
-let toCamelCase = (str: string): string => {
-  return str.replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase());
-};
-
-let transformKeys = (obj: any): any => {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(transformKeys);
-  if (typeof obj === 'object') {
-    let result: Record<string, any> = {};
-    for (let [key, value] of Object.entries(obj)) {
-      result[toCamelCase(key)] = transformKeys(value);
-    }
-    return result;
+  let supplied = keys.filter(
+    key => typeof params[key] === 'string' && (params[key] as string).trim()
+  );
+  if (supplied.length !== 1) {
+    throw createApiServiceError(
+      `Provide exactly one of ${keys.join(', ')} to identify the requested currency or exchange.`
+    );
   }
-  return obj;
+  let value = params[supplied[0]!] as string;
+  if (single && value.includes(',')) {
+    throw createApiServiceError('Provide one currency or exchange per request.');
+  }
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  rawResponse: unknown;
 
   constructor(clientConfig: ClientConfig) {
-    let baseURL = BASE_URLS[clientConfig.environment] || BASE_URLS.production;
-    this.axios = createAxios({
-      baseURL,
-      headers: {
-        'X-CMC_PRO_API_KEY': clientConfig.token,
-        Accept: 'application/json'
-      }
+    if (!clientConfig.token.trim() || /[\r\n]/.test(clientConfig.token)) {
+      throw createApiServiceError('Provide a valid CoinMarketCap API key.');
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: BASE_URLS[clientConfig.environment] || BASE_URLS.production,
+      authHeader: { name: 'X-CMC_PRO_API_KEY', value: clientConfig.token.trim() },
+      headers: { Accept: 'application/json' },
+      timeout: 30_000,
+      errorAdapter: coinMarketCapError
     });
   }
 
-  private async get<T>(path: string, params?: Record<string, any>): Promise<T> {
-    let cleanParams = params ? toSnakeCaseParams(params) : undefined;
-    let response = await this.axios.get(path, { params: cleanParams });
-    let transformed = transformKeys(response.data);
-    return transformed.data;
+  private async get<T>(
+    path: string,
+    params: Record<string, unknown> = {},
+    shape: 'array' | 'object' | 'either' = 'object'
+  ): Promise<T> {
+    for (let key of ['start', 'limit']) {
+      let value = params[key];
+      if (
+        value !== undefined &&
+        (typeof value !== 'number' ||
+          !Number.isSafeInteger(value) ||
+          value < 1 ||
+          (key === 'limit' && value > 5000))
+      ) {
+        throw createApiServiceError(
+          `${key} must be a positive whole number${key === 'limit' ? ' no greater than 5000' : ''}.`
+        );
+      }
+    }
+    if (params.convert !== undefined && params.convertId !== undefined) {
+      throw createApiServiceError('Use either convert or convertId, not both.');
+    }
+    if (params.matchedId !== undefined && params.matchedSymbol !== undefined) {
+      throw createApiServiceError('Use either matchedId or matchedSymbol, not both.');
+    }
+    let response = await this.axios.get<unknown>(path, { params: toSnakeCaseParams(params) });
+    let body = response.data;
+    if (!isApiErrorRecord(body)) {
+      throw createApiServiceError('CoinMarketCap returned an unexpected response object.');
+    }
+    let status = isApiErrorRecord(body.status) ? body.status : undefined;
+    let errorCode = status?.error_code;
+    if (
+      errorCode !== undefined &&
+      errorCode !== null &&
+      errorCode !== 0 &&
+      errorCode !== '0'
+    ) {
+      throw coinMarketCapError({ response: { status: response.status, data: body } });
+    }
+    if (body.data === undefined || body.data === null) {
+      throw createApiServiceError('CoinMarketCap did not return data for this request.');
+    }
+    if (
+      (shape === 'array' && !Array.isArray(body.data)) ||
+      (shape === 'object' && !isApiErrorRecord(body.data)) ||
+      (shape === 'either' && !Array.isArray(body.data) && !isApiErrorRecord(body.data))
+    ) {
+      throw createApiServiceError('CoinMarketCap returned an unexpected result shape.');
+    }
+    this.rawResponse = body;
+    return transformKeys(body.data) as T;
   }
 
   // Cryptocurrency Map
@@ -323,7 +422,14 @@ export class Client {
     sort?: string;
     symbol?: string;
   }): Promise<CryptocurrencyMapEntry[]> {
-    return this.get<CryptocurrencyMapEntry[]>('/v1/cryptocurrency/map', params);
+    return this.get<CryptocurrencyMapEntry[]>(
+      '/v1/cryptocurrency/map',
+      {
+        ...params,
+        aux: 'platform,first_historical_data,last_historical_data,is_active'
+      },
+      'array'
+    );
   }
 
   // Cryptocurrency Info / Metadata
@@ -331,8 +437,15 @@ export class Client {
     id?: string;
     slug?: string;
     symbol?: string;
-  }): Promise<Record<string, CryptocurrencyInfo>> {
-    return this.get<Record<string, CryptocurrencyInfo>>('/v2/cryptocurrency/info', params);
+  }): Promise<Record<string, CryptocurrencyInfo | CryptocurrencyInfo[]>> {
+    requireIdentifier(params, ['id', 'slug', 'symbol']);
+    return this.get<Record<string, CryptocurrencyInfo | CryptocurrencyInfo[]>>(
+      '/v2/cryptocurrency/info',
+      {
+        ...params,
+        aux: 'urls,logo,description,tags,platform,date_added'
+      }
+    );
   }
 
   // Cryptocurrency Listings Latest
@@ -357,7 +470,14 @@ export class Client {
     tag?: string;
     aux?: string;
   }): Promise<CryptocurrencyListing[]> {
-    return this.get<CryptocurrencyListing[]>('/v1/cryptocurrency/listings/latest', params);
+    return this.get<CryptocurrencyListing[]>(
+      '/v1/cryptocurrency/listings/latest',
+      {
+        ...params,
+        aux: 'num_market_pairs,cmc_rank,date_added,tags,platform,max_supply,circulating_supply,total_supply'
+      },
+      'array'
+    );
   }
 
   // Cryptocurrency Quotes Latest
@@ -369,9 +489,13 @@ export class Client {
     convertId?: string;
     aux?: string;
   }): Promise<Record<string, CryptocurrencyQuote | CryptocurrencyQuote[]>> {
+    requireIdentifier(params, ['id', 'slug', 'symbol']);
     return this.get<Record<string, CryptocurrencyQuote | CryptocurrencyQuote[]>>(
       '/v2/cryptocurrency/quotes/latest',
-      params
+      {
+        ...params,
+        aux: 'num_market_pairs,cmc_rank,date_added,tags,platform,max_supply,circulating_supply,total_supply,is_active'
+      }
     );
   }
 
@@ -391,7 +515,11 @@ export class Client {
     convert?: string;
     convertId?: string;
   }): Promise<MarketPairsResponse> {
-    return this.get<MarketPairsResponse>('/v2/cryptocurrency/market-pairs/latest', params);
+    requireIdentifier(params, ['id', 'slug', 'symbol'], true);
+    return this.get<MarketPairsResponse>('/v2/cryptocurrency/market-pairs/latest', {
+      ...params,
+      aux: 'num_market_pairs,category,fee_type,market_url,effective_liquidity'
+    });
   }
 
   // Cryptocurrency OHLCV Latest
@@ -401,7 +529,7 @@ export class Client {
     convert?: string;
     convertId?: string;
     skipInvalid?: boolean;
-  }): Promise<any> {
+  }): Promise<unknown> {
     return this.get('/v2/cryptocurrency/ohlcv/latest', params);
   }
 
@@ -422,7 +550,23 @@ export class Client {
     convert?: string;
     convertId?: string;
   }): Promise<PriceConversion> {
-    return this.get<PriceConversion>('/v2/tools/price-conversion', params);
+    requireIdentifier(params, ['id', 'symbol'], true);
+    if (!Number.isFinite(params.amount) || params.amount < 1e-8 || params.amount > 1e12) {
+      throw createApiServiceError('amount must be between 0.00000001 and 1000000000000.');
+    }
+    return this.get<PriceConversion | PriceConversion[]>(
+      '/v2/tools/price-conversion',
+      params,
+      'either'
+    ).then(data => {
+      if (!Array.isArray(data)) return data;
+      if (data.length !== 1) {
+        throw createApiServiceError(
+          'The currency symbol is ambiguous or unavailable. Use a CoinMarketCap currency ID from search_cryptocurrencies or list_fiat_currencies.'
+        );
+      }
+      return data[0]!;
+    });
   }
 
   // Fiat Map
@@ -432,7 +576,7 @@ export class Client {
     sort?: string;
     includeMetals?: boolean;
   }): Promise<FiatMapEntry[]> {
-    return this.get<FiatMapEntry[]>('/v1/fiat/map', params);
+    return this.get<FiatMapEntry[]>('/v1/fiat/map', params, 'array');
   }
 
   // Exchange Map
@@ -444,7 +588,14 @@ export class Client {
     sort?: string;
     cryptoId?: string;
   }): Promise<ExchangeMapEntry[]> {
-    return this.get<ExchangeMapEntry[]>('/v1/exchange/map', params);
+    return this.get<ExchangeMapEntry[]>(
+      '/v1/exchange/map',
+      {
+        ...params,
+        aux: 'first_historical_data,last_historical_data,is_active,status'
+      },
+      'array'
+    );
   }
 
   // Exchange Listings Latest
@@ -458,7 +609,19 @@ export class Client {
     convertId?: string;
     aux?: string;
   }): Promise<ExchangeListing[]> {
-    return this.get<ExchangeListing[]>('/v1/exchange/listings/latest', params);
+    if (params?.sort === 'volume_7d' || params?.sort === 'volume_30d') {
+      throw createApiServiceError(
+        'CoinMarketCap currently supports exchange sorting by volume_24h, volume_24h_adjusted, or exchange_score.'
+      );
+    }
+    return this.get<ExchangeListing[]>(
+      '/v1/exchange/listings/latest',
+      {
+        ...params,
+        aux: 'num_market_pairs,effective_liquidity_24h'
+      },
+      'array'
+    );
   }
 
   // Exchange Info
@@ -466,7 +629,8 @@ export class Client {
     id?: string;
     slug?: string;
   }): Promise<Record<string, ExchangeInfo>> {
-    return this.get<Record<string, ExchangeInfo>>('/v2/exchange/info', params);
+    requireIdentifier(params, ['id', 'slug']);
+    return this.get<Record<string, ExchangeInfo>>('/v1/exchange/info', params);
   }
 
   // Exchange Market Pairs Latest
@@ -481,12 +645,12 @@ export class Client {
     matchedId?: string;
     matchedSymbol?: string;
     category?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     return this.get('/v1/exchange/market-pairs/latest', params);
   }
 
   // Key Info (API usage)
-  async getKeyInfo(): Promise<any> {
-    return this.get('/v1/key/info');
+  async getKeyInfo(): Promise<KeyInfo> {
+    return this.get<KeyInfo>('/v1/key/info');
   }
 }

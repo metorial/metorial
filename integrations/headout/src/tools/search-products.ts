@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireHeadoutId, requireHeadoutText } from '../lib/response';
 import { spec } from '../spec';
 
 let productListingSchema = z
@@ -68,7 +69,7 @@ Returns a paginated list of product listings with names, pricing, ratings, and U
       languageCode: z
         .string()
         .optional()
-        .describe('Override default language (EN, ES, FR, IT, DE, PT, NL)'),
+        .describe('Override default language (EN, ES, FR, IT, DE, PT, NL, PL)'),
       currencyCode: z
         .string()
         .optional()
@@ -81,6 +82,7 @@ Returns a paginated list of product listings with names, pricing, ratings, and U
     z.object({
       products: z.array(productListingSchema).describe('List of matching products'),
       total: z.number().optional().describe('Total number of matching products'),
+      raw: z.unknown().optional().describe('Complete provider response'),
       nextOffset: z.number().optional().describe('Offset for the next page of results')
     })
   )
@@ -105,35 +107,63 @@ Returns a paginated list of product listings with names, pricing, ratings, and U
     });
 
     let products = (result.items ?? result.products ?? []).map((p: any) => ({
-      productId: String(p.id ?? p.productId ?? ''),
-      name: p.name ?? '',
-      url: p.url,
+      ...p,
+      productId: requireHeadoutId(p?.id ?? p?.productId, 'product ID'),
+      name: requireHeadoutText(p.name, 'product name'),
+      url: p.url ?? p.canonicalUrl ?? undefined,
       cityCode: p.city?.code ?? p.cityCode,
-      imageUrl: p.image?.url ?? p.imageUrl,
-      neighbourhood: p.neighbourhood,
-      category: p.category
-        ? {
-            categoryId: String(p.category.id ?? ''),
-            name: p.category.name,
-            cityCode: p.category.cityCode
-          }
-        : undefined,
-      ratingCumulative: p.ratingCumulative ?? p.rating,
-      pricing: p.pricing
-        ? {
-            type: p.pricing.type,
-            currencyCode: p.pricing.currencyCode,
-            minimumPrice: p.pricing.minimumPrice,
-            bestDiscount: p.pricing.bestDiscount
-          }
-        : undefined
+      imageUrl:
+        (typeof p.image === 'string' ? p.image : p.image?.url) ??
+        p.imageUrl ??
+        p.images?.[0]?.url ??
+        p.media?.[0]?.url ??
+        undefined,
+      neighbourhood: p.neighbourhood ?? undefined,
+      category:
+        (p.category ?? p.primaryCategory)
+          ? {
+              categoryId:
+                (p.category ?? p.primaryCategory).id != null
+                  ? requireHeadoutId((p.category ?? p.primaryCategory).id, 'category ID')
+                  : undefined,
+              name: (p.category ?? p.primaryCategory).name ?? undefined,
+              cityCode:
+                (p.category ?? p.primaryCategory).cityCode ?? p.city?.code ?? p.cityCode
+            }
+          : undefined,
+      ratingCumulative:
+        p.ratingCumulative ??
+        p.rating ??
+        (p.reviewsSummary
+          ? {
+              avg: p.reviewsSummary.averageRating ?? undefined,
+              count: p.reviewsSummary.ratingsCount ?? undefined
+            }
+          : undefined),
+      pricing:
+        (p.listingPrice ?? p.pricing)
+          ? {
+              type: (p.listingPrice ?? p.pricing).type ?? p.pricing?.profileType,
+              currencyCode: (p.listingPrice ?? p.pricing).currencyCode ?? p.pricing?.currency,
+              minimumPrice:
+                (p.listingPrice ?? p.pricing).minimumPrice ??
+                (p.pricing?.headoutSellingPrice != null
+                  ? {
+                      originalPrice: p.pricing.headoutSellingPrice,
+                      finalPrice: p.pricing.headoutSellingPrice
+                    }
+                  : undefined),
+              bestDiscount: (p.listingPrice ?? p.pricing).bestDiscount ?? undefined
+            }
+          : undefined
     }));
 
     return {
       output: {
         products,
+        raw: result,
         total: result.total,
-        nextOffset: result.nextOffset
+        nextOffset: result.nextOffset ?? undefined
       },
       message: `Found ${result.total ?? products.length} products in **${ctx.input.cityCode}**. Showing ${products.length} results${ctx.input.offset ? ` starting from offset ${ctx.input.offset}` : ''}.`
     };

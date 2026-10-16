@@ -1,6 +1,14 @@
 # <img src="logo.svg" height="20"> Timelink
 
-Track and manage time entries for individuals and teams. Create, update, search, and delete time entries with start/end times, descriptions, and billable status. Manage clients, projects, and services (activity types) associated with time tracking. Retrieve user information. Filter time entries by date range, client, project, or service.
+Track time for clients, projects, services, and users. Discover current Timelink
+string IDs with `list_records`, retrieve original provider records with
+`get_record`, and create, update, or delete records with the `manage_*_record`
+tools. Inspect running entries, company-specific required fields, the connected
+company, and API token metadata. Legacy numeric-ID tools remain available and
+are deprecated in favor of the current tools.
+
+Create an API token under **My Account > API Tokens**. See the
+[tool specification](docs/SPEC.md) and [official API documentation](https://api.timelink.io/documentation).
 
 ## License
 

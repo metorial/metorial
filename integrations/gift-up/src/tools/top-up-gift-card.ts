@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateBalanceInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let topUpGiftCard = SlateTool.create(spec, {
@@ -32,6 +33,7 @@ export let topUpGiftCard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateBalanceInput(ctx.input);
     let client = new Client({
       token: ctx.auth.token,
       testMode: ctx.config.testMode

@@ -18,7 +18,7 @@ let imageSchema = z.object({
 });
 
 let generationOutputSchema = z.object({
-  generationId: z.string().describe('Generation ID'),
+  generationId: z.string().optional().describe('Generation ID'),
   name: z.string().describe('Generation name'),
   prompt: z.string().describe('The prompt used'),
   status: z
@@ -27,7 +27,10 @@ let generationOutputSchema = z.object({
   statusLabel: z.string().describe('Human-readable status label'),
   params: z.array(generationParamSchema).describe('Generation parameters'),
   processMode: z.string().optional().describe('Processing mode (fast or relax)'),
-  images: z.array(imageSchema).describe('Generated images (available when status is done)'),
+  images: z
+    .array(imageSchema)
+    .optional()
+    .describe('Generated images (available when status is done)'),
   nbImages: z.number().optional().describe('Number of images'),
   tags: z.array(z.string()).optional().describe('Tags'),
   metaData: z.record(z.string(), z.unknown()).optional().describe('Custom metadata'),
@@ -138,7 +141,8 @@ export let generateImage = SlateTool.create(spec, {
 
     let params: { name: string; value: string }[] = [];
 
-    if (ctx.input.photoType) params.push({ name: 'sujetMode', value: ctx.input.photoType });
+    if (ctx.input.photoType)
+      params.push({ name: 'templatePrompt', value: ctx.input.photoType });
     if (ctx.input.aspectRatio) params.push({ name: 'format', value: ctx.input.aspectRatio });
     if (ctx.input.weather) params.push({ name: 'weather', value: ctx.input.weather });
     if (ctx.input.timeOfDay) params.push({ name: 'time', value: ctx.input.timeOfDay });
@@ -166,7 +170,7 @@ export let generateImage = SlateTool.create(spec, {
 
     return {
       output: generation,
-      message: `Image generation **"${generation.name}"** created (ID: \`${generation.generationId}\`). Status: **${generation.statusLabel}**. The generation will produce 4 images asynchronously.`
+      message: `Image generation **"${generation.name}"** created${generation.generationId ? ` (ID: \`${generation.generationId}\`)` : ''}. Status: **${generation.statusLabel}**. The generation will produce 4 images asynchronously.`
     };
   })
   .build();

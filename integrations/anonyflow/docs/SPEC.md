@@ -1,77 +1,63 @@
-Now I have enough information to compose the specification. Let me consolidate what I've found:
+# AnonyFlow cloud API integration
 
-- AnonyFlow is an encryption-based data anonymization/deanonymization service for PII protection
-- It uses API keys for authentication (via `x-api-key` header)
-- Base URL: `https://api.anonyflow.com`
-- Two main API actions: Protect (encrypt via `/anony-packet` and `/anony-value`) and Unprotect (decrypt via `/deanony-packet`)
-- Parameters include `data` (the data to protect/unprotect) and `keys` (specifying which fields to process)
-- Also has a document redaction product (AnonyFlow-Redact) for PDF redaction
-- Supports GDPR, CCPA, HIPAA compliance
-- Private key management is handled by AnonyFlow
-- Data can be shared with colleagues/third parties
-- No evidence of webhooks or event support
+Official sources checked on 2026-10-15:
 
-# Slates Specification for Anonyflow
+- [Published API reference](https://documenter.getpostman.com/view/12641271/TVCjvkLG)
+- [Current product website](https://anonyflow.com/)
 
-## Overview
+## Authentication and requests
 
-AnonyFlow is a cloud-based data privacy service that provides encryption-based anonymization and deanonymization of sensitive data (PII). It is a service for encryption-based data anonymization/deanonymization and community sharing, enabling GDPR, CCPA, and HIPAA data privacy protection compliance. Instead of requiring users to manage encryption keys themselves, AnonyFlow handles private key management on their behalf.
+Requests target `https://api.anonyflow.com` and send the configured API key in
+`x-api-key`. JSON requests use `Content-Type: application/json`. Authentication
+has no OAuth scopes, refresh flow, tenant identifier, or global configuration.
+Blank API keys fail with a service error. Requests time out after 30 seconds.
 
-## Authentication
+## Tool coverage
 
-AnonyFlow uses API keys for authentication.
+| Tool | Method and path | Request |
+| --- | --- | --- |
+| `protect_value` | `POST /anony-value` | `{ data: sensitiveValue }` |
+| `unprotect_value` | `POST /deanony-value` | `{ data: encryptedValue }` |
+| `protect_data` | `POST /anony-packet` | `{ data: fields, keys }` |
+| `unprotect_data` | `POST /deanony-packet` | `{ data: protectedFields, keys }` |
+| `check_connection` | `GET /test` | No body |
 
-To authenticate, include your API key in the `x-api-key` header on every request:
+The API also accepts string arrays at both value endpoints. The current value
+tools intentionally retain scalar string inputs; array input is not exposed.
+No identity endpoint, pagination, webhook, or file download contract is
+documented in this reference.
 
-- **Header**: `x-api-key`
-- **Base URL**: `https://api.anonyflow.com`
+## Responses and chaining
 
-API keys can be obtained from your AnonyFlow account. No OAuth flows, scopes, or additional credentials are required.
+Transformation responses contain `status: true` and a `value` containing the
+processed data. The connection check returns `status: true` without a required
+`value`. A false status fails with a service error, as do malformed success
+responses. HTTP failures retain the provider response body and status in the
+shared error mapping.
 
-Example:
+For compatibility, the original `protect_value.encryptedValue`,
+`protect_data.protectedFields`, and `unprotect_data.fields` outputs remain full
+provider response objects. New direct outputs are `protect_value.value` and
+both packet tools' `values`. Pass `protect_value.value` to
+`unprotect_value.encryptedValue`, or `protect_data.values` to
+`unprotect_data.protectedFields`. New tools also return the full response under
+`response`.
 
-```
-POST https://api.anonyflow.com/anony-value
-Headers:
-  x-api-key: YOUR_API_KEY
-  accept: application/json
-```
+For packets, a non-empty `keys` array selects named fields. An empty array
+processes every field. The provider documents the literal string `Error` for a
+field whose decryption fails. Preserve that value and inspect packet results;
+an accepted response does not establish that every field was decrypted. The
+same plaintext string could be legitimate data, so no failure classification
+is inferred from that string alone.
 
-## Features
+## Product boundary and verification limits
 
-### Data Protection (Encryption/Anonymization)
+The published reference contains cloud encryption APIs, with examples dated
+2020. The current website promotes local document redaction products. Public
+documentation alone does not establish continued cloud endpoint availability,
+current account enrollment, or API key issuance. No replacement cloud endpoint
+was found, and the documented existing base URL remains unchanged.
 
-Encrypt and anonymize sensitive data fields using AnonyFlow's encryption service. Encrypts sensitive data using AnonyFlow encryption service with a unique private key managed by AnonyFlow.
-
-- **Parameters**:
-  - `data`: The data object containing the values to be protected.
-  - `keys`: Specifies which fields within the data should be anonymized. AnonyFlow uses encryption-based anonymization to protect part of the data while the rest is left untouched — you decide which data you want to protect.
-- Supports both single-value anonymization (`/anony-value`) and packet/batch anonymization (`/anony-packet`).
-
-### Data Unprotection (Decryption/Deanonymization)
-
-Decrypt previously protected data back to its original form. Decrypts protected data using AnonyFlow decryption service with a unique private key, managed by AnonyFlow.
-
-- **Parameters**:
-  - `data`: The anonymized data object to be decrypted.
-  - `keys`: Specifies which fields to deanonymize.
-- Through the API, information can be deanonymized whenever you need access.
-
-### Data Sharing
-
-Data can also be shared safely and securely with colleagues or third parties. Protected data can be transmitted or stored while remaining encrypted, and only authorized parties can deanonymize it.
-
-### Personal Data Deletion
-
-The API can handle personal data extraction, anonymization, and deletion requests programmatically. This supports "Right to be Forgotten" compliance workflows where user data must be permanently removed upon request.
-
-### Document Redaction (AnonyFlow-Redact)
-
-AnonyFlow-Redact is a web-based document redaction solution that processes all documents locally in your browser for maximum security and privacy. Users can select PII types to detect, including names, addresses, SSNs, and more. It leverages advanced AI and NLP technologies to identify and secure Personally Identifiable Information (PII) within documents.
-
-- Supports PDF format.
-- An API is available for integration with existing systems, though detailed API documentation for this product is still forthcoming.
-
-## Events
-
-The provider does not support events. There is no evidence of webhooks, event subscriptions, or purpose-built polling mechanisms in the AnonyFlow API.
+This integration does not implement the separate document redaction products,
+data deletion, sharing administration, or encryption key management. No live
+provider requests, E2E suites, or tool-use evals were run for this refresh.

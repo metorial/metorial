@@ -1,6 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  polygonTickerList
+} from '../lib/response';
 import { spec } from '../spec';
 
 let snapshotBarSchema = z
@@ -59,33 +65,38 @@ let mapSnapshotBar = (bar: any) => {
   };
 };
 
-let mapSnapshot = (t: any) => ({
-  ticker: t.ticker,
-  todaysChange: t.todaysChange,
-  todaysChangePercent: t.todaysChangePerc,
-  updatedAt: t.updated,
-  day: mapSnapshotBar(t.day),
-  prevDay: mapSnapshotBar(t.prevDay),
-  min: mapSnapshotBar(t.min),
-  lastTrade: t.lastTrade
-    ? {
-        price: t.lastTrade.p,
-        size: t.lastTrade.s,
-        timestamp: t.lastTrade.t,
-        conditions: t.lastTrade.c,
-        exchange: t.lastTrade.x
-      }
-    : undefined,
-  lastQuote: t.lastQuote
-    ? {
-        bidPrice: t.lastQuote.p ?? t.lastQuote.P,
-        bidSize: t.lastQuote.s ?? t.lastQuote.S,
-        askPrice: t.lastQuote.P ?? t.lastQuote.p,
-        askSize: t.lastQuote.S ?? t.lastQuote.s,
-        timestamp: t.lastQuote.t
-      }
-    : undefined
-});
+let mapSnapshot = (t: any) => {
+  if (typeof t.ticker !== 'string' || !t.ticker) {
+    throw createApiServiceError('Massive returned a stock snapshot without a ticker.');
+  }
+  return {
+    ticker: t.ticker,
+    todaysChange: t.todaysChange,
+    todaysChangePercent: t.todaysChangePerc,
+    updatedAt: t.updated,
+    day: mapSnapshotBar(t.day),
+    prevDay: mapSnapshotBar(t.prevDay),
+    min: mapSnapshotBar(t.min),
+    lastTrade: t.lastTrade
+      ? {
+          price: t.lastTrade.p,
+          size: t.lastTrade.s,
+          timestamp: t.lastTrade.t,
+          conditions: t.lastTrade.c,
+          exchange: t.lastTrade.x
+        }
+      : undefined,
+    lastQuote: t.lastQuote
+      ? {
+          bidPrice: t.lastQuote.p,
+          bidSize: t.lastQuote.s,
+          askPrice: t.lastQuote.P,
+          askSize: t.lastQuote.S,
+          timestamp: t.lastQuote.t
+        }
+      : undefined
+  };
+};
 
 export let getStockSnapshot = SlateTool.create(spec, {
   name: 'Get Stock Snapshot',
@@ -111,33 +122,38 @@ export let getStockSnapshot = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       snapshots: z.array(snapshotOutputSchema).describe('Array of stock snapshots')
     })
   )
   .handleInvocation(async ctx => {
     let client = new PolygonClient(ctx.auth.token);
 
-    let tickerList = ctx.input.tickers.split(',').map(t => t.trim());
+    let tickerList = polygonTickerList(ctx.input.tickers);
     let isSingle = tickerList.length === 1;
 
     let snapshots: any[];
+    let response: any;
     if (isSingle) {
-      let response = await client.getStockSnapshot(tickerList[0] as string);
+      response = await client.getStockSnapshot(tickerList[0] as string);
       snapshots = response.ticker ? [response.ticker] : [];
     } else {
-      let response = await client.getAllStockSnapshots({
-        tickers: ctx.input.tickers,
+      response = await client.getAllStockSnapshots({
+        tickers: tickerList.join(','),
         includeOtc: ctx.input.includeOtc
       });
-      snapshots = response.tickers || [];
+      snapshots = polygonRecords(response.tickers, 'tickers');
     }
 
     let mappedSnapshots = snapshots.map(mapSnapshot);
 
     return {
-      output: {
-        snapshots: mappedSnapshots
-      },
+      output: polygonOutput(
+        {
+          snapshots: mappedSnapshots
+        },
+        response
+      ),
       message: `Retrieved snapshots for **${mappedSnapshots.length}** stock ticker(s): ${tickerList.join(', ')}.`
     };
   })

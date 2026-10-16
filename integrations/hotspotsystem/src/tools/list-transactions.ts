@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type BaseTransaction, Client } from '../lib/client';
 import { spec } from '../spec';
 
 let baseTransactionSchema = z.object({
@@ -90,13 +90,18 @@ Specify a transaction type to query. Can be filtered by location.`,
         .string()
         .optional()
         .describe(
-          'Filter transactions by a specific location ID. Omit to retrieve across all locations.'
+          'Filter transactions by a location ID from list_locations. Omit to retrieve across all locations.'
         ),
       limit: z
         .number()
         .optional()
         .describe('Maximum number of transactions to return per page'),
-      offset: z.number().optional().describe('Zero-based page offset for pagination'),
+      offset: z
+        .number()
+        .optional()
+        .describe(
+          'Zero-based starting item offset; use the provider Link header to continue pagination'
+        ),
       sort: z
         .string()
         .optional()
@@ -105,6 +110,13 @@ Specify a transaction type to query. Can be filtered by location.`,
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete original provider response'),
+      linkHeader: z
+        .string()
+        .optional()
+        .describe(
+          'Provider Link header with self, next, and previous page URLs when available'
+        ),
       totalCount: z.number().describe('Total number of transactions matching the query'),
       transactions: z.array(transactionSchema).describe('List of transaction records')
     })
@@ -114,100 +126,100 @@ Specify a transaction type to query. Can be filtered by location.`,
     let { transactionType, locationId, limit, offset, sort } = ctx.input;
     let queryParams = { locationId, limit, offset, sort };
 
-    let mapBase = (t: any) => ({
-      transactionId: String(t.id ?? ''),
-      operator: t.operator ?? '',
-      locationId: String(t.location_id ?? ''),
-      userName: t.user_name ?? '',
-      actionDateGmt: t.action_date_gmt ?? '',
-      userAgent: t.user_agent ?? '',
-      customer: t.customer ?? '',
-      newsletter: t.newsletter ?? '',
-      companyName: t.company_name ?? '',
-      email: t.email ?? '',
-      address: t.address ?? '',
-      city: t.city ?? '',
-      state: t.state ?? '',
-      zip: t.zip ?? '',
-      countryCode: t.country_code ?? '',
-      phone: t.phone ?? ''
+    let mapBase = (t: BaseTransaction) => ({
+      transactionId: String(t.id),
+      operator: t.operator,
+      locationId: String(t.location_id),
+      userName: t.user_name,
+      actionDateGmt: t.action_date_gmt,
+      userAgent: t.user_agent,
+      customer: t.customer,
+      newsletter: String(t.newsletter),
+      companyName: t.company_name,
+      email: t.email,
+      address: t.address,
+      city: t.city,
+      state: t.state,
+      zip: t.zip,
+      countryCode: t.country_code,
+      phone: t.phone
     });
 
     if (transactionType === 'mac') {
-      let result = await client.getMacTransactions(queryParams);
-      let transactions = (result.items ?? []).map(t => ({
+      let { data: result, raw, linkHeader } = await client.getMacTransactions(queryParams);
+      let transactions = result.items.map(t => ({
         ...mapBase(t),
         transactionType: 'mac' as const,
-        packageId: t.package_id ?? '',
-        question1: t.q1 || undefined,
-        answer1: t.a1 || undefined,
-        question2: t.q2 || undefined,
-        answer2: t.a2 || undefined,
-        question3: t.q3 || undefined,
-        answer3: t.a3 || undefined,
-        question4: t.q4 || undefined,
-        answer4: t.a4 || undefined,
-        question5: t.q5 || undefined,
-        answer5: t.a5 || undefined
+        packageId: t.package_id,
+        question1: t.q1 ?? undefined,
+        answer1: t.a1 ?? undefined,
+        question2: t.q2 ?? undefined,
+        answer2: t.a2 ?? undefined,
+        question3: t.q3 ?? undefined,
+        answer3: t.a3 ?? undefined,
+        question4: t.q4 ?? undefined,
+        answer4: t.a4 ?? undefined,
+        question5: t.q5 ?? undefined,
+        answer5: t.a5 ?? undefined
       }));
 
       return {
-        output: { totalCount: result.metadata.total_count, transactions },
+        output: { totalCount: result.metadata.total_count, transactions, raw, linkHeader },
         message: `Retrieved ${transactions.length} MAC transactions (${result.metadata.total_count} total).`
       };
     }
 
     if (transactionType === 'social') {
-      let result = await client.getSocialTransactions(queryParams);
-      let transactions = (result.items ?? []).map(t => ({
+      let { data: result, raw, linkHeader } = await client.getSocialTransactions(queryParams);
+      let transactions = result.items.map(t => ({
         ...mapBase(t),
         transactionType: 'social' as const,
-        packageId: t.package_id ?? '',
-        socialId: t.social_id ?? '',
-        socialUsername: t.social_username ?? '',
-        socialLink: t.social_link ?? '',
-        socialGender: t.social_gender ?? '',
-        socialAgeRange: t.social_age_range ?? '',
-        socialFollowersCount: t.social_followers_count ?? '',
-        socialNetwork: t.social_network ?? ''
+        packageId: t.package_id,
+        socialId: t.social_id,
+        socialUsername: t.social_username,
+        socialLink: t.social_link,
+        socialGender: t.social_gender,
+        socialAgeRange: t.social_age_range,
+        socialFollowersCount: t.social_followers_count,
+        socialNetwork: t.social_network
       }));
 
       return {
-        output: { totalCount: result.metadata.total_count, transactions },
+        output: { totalCount: result.metadata.total_count, transactions, raw, linkHeader },
         message: `Retrieved ${transactions.length} social transactions (${result.metadata.total_count} total).`
       };
     }
 
     if (transactionType === 'voucher') {
-      let result = await client.getVoucherTransactions(queryParams);
-      let transactions = (result.items ?? []).map(t => ({
+      let { data: result, raw, linkHeader } = await client.getVoucherTransactions(queryParams);
+      let transactions = result.items.map(t => ({
         ...mapBase(t),
         transactionType: 'voucher' as const,
-        amount: t.amount ?? '',
-        currency: t.currency ?? '',
-        language: t.language ?? '',
-        smsCountry: t.smscountry ?? ''
+        amount: String(t.amount),
+        currency: t.currency,
+        language: t.language,
+        smsCountry: t.smscountry
       }));
 
       return {
-        output: { totalCount: result.metadata.total_count, transactions },
+        output: { totalCount: result.metadata.total_count, transactions, raw, linkHeader },
         message: `Retrieved ${transactions.length} voucher transactions (${result.metadata.total_count} total).`
       };
     }
 
     // paid
-    let result = await client.getPaidTransactions(queryParams);
-    let transactions = (result.items ?? []).map(t => ({
+    let { data: result, raw, linkHeader } = await client.getPaidTransactions(queryParams);
+    let transactions = result.items.map(t => ({
       ...mapBase(t),
       transactionType: 'paid' as const,
-      amount: t.amount ?? '',
-      currency: t.currency ?? '',
-      language: t.language ?? '',
-      smsCountry: t.smscountry ?? ''
+      amount: String(t.amount),
+      currency: t.currency,
+      language: t.language,
+      smsCountry: t.smscountry
     }));
 
     return {
-      output: { totalCount: result.metadata.total_count, transactions },
+      output: { totalCount: result.metadata.total_count, transactions, raw, linkHeader },
       message: `Retrieved ${transactions.length} paid transactions (${result.metadata.total_count} total).`
     };
   })

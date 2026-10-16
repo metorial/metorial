@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let exchangeSchema = z.object({
@@ -70,7 +70,7 @@ export let getExchangeInfo = SlateTool.create(spec, {
 
     if (!ctx.input.exchangeCode) {
       let exchanges = await client.getExchangesList();
-      let exchangesList = Array.isArray(exchanges) ? exchanges : [];
+      let exchangesList = eodhdArray(exchanges, 'get-exchange-info');
       return {
         output: { exchanges: exchangesList },
         message: `Retrieved **${exchangesList.length}** supported exchanges.`
@@ -81,7 +81,7 @@ export let getExchangeInfo = SlateTool.create(spec, {
       type: ctx.input.type,
       delisted: ctx.input.includeDelisted ? 1 : undefined
     });
-    let tickersList = Array.isArray(tickers) ? tickers : [];
+    let tickersList = eodhdArray(tickers, 'get-exchange-info');
 
     return {
       output: { tickers: tickersList },

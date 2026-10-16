@@ -1,16 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords, type ProviderResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let getGrades = SlateTool.create(spec, {
   name: 'Get AI Grades',
   key: 'get_grades',
-  description: `Retrieve Token Metrics' AI-powered grades for cryptocurrency assets. Supports multiple grade types:
-- **Trader Grades**: Short-term oriented grades combining technical analysis, quantitative metrics, and on-chain data. Updated hourly.
-- **Investor Grades**: Long-term assessments based on technology, fundamentals, and valuation. Updated daily.
-- **Technology Grades**: Code activity, security, repository, and collaboration scores.
-- **Fundamental Grades**: Community, exchange, VC, tokenomics, and DeFi scores.`,
+  description: `Retrieve trader, investor, technology, or fundamental grade records. For the current TM Grade and its historical values, use get_tm_grades or get_grade_history. Legacy trader and investor routes remain available for existing workflows; provider availability can vary.`,
   constraints: ['Date ranges for trader and investor grades are limited to 29-day windows.'],
   tags: {
     readOnly: true
@@ -42,12 +38,16 @@ export let getGrades = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       grades: z.array(z.record(z.string(), z.any())).describe('Array of grade records')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: ProviderResponse;
 
     let gradeParams = {
       tokenId: ctx.input.tokenId,
@@ -79,10 +79,10 @@ export let getGrades = SlateTool.create(spec, {
       });
     }
 
-    let grades = result?.data ?? [];
+    let grades = getRecords(result);
 
     return {
-      output: { grades },
+      output: { grades, raw: result },
       message: `Retrieved **${grades.length}** ${ctx.input.gradeType} grade record(s).`
     };
   })

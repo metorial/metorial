@@ -1,6 +1,12 @@
-# <img src="logo.png" height="20"> Beaconstac
+# <img src="logo.png" height="20"> Uniqode
 
-Create, manage, and track QR codes, NFC tags, BLE beacons, and geofences for proximity marketing. Build campaigns including URL redirects, landing pages, feedback forms, digital business cards, coupons, and vCard contacts. Download QR codes in multiple formats (PNG, SVG, PDF) with custom branding. Bulk-create QR codes via CSV upload. Manage geofences with geographic triggers. Retrieve scan analytics with time-series performance data, impression details, and CSV report exports. Capture leads and form responses from campaign interactions. Monitor beacon battery levels and hardware status. Organize products by physical places and locations.
+Manage static and dynamic QR codes, digital business cards, campaign landing pages, feedback form responses, and QR scan analytics. Discover organization IDs, update QR destinations and designs, and activate or deactivate QR codes and cards. Existing beacon, NFC tag, geofence, and legacy reporting tools remain available for compatible accounts.
+
+Connect with an API key from the **API** section of the Uniqode dashboard. An optional organization ID can supply a default; use `list_organizations` to discover IDs and select an organization when calling a tool. API access and individual capabilities depend on your Uniqode plan and permissions.
+
+The integration has 24 tools, with separate **QR Code** and **Digital Business Card** categories. It does not currently provide file downloads, bulk CSV generation, media uploads, webhook triggers, or emailed report exports.
+
+See the [API documentation](https://apidocs.uniqode.com/) and [supported workflows](docs/SPEC.md).
 
 ## License
 

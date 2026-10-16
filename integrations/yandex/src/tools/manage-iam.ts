@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as iam from '../lib/iam';
 import { spec } from '../spec';
@@ -34,7 +34,8 @@ export let listServiceAccounts = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await iam.listServiceAccounts(
       ctx.auth,
@@ -88,8 +89,10 @@ export let manageServiceAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'create') {
       let folderId = ctx.input.folderId || ctx.config.folderId;
-      if (!folderId) throw new Error('folderId is required for service account creation');
-      if (!ctx.input.name) throw new Error('name is required for service account creation');
+      if (!folderId)
+        throw createApiServiceError('folderId is required for service account creation');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for service account creation');
 
       let result = await iam.createServiceAccount(ctx.auth, {
         folderId,
@@ -101,20 +104,20 @@ export let manageServiceAccount = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           serviceAccountId: result.metadata?.serviceAccountId,
-          done: result.done || false
+          done: result.done
         },
         message: `Service account **${ctx.input.name}** creation initiated.`
       };
     } else {
       if (!ctx.input.serviceAccountId)
-        throw new Error('serviceAccountId is required for deletion');
+        throw createApiServiceError('serviceAccountId is required for deletion');
 
       let result = await iam.deleteServiceAccount(ctx.auth, ctx.input.serviceAccountId);
 
       return {
         output: {
           operationId: result.id,
-          done: result.done || false
+          done: result.done
         },
         message: `Service account **${ctx.input.serviceAccountId}** deletion initiated.`
       };
@@ -125,7 +128,7 @@ export let manageServiceAccount = SlateTool.create(spec, {
 export let manageApiKeys = SlateTool.create(spec, {
   name: 'Manage API Keys',
   key: 'manage_api_keys',
-  description: `List, create, or delete API keys for a service account. API keys provide simplified, non-expiring authentication for service accounts.`,
+  description: `List, create, or delete API keys for a service account. API keys provide simplified authentication for supported services, subject to their scopes and validity period.`,
   tags: { destructive: true }
 })
   .input(
@@ -137,7 +140,13 @@ export let manageApiKeys = SlateTool.create(spec, {
         .describe('Service account ID (required for list and create)'),
       apiKeyId: z.string().optional().describe('API key ID (required for delete)'),
       description: z.string().optional().describe('Description for the new API key'),
-      scopes: z.array(z.string()).optional().describe('Scopes to restrict the API key to')
+      scopes: z.array(z.string()).optional().describe('Scopes to restrict the API key to'),
+      expiresAt: z
+        .string()
+        .optional()
+        .describe('API key expiration timestamp in RFC 3339 format; used for create'),
+      pageSize: z.number().optional().describe('Maximum API keys per page; used for list'),
+      pageToken: z.string().optional().describe('Continuation token; used for list')
     })
   )
   .output(
@@ -148,12 +157,18 @@ export let manageApiKeys = SlateTool.create(spec, {
             apiKeyId: z.string().describe('API key ID'),
             serviceAccountId: z.string().optional().describe('Service account ID'),
             description: z.string().optional().describe('API key description'),
-            createdAt: z.string().optional().describe('Creation timestamp')
+            createdAt: z.string().optional().describe('Creation timestamp'),
+            scopes: z.array(z.string()).optional().describe('API key scopes'),
+            expiresAt: z.string().optional().describe('API key expiration timestamp')
           })
         )
         .optional()
         .describe('List of API keys'),
       apiKeyId: z.string().optional().describe('Created or deleted API key ID'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Continuation token for listing more API keys'),
       secret: z
         .string()
         .optional()
@@ -163,28 +178,36 @@ export let manageApiKeys = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'list') {
       if (!ctx.input.serviceAccountId)
-        throw new Error('serviceAccountId is required for listing API keys');
+        throw createApiServiceError('serviceAccountId is required for listing API keys');
 
-      let result = await iam.listApiKeys(ctx.auth, ctx.input.serviceAccountId);
+      let result = await iam.listApiKeys(
+        ctx.auth,
+        ctx.input.serviceAccountId,
+        ctx.input.pageSize,
+        ctx.input.pageToken
+      );
       let keys = (result.apiKeys || []).map((k: any) => ({
         apiKeyId: k.id,
         serviceAccountId: k.serviceAccountId,
         description: k.description,
-        createdAt: k.createdAt
+        createdAt: k.createdAt,
+        scopes: k.scopes,
+        expiresAt: k.expiresAt
       }));
 
       return {
-        output: { apiKeys: keys },
+        output: { apiKeys: keys, nextPageToken: result.nextPageToken },
         message: `Found ${keys.length} API key(s) for service account ${ctx.input.serviceAccountId}.`
       };
     } else if (ctx.input.action === 'create') {
       if (!ctx.input.serviceAccountId)
-        throw new Error('serviceAccountId is required for creating API keys');
+        throw createApiServiceError('serviceAccountId is required for creating API keys');
 
       let result = await iam.createApiKey(ctx.auth, {
         serviceAccountId: ctx.input.serviceAccountId,
         description: ctx.input.description,
-        scopes: ctx.input.scopes
+        scopes: ctx.input.scopes,
+        expiresAt: ctx.input.expiresAt
       });
 
       return {
@@ -195,7 +218,8 @@ export let manageApiKeys = SlateTool.create(spec, {
         message: `API key created for service account **${ctx.input.serviceAccountId}**. Save the secret — it won't be shown again.`
       };
     } else {
-      if (!ctx.input.apiKeyId) throw new Error('apiKeyId is required for deletion');
+      if (!ctx.input.apiKeyId)
+        throw createApiServiceError('apiKeyId is required for deletion');
 
       await iam.deleteApiKey(ctx.auth, ctx.input.apiKeyId);
 

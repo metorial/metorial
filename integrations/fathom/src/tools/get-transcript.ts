@@ -1,17 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTranscriptEntry, transcriptEntrySchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let transcriptEntrySchema = z.object({
-  speakerName: z.string().describe('Display name of the speaker'),
-  speakerEmail: z
-    .string()
-    .nullable()
-    .describe('Matched calendar invitee email of the speaker'),
-  text: z.string().describe('Spoken text'),
-  timestamp: z.string().describe('Timestamp in HH:MM:SS format')
-});
 
 export let getTranscript = SlateTool.create(spec, {
   name: 'Get Transcript',
@@ -34,16 +25,11 @@ export let getTranscript = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let data = await client.getTranscript(ctx.input.recordingId);
 
-    let transcript = (data.transcript || []).map(entry => ({
-      speakerName: entry.speaker.display_name,
-      speakerEmail: entry.speaker.matched_calendar_invitee_email,
-      text: entry.text,
-      timestamp: entry.timestamp
-    }));
+    let transcript = data.transcript.map(mapTranscriptEntry);
 
     return {
       output: { transcript },

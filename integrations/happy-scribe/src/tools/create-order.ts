@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationId, rawSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 export let createOrder = SlateTool.create(spec, {
@@ -30,7 +31,9 @@ export let createOrder = SlateTool.create(spec, {
       organizationId: z
         .string()
         .optional()
-        .describe('Organization ID. Falls back to the value in config if not provided.'),
+        .describe(
+          'Organization ID. Call list_organizations to discover IDs. Falls back to the saved setting.'
+        ),
       service: z
         .enum(['auto', 'pro'])
         .optional()
@@ -80,16 +83,14 @@ export let createOrder = SlateTool.create(spec, {
       orderId: z.string().describe('ID of the created order.'),
       state: z.string().describe('Current state of the order.'),
       operations: z.any().optional().describe('Operations associated with the order.'),
-      transcriptions: z.any().optional().describe('Transcriptions associated with the order.')
+      transcriptions: z.any().optional().describe('Transcriptions associated with the order.'),
+      raw: rawSchema
+        .optional()
+        .describe('Complete order response, including pricing and ingestion details.')
     })
   )
   .handleInvocation(async ctx => {
-    let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) {
-      throw new Error(
-        'Organization ID is required. Provide it in the input or configure it globally.'
-      );
-    }
+    let orgId = organizationId(ctx.input.organizationId, ctx.config.organizationId);
 
     let client = new Client({ token: ctx.auth.token });
 
@@ -115,9 +116,10 @@ export let createOrder = SlateTool.create(spec, {
         orderId: result.id,
         state: result.state,
         operations: result.operations,
-        transcriptions: result.transcriptions
+        transcriptions: result.transcriptions,
+        raw: result
       },
-      message: `Created transcription order **${result.id}** in state **${result.state}**${ctx.input.confirm ? ' (confirmed)' : ' (draft - needs confirmation)'}.`
+      message: `Created transcription order **${result.id}** in state **${result.state}**.`
     };
   })
   .build();

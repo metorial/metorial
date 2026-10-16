@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, expectArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let getFormAnswers = SlateTool.create(spec, {
@@ -12,7 +12,7 @@ Use **detailed mode** to get full question metadata including question types, se
   instructions: [
     'Dates should be in YYYY-MM-DD format.',
     'By default returns submissions from the last 7 days. Use start/end to extend the range.',
-    'Maximum 200 results per request. Use limit and offset for pagination.'
+    'Standard mode returns at most 200 results; use limit and offset for pagination. Detailed mode returns at most 600 results and does not support pagination.'
   ],
   tags: {
     readOnly: true
@@ -32,7 +32,7 @@ Use **detailed mode** to get full question metadata including question types, se
       sortByModified: z
         .boolean()
         .optional()
-        .describe('If true, sorts results by modification date'),
+        .describe('If true, filters standard-mode results by modification date'),
       limit: z.number().optional().describe('Max results to return (max 200)'),
       offset: z.number().optional().describe('Offset for pagination')
     })
@@ -46,7 +46,7 @@ Use **detailed mode** to get full question metadata including question types, se
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let results: any;
+    let results: unknown;
 
     if (ctx.input.detailed) {
       results = await client.getAnswersDetailed({
@@ -69,7 +69,7 @@ Use **detailed mode** to get full question metadata including question types, se
       });
     }
 
-    let answersArray = Array.isArray(results) ? results : [];
+    let answersArray = expectArray(results, 'form answers');
 
     return {
       output: {

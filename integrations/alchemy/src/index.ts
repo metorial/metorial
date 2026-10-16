@@ -1,12 +1,16 @@
 import { Slate } from 'slates';
+import { toolCategories } from './categories';
 import { spec } from './spec';
 import {
   callContract,
   getBlockInfo,
   getLogs,
+  getNetworkInfo,
   getNFTOwners,
   getNFTs,
+  getTokenAllowance,
   getTokenBalances,
+  getTokenMetadata,
   getTokenPrices,
   getTransaction,
   getTransfers,
@@ -17,6 +21,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getNetworkInfo,
+    getTokenMetadata,
+    getTokenAllowance,
     getTokenBalances,
     getTransfers,
     getNFTs,
@@ -30,5 +37,6 @@ export let provider = Slate.create({
     sendRawTransaction,
     callContract
   ],
+  toolCategories,
   triggers: []
 });

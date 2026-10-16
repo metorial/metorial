@@ -7,7 +7,7 @@ let exchangeInfoSchema = z.object({
   exchangeId: z.number().describe('CoinMarketCap exchange ID'),
   name: z.string().describe('Exchange name'),
   slug: z.string().describe('URL-friendly slug'),
-  description: z.string().describe('Exchange description'),
+  description: z.string().optional().describe('Exchange description, when available'),
   dateLaunched: z.string().nullable().describe('Date the exchange was launched'),
   logo: z.string().describe('URL of the exchange logo'),
   urls: z
@@ -29,7 +29,7 @@ export let getExchangeInfo = SlateTool.create(spec, {
     'Provide at least one of: exchangeIds or slugs.',
     'Multiple values can be comma-separated.'
   ],
-  constraints: ['Requires Standard plan or above.'],
+  constraints: ['Access depends on the API plan enabled for your key.'],
   tags: {
     readOnly: true
   }
@@ -48,6 +48,7 @@ export let getExchangeInfo = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       exchanges: z.array(exchangeInfoSchema).describe('List of exchange metadata')
     })
   )
@@ -70,7 +71,7 @@ export let getExchangeInfo = SlateTool.create(spec, {
           exchangeId: item.id,
           name: item.name,
           slug: item.slug,
-          description: item.description,
+          description: item.description ?? undefined,
           dateLaunched: item.dateLaunched,
           logo: item.logo,
           urls: item.urls || {
@@ -91,7 +92,7 @@ export let getExchangeInfo = SlateTool.create(spec, {
         : 'No exchange metadata found.';
 
     return {
-      output: { exchanges },
+      output: { exchanges, raw: client.rawResponse },
       message
     };
   })

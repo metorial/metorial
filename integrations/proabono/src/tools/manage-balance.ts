@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,11 @@ let balanceLineSchema = z.object({
   referenceCustomer: z.string().optional().describe('Customer reference'),
   amount: z.number().optional().describe('Amount in cents (positive=debit, negative=credit)'),
   description: z.string().optional().describe('Line description'),
-  dateCreated: z.string().optional().describe('Creation timestamp')
+  dateCreated: z.string().optional().describe('Creation timestamp'),
+  dateMove: z.string().optional().describe('Date of the balance movement'),
+  amountSubtotal: z.number().optional().describe('Amount before taxes in cents'),
+  amountTotal: z.number().optional().describe('Amount including taxes in cents'),
+  currency: z.string().optional().describe('Currency code')
 });
 
 export let manageBalance = SlateTool.create(spec, {
@@ -56,8 +60,9 @@ Balance lines appear on the next invoice when the customer is billed.`,
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.referenceCustomer) throw new Error('referenceCustomer is required');
-      if (ctx.input.amount == null) throw new Error('amount is required');
+      if (!ctx.input.referenceCustomer)
+        throw createApiServiceError('referenceCustomer is required');
+      if (ctx.input.amount == null) throw createApiServiceError('amount is required');
       let result = await client.createBalanceLine({
         ReferenceCustomer: ctx.input.referenceCustomer,
         Amount: ctx.input.amount,
@@ -84,18 +89,22 @@ Balance lines appear on the next invoice when the customer is billed.`,
           totalItems: result?.TotalItems,
           page: result?.Page
         },
-        message: `Found **${balanceLines.length}** balance lines (total: ${result?.TotalItems || 0})`
+        message: `Found **${balanceLines.length}** balance lines on this page`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
 
 let mapBalanceLine = (raw: any) => ({
   balanceLineId: raw?.Id,
   referenceCustomer: raw?.ReferenceCustomer,
-  amount: raw?.Amount,
-  description: raw?.Description,
-  dateCreated: raw?.DateCreated
+  amount: raw?.Amount ?? raw?.AmountSubtotal,
+  description: raw?.Description ?? raw?.LabelLocalized,
+  dateCreated: raw?.DateCreated,
+  dateMove: raw?.DateMove,
+  amountSubtotal: raw?.AmountSubtotal,
+  amountTotal: raw?.AmountTotal,
+  currency: raw?.Currency
 });

@@ -1,6 +1,8 @@
-# <img src="logo.svg" height="20"> Pexels
+# <img src="logo.png" height="20"> Pexels
 
-Search and retrieve free, royalty-free stock photos and videos from the Pexels library. Search photos and videos by keyword with filters for orientation, size, color, and locale across 28 languages. Browse curated and trending photos, popular videos, and featured collections. Retrieve specific photos or videos by ID with full metadata including dimensions, photographer/videographer info, and multiple resolution variants. List and browse collections of curated media content.
+Search and retrieve stock photos and videos from the Pexels library. Browse curated photos, popular videos, and featured or personal collections. Retrieve media metadata and download a selected image size or video file. Provide a Pexels API key; no additional configuration is required.
+
+Photo text/color metadata and video-file dimensions are optional when Pexels returns null. Original values remain available in `raw`. Follow the [Pexels usage guidelines](https://www.pexels.com/api/documentation/#guidelines) and credit Pexels and the creator when displaying media.
 
 ## License
 

@@ -1,15 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getFileUrl = SlateTool.create(spec, {
   name: 'Get File Download URL',
   key: 'get_file_url',
-  description: `Generate a download URL for a file or image uploaded to a Ragic record. The file reference can be found in the record's field value for file/image fields (format: "token@filename").`,
+  description: `Prepare a downloadable file or image from a Ragic record and return its provider URL. The file reference can be found in the record's field value for file/image fields (format: "token@filename").`,
   instructions: [
     'File references are in the format `token@filename.ext` (e.g., "Ni92W2luv@My_Picture.jpg").',
-    'First retrieve the record to get the file reference value from the file/image field, then use this tool to generate the download URL.'
+    'First retrieve the record to get the file reference value from the file/image field.',
+    'When authenticated file downloads are enabled in Ragic, provide tabFolder, sheetIndex, and recordId together.'
   ],
   tags: {
     destructive: false,
@@ -18,6 +19,14 @@ export let getFileUrl = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      tabFolder: z
+        .string()
+        .optional()
+        .describe(
+          'Folder path of the owning record; provide with sheetIndex and recordId for authenticated file downloads'
+        ),
+      sheetIndex: z.number().optional().describe('Sheet index of the owning record'),
+      recordId: z.number().optional().describe('ID of the owning record'),
       fileReference: z
         .string()
         .describe(
@@ -32,23 +41,33 @@ export let getFileUrl = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      serverDomain: ctx.config.serverDomain,
-      accountName: ctx.config.accountName
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
-    let downloadUrl = client.getFileDownloadUrl(ctx.input.fileReference);
+    let { tabFolder, sheetIndex, recordId } = ctx.input;
+    let hasRecord =
+      tabFolder !== undefined || sheetIndex !== undefined || recordId !== undefined;
+    if (
+      hasRecord &&
+      (tabFolder === undefined || sheetIndex === undefined || recordId === undefined)
+    )
+      throw createApiServiceError('Provide tabFolder, sheetIndex, and recordId together.');
+    let record =
+      tabFolder !== undefined && sheetIndex !== undefined && recordId !== undefined
+        ? { tabFolder, sheetIndex, recordId }
+        : undefined;
+    let downloadUrl = client.getFileDownloadUrl(ctx.input.fileReference, record);
     let fileName = ctx.input.fileReference.includes('@')
       ? ctx.input.fileReference.split('@').slice(1).join('@')
       : ctx.input.fileReference;
+
+    await ctx.addAttachment({ type: 'url', url: downloadUrl, ...client.getDownloadAuth() });
 
     return {
       output: {
         downloadUrl,
         fileName
       },
-      message: `Generated download URL for file **${fileName}**: [Download](${downloadUrl})`
+      message: `Prepared **${fileName}** for download.`
     };
   })
   .build();

@@ -1,52 +1,43 @@
-Now let me fetch the authentication reference page and the export details:# Slates Specification for Draftable
+# Draftable API capabilities
 
-## Overview
+Draftable compares two documents and exposes comparison metadata, an interactive viewer, structured change details, and PDF exports. The integration supports cloud, regional, and self-hosted API base URLs.
 
-Draftable is a document comparison service that identifies differences between two documents, detecting changes in text, formatting, and layout. It can compare Word, PowerPoint, RTF, Excel, PDF, and text documents, including cross-format comparisons (e.g., Word to PDF). The Draftable API lets you integrate document comparison technologies into your app.
+## Authentication and configuration
 
-## Authentication
+The API Token connection stores the Account ID and Auth Token from the [credentials page](https://api.draftable.com/account/credentials). API requests use `Authorization: Token {token}`. The Account ID and Auth Token also sign private viewer links. Token authentication has no OAuth scope or refresh-token flow.
 
-Draftable uses **token-based authentication** with two credentials: an **Account ID** and an **Auth Token**.
+The optional `baseUrl` setting defaults to `https://api.draftable.com/v1`; self-hosted deployments may use a base such as `https://draftable.example.com/api/v1`. It should include the deployment's API version path. The official API reference and client expose no current-account/profile endpoint.
 
-- Credentials can be obtained from `https://api.draftable.com/account/credentials`.
-- Requests are authenticated by passing the auth token in the `Authorization` header using the format: `Authorization: Token {access_token}`.
-- The API base URL for the cloud-hosted service is `https://api.draftable.com/v1`.
-- For self-hosted or regional deployments, a custom base URL can be provided (e.g., `https://draftable.example.com/api/v1`).
+## Tools
 
-Both the Account ID and Auth Token are required for all API operations. When creating comparisons, the `public` flag determines visibility: if `false` or unspecified, authentication is required to view the comparison; if `true`, the comparison can be accessed by anyone with knowledge of the URL.
+| Tool | Provider operation | Behavior |
+| --- | --- | --- |
+| `create_comparison` | `POST /comparisons` | Compare two publicly accessible document URLs. |
+| `create_comparison_from_files` | `POST /comparisons` | Upload both files as multipart document bytes supplied in base64 form. |
+| `get_comparison` | `GET /comparisons/{identifier}` | Retrieve metadata and asynchronous processing state. |
+| `list_comparisons` | `GET /comparisons` | Retrieve one page using integer limit/offset. The provider caps pages at 300 comparisons and returns the total count. |
+| `delete_comparison` | `DELETE /comparisons/{identifier}` | Permanently delete a comparison. |
+| `get_viewer_url` | Local generation of the documented viewer URL | Generate a public link or an HMAC-SHA256 signed private link using an integer Unix expiry timestamp. The default duration is 30 minutes. |
+| `get_change_details` | `GET /comparisons/{identifier}/change-details` | Retrieve changes, optional summary, and the complete original JSON object. |
+| `export_comparison` | `POST /exports` | Request an asynchronous PDF export. |
+| `get_export_status` | `GET /exports/{identifier}` | Poll export state and obtain a downloadable PDF when ready. |
 
-For private comparisons, **signed viewer URLs** can be generated client-side using the Account ID and Auth Token. The expiry time defaults to 30 minutes if not specified, but a custom expiry can be set.
+Comparisons are immutable; the official API has no comparison update operation. Optional comparison expiry is a future UTC ISO 8601 timestamp. A private comparison is the default; setting `isPublic` grants access to anyone with its viewer link.
 
-## Features
+The hosted API schema lists PDF, Word, PowerPoint, RTF, text, and Markdown input types. Product documentation additionally advertises Excel. The existing Excel, CSV, and ODT input values are retained for deployment compatibility; support must be confirmed with the target deployment.
 
-### Document Comparison
+PDF export kinds are `single_page` (right document with change highlights and deletion markers), `combined` (both documents), `left` (left document), and `right` (right document). `includeCoverPage` applies to `combined`; the API schema documents a default of true, while the Python client's default is false. The integration sends the option only when explicitly provided and otherwise preserves the API default.
 
-Create comparisons between two documents (referred to as "left" and "right" sides). Documents can be provided via a publicly accessible URL or uploaded directly as a file. You can compare different file types against each other, such as Word docs to PDFs, PowerPoints to Excel files, or any other combination. The comparison analyses text, formatting, and layout to detect changes like insertions, deletions, and formatting adjustments.
+The comparison and export APIs omit some state-specific fields. Missing optional values remain absent; explicit null values remain null. Missing required identifiers, sides, status booleans, timestamps, or list totals produce a provider-response error rather than invented values.
 
-- **Parameters**: Each side requires a `file_type` (e.g., `pdf`, `rtf`, `docx`, `pptx`, `xlsx`) and optionally a `display_name`. Comparisons can include a custom `identifier`, a `public` visibility flag, and an optional `expires` timestamp.
-- If an expiry is specified, the provided time must be UTC and in the future. If unspecified, the comparison will never expire but may be explicitly deleted.
+Ready exports produce a downloadable PDF and retain the existing download URL metadata. Signed export URLs are resolved again on subsequent downloads because the provider documents no fixed URL lifetime.
 
-### Comparison Viewer
+No webhook registration or event subscription endpoint is documented in the API reference or official client; comparison and export completion use polling.
 
-Access an interactive viewer for any comparison, supporting side-by-side and single-page (redline) views. The viewer shows changes to text styles like font, font size, bold, and italics. The viewer can be embedded in an application via an iframe using a signed or public viewer URL.
+## Official references
 
-- **Parameters**: Signed viewer URLs accept a custom expiry duration and a `wait` flag that causes the viewer to wait if comparison processing has not yet completed.
-
-### Comparison Export
-
-Export comparisons to PDF format for easy sharing. Four export kinds are supported: `left` (left document with deletion highlights), `right` (right document with insertion highlights), `combined` (both documents side by side), and `single_page` (comparison in single-page mode).
-
-- **Parameters**: Export kind and an optional `include_cover_page` flag (only applies to the `combined` export kind).
-- Exports are asynchronous; after requesting an export, you must poll for its completion status to obtain the download URL.
-
-### Change Details
-
-Draftable provides a change-details endpoint that allows users to retrieve comparison results as a structured JSON response. This provides a programmatic summary of all detected changes between the two documents, useful for integrating comparison results into workflows without using the visual viewer.
-
-### Comparison Management
-
-Retrieve all comparisons associated with your account, get a specific comparison by identifier, or delete comparisons. Retrieving all comparisons returns them ordered from newest to oldest.
-
-## Events
-
-The provider does not support events. Draftable's API does not offer webhooks or event subscription mechanisms. Export completion must be determined by polling.
+- [API explorer and schema](https://api.draftable.com/api-explorer)
+- [OpenAPI source](https://api.draftable.com/api-explorer/spec)
+- [Official Python client](https://github.com/draftable/compare-api-python-client)
+- [Viewer reference](https://api.draftable.com/reference/comparison-viewer)
+- [Export reference](https://api.draftable.com/reference/exporting-comparisons)

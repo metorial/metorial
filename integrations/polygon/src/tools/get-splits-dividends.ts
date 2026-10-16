@@ -6,9 +6,13 @@ import { spec } from '../spec';
 export let getSplitsDividends = SlateTool.create(spec, {
   name: 'Get Splits & Dividends',
   key: 'get_splits_dividends',
-  description: `Retrieve stock split and dividend history. Filter by ticker and date range. Useful for tracking corporate actions that affect share prices and calculating adjusted returns.`,
+  description: `DEPRECATED — use \`get_corporate_actions\` instead. Retrieve stock split and dividend history. Filter by ticker and date range. Useful for tracking corporate actions that affect share prices and calculating adjusted returns.`,
+  instructions: [
+    'Use get_corporate_actions for the current provider API. The legacy endpoint is retained only for compatibility.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

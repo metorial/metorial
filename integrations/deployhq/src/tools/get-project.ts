@@ -13,12 +13,16 @@ export let getProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project')
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.')
     })
   )
   .output(
     z.object({
       name: z.string().describe('Project name'),
+      projectIdentifier: z.string().optional().describe('Stable project identifier'),
+      zone: z.string().optional().describe('Deployment zone identifier'),
       permalink: z.string().describe('URL-friendly project identifier'),
       zoneId: z.number().optional().describe('Deployment zone ID'),
       publicKey: z.string().optional().describe('SSH public key for the project'),
@@ -52,19 +56,24 @@ export let getProject = SlateTool.create(spec, {
     return {
       output: {
         name: p.name,
+        projectIdentifier: p.identifier,
+        zone: p.zone,
         permalink: p.permalink,
         zoneId: p.zone_id,
         publicKey: p.public_key,
-        lastDeployedAt: p.last_deployed_at ?? null,
+        lastDeployedAt: p.last_deployed_at,
         autoDeployUrl: p.auto_deploy_url,
-        repository: p.repository
-          ? {
-              scmType: p.repository.scm_type,
-              url: p.repository.url,
-              branch: p.repository.branch,
-              cached: p.repository.cached
-            }
-          : null
+        repository:
+          p.repository === null
+            ? null
+            : p.repository
+              ? {
+                  scmType: p.repository.scm_type,
+                  url: p.repository.url,
+                  branch: p.repository.branch,
+                  cached: p.repository.cached
+                }
+              : undefined
       },
       message: `Retrieved project **${p.name}** (\`${p.permalink}\`).`
     };

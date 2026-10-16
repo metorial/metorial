@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prepareGeneratedFile } from '../lib/files';
 import { spec } from '../spec';
 
 export let renderImage = SlateTool.create(spec, {
   name: 'Render Image',
   key: 'render_image',
-  description: `Render an image or PDF from a RenderForm template with dynamic content. Provide a template ID and key-value data pairs to customize text, images, colors, and other component properties. Supports custom output dimensions, file naming, metadata attachment, and webhook notification on completion.`,
+  description: `Render an image, PDF, or video from a RenderForm template with dynamic content. Video renders are asynchronous; use get_result to check their status. Provide a template ID and key-value data pairs to customize text, images, colors, and other component properties. Supports custom output dimensions, file naming, metadata attachment, and webhook notification on completion.`,
   instructions: [
     'Use the "data" field to pass component property overrides as key-value pairs, e.g. {"my-text.text": "Hello", "my-image.src": "https://..."}.',
     'For HTML templates, the data keys do not include a component ID prefix.'
@@ -48,6 +49,18 @@ export let renderImage = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('URL to receive a POST notification when rendering is complete'),
+      outputFormat: z
+        .enum(['jpeg', 'png', 'webp', 'pdf', 'mp4', 'webm'])
+        .optional()
+        .describe(
+          'Override the template format. Video requires an Advanced Editor video template.'
+        ),
+      cache: z
+        .boolean()
+        .optional()
+        .describe('Set false to skip the cache and charge credits for a fresh render.'),
+      duration: z.number().optional().describe('Video duration in milliseconds (1000-30000).'),
+      fps: z.number().optional().describe('Video frame rate: 24, 25, or 30.'),
       waitTime: z
         .number()
         .optional()
@@ -57,7 +70,23 @@ export let renderImage = SlateTool.create(spec, {
   .output(
     z.object({
       requestId: z.string().describe('Unique identifier for this render request'),
-      href: z.string().describe('CDN URL of the rendered image or PDF')
+      href: z
+        .string()
+        .describe(
+          'CDN URL of the rendered image, PDF, or video; pending files are not available yet'
+        ),
+      status: z.string().optional().describe('Provider render status when returned'),
+      cached: z.boolean().optional().describe('Whether the provider reused a cached file'),
+      downloadPrepared: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether file content was retrieved and prepared for download; availability remains unverified'
+        ),
+      downloadWarning: z
+        .string()
+        .optional()
+        .describe('File preparation or availability information')
     })
   )
   .handleInvocation(async ctx => {
@@ -73,15 +102,24 @@ export let renderImage = SlateTool.create(spec, {
       metadata: ctx.input.metadata,
       batchName: ctx.input.batchName,
       webhookUrl: ctx.input.webhookUrl,
-      waitTime: ctx.input.waitTime
+      waitTime: ctx.input.waitTime,
+      outputFormat: ctx.input.outputFormat,
+      cache: ctx.input.cache,
+      duration: ctx.input.duration,
+      fps: ctx.input.fps
     });
+
+    let download = await prepareGeneratedFile(ctx, result, Boolean(ctx.input.webhookUrl));
 
     return {
       output: {
         requestId: result.requestId,
-        href: result.href
+        href: result.href,
+        status: result.status,
+        cached: result.cached,
+        ...download
       },
-      message: `Rendered image from template \`${ctx.input.templateId}\`. Available at: ${result.href}`
+      message: `Render request accepted for template \`${ctx.input.templateId}\`. Result URL: ${result.href}. ${download.downloadWarning}`
     };
   })
   .build();

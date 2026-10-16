@@ -53,11 +53,19 @@ export let campaignInsights = SlateTool.create(spec, {
             clicks: z.number().optional().describe('Clicks for this creative'),
             conversions: z.number().optional().describe('Conversions for this creative'),
             cpc: z.number().optional().describe('Cost per click'),
-            ctr: z.number().optional().describe('Click-through rate')
+            ctr: z.number().optional().describe('Click-through rate'),
+            raw: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Original provider ad and creative details')
           })
         )
         .optional()
-        .describe('Per-creative performance breakdown')
+        .describe('Per-creative performance breakdown'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Original insight intervals, including audience-specific statistics')
     })
   )
   .handleInvocation(async ctx => {
@@ -80,9 +88,10 @@ export let campaignInsights = SlateTool.create(spec, {
     });
 
     let output: any = {
-      total: mapStats(insights?.total),
-      today: mapStats(insights?.today),
-      yesterday: mapStats(insights?.yesterday)
+      total: mapStats(insights?.total?.total ?? insights?.total),
+      today: mapStats(insights?.today?.total ?? insights?.today),
+      yesterday: mapStats(insights?.yesterday?.total ?? insights?.yesterday),
+      raw: insights
     };
 
     if (ctx.input.includeCreativeInsights) {
@@ -98,13 +107,14 @@ export let campaignInsights = SlateTool.create(spec, {
         clicks: ad.insights?.clicks,
         conversions: ad.insights?.conversions,
         cpc: ad.insights?.cpc,
-        ctr: ad.insights?.ctr
+        ctr: ad.insights?.ctr,
+        raw: ad
       }));
     }
 
     return {
       output,
-      message: `Retrieved insights for campaign **${ctx.input.campaignId}**. Total spend: ${insights?.total?.amount_spent ?? 'N/A'}, reach: ${insights?.total?.reach ?? 'N/A'}, clicks: ${insights?.total?.clicks ?? 'N/A'}.`
+      message: `Retrieved insights for campaign **${ctx.input.campaignId}**. Total spend: ${output.total.amountSpent ?? 'N/A'}, reach: ${output.total.reach ?? 'N/A'}, clicks: ${output.total.clicks ?? 'N/A'}.`
     };
   })
   .build();

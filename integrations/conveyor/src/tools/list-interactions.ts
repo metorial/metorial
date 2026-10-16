@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConveyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -64,6 +64,23 @@ export let listInteractions = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConveyorClient({ token: ctx.auth.token });
+
+    if (
+      [ctx.input.connectionId, ctx.input.documentId, ctx.input.questionId].filter(Boolean)
+        .length > 1
+    ) {
+      throw createApiServiceError(
+        'Provide at most one of connectionId, documentId, or questionId.'
+      );
+    }
+    if (
+      (ctx.input.documentId && ctx.input.type === 'Q & A') ||
+      (ctx.input.questionId && ctx.input.type === 'Document')
+    ) {
+      throw createApiServiceError(
+        'The interaction type conflicts with the document or question filter.'
+      );
+    }
 
     let data: any;
     let filterDescription = '';

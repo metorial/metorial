@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'The Eventbrite organization ID to scope API requests to. Required for most operations.'
+        'Optional default organization ID. Call get_user with includeOrganizations=true to discover IDs; each organization-scoped tool can also accept organizationId.'
       )
   })
 );

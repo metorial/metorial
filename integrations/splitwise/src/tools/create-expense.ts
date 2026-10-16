@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -62,7 +62,7 @@ export let createExpense = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let expenses: any[];
 
-    if (ctx.input.splitEqually && ctx.input.groupId) {
+    if (ctx.input.splitEqually && ctx.input.groupId !== undefined) {
       expenses = await client.createExpenseEqualSplit({
         cost: ctx.input.cost,
         description: ctx.input.description,
@@ -93,10 +93,13 @@ export let createExpense = SlateTool.create(spec, {
         }))
       });
     } else {
-      throw new Error('Either set splitEqually with a groupId, or provide custom shares.');
+      throw createApiServiceError(
+        'Either set splitEqually with a groupId, or provide custom shares.'
+      );
     }
 
     let created = expenses[0];
+    if (!created) throw createApiServiceError('Splitwise did not return a created expense.');
 
     return {
       output: {

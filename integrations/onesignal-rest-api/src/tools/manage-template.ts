@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { appIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let templateOutputSchema = z.object({
@@ -21,19 +22,21 @@ let templateOutputSchema = z.object({
 let mapTemplate = (t: any) => ({
   templateId: t.id,
   name: t.name,
-  channel: t.channel,
+  channel:
+    t.channel ??
+    (t.content?.isEmail ? 'email' : t.content?.isSMS ? 'sms' : t.content ? 'push' : undefined),
   createdAt: t.created_at,
   updatedAt: t.updated_at,
-  contents: t.contents,
-  headings: t.headings,
-  emailSubject: t.email_subject,
-  emailBody: t.email_body
+  contents: t.content?.contents ?? t.contents ?? undefined,
+  headings: t.content?.headings ?? t.headings ?? undefined,
+  emailSubject: t.content?.email_subject ?? t.email_subject ?? undefined,
+  emailBody: t.content?.email_body ?? t.email_body ?? undefined
 });
 
 export let createTemplate = SlateTool.create(spec, {
   name: 'Create Template',
   key: 'create_template',
-  description: `Create a reusable message template for push notifications, emails, or SMS. Templates simplify sending consistent messages across campaigns.`,
+  description: `Create a reusable message template for push notifications, emails, or SMS. Templates simplify sending consistent messages across campaigns. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -41,6 +44,7 @@ export let createTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       name: z.string().describe('Template name'),
       contents: z
         .record(z.string(), z.string())
@@ -57,14 +61,14 @@ export let createTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let body: Record<string, any> = { name: ctx.input.name };
     if (ctx.input.contents) body.contents = ctx.input.contents;
     if (ctx.input.headings) body.headings = ctx.input.headings;
-    if (ctx.input.emailSubject) body.email_subject = ctx.input.emailSubject;
-    if (ctx.input.emailBody) body.email_body = ctx.input.emailBody;
+    if (ctx.input.emailSubject !== undefined) body.email_subject = ctx.input.emailSubject;
+    if (ctx.input.emailBody !== undefined) body.email_body = ctx.input.emailBody;
     if (ctx.input.isEmail !== undefined) body.isEmail = ctx.input.isEmail;
     if (ctx.input.isSms !== undefined) body.isSMS = ctx.input.isSms;
 
@@ -80,13 +84,14 @@ export let createTemplate = SlateTool.create(spec, {
 export let listTemplates = SlateTool.create(spec, {
   name: 'List Templates',
   key: 'list_templates',
-  description: `Retrieve all message templates with optional channel filtering and pagination.`,
+  description: `Retrieve all message templates with optional channel filtering and pagination. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       channel: z.enum(['push', 'email', 'sms']).optional().describe('Filter by channel type'),
       limit: z.number().optional().describe('Number of templates to return (default 50)'),
       offset: z.number().optional().describe('Pagination offset')
@@ -101,7 +106,7 @@ export let listTemplates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let result = await client.listTemplates({
@@ -125,13 +130,14 @@ export let listTemplates = SlateTool.create(spec, {
 export let getTemplate = SlateTool.create(spec, {
   name: 'Get Template',
   key: 'get_template',
-  description: `Retrieve the full details of a specific template by its ID.`,
+  description: `Retrieve the full details of a specific template by its ID. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       templateId: z.string().describe('Template ID to retrieve')
     })
   )
@@ -139,7 +145,7 @@ export let getTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let result = await client.getTemplate(ctx.input.templateId);
@@ -154,7 +160,7 @@ export let getTemplate = SlateTool.create(spec, {
 export let updateTemplate = SlateTool.create(spec, {
   name: 'Update Template',
   key: 'update_template',
-  description: `Update an existing template's name, content, or other properties.`,
+  description: `Update an existing template's name, content, or other properties. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -162,6 +168,7 @@ export let updateTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       templateId: z.string().describe('Template ID to update'),
       name: z.string().describe('Updated template name'),
       contents: z
@@ -180,14 +187,14 @@ export let updateTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let body: Record<string, any> = { name: ctx.input.name };
     if (ctx.input.contents) body.contents = ctx.input.contents;
     if (ctx.input.headings) body.headings = ctx.input.headings;
-    if (ctx.input.emailSubject) body.email_subject = ctx.input.emailSubject;
-    if (ctx.input.emailBody) body.email_body = ctx.input.emailBody;
+    if (ctx.input.emailSubject !== undefined) body.email_subject = ctx.input.emailSubject;
+    if (ctx.input.emailBody !== undefined) body.email_body = ctx.input.emailBody;
 
     let result = await client.updateTemplate(ctx.input.templateId, body);
 
@@ -201,13 +208,14 @@ export let updateTemplate = SlateTool.create(spec, {
 export let deleteTemplate = SlateTool.create(spec, {
   name: 'Delete Template',
   key: 'delete_template',
-  description: `Delete a message template. Templates used in active Journeys cannot be deleted.`,
+  description: `Delete a message template. Templates used in active Journeys cannot be deleted. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       templateId: z.string().describe('Template ID to delete')
     })
   )
@@ -219,7 +227,7 @@ export let deleteTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let result = await client.deleteTemplate(ctx.input.templateId);

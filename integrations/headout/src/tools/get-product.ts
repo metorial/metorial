@@ -1,7 +1,33 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireHeadoutId, requireHeadoutText } from '../lib/response';
 import { spec } from '../spec';
+
+let mapLocation = (location: any) => {
+  if (!location) return undefined;
+  let address = location.address;
+  return {
+    ...location,
+    latitude: location.latitude ?? location.geolocation?.latitude ?? undefined,
+    longitude: location.longitude ?? location.geolocation?.longitude ?? undefined,
+    address:
+      typeof address === 'string'
+        ? address
+        : address
+          ? [
+              address.addressLine1,
+              address.addressLine2,
+              address.cityName,
+              address.state,
+              address.postalCode,
+              address.countryName
+            ]
+              .filter(Boolean)
+              .join(', ')
+          : undefined
+  };
+};
 
 let variantInputFieldSchema = z
   .object({
@@ -116,6 +142,10 @@ let productSchema = z
       .optional(),
     hasInstantConfirmation: z.boolean().optional(),
     hasMobileTicket: z.boolean().optional(),
+    raw: z
+      .unknown()
+      .optional()
+      .describe('Complete product response, including location choices and booking policies'),
     variants: z.array(variantSchema).optional().describe('Bookable variants for this product')
   })
   .passthrough();
@@ -140,7 +170,7 @@ Each product can have multiple variants (e.g., "Skip the Line", "General Admissi
       languageCode: z
         .string()
         .optional()
-        .describe('Override language (EN, ES, FR, IT, DE, PT, NL)'),
+        .describe('Override language (EN, ES, FR, IT, DE, PT, NL, PL)'),
       fetchVariants: z
         .boolean()
         .optional()
@@ -163,35 +193,68 @@ Each product can have multiple variants (e.g., "Skip the Line", "General Admissi
     });
 
     let mapped = {
-      productId: String(product.id ?? product.productId ?? ''),
-      name: product.name ?? '',
+      ...product,
+      raw: product,
+      productId: requireHeadoutId(product?.id ?? product?.productId, 'product ID'),
+      name: requireHeadoutText(product.name, 'product name'),
       canonicalUrl: product.canonicalUrl ?? product.url,
       cityCode: product.city?.code ?? product.cityCode,
       currency: product.currency,
-      images: product.images,
-      content: product.content,
-      startLocation: product.startLocation,
-      endLocation: product.endLocation,
+      images: product.images ?? product.media ?? undefined,
+      content: Array.isArray(product.content)
+        ? product.content
+        : (product.contentListHtml ??
+          (product.content
+            ? Object.entries(product.content)
+                .filter(([, value]) => typeof value === 'string')
+                .map(([title, html]) => ({ title, html }))
+            : undefined)),
+      startLocation: mapLocation(product.startLocation ?? product.address),
+      endLocation: mapLocation(product.endLocation),
       productType: product.productType,
-      ratingCumulative: product.ratingCumulative,
+      ratingCumulative:
+        product.ratingCumulative ??
+        (product.reviewsSummary
+          ? {
+              avg: product.reviewsSummary.averageRating ?? undefined,
+              count: product.reviewsSummary.ratingsCount ?? undefined
+            }
+          : undefined),
       hasInstantConfirmation: product.hasInstantConfirmation,
       hasMobileTicket: product.hasMobileTicket,
       variants: product.variants?.map((v: any) => ({
-        variantId: String(v.id ?? v.variantId ?? ''),
-        name: v.name,
-        description: v.description,
-        inventoryType: v.inventoryType,
-        duration: v.duration,
-        priceType: v.priceType,
+        ...v,
+        variantId: requireHeadoutId(v?.id ?? v?.variantId, 'variant ID'),
+        name: v.name ?? undefined,
+        description: v.description ?? undefined,
+        inventoryType: v.inventoryType ?? undefined,
+        duration: v.duration ?? undefined,
+        priceType:
+          v.priceType ??
+          v.pricing?.profileType ??
+          product.pricing?.profileType ??
+          product.pricing?.type,
         pax: v.pax,
         cashback: v.cashback,
-        ticketDeliveryInfoHtml: v.ticketDeliveryInfoHtml,
+        ticketDeliveryInfoHtml: v.ticketDeliveryInfoHtml ?? undefined,
         inputFields: v.inputFields?.map((f: any) => ({
-          fieldId: String(f.id ?? f.fieldId ?? ''),
-          name: f.name,
+          ...f,
+          fieldId: requireHeadoutId(f?.id ?? f?.fieldId, 'booking input field ID'),
+          name: requireHeadoutText(f.name, 'booking input field name'),
           dataType: f.dataType,
           level: f.level,
           validation: f.validation
+            ? {
+                ...Object.fromEntries(
+                  Object.entries(f.validation).filter(([, value]) => value != null)
+                ),
+                values: f.validation.values?.map((value: any) =>
+                  typeof value === 'string'
+                    ? value
+                    : requireHeadoutId(value?.id, 'predefined location ID')
+                )
+              }
+            : undefined
         }))
       }))
     };

@@ -1,21 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { eventSchema, mapEvent } from '../lib/schemas';
 import { spec } from '../spec';
-
-let eventSchema = z.object({
-  eventId: z.string().describe('Unique event identifier'),
-  sportKey: z.string().describe('Sport key'),
-  sportTitle: z.string().describe('Sport display name'),
-  commenceTime: z.string().describe('ISO timestamp of event start time'),
-  homeTeam: z.string().nullable().describe('Home team name'),
-  awayTeam: z.string().nullable().describe('Away team name')
-});
 
 export let getHistoricalEventsTool = SlateTool.create(spec, {
   name: 'Get Historical Events',
   key: 'get_historical_events',
-  description: `Retrieve event listings as they appeared at a specific historical timestamp. Useful for discovering historical event IDs needed to query historical event-level odds via **Get Historical Odds**.`,
+  description: `Retrieve event listings as they appeared at a specific historical timestamp. Useful for discovering historical event IDs needed to query historical event-level odds via **Get Historical Event Odds**.`,
   instructions: [
     'Use ISO 8601 format for the date parameter.',
     'Use previousTimestamp and nextTimestamp to navigate between snapshots.'
@@ -27,7 +19,11 @@ export let getHistoricalEventsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      sport: z.string().describe('Sport key (e.g. "americanfootball_nfl")'),
+      includeRotationNumbers: z
+        .boolean()
+        .optional()
+        .describe('Include home and away rotation numbers when available'),
+      sport: z.string().describe('Sport key from list_sports (e.g. "americanfootball_nfl")'),
       date: z
         .string()
         .describe('ISO 8601 timestamp for the snapshot (e.g. "2023-10-15T12:00:00Z")'),
@@ -55,6 +51,7 @@ export let getHistoricalEventsTool = SlateTool.create(spec, {
     let { sport, date, eventIds, commenceTimeFrom, commenceTimeTo } = ctx.input;
 
     let response = await client.getHistoricalEvents({
+      includeRotationNumbers: ctx.input.includeRotationNumbers,
       sport,
       date,
       eventIds,
@@ -62,14 +59,7 @@ export let getHistoricalEventsTool = SlateTool.create(spec, {
       commenceTimeTo
     });
 
-    let events = response.data.map(e => ({
-      eventId: e.id,
-      sportKey: e.sport_key,
-      sportTitle: e.sport_title,
-      commenceTime: e.commence_time,
-      homeTeam: e.home_team,
-      awayTeam: e.away_team
-    }));
+    let events = response.data.map(mapEvent);
 
     return {
       output: {

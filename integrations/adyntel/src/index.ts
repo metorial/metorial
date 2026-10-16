@@ -2,13 +2,16 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   analyzeKeywords,
+  getGoogleShoppingStatus,
+  getTikTokAd,
   getTikTokAdDetails,
   lookupGoogleAds,
   lookupGoogleShoppingAds,
   lookupLinkedInAds,
   lookupMetaAds,
   searchMetaAds,
-  searchTikTokAds
+  searchTikTokAds,
+  submitGoogleShoppingSearch
 } from './tools';
 
 export let provider = Slate.create({
@@ -21,6 +24,9 @@ export let provider = Slate.create({
     lookupGoogleShoppingAds,
     searchTikTokAds,
     getTikTokAdDetails,
+    getTikTokAd,
+    getGoogleShoppingStatus,
+    submitGoogleShoppingSearch,
     analyzeKeywords
   ],
   triggers: []

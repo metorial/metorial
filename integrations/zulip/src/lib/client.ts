@@ -1,11 +1,52 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+export let normalizeServerUrl = (value: string) => {
+  let serverUrl = value.replace(/\/+$/, '');
+  let parsed: URL;
+  try {
+    parsed = new URL(serverUrl);
+  } catch {
+    throw createApiServiceError(
+      'Enter the full Zulip server URL, including http:// or https://.'
+    );
+  }
+  if (
+    !['http:', 'https:'].includes(parsed.protocol) ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw createApiServiceError(
+      'Use a Zulip HTTP or HTTPS server URL without embedded credentials, a query, or a fragment.'
+    );
+  }
+  return serverUrl;
+};
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { serverUrl: string; email: string; token: string }) {
-    this.axios = createAxios({
-      baseURL: config.serverUrl,
+    this.axios = createAuthenticatedAxios({
+      baseURL: normalizeServerUrl(config.serverUrl),
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Zulip',
+          reason: 'zulip_api_error',
+          detailKeys: ['msg', 'message', 'code'],
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          extractUpstreamCode: (_error, response) =>
+            isApiErrorRecord(response?.data) && typeof response.data.code === 'string'
+              ? response.data.code
+              : undefined
+        }),
       auth: {
         username: config.email,
         password: config.token
@@ -45,6 +86,8 @@ export class Client {
     numAfter: number;
     narrow?: Array<{ operator: string; operand: string | number }>;
     applyMarkdown?: boolean;
+    includeAnchor?: boolean;
+    allowEmptyTopicName?: boolean;
   }) {
     let query: Record<string, any> = {
       anchor: params.anchor ?? 'newest',
@@ -53,13 +96,28 @@ export class Client {
     };
     if (params.narrow) query.narrow = JSON.stringify(params.narrow);
     if (params.applyMarkdown !== undefined) query.apply_markdown = params.applyMarkdown;
+    if (params.includeAnchor !== undefined) query.include_anchor = params.includeAnchor;
+    if (params.allowEmptyTopicName !== undefined)
+      query.allow_empty_topic_name = params.allowEmptyTopicName;
 
     let response = await this.axios.get('/api/v1/messages', { params: query });
     return response.data;
   }
 
-  async getMessage(messageId: number) {
-    let response = await this.axios.get(`/api/v1/messages/${messageId}`);
+  async getMessage(
+    messageId: number,
+    params?: { applyMarkdown?: boolean; allowEmptyTopicName?: boolean }
+  ) {
+    let response = await this.axios.get(`/api/v1/messages/${messageId}`, {
+      params: {
+        ...(params?.applyMarkdown !== undefined
+          ? { apply_markdown: params.applyMarkdown }
+          : {}),
+        ...(params?.allowEmptyTopicName !== undefined
+          ? { allow_empty_topic_name: params.allowEmptyTopicName }
+          : {})
+      }
+    });
     return response.data;
   }
 
@@ -87,11 +145,17 @@ export class Client {
     return response.data;
   }
 
-  async addReaction(messageId: number, emojiName: string) {
+  async addReaction(
+    messageId: number,
+    emojiName: string,
+    params?: { emojiCode?: string; reactionType?: string }
+  ) {
     let response = await this.axios.post(
       `/api/v1/messages/${messageId}/reactions`,
       {
-        emoji_name: emojiName
+        emoji_name: emojiName,
+        ...(params?.emojiCode !== undefined ? { emoji_code: params.emojiCode } : {}),
+        ...(params?.reactionType !== undefined ? { reaction_type: params.reactionType } : {})
       },
       {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -100,9 +164,18 @@ export class Client {
     return response.data;
   }
 
-  async removeReaction(messageId: number, emojiName: string) {
+  async removeReaction(
+    messageId: number,
+    emojiName: string,
+    params?: { emojiCode?: string; reactionType?: string }
+  ) {
     let response = await this.axios.delete(`/api/v1/messages/${messageId}/reactions`, {
-      params: { emoji_name: emojiName }
+      data: {
+        emoji_name: emojiName,
+        ...(params?.emojiCode !== undefined ? { emoji_code: params.emojiCode } : {}),
+        ...(params?.reactionType !== undefined ? { reaction_type: params.reactionType } : {})
+      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
     return response.data;
   }
@@ -128,11 +201,20 @@ export class Client {
 
   // ── Channels (Streams) ───────────────────────────────────────
 
-  async getChannels(params?: { includePublic?: boolean; includeSubscribed?: boolean }) {
+  async getChannels(params?: {
+    includePublic?: boolean;
+    includeSubscribed?: boolean;
+    includeWebPublic?: boolean;
+    excludeArchived?: boolean;
+  }) {
     let query: Record<string, any> = {};
     if (params?.includePublic !== undefined) query.include_public = params.includePublic;
     if (params?.includeSubscribed !== undefined)
       query.include_subscribed = params.includeSubscribed;
+
+    if (params?.includeWebPublic !== undefined)
+      query.include_web_public = params.includeWebPublic;
+    if (params?.excludeArchived !== undefined) query.exclude_archived = params.excludeArchived;
 
     let response = await this.axios.get('/api/v1/streams', { params: query });
     return response.data;
@@ -180,9 +262,8 @@ export class Client {
     }
   ) {
     let payload: Record<string, any> = {};
-    if (params.name !== undefined) payload.new_name = JSON.stringify(params.name);
-    if (params.description !== undefined)
-      payload.description = JSON.stringify(params.description);
+    if (params.name !== undefined) payload.new_name = params.name;
+    if (params.description !== undefined) payload.description = params.description;
     if (params.isPrivate !== undefined) payload.is_private = params.isPrivate;
 
     let response = await this.axios.patch(`/api/v1/streams/${streamId}`, payload, {
@@ -264,7 +345,9 @@ export class Client {
       query.include_custom_profile_fields = params.includeCustomProfileFields;
     }
 
-    let response = await this.axios.get(`/api/v1/users/${email}`, { params: query });
+    let response = await this.axios.get(`/api/v1/users/${encodeURIComponent(email)}`, {
+      params: query
+    });
     return response.data;
   }
 
@@ -325,10 +408,18 @@ export class Client {
     return response.data;
   }
 
-  async setUserStatus(params: { statusText?: string; emoji?: string; away?: boolean }) {
+  async setUserStatus(params: {
+    statusText?: string;
+    emoji?: string;
+    emojiCode?: string;
+    reactionType?: string;
+    away?: boolean;
+  }) {
     let payload: Record<string, any> = {};
     if (params.statusText !== undefined) payload.status_text = params.statusText;
     if (params.emoji !== undefined) payload.emoji_name = params.emoji;
+    if (params.emojiCode !== undefined) payload.emoji_code = params.emojiCode;
+    if (params.reactionType !== undefined) payload.reaction_type = params.reactionType;
     if (params.away !== undefined) payload.away = params.away;
 
     let response = await this.axios.post('/api/v1/users/me/status', payload, {
@@ -536,12 +627,17 @@ export class Client {
     return response.data;
   }
 
+  async getAttachments() {
+    let response = await this.axios.get('/api/v1/attachments');
+    return response.data;
+  }
+
   // ── File Upload ──────────────────────────────────────────────
 
   async uploadFile(fileName: string, fileContent: Uint8Array, contentType: string) {
     let formData = new FormData();
-    let blob = new Blob([fileContent], { type: contentType });
-    formData.append('file', blob, fileName);
+    let blob = new Blob([new Uint8Array(fileContent)], { type: contentType });
+    formData.append('filename', blob, fileName);
 
     let response = await this.axios.post('/api/v1/user_uploads', formData);
     return response.data;

@@ -7,6 +7,9 @@ export let listMembers = SlateTool.create(spec, {
   name: 'List Members',
   key: 'list_members',
   description: `Lists members of your Heartbeat community with optional filtering by group, role, or creation date. Returns a paginated list of users.`,
+  instructions: [
+    'The current API documents an array response without pagination metadata. Existing filter and pagination inputs are still forwarded unchanged, but their effect is not documented or verified. Missing role IDs, creation timestamps, and hasMore are omitted.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -45,13 +48,20 @@ export let listMembers = SlateTool.create(spec, {
             email: z.string().describe('User email'),
             firstName: z.string().describe('First name'),
             lastName: z.string().describe('Last name'),
-            roleId: z.string().describe('Role ID'),
+            roleId: z.string().optional().describe('Role ID, when returned by Heartbeat'),
             groups: z.array(z.string()).nullable().describe('Group IDs'),
-            createdAt: z.string().describe('Creation timestamp')
+            createdAt: z
+              .string()
+              .optional()
+              .describe('Creation timestamp, when returned by Heartbeat')
           })
         )
         .describe('List of community members'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether more results are available, when returned by Heartbeat'),
+      raw: z.unknown().optional().describe('Complete provider list response')
     })
   )
   .handleInvocation(async ctx => {
@@ -79,7 +89,8 @@ export let listMembers = SlateTool.create(spec, {
     return {
       output: {
         users,
-        hasMore: result.hasMore
+        hasMore: result.hasMore,
+        raw: result.raw
       },
       message: `Found ${users.length} member(s).${result.hasMore ? ' More results are available.' : ''}`
     };

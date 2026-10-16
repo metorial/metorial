@@ -21,6 +21,7 @@ export let listActivities = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       activities: z.array(
         z.object({
           activityId: z.string(),
@@ -37,12 +38,13 @@ export let listActivities = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listActivities(ctx.input);
 
     return {
       output: {
         activities: result.items,
+        raw: result.raw,
         currentPage: result.pagination.currentPage,
         totalPages: result.pagination.totalPages,
         totalCount: result.pagination.totalCount

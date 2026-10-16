@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let recordAdPerformance = SlateTool.create(spec, {
@@ -17,11 +18,22 @@ Spend amounts are in **cents**.`,
 })
   .input(
     z.object({
+      ...importScopeFields,
       adId: z.string().describe('The ad identifier.'),
       adName: z
         .string()
         .optional()
         .describe('Name of the ad. If provided with adId, the ad will be created/updated.'),
+      adCampaignId: z
+        .string()
+        .optional()
+        .describe(
+          'Existing campaign ID, required with adName unless provided by adCampaign or adSet.'
+        ),
+      adSetId: z
+        .string()
+        .optional()
+        .describe('Existing ad set ID, required with adName unless adSet is provided.'),
       date: z.string().describe('Date for the performance data (YYYY-MM-DD).'),
       spend: z.number().describe('Ad spend in cents for the day.'),
       clicks: z.number().optional().describe('Number of clicks for the day.'),
@@ -50,11 +62,35 @@ Spend amounts are in **cents**.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
+    let campaignId =
+      ctx.input.adCampaignId ??
+      ctx.input.adCampaign?.campaignId ??
+      ctx.input.adSet?.campaignId;
+    let adSetId = ctx.input.adSetId ?? ctx.input.adSet?.adSetId;
+    if (ctx.input.adName && (!campaignId?.trim() || !adSetId?.trim())) {
+      throw createApiServiceError(
+        'Creating an ad with adName requires its campaign and ad set IDs. Provide adCampaignId/adSetId or the corresponding inline objects.'
+      );
+    }
+    if (ctx.input.adSet && !campaignId?.trim()) {
+      throw createApiServiceError(
+        'An inline adSet requires campaignId, adCampaignId, or adCampaign.'
+      );
+    }
+    let campaignIds = [
+      ctx.input.adCampaignId,
+      ctx.input.adCampaign?.campaignId,
+      ctx.input.adSet?.campaignId
+    ].filter(value => value !== undefined);
+    if (
+      new Set(campaignIds).size > 1 ||
+      (ctx.input.adSetId && ctx.input.adSet && ctx.input.adSetId !== ctx.input.adSet.adSetId)
+    ) {
+      throw createApiServiceError(
+        'Use the same parent campaign and ad set IDs in the inline objects and ID fields.'
+      );
+    }
 
     let body: Record<string, unknown> = {
       date: ctx.input.date,
@@ -62,7 +98,12 @@ Spend amounts are in **cents**.`,
     };
 
     if (ctx.input.adName) {
-      body.ad = { id: ctx.input.adId, name: ctx.input.adName };
+      body.ad = {
+        id: ctx.input.adId,
+        name: ctx.input.adName,
+        adcampaign: campaignId,
+        adset: adSetId
+      };
     } else {
       body.ad = ctx.input.adId;
     }
@@ -75,6 +116,8 @@ Spend amounts are in **cents**.`,
         id: ctx.input.adCampaign.campaignId,
         name: ctx.input.adCampaign.campaignName
       };
+    } else if (campaignId) {
+      body.adcampaign = campaignId;
     }
 
     if (ctx.input.adSet) {
@@ -82,8 +125,10 @@ Spend amounts are in **cents**.`,
         id: ctx.input.adSet.adSetId,
         name: ctx.input.adSet.adSetName
       };
-      if (ctx.input.adSet.campaignId) adSetBody.adcampaign = ctx.input.adSet.campaignId;
+      adSetBody.adcampaign = campaignId;
       body.adset = adSetBody;
+    } else if (adSetId) {
+      body.adset = adSetId;
     }
 
     let response = await client.recordAdPerformance(body);

@@ -7,16 +7,18 @@ export let takeScreenshot = SlateTool.create(spec, {
   name: 'Take Screenshot',
   key: 'take_screenshot',
 
-  description: `Capture a screenshot of any website. Configure viewport size for mobile or desktop views, enable full-page capture, toggle dark mode, and choose the output image format. Returns a URL to the captured screenshot image.`,
+  description: `Capture a screenshot of a website and prepare the image for download. Configure viewport size, full-page capture, dark mode, and image format. Each capture uses the account's screenshot allowance.`,
 
   instructions: [
     'Provide a fully qualified URL including the protocol (e.g., https://example.com).',
-    'Use width and height to simulate specific device viewports (e.g., 375x812 for iPhone, 1920x1080 for desktop).'
+    'Use positive whole-number width and height values to simulate specific device viewports (e.g., 375x812 for iPhone, 1920x1080 for desktop).',
+    'Save the downloadable image promptly. The provider does not publish an exact lifetime for its screenshot URLs.',
+    'If capture succeeds but delivery fails, use the returned screenshot URL. Repeating the tool creates another capture and may use additional allowance.'
   ],
 
   tags: {
     destructive: false,
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -56,7 +58,13 @@ export let takeScreenshot = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      screenshotUrl: z.string().describe('URL to the captured screenshot image.')
+      screenshotUrl: z.string().describe('Provider URL to the captured screenshot image.'),
+      deliveryWarning: z
+        .string()
+        .optional()
+        .describe(
+          'Delivery warning when capture succeeded but a downloadable file could not be prepared.'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -64,7 +72,7 @@ export let takeScreenshot = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    ctx.info({ message: 'Taking screenshot', url: ctx.input.url });
+    ctx.info({ message: 'Taking screenshot' });
 
     let result = await client.takeScreenshot({
       url: ctx.input.url,
@@ -76,11 +84,21 @@ export let takeScreenshot = SlateTool.create(spec, {
       format: ctx.input.format
     });
 
+    let deliveryWarning: string | undefined;
+    try {
+      let file = await client.downloadScreenshot(result.screenshotUrl);
+      await ctx.addAttachment({ type: 'content', ...file });
+    } catch {
+      deliveryWarning =
+        'The screenshot was captured, but its downloadable file could not be prepared. Use screenshotUrl promptly. Do not repeat the capture unless you intend to use more screenshot allowance.';
+    }
+
     return {
       output: {
-        screenshotUrl: result.screenshotUrl
+        screenshotUrl: result.screenshotUrl,
+        ...(deliveryWarning ? { deliveryWarning } : {})
       },
-      message: `Screenshot captured for **${ctx.input.url}**. [View screenshot](${result.screenshotUrl})`
+      message: deliveryWarning ?? 'Screenshot captured and prepared for download.'
     };
   })
   .build();

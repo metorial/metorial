@@ -5,11 +5,14 @@ import {
   deleteEvent,
   getSiteDetails,
   getWaiver,
+  getWaiverDataCount,
   getWaiverForms,
   getWaiversForEvent,
+  listCompleteWaivers,
   listEvents,
   listWaiversByDate,
   manageEventCategories,
+  manageEventManagers,
   searchWaivers,
   updateEvent
 } from './tools';
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     deleteEvent,
     manageEventCategories,
     getWaiversForEvent,
-    listWaiversByDate
+    listWaiversByDate,
+    listCompleteWaivers,
+    getWaiverDataCount,
+    manageEventManagers
   ],
   triggers: []
 });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,12 @@ export let sendEmail = SlateTool.create(spec, {
     z.object({
       customerId: z.string().describe('Plain customer ID'),
       subject: z.string().describe('Email subject'),
-      textContent: z.string().optional().describe('Plain text content of the email'),
+      textContent: z
+        .string()
+        .optional()
+        .describe(
+          'Plain text content; when omitted, markdownContent is also used as the text fallback'
+        ),
       markdownContent: z.string().optional().describe('Markdown content of the email'),
       additionalRecipients: z
         .array(
@@ -48,14 +53,15 @@ export let sendEmail = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let input: any = {
-      customerIdentifier: { customerId: ctx.input.customerId },
-      subject: ctx.input.subject
-    };
-
-    if (ctx.input.textContent) {
-      input.textContent = ctx.input.textContent;
+    let textContent = ctx.input.textContent ?? ctx.input.markdownContent;
+    if (!textContent?.trim()) {
+      throw createApiServiceError('Provide textContent or markdownContent for the email');
     }
+    let input: any = {
+      customerId: ctx.input.customerId,
+      subject: ctx.input.subject,
+      textContent
+    };
     if (ctx.input.markdownContent) {
       input.markdownContent = ctx.input.markdownContent;
     }

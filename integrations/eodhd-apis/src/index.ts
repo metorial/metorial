@@ -2,7 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getBulkEod,
+  getCurrentUser,
   getDividendsSplits,
+  getEconomicEvents,
+  getExchangeDetails,
   getExchangeInfo,
   getFinancialCalendar,
   getFinancialNews,
@@ -36,7 +39,10 @@ export let provider = Slate.create({
     getMacroIndicators,
     getDividendsSplits,
     getExchangeInfo,
-    getBulkEod
+    getBulkEod,
+    getCurrentUser,
+    getEconomicEvents,
+    getExchangeDetails
   ],
   triggers: []
 });

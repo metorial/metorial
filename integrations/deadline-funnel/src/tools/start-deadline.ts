@@ -20,7 +20,7 @@ export let startDeadline = SlateTool.create(spec, {
     z.object({
       campaignId: z
         .string()
-        .describe('ID of the Deadline Funnel campaign to start the deadline for'),
+        .describe('Campaign ID. Call list_campaigns to discover available campaign IDs.'),
       email: z.string().describe('Email address of the subscriber to start the deadline for'),
       firstName: z.string().optional().describe('First name of the subscriber')
     })

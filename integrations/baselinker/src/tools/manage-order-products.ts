@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BaseLinkerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -60,7 +60,20 @@ export let manageOrderProducts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BaseLinkerClient({ token: ctx.auth.token });
 
+    if (ctx.input.action !== 'add' && ctx.input.orderProductId === undefined) {
+      throw createApiServiceError('orderProductId is required for update and remove.');
+    }
     if (ctx.input.action === 'add') {
+      if (
+        ctx.input.name === undefined ||
+        ctx.input.priceBrutto === undefined ||
+        ctx.input.taxRate === undefined ||
+        ctx.input.quantity === undefined
+      ) {
+        throw createApiServiceError(
+          'name, priceBrutto, taxRate, and quantity are required when adding an order product.'
+        );
+      }
       let result = await client.addOrderProduct({
         orderId: ctx.input.orderId,
         storage: ctx.input.storage,

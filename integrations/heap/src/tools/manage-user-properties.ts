@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HeapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -63,7 +63,12 @@ Properties can be set without an existing session, making this ideal for backfil
       datacenter: ctx.config.datacenter
     });
 
-    if (ctx.input.users && ctx.input.users.length > 0) {
+    if (ctx.input.users !== undefined) {
+      if (ctx.input.identity !== undefined || ctx.input.properties !== undefined) {
+        throw createApiServiceError(
+          'Provide users for bulk updates or top-level fields for a single update, not both.'
+        );
+      }
       ctx.info(`Bulk updating properties for ${ctx.input.users.length} users`);
       await client.bulkAddUserProperties(ctx.input.users);
 
@@ -77,7 +82,7 @@ Properties can be set without an existing session, making this ideal for backfil
     }
 
     if (!ctx.input.identity || !ctx.input.properties) {
-      throw new Error(
+      throw createApiServiceError(
         'Either provide "identity" and "properties" for a single update, or "users" array for bulk updates.'
       );
     }

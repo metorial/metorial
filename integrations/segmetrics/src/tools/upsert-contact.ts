@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let upsertContact = SlateTool.create(spec, {
@@ -12,7 +13,7 @@ When updating custom fields, values are appended to existing data — set a valu
 When tags are provided here, they **replace** existing tags. Use the dedicated tag tools to add/remove tags incrementally.`,
   instructions: [
     'Provide either contactId or email (or both) to identify the contact.',
-    'All amounts and dates should be strings in the format "YYYY-MM-DD HH:MM:SS".'
+    'Dates should use the format "YYYY-MM-DD HH:MM:SS".'
   ],
   tags: {
     destructive: false,
@@ -21,6 +22,7 @@ When tags are provided here, they **replace** existing tags. Use the dedicated t
 })
   .input(
     z.object({
+      ...importScopeFields,
       contactId: z
         .string()
         .optional()
@@ -74,11 +76,7 @@ When tags are provided here, they **replace** existing tags. Use the dedicated t
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
 
     let body: Record<string, unknown> = {};
 

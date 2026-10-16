@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAiReports = SlateTool.create(spec, {
@@ -21,6 +21,10 @@ export let getAiReports = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       reports: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of AI-generated report records')
@@ -36,10 +40,10 @@ export let getAiReports = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let reports = result?.data ?? [];
+    let reports = getRecords(result);
 
     return {
-      output: { reports },
+      output: { reports, raw: result },
       message: `Retrieved **${reports.length}** AI report(s).`
     };
   })

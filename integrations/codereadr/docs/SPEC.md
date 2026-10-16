@@ -1,73 +1,35 @@
-Now let me fetch the API overview documentation to get more details on authentication and features.Now let me look at the actual API sections to understand the full scope of features:I now have enough information to write the specification.
+# CodeREADr Integration
 
-# Slates Specification for Codereadr
+CodeREADr provides barcode scanning workflows, validation databases, app users, and collected scan records. This integration exposes 29 tools through the documented API.
 
-## Overview
+## Authentication and API
 
-CodeREADr is a cloud-based barcode scanning and data collection platform that turns smartphones and tablets into enterprise-grade barcode scanners. It provides mobile apps (iOS and Android) for scanning barcodes, NFC tags, and OCR text, paired with web services for managing scanning workflows (called "Services"), validation databases, app users, and scan records. The platform is used for access control, inventory tracking, attendance, ticket validation, asset management, and similar use cases.
+An API key from account settings is sent as `api_key` in a form-encoded POST body. The normal endpoint is `https://api.codereadr.com/api/`; barcode images use `https://barcode.codereadr.com/api/`. Requests select an operation using `section` and `action`. Normal operations return XML with a success status or provider error code and text. The deprecated `generate_barcode` tool preserves its original API-key GET URL behavior for compatibility; current provider documentation disables GET by default. API keys have no documented refresh flow. No account-owner profile or self-identity endpoint is documented; app users are distinct from the account authenticated by the API key.
 
-## Authentication
+## Capabilities
 
-CodeREADr uses API keys for authentication. All API requests are made to a single endpoint: `https://api.codereadr.com/api/`.
+- Services: retrieve, create, update, delete, authorize or revoke app users, attach or remove questions, and configure documented postback forwarding options. On question association, required=true sends the selected question IDs; required=false or omitted sends no mandatory-ID list. When selecting all questions with required=true, authorized question IDs are retrieved and sent explicitly. Service updates accept optional comma-separated symbologies. Omission resets symbologies to the provider default even when only updating another setting; provide the current selection from service settings to retain custom formats. The retrieval documentation does not specify a current-selection response field, so no automatic preservation is attempted.
+- App users: retrieve, create, update, delete, and configure device allowances. Email usernames receive invitations; other usernames require a password.
+- Validation databases: retrieve, create, rename, delete, clear, search values, and add, upsert, edit, or delete values. Bulk upsert supports at most 100 values and preserves explicitly empty response text. Values support up to 500 characters.
+- Scans: retrieve with filters and limit/offset pagination, retain names plus available relationship IDs, include properties when requested, and delete selected records. Scan upload discovery supplies IDs for filtering scan retrieval.
+- Questions: retrieve, create, edit text and external identifiers, delete, and add or remove answer options. Question type is fixed at creation.
+- Devices: retrieve and rename registered devices.
+- API limits: retrieve each tracked metric's allowance and remaining requests; -1 means unlimited.
+- Barcode images: `generate_barcode_file` POSTs generation parameters, validates the returned image format or XML error, and provides a downloadable PNG, JPEG, or GIF with filename and MIME metadata. The deprecated `generate_barcode` tool retains its original input/output schema and handler, including a credential-bearing `barcodeUrl`; it has not been secured or made compatible with the current GET restriction. Branded image settings may require a paid plan.
 
-The API key is passed as a parameter (`api_key`) in each request. Requests include the `api_key` parameter along with `section` and `action` parameters to specify what operation to perform.
+List endpoints return the provider's list without an invented pagination envelope. Scan and database-value searches expose the provider's limit/offset inputs; an offset requires an explicit limit. Provider field spellings remain available in existing extensible outputs alongside the advertised camel-case aliases. No CSV database upload, scan-property mutation, kiosk configuration, scan-validation endpoint, or trigger lifecycle is exposed by this package.
 
-For example, to retrieve users:
+## Official references
 
-```
-POST https://api.codereadr.com/api/
-  section=users
-  action=retrieve
-  api_key=YOUR_API_KEY
-```
-
-The API key can be found in your CodeREADr account settings. All API calls are made via HTTP POST with `application/x-www-form-urlencoded` or `multipart/form-data` encoding. You can optionally define specific IP address ranges which are permitted to call your account APIs for additional security.
-
-API functionality is limited for Free Plan users — a paid plan is required for full API access.
-
-## Features
-
-### Service Management
-
-A Service is a custom workflow you create to enable app users to capture and collect data exactly as you need. Through the API, you can create, edit, retrieve, and delete services. Service types include Record Scans (general data collection), Validate Scans (compare scans against a database), and Check In/Out (track status of scanned values). Services can be configured with advanced settings such as postback URLs, duplicate prevention, date-based access limits, GPS tracking, kiosk mode, and scan filtering rules.
-
-### User Management
-
-App Users are authorized users who access the mobile app under your administration, and you can create multiple user accounts. The API allows you to create, retrieve, update, and delete app users and manage which services they can access.
-
-### Database Management
-
-A Database is a repository of barcode values against which scans are validated, optionally displaying specific responses upon scanning. You can use the API to add, delete and edit individual database values, along with their associated response text and validation status. Databases can be populated by uploading CSV files or inserting/updating values individually or in bulk (up to 100 values per request). Multiple services can use the same database, but each service can only be linked to one database.
-
-### Scan Records Retrieval
-
-The Scans Retrieve API allows you to auto-fetch, modify, and insert scan records into third-party databases. You can filter scan records by service, user, date range, barcode value, and other criteria. Scan records include metadata such as who scanned, what was scanned, timestamps, GPS coordinates, and associated question answers.
-
-### Questions (Data Collection Forms)
-
-The "Questions" feature allows you to create prompts for app users to answer and submit alongside their scans. Questions can be answered through various inputs including text, scans, dropdowns, photos, signatures, and GPS locations. The API supports creating and managing these question definitions. Session questions can be configured to ask once and submit with each subsequent scan.
-
-### Barcode Generation
-
-Any value in a database uploaded to CodeREADr can be generated into a barcode. The API can generate QR codes and PDF417 barcodes with configurable size (1–10, in 50px increments).
-
-### Postback URL / Direct Scan to URL (DSU)
-
-A Postback URL enables seamless data exchange between the CodeREADr app and your designated server — every barcode scan is immediately sent via an HTTP POST request to a URL you specify. Your server can respond with validation results displayed in the app. With DSU, all scan records are posted directly to your server from the barcode scanner, and no scan records are sent to CodeREADr's servers. A "Receiver Only" mode allows CodeREADr to act as a conduit, forwarding scans without requiring your server to respond.
-
-### Device Management
-
-The API supports managing devices associated with your account, including configuring kiosk mode settings for dedicated scanning terminals.
-
-## Events
-
-CodeREADr supports real-time scan data forwarding through its **Postback URL** mechanism, which functions as a webhook system.
-
-### Scan Postback (Webhook)
-
-When a barcode is scanned, the app sends an HTTP POST request to your server, including data such as the scanned barcode value. The POST includes key-value pairs with scan metadata (barcode value, user, timestamp, service ID, device info, GPS data, and question answers). Two modes are available:
-
-- **Full Postback**: Your server receives the scan and must respond with an XML result (valid/invalid) that is displayed to the app user in real-time.
-- **Receiver Only**: CodeREADr's server acts as a conduit, records all transactions, and forwards scan data to your server. Server responses are optional.
-
-Configuration is done per-service through the service's advanced settings by specifying the destination URL. Custom HTTP headers are not currently supported, but a custom key can be appended as a query parameter to the URL for verification purposes.
+- [Overview](https://developer.codereadr.com/1.0/api/overview/)
+- [Services](https://developer.codereadr.com/1.0/api/services/)
+- [Users](https://developer.codereadr.com/1.0/api/users/)
+- [Databases](https://developer.codereadr.com/1.0/api/databases/)
+- [Scans](https://developer.codereadr.com/1.0/api/scans/)
+- [Questions](https://developer.codereadr.com/1.0/api/questions/)
+- [Devices](https://developer.codereadr.com/1.0/api/devices/)
+- [Barcode generator](https://developer.codereadr.com/1.0/api/barcode-generator/)
+- [Limits](https://developer.codereadr.com/1.0/api/limits/)
+- [Scan uploads](https://developer.codereadr.com/1.0/api/uploads/)
+- [Scan properties](https://developer.codereadr.com/1.0/api/scan-properties/)
+- [Errors](https://developer.codereadr.com/1.0/reference/error-codes/)

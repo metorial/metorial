@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FinageClient } from '../lib/client';
+import { finageRecords, finageString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getSectorPerformance = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let getSectorPerformance = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       sectors: z
         .array(
           z.object({
@@ -26,17 +28,17 @@ export let getSectorPerformance = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FinageClient({ token: ctx.auth.token });
-
     let data = await client.getSectorPerformance();
-
-    let rawSectors = Array.isArray(data) ? data : data?.sectors || data?.results || [];
-    let sectors = rawSectors.map((s: any) => ({
-      sector: s.sector ?? s.name,
-      changePercentage: s.changesPercentage ?? s.change_percentage ?? s.performance
-    }));
-
+    let sectors = finageRecords(data, ['sectors', 'results']).map(s =>
+      pickDefined({
+        sector: finageString(s.sector ?? s.name),
+        changePercentage: finageString(
+          s.changesPercentage ?? s.change_percentage ?? s.performance
+        )
+      })
+    );
     return {
-      output: { sectors },
+      output: { sectors, raw: data },
       message: `Retrieved performance data for **${sectors.length}** sectors.`
     };
   })

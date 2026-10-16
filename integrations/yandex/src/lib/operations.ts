@@ -8,7 +8,7 @@ export let listOperations = async (
 ) => {
   let client = createServiceClient('https://operation.api.cloud.yandex.net', auth);
   let params: Record<string, string | number> = { folderId };
-  if (pageSize) params.pageSize = pageSize;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   if (pageToken) params.pageToken = pageToken;
   let response = await client.get('/operations/v1/operations', { params });
   return response.data;
@@ -16,6 +16,6 @@ export let listOperations = async (
 
 export let getOperation = async (auth: AuthType, operationId: string) => {
   let client = createServiceClient('https://operation.api.cloud.yandex.net', auth);
-  let response = await client.get(`/operations/v1/operations/${operationId}`);
+  let response = await client.get(`/operations/${encodeURIComponent(operationId)}`);
   return response.data;
 };

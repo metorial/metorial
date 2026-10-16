@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requiredTicker, responseObject } from '../lib/response';
 import { spec } from '../spec';
 
 export let getTickerDetails = SlateTool.create(spec, {
   name: 'Get Ticker Details',
   key: 'get_ticker_details',
-  description: `Retrieve detailed information about a ticker symbol including company name, description, market cap, SIC code, homepage URL, address, and more. Useful for fundamental research and company lookups.`,
+  description: `Retrieve detailed information about a ticker symbol including company name, description, market cap, SIC code, homepage URL, and more. Useful for fundamental research and company lookups.`,
   tags: {
     readOnly: true
   }
@@ -24,7 +25,7 @@ export let getTickerDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      ticker: z.string().describe('Ticker symbol'),
+      ticker: z.string().optional().describe('Ticker symbol'),
       name: z.string().optional().describe('Company name'),
       market: z.string().optional().describe('Market type (stocks, crypto, fx, otc, indices)'),
       locale: z.string().optional().describe('Locale of the asset'),
@@ -59,33 +60,35 @@ export let getTickerDetails = SlateTool.create(spec, {
       date: ctx.input.date
     });
 
-    let r = data.results || {};
+    let r = data.results == null ? undefined : responseObject(data.results, 'ticker details');
+    if (!r) return { output: {}, message: `No details returned for **${ctx.input.ticker}**.` };
+    requiredTicker(r.ticker);
 
     return {
       output: {
-        ticker: r.ticker || ctx.input.ticker,
-        name: r.name,
-        market: r.market,
-        locale: r.locale,
-        primaryExchange: r.primary_exchange,
-        type: r.type,
-        active: r.active,
-        currencyName: r.currency_name,
-        cik: r.cik,
-        compositeFigi: r.composite_figi,
-        shareClassFigi: r.share_class_figi,
-        marketCap: r.market_cap,
-        phoneNumber: r.phone_number,
-        description: r.description,
-        sicCode: r.sic_code,
-        sicDescription: r.sic_description,
-        tickerRoot: r.ticker_root,
-        homepageUrl: r.homepage_url,
-        totalEmployees: r.total_employees,
-        listDate: r.list_date,
-        shareClassSharesOutstanding: r.share_class_shares_outstanding,
-        weightedSharesOutstanding: r.weighted_shares_outstanding,
-        roundLot: r.round_lot
+        ticker: r.ticker ?? undefined,
+        name: r.name ?? undefined,
+        market: r.market ?? undefined,
+        locale: r.locale ?? undefined,
+        primaryExchange: r.primary_exchange ?? undefined,
+        type: r.type ?? undefined,
+        active: r.active ?? undefined,
+        currencyName: r.currency_name ?? undefined,
+        cik: r.cik ?? undefined,
+        compositeFigi: r.composite_figi ?? undefined,
+        shareClassFigi: r.share_class_figi ?? undefined,
+        marketCap: r.market_cap ?? undefined,
+        phoneNumber: r.phone_number ?? undefined,
+        description: r.description ?? undefined,
+        sicCode: r.sic_code ?? undefined,
+        sicDescription: r.sic_description ?? undefined,
+        tickerRoot: r.ticker_root ?? undefined,
+        homepageUrl: r.homepage_url ?? undefined,
+        totalEmployees: r.total_employees ?? undefined,
+        listDate: r.list_date ?? undefined,
+        shareClassSharesOutstanding: r.share_class_shares_outstanding ?? undefined,
+        weightedSharesOutstanding: r.weighted_shares_outstanding ?? undefined,
+        roundLot: r.round_lot ?? undefined
       },
       message: `Retrieved details for **${r.name || ctx.input.ticker}** (${r.ticker || ctx.input.ticker}) — ${r.market || 'unknown market'}, ${r.active ? 'active' : 'inactive'}.`
     };

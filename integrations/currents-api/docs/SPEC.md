@@ -1,67 +1,78 @@
-# Slates Specification for Currents API
-
-## Overview
-
-Currents News API provides a comprehensive solution for curating global news and delivering it in a parseable JSON format. News articles from 70 countries and 18 different languages are added daily, monitoring over 43,552 news domains to provide the latest updates. The API provides access to both real-time and historical news articles from news sources, blogs, and forums.
+# Currents API Specification
 
 ## Authentication
 
-Authentication is handled with a simple API key. You can attach your API key to a request in one of two ways: via the `Authorization` HTTP header, or via the `apiKey` query string parameter.
+Connect with the API key from the Currents dashboard. The integration sends the
+stored key in the `Authorization` header; Currents accepts either the bare key or
+`Bearer <key>`. API keys have no documented OAuth refresh or invented expiry.
+`check_api_key` calls the documented `/v1/auth` token-check endpoint and returns its
+original response. This is a key-validity check, not an account identity endpoint.
+No suitable user/profile/self endpoint is documented.
 
-To obtain an API key:
+## Tool coverage
 
-1. Go to https://currentsapi.services/ and sign up for a free account. Once logged in, you will be given an API key that you will use to authenticate your requests.
+| Tool | Provider operation | Behavior |
+| --- | --- | --- |
+| `list_latest_news` | `GET /v1/latest-news` | Latest feed; language, country, legacy category, type, domain, excluded domain, author, and pagination filters |
+| `search_news` | `GET /v1/search` | Existing keyword/date/type/domain/page filters plus boolean query, author, image/description presence, result limit, and complete raw response |
+| `search_news_v2` | `GET /v2/search` | Canonical V2 taxonomy, cursor and offset pagination, search/date/publisher/metadata filters; original article and response fields |
+| `get_available_filters` | `GET /v1/available/*` or `/v2/available/*` | Language and region name-to-code maps and categories; optional version defaults to V1 |
+| `check_api_key` | `GET /v1/auth` | Original token-check response; no guessed account or quota fields |
+| `get_latest_news` | `GET /v1/latest-news` | Deprecated legacy handler retained with its original schema and request, including the keyword input |
+| `get_news_sources` | `GET /v1/sources` | Unchanged legacy source-directory handler; current official docs/spec do not list the route |
+| `get_source_news` | `GET /v1/source` | Unchanged legacy source-ID handler; current official docs/spec do not list the route |
 
-**Header-based authentication example:**
+The absence of the two legacy source routes from current documentation does not
+establish their retirement. Their availability remains unverified. Supported
+source-domain filtering is available in `list_latest_news` and the search tools.
 
-```
-Authorization: YOUR_API_KEY
-```
+## Compatibility and pagination
 
-**Query parameter authentication example:**
+V1 remains supported and uses its legacy category names. Use
+`get_available_filters` with `apiVersion: "v2"` before V2 searches, because the V2
+canonical categories differ. Both versions are one news API product, so tools do
+not need separate product categories.
 
-```
-https://api.currentsapi.services/v1/latest-news?apiKey=YOUR_API_KEY
-```
+Latest News explicitly rejects `keywords`, `query`, date ranges, `limit`, image and
+description presence flags, and cursors. This positive incompatibility is why
+`list_latest_news` replaces the old latest tool while its exact old handler and
+input/output schemas remain registered. Topic searches use Search.
 
-If the API key is not appended correctly, or if the API key is invalid, you will receive the following HTTP error "401 - Unauthorized".
+Page numbers range from 1 to 180 and page sizes have a hard maximum of 300;
+account plans may apply smaller caps. Search offset requests where
+`(page_number - 1) * page_size > 5000` are rejected. V2 search supports the opaque
+`next_cursor` continuation token; pass it back unchanged with the same filters.
+Date filters require RFC 3339 timestamps and plan-specific spans/history.
+`keywords` takes precedence over `query` when both are provided.
+Image and description filters are presence flags at the provider, so the
+integration sends them only when the corresponding input is true.
 
-## Features
+Existing inputs retain their original types and legacy falsy omission behavior.
+Legacy article summaries retain their historical empty-string/array/page defaults;
+`search_news.raw` and both new news tools preserve the actual provider fields,
+including nulls, source-category metadata, and timestamps. The new news tools do
+not manufacture missing values. No existing output-requiredness exceptions apply.
+Publisher and image URLs remain original provider data; the API does not provide
+file-generation or download operations needing a different output mechanism.
 
-### Latest News Retrieval
+Errors use the shared service-error adapter, preserving HTTP status, provider
+codes, and `msg`/nested detail messages, including responses normalized by the HTTP
+client. The integration also rejects provider error envelopes returned with a
+successful HTTP status. No live provider requests were used for this refresh.
 
-The Latest News Endpoint provides a real-time stream of international news articles from diverse sources. Use this endpoint to fetch the most recent news and stay updated on global events.
+No current official API operation supports the previously advertised trend or
+sentiment analysis; those capability claims have been removed. No webhook or
+event-subscription operations are documented.
 
-- Can be filtered by language (defaults to English). Supported language codes are available at `/v1/available/languages`.
-- Each article includes title, description, image URL, publication date, category, author, and source information.
+## Official references
 
-### News Search
+- [Quick start and V1/V2 compatibility](https://currentsapi.services/en/docs/)
+- [V1 OpenAPI specification](https://currentsapi.services/json/swagger.json)
+- [Authentication and token check](https://currentsapi.services/en/docs/authentication)
+- [Latest News filters and rejected search-only parameters](https://currentsapi.services/en/docs/latest_news)
+- [Search, canonical taxonomy, and cursor pagination](https://currentsapi.services/en/docs/search)
+- [Error responses](https://currentsapi.services/en/docs/errors)
 
-The Search Endpoint allows you to search through tens of millions of articles from over 14,000 news sources and blogs, including breaking news, blog articles, and forum content.
-
-- **Keywords**: Search for exact matches of words in titles or descriptions.
-- **Language**: Filter results by language code. Codes available via `/v1/available/languages`.
-- **Date range**: `start_date` and `end_date` parameters to search for news published within a specific time window, in RFC 3339 format.
-- **Content type**: Filter by type — news (1), articles (2), or discussion content (3).
-- **Country**: Filter by the country code of the news source. Codes available via `/v1/available/regions`.
-- **Category**: Filter results by news category. Categories available via `/v1/available/categories`.
-- **Domain filtering**: Filter results by specific website domains, or exclude specific domains from results.
-- **Page size**: Specify the number of articles per page.
-
-Available categories include: regional, technology, lifestyle, business, general, programming, science, entertainment, world, sports, finance, academia, politics, health, opinion, food, and game.
-
-### News Source Discovery
-
-You can get a list of available news sources, and retrieve news articles from a specific news source. Sources can be filtered by language and category.
-
-### Reference Data
-
-The API provides endpoints for retrieving lists of supported languages, regions, and categories for filtering news. These helper endpoints (`/v1/available/languages`, `/v1/available/regions`, `/v1/available/categories`) allow you to discover valid filter values dynamically.
-
-### Trend and Sentiment Analysis
-
-You can understand the number of articles that mention a specific topic over a period of time, which allows a pulse check of trending topics. You can also get insights into changes in sentiment specific to topics of interest, for example, sentiment of news on a specific company.
-
-## Events
-
-The provider does not support events. Currents API is a read-only news data API with no webhooks, event subscriptions, or purpose-built polling mechanisms.
+Verified against the public references on 2026-10-15. Local schema/build checks
+do not prove live acceptance, source-route availability, account-plan limits, or
+production response shapes.

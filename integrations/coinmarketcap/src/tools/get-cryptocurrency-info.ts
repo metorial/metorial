@@ -32,7 +32,7 @@ let infoSchema = z.object({
   symbol: z.string().describe('Cryptocurrency ticker symbol'),
   slug: z.string().describe('URL-friendly slug'),
   category: z.string().describe('Category (coin or token)'),
-  description: z.string().describe('Cryptocurrency description'),
+  description: z.string().optional().describe('Cryptocurrency description, when available'),
   dateAdded: z.string().describe('Date added to CoinMarketCap'),
   dateLaunched: z.string().nullable().describe('Launch date'),
   logo: z.string().describe('URL of the logo image (64x64 PNG by default)'),
@@ -66,6 +66,7 @@ export let getCryptocurrencyInfo = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Unmodified provider response'),
       cryptocurrencies: z.array(infoSchema).describe('List of cryptocurrency metadata')
     })
   )
@@ -91,23 +92,23 @@ export let getCryptocurrencyInfo = SlateTool.create(spec, {
           symbol: item.symbol,
           slug: item.slug,
           category: item.category,
-          description: item.description,
+          description: item.description ?? undefined,
           dateAdded: item.dateAdded,
-          dateLaunched: item.dateLaunched,
+          dateLaunched: item.dateLaunched ?? null,
           logo: item.logo,
           tags: item.tags || [],
           platform: item.platform,
-          urls: item.urls || {
-            website: [],
-            twitter: [],
-            messageBoard: [],
-            chat: [],
-            facebook: [],
-            explorer: [],
-            reddit: [],
-            technicalDoc: [],
-            sourceCode: [],
-            announcement: []
+          urls: {
+            website: item.urls?.website ?? [],
+            twitter: item.urls?.twitter ?? [],
+            messageBoard: item.urls?.messageBoard ?? [],
+            chat: item.urls?.chat ?? [],
+            facebook: item.urls?.facebook ?? [],
+            explorer: item.urls?.explorer ?? [],
+            reddit: item.urls?.reddit ?? [],
+            technicalDoc: item.urls?.technicalDoc ?? [],
+            sourceCode: item.urls?.sourceCode ?? [],
+            announcement: item.urls?.announcement ?? []
           }
         });
       }
@@ -120,7 +121,7 @@ export let getCryptocurrencyInfo = SlateTool.create(spec, {
         : `No metadata found for the specified cryptocurrencies.`;
 
     return {
-      output: { cryptocurrencies },
+      output: { cryptocurrencies, raw: client.rawResponse },
       message
     };
   })

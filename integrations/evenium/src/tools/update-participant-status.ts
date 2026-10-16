@@ -34,7 +34,8 @@ export let updateParticipantStatus = SlateTool.create(spec, {
     z.object({
       contactId: z.string().describe('Contact ID of the participant'),
       eventId: z.string().describe('Event ID'),
-      status: z.string().describe('Updated registration status')
+      status: z.string().describe('Updated registration status'),
+      raw: z.unknown().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -50,7 +51,8 @@ export let updateParticipantStatus = SlateTool.create(spec, {
       output: {
         contactId: ctx.input.contactId,
         eventId: ctx.input.eventId,
-        status: result.status ?? ctx.input.status
+        status: result.status ?? ctx.input.status,
+        raw: result.raw
       },
       message: `Updated participant \`${ctx.input.contactId}\` status to **${ctx.input.status}** on event \`${ctx.input.eventId}\`.`
     };

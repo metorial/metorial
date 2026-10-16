@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { BitqueryClient } from '../lib/client';
+import { BitqueryClient, toBitqueryNumber } from '../lib/client';
 import { spec } from '../spec';
 
 let _evmNetworkSchema = z
@@ -103,7 +103,7 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
   .handleInvocation(async ctx => {
     let client = new BitqueryClient({
       token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion as 'v1' | 'v2'
+      apiVersion: ctx.auth.apiVersion
     });
 
     let { blockchain, baseCurrency, quoteCurrency, dexProtocol, since, till, limit } =
@@ -113,7 +113,7 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
 
     let trades: z.infer<typeof tradeOutputSchema>[] = [];
 
-    if (ctx.config.apiVersion === 'v1' && blockchain !== 'solana') {
+    if (ctx.auth.apiVersion === 'v1' && blockchain !== 'solana') {
       let query = buildV1DexTradesQuery(baseCurrency, quoteCurrency, dexProtocol, since, till);
       let variables: Record<string, any> = {
         network: mapToV1Network(blockchain),
@@ -130,12 +130,12 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
       let rawTrades = data?.ethereum?.dexTrades || [];
 
       trades = rawTrades.map((t: any) => ({
-        blockTime: t.block?.timestamp?.iso8601 || '',
+        blockTime: t.block?.timestamp?.iso8601,
         blockNumber: t.block?.height,
-        transactionHash: t.transaction?.hash || '',
-        amount: t.baseAmount,
-        amountInUsd: t.tradeAmount,
-        price: t.quotePrice,
+        transactionHash: t.transaction?.hash,
+        amount: toBitqueryNumber(t.baseAmount),
+        amountInUsd: toBitqueryNumber(t.tradeAmount),
+        price: toBitqueryNumber(t.quotePrice),
         baseTokenSymbol: t.baseCurrency?.symbol,
         baseTokenName: t.baseCurrency?.name,
         baseTokenAddress: t.baseCurrency?.address,
@@ -146,8 +146,16 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
         sideType: t.side
       }));
     } else if (blockchain === 'solana') {
-      let query = buildSolanaDexTradesQuery(baseCurrency, quoteCurrency, since, till);
+      client.requireV2('Solana convenience queries');
+      let query = buildSolanaDexTradesQuery(
+        baseCurrency,
+        quoteCurrency,
+        dexProtocol,
+        since,
+        till
+      );
       let variables: Record<string, any> = { limit };
+      if (dexProtocol) variables.exchange = dexProtocol;
       if (baseCurrency) variables.baseCurrency = baseCurrency;
       if (quoteCurrency) variables.quoteCurrency = quoteCurrency;
       if (since) variables.since = since;
@@ -157,13 +165,13 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
       let rawTrades = data?.Solana?.DEXTradeByTokens || [];
 
       trades = rawTrades.map((t: any) => ({
-        blockTime: t.Block?.Time || '',
+        blockTime: t.Block?.Time,
         blockNumber: t.Block?.Slot,
-        transactionHash: t.Transaction?.Signature || '',
-        amount: t.Trade?.Amount,
-        amountInUsd: t.Trade?.AmountInUSD,
-        price: t.Trade?.Price,
-        priceInUsd: t.Trade?.PriceInUSD,
+        transactionHash: t.Transaction?.Signature,
+        amount: toBitqueryNumber(t.Trade?.Amount),
+        amountInUsd: toBitqueryNumber(t.Trade?.AmountInUSD),
+        price: toBitqueryNumber(t.Trade?.Price),
+        priceInUsd: toBitqueryNumber(t.Trade?.PriceInUSD),
         baseTokenSymbol: t.Trade?.Currency?.Symbol,
         baseTokenName: t.Trade?.Currency?.Name,
         baseTokenAddress: t.Trade?.Currency?.MintAddress,
@@ -173,8 +181,8 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
         dexProtocol: t.Trade?.Dex?.ProtocolName,
         dexFamily: t.Trade?.Dex?.ProtocolFamily,
         sideType: t.Trade?.Side?.Type,
-        sideAmount: t.Trade?.Side?.Amount,
-        sideAmountInUsd: t.Trade?.Side?.AmountInUSD
+        sideAmount: toBitqueryNumber(t.Trade?.Side?.Amount),
+        sideAmountInUsd: toBitqueryNumber(t.Trade?.Side?.AmountInUSD)
       }));
     } else {
       // V2 EVM query
@@ -199,13 +207,13 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
       let rawTrades = data?.EVM?.DEXTradeByTokens || [];
 
       trades = rawTrades.map((t: any) => ({
-        blockTime: t.Block?.Time || '',
+        blockTime: t.Block?.Time,
         blockNumber: t.Block?.Number,
-        transactionHash: t.Transaction?.Hash || '',
-        amount: t.Trade?.Amount,
-        amountInUsd: t.Trade?.AmountInUSD,
-        price: t.Trade?.Price,
-        priceInUsd: t.Trade?.PriceInUSD,
+        transactionHash: t.Transaction?.Hash,
+        amount: toBitqueryNumber(t.Trade?.Amount),
+        amountInUsd: toBitqueryNumber(t.Trade?.AmountInUSD),
+        price: toBitqueryNumber(t.Trade?.Price),
+        priceInUsd: toBitqueryNumber(t.Trade?.PriceInUSD),
         baseTokenSymbol: t.Trade?.Currency?.Symbol,
         baseTokenName: t.Trade?.Currency?.Name,
         baseTokenAddress: t.Trade?.Currency?.SmartContract,
@@ -215,8 +223,8 @@ Supports major DEXs like Uniswap, PancakeSwap, Raydium, Jupiter, and more across
         dexProtocol: t.Trade?.Dex?.ProtocolName,
         dexFamily: t.Trade?.Dex?.ProtocolFamily,
         sideType: t.Trade?.Side?.Type,
-        sideAmount: t.Trade?.Side?.Amount,
-        sideAmountInUsd: t.Trade?.Side?.AmountInUSD
+        sideAmount: toBitqueryNumber(t.Trade?.Side?.Amount),
+        sideAmountInUsd: toBitqueryNumber(t.Trade?.Side?.AmountInUSD)
       }));
     }
 
@@ -238,7 +246,7 @@ let mapToV1Network = (chain: string): string => {
     arbitrum: 'arbitrum',
     base: 'base',
     optimism: 'optimism',
-    avalanche: 'avalanche_c',
+    avalanche: 'avalanche',
     fantom: 'fantom',
     cronos: 'cronos'
   };
@@ -254,7 +262,10 @@ let buildV1DexTradesQuery = (
 ): string => {
   let filters: string[] = [];
   filters.push('options: {limit: $limit, offset: $offset, desc: "block.timestamp.iso8601"}');
-  if (since || till) filters.push('date: {since: $since, till: $till}');
+  if (since || till)
+    filters.push(
+      `date: {${since ? 'since: $since' : ''}${since && till ? ', ' : ''}${till ? 'till: $till' : ''}}`
+    );
   if (baseCurrency) filters.push('baseCurrency: {is: $baseCurrency}');
   if (quoteCurrency) filters.push('quoteCurrency: {is: $quoteCurrency}');
   if (exchange) filters.push('exchangeName: {is: $exchange}');
@@ -339,6 +350,7 @@ let buildV2EvmDexTradesQuery = (
 let buildSolanaDexTradesQuery = (
   baseCurrency?: string,
   quoteCurrency?: string,
+  exchange?: string,
   since?: string,
   till?: string
 ): string => {
@@ -347,16 +359,21 @@ let buildSolanaDexTradesQuery = (
   if (quoteCurrency)
     whereFilters.push('Side: {Currency: {MintAddress: {is: $quoteCurrency}}}');
 
+  let dexFilter = exchange
+    ? 'any: [{Trade: {Dex: {ProtocolName: {is: $exchange}}}}, {Trade: {Dex: {ProtocolFamily: {is: $exchange}}}}]'
+    : '';
+
   let tradeFilter = whereFilters.length > 0 ? `Trade: {${whereFilters.join(', ')}}` : '';
   let timeFilter =
     since || till
       ? `Block: {Time: {${since ? 'since: $since' : ''}${since && till ? ', ' : ''}${till ? 'till: $till' : ''}}}`
       : '';
 
-  let allWhereFilters = [tradeFilter, timeFilter].filter(Boolean).join(', ');
+  let allWhereFilters = [tradeFilter, dexFilter, timeFilter].filter(Boolean).join(', ');
   let whereClause = allWhereFilters ? `where: {${allWhereFilters}}` : '';
 
   let varDefs: string[] = ['$limit: Int!'];
+  if (exchange) varDefs.push('$exchange: String');
   if (baseCurrency) varDefs.push('$baseCurrency: String');
   if (quoteCurrency) varDefs.push('$quoteCurrency: String');
   if (since) varDefs.push('$since: DateTime');

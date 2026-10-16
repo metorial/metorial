@@ -1,82 +1,48 @@
-# Slates Specification for BigDataCloud
+# BigDataCloud Tool Reference
 
-## Overview
+## Connection
 
-BigDataCloud is a data services provider offering APIs for IP geolocation, reverse geocoding, phone and email verification, and network engineering intelligence. All APIs are bundled into five packages: IP Geolocation, Reverse Geocoding, Phone & Email Verification, Network Engineering, and a Free API Package (which doesn't require account creation or an API key). Both REST and GraphQL interfaces are supported.
+Use the API key from Account → Credentials in your BigDataCloud dashboard. Requests use `https://api-bdc.net` and the documented `x-bdc-key` header. An optional `localityLanguage` connection setting controls localised names and defaults to `en`. API keys can take up to ten minutes to propagate.
 
-## Authentication
+API-key authentication has no OAuth refresh flow. There are no required account/workspace identifiers. The documented public API has no account/profile identity endpoint.
 
-BigDataCloud uses **API key** authentication for its premium (non-free) endpoints.
+## Tools
 
-- To access BigDataCloud's premium API services, simply create an account and obtain your API key. Click the "Sign Up" button at the top-right corner of the website and follow the registration process.
-- No credit card or sensitive information is required to join.
-- You can access any and all BigDataCloud APIs with a free API Key. To get your API Key, access your account and retrieve it from your Account Dashboard.
-- The API key is passed as a query parameter named `key` in each request. For example: `https://api-bdc.net/data/reverse-geocode?latitude=-34.93&longitude=138.59&key=[YOUR API KEY]`
-- After registration, you'll receive a unique API key. Allow up to 10 minutes for your key to propagate across the API server network.
-- **Free (client-side) endpoints** do not require an API key or account. The free client-side endpoint does not require an API key and is designed to work directly in the browser or device application.
+| Tool | Endpoint | Behaviour |
+| --- | --- | --- |
+| `geolocate_ip` | `/data/ip-geolocation-full` | Geographic location, country, network, confidence polygon and hazard report. |
+| `assess_ip_risk` | `/data/ip-geolocation-full` | Flattens hazard flags and exposes the full provider response as `raw`. `securityThreat` is descriptive text, not a low/moderate/high enum. |
+| `reverse_geocode` | `/data/reverse-geocode-with-timezone` | Locality and `timeZone` data for coordinates. Existing `timezone` output remains supported if supplied by the provider. |
+| `validate_phone_number` | `/data/phone-number-validate` | Sends `phoneNumber` as `number`, plus optional ISO country code. Returns validity and formats; no SMS or call is made. |
+| `verify_email` | `/data/email-verify` | Syntax, domain mail-server and disposable/spam-domain checks; does not guarantee mailbox delivery. |
+| `lookup_asn` | `/data/asn-info-full` | Sends existing `limit` as provider `peersCap`, capped at 50; exposes totals and `confidenceArea` when available. |
+| `lookup_network` | `/data/network-by-ip` | Network registration, BGP prefix, address count and carriers. |
+| `get_country_info` | `/data/country-info` | ISO country information, currency, calling code and languages. |
+| `get_timezone_info` | `/data/timezone-info` | IANA identifier plus optional UTC Unix seconds; returns current or reference local time and offset. |
+| `list_asn_peers` | `/data/asn-info-receiving-from`, `/data/asn-info-transit-to` | `direction` selects the relationship; `batchSize` is at most 50, `offset` skips entries. |
+| `lookup_networks_by_cidr` | `/data/network-by-cidr` | IPv4 CIDR network hierarchy; `subnetsBatchSize` is at most 20, `subnetsOffset` pages subnets, `depthLimit` controls nesting. |
 
-**Base URLs:**
+All tools are read-only. IP omission resolves the execution server’s public IP, not the end user’s device. Time zone UTC offsets are provider-formatted strings under `timeZone`; the legacy lowercase `timezone` contract is retained. Full provider objects pass through so additional fields remain available. Confidence polygons can contain multiple rings, separated where each ring repeats its first point.
 
-- `https://api.bigdatacloud.net/` (legacy)
-- `https://api-bdc.net/` (primary)
+## Limits and exclusions
 
-## Features
+The provider’s quota is monthly request volume; current authentication docs describe HTTP 402 for exhausted quota, while individual endpoint references also document 403. Failures retain provider HTTP status and response details. A CIDR lookup may return 406 if the range/depth produces too many results; narrow the request.
 
-### IP Geolocation
+The provider’s published API products are IP Geolocation, Reverse Geocoding, Phone & Email Verification, and Network Engineering. Tool categories follow those products. Browser/mobile-only free endpoints are unsuitable for server execution. GraphQL duplicates the covered REST workflows; global routing dumps, rankings, Tor directory and specialised parsers are not part of this practical lookup surface. No file outputs or event/webhook operations are provided.
 
-Determine the geographic location of an IP address (IPv4 or IPv6), including country, region, city, coordinates, and timezone data. This package offers precision IP geolocation, ISP/ASN intelligence, network type classification, confidence polygons, hazard/proxy detection, mobile differentiation and more.
+## Official documentation
 
-- **Parameters:** IP address (if omitted, the caller's IP is used), preferred locality language (ISO 639-1).
-- Responses include confidence levels (`low`, `moderate`, `high`) and a polygonal confidence area.
-- Provides timezone, currency, flags, country phone number code and other localised metrics for an IP address, with detailed locality information in 147 common world languages.
-
-### IP Hazard Report & User Risk Assessment
-
-Assess the security risk associated with an IP address. The Hazard Report API provides a consolidated, machine-readable assessment of IP address risk, combining reactive signals (evidence of past malicious behaviour such as blacklist appearances and known anonymiser detections) with proactive indicators.
-
-- Key outputs include hostingLikelihood (0–10), AS/provider context, anonymiser indicators, and related hazard flags.
-- Detects VPNs, proxies, Tor exit nodes, hosting networks, iCloud Private Relay, and bogon addresses.
-- The User Risk API provides a simplified version, categorising risk level as low, moderate, or high.
-
-### Reverse Geocoding
-
-Convert latitude/longitude coordinates into structured locality data (country, state/region, city, postcode). The administrative/non-administrative boundaries-based reverse geocoder provides accurate location data with full global coverage, including seas and oceans, and postal code level accuracy for select countries.
-
-- **Parameters:** Latitude, longitude, preferred locality language.
-- Supports locality names in 147 languages and FIPS codes for US geographic areas.
-- Also provides detailed timezone information based on geocoordinates.
-- A free client-side variant exists that falls back to IP-based geolocation when coordinates are unavailable.
-
-### Phone Number Validation
-
-Validate and format international phone numbers. BigDataCloud's Phone Number Validation API offers worldwide international and national phone number validation based on the E.164 numbering plan. It helps businesses maintain an accurate and clean customer database.
-
-- **Parameters:** Phone number, country code (ISO 3166-1), locality language.
-- Detects line type, including FIXED_LINE, MOBILE, TOLL_FREE, PREMIUM_RATE, VOIP, PAGER, and others.
-- Also supports IP-based country detection for phone validation (no explicit country code required).
-
-### Email Address Verification
-
-Validate email addresses for format compliance and deliverability. The API conducts full compliance verification against multiple standards including RFC 822, RFC 2822, and RFC 5321, ensuring accurate and reliable email validation results.
-
-- Avoids the use of illegal tactics, such as the broken SMTP handshake, during validation.
-- Identifies invalid, fake, or disposable/spam email addresses.
-
-### Network Engineering
-
-Access detailed internet infrastructure metadata. Provides the most complete and actively updated IP network metadata available: active BGP prefixes, peering relationships, RIR registry data and Autonomous System information, giving visibility into how the global Internet is structured.
-
-- Look up comprehensive ownership and connectivity reports for any Autonomous System Number (ASN).
-- Retrieve extended network information for individual IP addresses or CIDR ranges.
-- Designed for network and communication engineers, cyber security experts and IT support teams.
-
-### Client Info (Free)
-
-Get the user's current IP address with proxy, mobile, bot detection and user's roaming status, as well as public device OS and browser information.
-
-- No API key required; client-side only.
-- Includes a roaming detection API for mobile app developers.
-
-## Events
-
-The provider does not support events. BigDataCloud is a stateless data lookup service with no webhooks, event subscriptions, or purpose-built polling mechanisms.
+- [Developer hub and API products](https://www.bigdatacloud.com/docs)
+- [Authentication](https://www.bigdatacloud.com/docs/authentication)
+- [API domains](https://www.bigdatacloud.com/docs/api-domains)
+- [IP Geolocation API](https://www.bigdatacloud.com/ip-geolocation/ip-address-geolocation-with-confidence-area-and-hazard-report-api)
+- [Reverse Geocoding with Timezone](https://www.bigdatacloud.com/reverse-geocoding/reverse-geocode-with-timezone)
+- [Phone Number Validation](https://www.bigdatacloud.com/phone-email-verification/phone-number-validation-api)
+- [Email Verification](https://www.bigdatacloud.com/phone-email-verification/email-verify-api)
+- [ASN Info Extended](https://www.bigdatacloud.com/network-engineering/asn-info-extended-api)
+- [Network by IP](https://www.bigdatacloud.com/ip-geolocation/network-by-ip-address-api)
+- [Country Info](https://www.bigdatacloud.com/ip-geolocation/country-info-api)
+- [Time Zone Info](https://www.bigdatacloud.com/ip-geolocation/timezone-info-api)
+- [Receiving-from peers](https://www.bigdatacloud.com/network-engineering/asn-info-receiving-from)
+- [Transit-to peers](https://www.bigdatacloud.com/network-engineering/asn-info-transit-to)
+- [Networks by CIDR](https://www.bigdatacloud.com/network-engineering/networks-by-cidr-api)

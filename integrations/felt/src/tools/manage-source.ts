@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ To **update** a source, provide the source ID and updated connection/settings.
 To **sync** a source, provide the source ID and set sync to true.
 To **delete** a source, provide the source ID and set delete to true.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -45,6 +45,35 @@ To **delete** a source, provide the source ID and set delete to true.`,
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.delete || ctx.input.sync) && !ctx.input.sourceId) {
+      throw createApiServiceError(
+        'sourceId is required to sync or delete a source. Call list_sources to find it.'
+      );
+    }
+    if (ctx.input.delete && ctx.input.sync) {
+      throw createApiServiceError('Choose either sync or delete for a source.');
+    }
+    if (
+      (ctx.input.delete || ctx.input.sync) &&
+      (ctx.input.name !== undefined ||
+        ctx.input.connection !== undefined ||
+        ctx.input.permissions !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Sync or delete the source separately from property changes.'
+      );
+    }
+    if (
+      ctx.input.sourceId &&
+      !ctx.input.delete &&
+      !ctx.input.sync &&
+      ctx.input.name === undefined &&
+      ctx.input.connection === undefined &&
+      ctx.input.permissions === undefined
+    ) {
+      throw createApiServiceError('Provide at least one source property to update.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.delete && ctx.input.sourceId) {
@@ -61,13 +90,13 @@ To **delete** a source, provide the source ID and set delete to true.`,
     }
 
     if (ctx.input.sync && ctx.input.sourceId) {
-      await client.syncSource(ctx.input.sourceId);
+      let source = await client.syncSource(ctx.input.sourceId);
       return {
         output: {
           sourceId: ctx.input.sourceId,
           action: 'synced',
-          name: null,
-          syncStatus: 'syncing'
+          name: source.name ?? null,
+          syncStatus: source.sync_status ?? null
         },
         message: `Triggered sync for source \`${ctx.input.sourceId}\`.`
       };
@@ -92,7 +121,7 @@ To **delete** a source, provide the source ID and set delete to true.`,
     }
 
     if (!ctx.input.name || !ctx.input.connection) {
-      throw new Error('name and connection are required to create a source');
+      throw createApiServiceError('name and connection are required to create a source');
     }
 
     let source = await client.createSource({

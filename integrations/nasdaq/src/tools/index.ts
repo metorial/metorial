@@ -1,6 +1,8 @@
+export * from './data-link-discovery';
 export * from './export-table';
 export * from './get-bars';
 export * from './get-dataset-info';
+export * from './get-file-url';
 export * from './get-last-sale';
 export * from './get-options-chain';
 export * from './get-snapshot';
@@ -8,4 +10,5 @@ export * from './get-table-metadata';
 export * from './get-time-series';
 export * from './list-databases';
 export * from './query-table';
+export * from './realtime-discovery';
 export * from './search-datasets';

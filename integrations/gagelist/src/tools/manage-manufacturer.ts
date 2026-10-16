@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ Returns the full list of manufacturers available in your account, including thei
 
     let result = await client.listManufacturers();
 
-    let manufacturers = (result.data ?? []).map((m: any) => ({
+    let manufacturers = result.data.map((m: any) => ({
       manufacturerId: m.Id,
       name: m.Name,
       address: m.Address,
@@ -141,6 +141,9 @@ Provide the manufacturer ID and any fields to update.`,
     if (ctx.input.fax !== undefined) data.Fax = ctx.input.fax;
     if (ctx.input.website !== undefined) data.Website = ctx.input.website;
 
+    if (Object.keys(data).length === 1) {
+      throw createApiServiceError('Provide at least one manufacturer field to update.');
+    }
     let result = await client.updateManufacturer(data);
 
     return {

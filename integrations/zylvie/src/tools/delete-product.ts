@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let deleteProduct = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let deleteProduct = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponseSchema,
       status: z.string().describe('Status of the operation'),
       message: z.string().describe('Result message from the server')
     })
@@ -30,10 +32,11 @@ export let deleteProduct = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         status: result.status,
         message: result.message
       },
-      message: `${result.message} (product ID: \`${ctx.input.productId}\`).`
+      message: result.message
     };
   })
   .build();

@@ -6,11 +6,13 @@ import {
   getCryptocurrencyQuotes,
   getExchangeInfo,
   getGlobalMetrics,
+  getKeyInfo,
   getMarketPairs,
   listCryptocurrencies,
   listExchanges,
   listFiatCurrencies,
-  searchCryptocurrencies
+  searchCryptocurrencies,
+  searchExchanges
 } from './tools';
 
 export let provider = Slate.create({
@@ -25,7 +27,9 @@ export let provider = Slate.create({
     getMarketPairs,
     listExchanges,
     getExchangeInfo,
-    listFiatCurrencies
+    listFiatCurrencies,
+    getKeyInfo,
+    searchExchanges
   ],
   triggers: []
 });

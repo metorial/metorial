@@ -3,6 +3,10 @@ import { spec } from './spec';
 import {
   createInvoice,
   deleteInvoice,
+  downloadExpenseFile,
+  downloadInvoice,
+  getExpense,
+  getInvoice,
   getProduct,
   getProfile,
   listCurrencies,
@@ -14,12 +18,18 @@ import {
   manageCustomer,
   manageExpense,
   managePayment,
-  manageProduct
+  manageProduct,
+  updateInvoice
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     createInvoice,
+    updateInvoice,
+    getInvoice,
+    getExpense,
+    downloadInvoice,
+    downloadExpenseFile,
     listInvoices,
     deleteInvoice,
     manageCustomer,

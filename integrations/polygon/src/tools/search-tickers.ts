@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonCursor,
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  validatePolygonLimit
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let searchTickers = SlateTool.create(spec, {
@@ -13,6 +20,7 @@ export let searchTickers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: polygonCursor,
       search: z
         .string()
         .optional()
@@ -45,6 +53,7 @@ export let searchTickers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       count: z.number().optional().describe('Total matching results'),
       tickers: z
         .array(
@@ -64,9 +73,11 @@ export let searchTickers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePolygonLimit(ctx.input.limit, 1000);
     let client = new PolygonClient(ctx.auth.token);
 
     let response = await client.getTickers({
+      cursor: ctx.input.cursor,
       search: ctx.input.search,
       ticker: ctx.input.ticker,
       market: ctx.input.market,
@@ -78,7 +89,7 @@ export let searchTickers = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let tickers = (response.results || []).map((r: any) => ({
+    let tickers = polygonRecords(response.results).map((r: any) => ({
       ticker: r.ticker,
       name: r.name,
       market: r.market,
@@ -91,10 +102,13 @@ export let searchTickers = SlateTool.create(spec, {
     }));
 
     return {
-      output: {
-        count: response.count,
-        tickers
-      },
+      output: polygonOutput(
+        {
+          count: response.count,
+          tickers
+        },
+        response
+      ),
       message: `Found **${tickers.length}** tickers${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}${ctx.input.market ? ` in ${ctx.input.market} market` : ''}.`
     };
   })

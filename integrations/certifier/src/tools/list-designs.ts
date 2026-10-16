@@ -13,7 +13,10 @@ export let listDesigns = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Number of designs per page (default: 20)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of designs per page (whole number 1–100; default: 20)'),
       cursor: z.string().optional().describe('Pagination cursor for fetching the next page')
     })
   )
@@ -49,10 +52,10 @@ export let listDesigns = SlateTool.create(spec, {
     return {
       output: {
         designs,
-        nextCursor: result.pagination.next,
-        prevCursor: result.pagination.prev
+        nextCursor: result.pagination?.next ?? null,
+        prevCursor: result.pagination?.prev ?? null
       },
-      message: `Retrieved **${designs.length}** design(s).${result.pagination.next ? ' More results available.' : ''}`
+      message: `Retrieved **${designs.length}** design(s).${result.pagination?.next ? ' More results available.' : ''}`
     };
   })
   .build();

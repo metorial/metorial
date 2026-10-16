@@ -1,53 +1,48 @@
-Now let me get more details about the API features:Now I have enough information to write the specification.
+# API.Bible
 
-# Slates Specification for API.Bible
+API.Bible provides licensed scripture and audio through the American Bible
+Society. An app API key is sent in the `api-key` header to
+`https://rest.api.bible/v1`. Existing key/auth settings are retained.
 
-## Overview
+## Capabilities
 
-API.Bible is a REST API operated by American Bible Society that provides access to Bible scripture content in text and audio formats. It offers nearly 2500 Bible versions available across over 1600 languages. It has a direct integration to the Digital Bible Library (DBL) content library, allowing developers to include Scripture content in their websites and applications.
+- Discover available text and audio editions, filter metadata, and request full details.
+- Retrieve text edition metadata, related audio editions and publisher information.
+- List books and optionally their chapters, then navigate chapter and verse content.
+- Retrieve passages across chapters and books, up to the provider's 200-verse limit.
+- List and read thematic sections where the edition supports them.
+- Search keywords or references with pagination, sort, range and fuzzy matching; retain both verse and passage results.
+- Read licensed audio edition metadata, list audio books and chapters, and download chapter MP3 files.
 
-## Authentication
+Content tools accept the existing HTML, JSON and text format choices. The
+`content` output remains a string: structured JSON blocks are serialized
+losslessly rather than changing the public field type. Optional parallel
+edition IDs are forwarded to the provider. Verse and passage tools can match
+original versification IDs with `useOrgId`.
 
-API.Bible uses API key authentication. Before you can access the API you must first create an account to retrieve your own personalized API key. Once your application has been approved you can find your API key in your Dashboard settings.
+Content metadata is retained, including current `fumsToken` and legacy `fumsId`
+when supplied. Web applications must implement the provider's engagement
+reporting; tools do not submit it automatically. Original audio URLs and numeric
+expiry values remain available. Download renewal requests a fresh URL each time
+rather than assuming undocumented expiry units.
 
-The authentication process uses a variation of HTTP Basic Auth. For each request you must place your private key into the `api-key` header.
+## Boundaries
 
-Example request:
+Access depends on the app's licensed editions; audio needs special licensing.
+The documented API exposes read operations and no current-user/profile route,
+write API, or webhook/event capability.
 
-```
-curl --request GET \
-  --url https://api.scripture.api.bible/v1/bibles \
-  --header 'api-key: YOUR_API_KEY'
-```
+## Official sources
 
-Your API key determines which Bibles you can access. Optionally, users who hold Digital Bible Library (DBL) accounts can link their DBL API key to their API.Bible app settings to gain access to additional DBL content items they have permission to use.
-
-## Features
-
-### Bible Version Discovery
-
-Browse and retrieve metadata about available Bible versions (translations/editions). Specific editions of the Bible such as the New International Version (NIV) or King James Version (KJV) can be listed, and versions have many books. Versions include metadata such as name, abbreviation, language, country, and copyright information. You can filter Bibles by language and other criteria.
-
-### Scripture Content Retrieval
-
-Access the hierarchical structure of Bible content: books, chapters, verses, passages, and sections. Use books, chapters, or verses endpoints to retrieve text, with parameters like `include-notes`, `include-titles`, and `include-chapter-numbers` for richer output. Content is returned in a unified HTML format across all versions. You can get content for an entire chapter or specify a slimmed down range of passages by combining two verse IDs with a dash.
-
-### Sections
-
-Retrieve a list of sections for a designated chapter along with titles of those sections (e.g., "The Birth of Jesus Christ"). Sections provide thematic groupings of verses that span across chapter boundaries.
-
-### Scripture Search
-
-Search the Bible for any reference or keyword directly from your site or app. Queries by default will match all verses for all books. In order to query for specific passage content, you must structure your query in a particular way. Search can be scoped to specific books or ranges.
-
-### Audio Bibles
-
-API.Bible provides the Bible in text and audio on-demand in the versions and languages you are looking for. Audio Bible versions can be listed and their content retrieved separately from text versions.
-
-### Fair Use Management System (FUMS)
-
-All API responses for scripture content include a FUMS token that must be reported back to API.Bible to track scripture engagement. This is a privacy-focused solution that tracks scripture usage and anonymized user viewing data. It also allows profiling of usage of the various versions, books, chapters, and verses so that the value of API-accessible Scripture texts can be communicated back to copyright holders and publishers. FUMS implementation is required for all applications using the API.
-
-## Events
-
-The provider does not support events.
+- [API reference and OpenAPI 1.6.3](https://api.scripture.api.bible/v1/swagger.json)
+- [Bible editions](https://docs.api.bible/guides/bibles/)
+- [Books](https://docs.api.bible/guides/books/)
+- [Chapters](https://docs.api.bible/guides/chapters/)
+- [Verses](https://docs.api.bible/guides/verses/)
+- [Passages](https://docs.api.bible/guides/passages/)
+- [Sections](https://docs.api.bible/guides/sections/)
+- [Search](https://docs.api.bible/guides/search/)
+- [Audio Bibles](https://docs.api.bible/guides/audio-bibles/)
+- [Content formats](https://docs.api.bible/resources/content-output-formats/)
+- [Fair use](https://docs.api.bible/resources/fair-use/)
+- [Migration compatibility](https://docs.api.bible/resources/legacy-users-faq/)

@@ -1,8 +1,17 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
 export interface PaginationParams {
   pageIndex?: number;
   pageSize?: number;
+  orderBy?: string;
+  query?: string;
 }
 
 export interface ListCustomersParams extends PaginationParams {
@@ -17,478 +26,414 @@ export interface ListInvoicesParams extends PaginationParams {
   customerId?: number;
   status?: string;
   includeCanceled?: boolean;
+  cancelled?: 'Only' | 'Excluded' | 'All';
+  processed?: 'Only' | 'Excluded' | 'All';
 }
-
-export interface ListQuotesParams extends PaginationParams {}
-
-export interface ListCreditsParams extends PaginationParams {}
 
 export interface ListProductsParams extends PaginationParams {
   productNumber?: string;
+  familyId?: string;
 }
-
-export interface ListSuppliersParams extends PaginationParams {}
-
-export interface ListReceiptsParams extends PaginationParams {}
 
 export interface MarkAsPaidParams {
   invoiceId: number;
   date: string;
   paymentMethod: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+  amount?: number;
+  paymentReference?: string;
+  allowUpdate?: boolean;
+  finalizationDate?: string;
+  dateAdjustment?: 'None' | 'MinimumDate' | 'Today';
 }
 
-export interface SendEmailParams {
-  documentId: number;
-}
+export let requireRecord = (value: unknown, label: string): Record<string, any> => {
+  if (!isApiErrorRecord(value)) {
+    throw createApiServiceError(`Altoviz returned an invalid ${label}; expected an object.`);
+  }
+  return value;
+};
 
-export interface WebhookRegistration {
-  name: string;
-  types: string[];
-  url: string;
-  secretKey?: string;
-}
+export let requireNumber = (value: unknown, label: string): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw createApiServiceError(`Altoviz returned an invalid ${label}; expected a number.`);
+  }
+  return value;
+};
+
+export let requireBoolean = (value: unknown, label: string): boolean => {
+  if (typeof value !== 'boolean') {
+    throw createApiServiceError(`Altoviz returned an invalid ${label}; expected a boolean.`);
+  }
+  return value;
+};
+
+let requireEntity = (value: unknown, label: string) => {
+  let entity = requireRecord(value, label);
+  requireNumber(entity.id, `${label} ID`);
+  return entity;
+};
+
+let findErrorCode = (value: unknown): string | undefined => {
+  if (!isApiErrorRecord(value)) return undefined;
+  for (let key of ['code', 'errorCode', 'Code']) {
+    let code = value[key];
+    if (typeof code === 'string' || typeof code === 'number') return String(code);
+  }
+  for (let nested of Object.values(value)) {
+    for (let item of Array.isArray(nested) ? nested : [nested]) {
+      let code = findErrorCode(item);
+      if (code) return code;
+    }
+  }
+  return undefined;
+};
+
+let mapDocument = (data: Record<string, any>) => {
+  let { lines, ...document } = data;
+  return pickDefined({
+    ...document,
+    lines: lines?.map((line: Record<string, any>) => {
+      let { unitPrice, vatId, discount, discountType, unit, ...fields } = line;
+      return pickDefined({
+        ...fields,
+        taxExcludedPrice: fields.taxExcludedPrice ?? unitPrice,
+        vat: vatId === undefined ? undefined : { id: vatId },
+        discount:
+          discount === undefined
+            ? undefined
+            : { type: discountType ?? 'Percent', value: discount },
+        unit: unit === undefined ? undefined : { code: unit }
+      });
+    })
+  });
+};
+
+let mapProduct = (data: Record<string, any>) => {
+  let { salePrice, vatId, unitCode, ...fields } = data;
+  return pickDefined({
+    ...fields,
+    taxExcludedPrice: fields.taxExcludedPrice ?? salePrice,
+    vat: vatId === undefined ? undefined : { id: vatId },
+    unit: unitCode === undefined ? undefined : { code: unitCode }
+  });
+};
+
+let mapSupplier = (data: Record<string, any>) => {
+  let { companyName, ...fields } = data;
+  return pickDefined({ ...fields, name: fields.name ?? companyName });
+};
+
+let mapReceipt = (data: Record<string, any>) => {
+  let { description, supplierId, ...fields } = data;
+  if (supplierId !== undefined) {
+    throw createApiServiceError(
+      'Altoviz receipts record customer payments, not supplier payments. Use customerId for a customer receipt; supplierId is not supported by the receipts API.'
+    );
+  }
+  return pickDefined({ ...fields, notes: fields.notes ?? description });
+};
 
 export class Client {
-  private baseURL = 'https://api.altoviz.com/v1';
-  private token: string;
+  private axios;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
+    if (!config.token.trim()) throw createApiServiceError('An Altoviz API key is required.');
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.altoviz.com/v1',
+      authHeader: { name: 'X-API-KEY', value: config.token },
+      timeout: 30_000
+    });
   }
 
-  private getAxios() {
-    return createAxios({
-      baseURL: this.baseURL,
-      headers: {
-        'X-API-KEY': this.token,
-        'Content-Type': 'application/json'
+  private async request<T = unknown>(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    data?: unknown,
+    params?: Record<string, unknown>
+  ): Promise<T> {
+    return requestAxiosData(
+      `${method} ${path}`,
+      () => this.axios.request<T>({ method, url: path, data, params }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Altoviz',
+          reason: 'altoviz_api_error',
+          operation,
+          detailKeys: [
+            'message',
+            'detail',
+            'title',
+            'error',
+            'error_description',
+            'code',
+            'errorCode'
+          ],
+          nestedKeys: ['errors', 'error'],
+          extractResponse: (source, helpers) => helpers.getResponseWithBody(source),
+          extractMessage: (source, helpers) => {
+            let body = helpers.getResponseWithBody(source)?.data;
+            let details: string[] = [];
+            let collect = (value: unknown) => {
+              helpers.collectDetails(value, details, {
+                detailKeys: ['message', 'detail', 'title', 'error', 'code', 'errorCode'],
+                nestedKeys: ['errors', 'error']
+              });
+              if (isApiErrorRecord(value)) {
+                for (let key of ['errors', 'error']) {
+                  if (isApiErrorRecord(value[key])) {
+                    for (let nested of Object.values(value[key])) collect(nested);
+                  }
+                }
+              }
+            };
+            collect(body);
+            return details.length ? details.join(' - ') : undefined;
+          },
+          extractUpstreamCode: (_source, response) => findErrorCode(response?.data)
+        })
+    );
+  }
+
+  private async entity(
+    method: 'GET' | 'POST' | 'PUT',
+    path: string,
+    data?: unknown,
+    params?: Record<string, unknown>
+  ) {
+    return requireEntity(await this.request(method, path, data, params), path);
+  }
+
+  private async list(path: string, params?: Record<string, unknown>) {
+    let result = await this.request('GET', path, undefined, params);
+    if (!Array.isArray(result)) {
+      throw createApiServiceError(
+        `Altoviz returned an invalid ${path} list; expected an array.`
+      );
+    }
+    return result.map(value => requireEntity(value, path));
+  }
+
+  private pagination(params?: PaginationParams): Record<string, unknown> {
+    return pickDefined({
+      PageIndex: params?.pageIndex,
+      PageSize: params?.pageSize,
+      OrderBy: params?.orderBy,
+      query: params?.query
+    });
+  }
+
+  async getCurrentUser() {
+    return requireRecord(await this.request('GET', '/Users/me'), 'current user');
+  }
+  async getSettings() {
+    return requireRecord(await this.request('GET', '/Settings'), 'settings');
+  }
+  async getVatRates() {
+    return this.list('/Vats');
+  }
+  async getClassifications() {
+    return this.list('/Classifications');
+  }
+  async getUnits() {
+    let result = await this.request('GET', '/Units');
+    if (!Array.isArray(result))
+      throw createApiServiceError('Altoviz returned an invalid units list.');
+    return result.map(value => requireRecord(value, 'unit'));
+  }
+
+  async listCustomers(params?: ListCustomersParams) {
+    if (params?.email !== undefined) return this.getCustomerByEmail(params.email);
+    return this.list('/Customers', this.pagination(params));
+  }
+  async getCustomer(id: number) {
+    return this.entity('GET', `/Customers/${id}`);
+  }
+  async getCustomerByInternalId(id: string) {
+    return this.entity('GET', `/Customers/GetByInternalId/${encodeURIComponent(id)}`);
+  }
+  async getCustomerByEmail(email: string) {
+    return this.list('/Customers/Find', { email });
+  }
+  async createCustomer(data: Record<string, unknown>) {
+    return this.entity('POST', '/Customers', data);
+  }
+  async updateCustomer(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/Customers/${id}`, data);
+  }
+  async deleteCustomer(id: number) {
+    await this.request('DELETE', `/Customers/${id}`);
+  }
+
+  async listContacts(params?: PaginationParams) {
+    return this.list('/Contacts', this.pagination(params));
+  }
+  async getContact(id: number) {
+    return this.entity('GET', `/Contacts/${id}`);
+  }
+  async createContact(data: Record<string, unknown>) {
+    return this.entity('POST', '/Contacts', data);
+  }
+  async updateContact(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/Contacts/${id}`, data);
+  }
+  async deleteContact(id: number) {
+    await this.request('DELETE', `/Contacts/${id}`);
+  }
+
+  async listSaleInvoices(params?: ListInvoicesParams) {
+    let orderBy = params?.orderBy;
+    if (!orderBy && params?.sortBy) {
+      let direction = params.sortDirection?.toLowerCase();
+      if (direction && direction !== 'asc' && direction !== 'desc') {
+        throw createApiServiceError('sortDirection must be asc or desc.');
       }
+      orderBy = `${params.sortBy}${direction ? ` ${direction}` : ''}`;
+    }
+    return this.list('/SalesInvoices', {
+      ...this.pagination({ ...params, orderBy }),
+      ...pickDefined({
+        From: params?.dateFrom,
+        To: params?.dateTo,
+        CustomerId: params?.customerId,
+        Status: params?.status,
+        Cancelled:
+          params?.cancelled ??
+          (params?.includeCanceled === undefined
+            ? undefined
+            : params.includeCanceled
+              ? 'All'
+              : 'Excluded'),
+        Processed: params?.processed
+      })
     });
   }
-
-  // --- Users ---
-
-  async getCurrentUser(): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Users/me');
-    return response.data;
+  async getSaleInvoice(id: number) {
+    return this.entity('GET', `/SalesInvoices/${id}`);
+  }
+  async createSaleInvoice(data: Record<string, unknown>) {
+    return this.entity('POST', '/SalesInvoices', mapDocument(data));
+  }
+  async updateSaleInvoice(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/SalesInvoices/${id}`, mapDocument(data));
+  }
+  async deleteSaleInvoice(id: number) {
+    await this.request('DELETE', `/SalesInvoices/${id}`);
+  }
+  async finalizeSaleInvoice(
+    id: number,
+    params?: { finalizationDate?: string; dateAdjustment?: string }
+  ) {
+    return this.entity(
+      'POST',
+      `/SalesInvoices/Finalize/${id}`,
+      undefined,
+      pickDefined(params ?? {})
+    );
+  }
+  async markSaleInvoiceAsPaid(params: MarkAsPaidParams) {
+    let paymentMethod =
+      ({ BankTransfer: 'Transfer', CreditCard: 'Card' } as Record<string, string>)[
+        params.paymentMethod
+      ] ?? params.paymentMethod;
+    return this.entity(
+      'POST',
+      '/SalesInvoices/MarkAsPaid',
+      pickDefined({ ...params, paymentMethod, finalizeInvoice: true })
+    );
+  }
+  async sendSaleInvoiceByEmail(id: number, recipients?: string[]) {
+    await this.request('POST', `/SalesInvoices/Send/${id}`, recipients);
   }
 
-  // --- Settings ---
-
-  async getSettings(): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Settings');
-    return response.data;
+  async listSaleQuotes(params?: PaginationParams) {
+    return this.list('/SalesQuotes', this.pagination(params));
+  }
+  async getSaleQuote(id: number) {
+    return this.entity('GET', `/SalesQuotes/${id}`);
+  }
+  async createSaleQuote(data: Record<string, unknown>) {
+    return this.entity('POST', '/SalesQuotes', mapDocument(data));
+  }
+  // Retain the existing route: the current OpenAPI does not document quote updates.
+  async updateSaleQuote(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/SaleQuotes/${id}`, mapDocument(data));
+  }
+  async deleteSaleQuote(id: number) {
+    await this.request('DELETE', `/SalesQuotes/${id}`);
+  }
+  async sendSaleQuoteByEmail(id: number, recipients?: string[]) {
+    await this.request('POST', `/SalesQuotes/Send/${id}`, recipients);
   }
 
-  async getVatRates(): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Vats');
-    return response.data;
+  async listSaleCredits(params?: PaginationParams) {
+    return this.list('/SalesCredits', this.pagination(params));
+  }
+  async getSaleCredit(id: number) {
+    return this.entity('GET', `/SalesCredits/${id}`);
+  }
+  async createSaleCredit(data: Record<string, unknown>) {
+    return this.entity('POST', '/SalesCredits', mapDocument(data));
+  }
+  async updateSaleCredit(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/SalesCredits/${id}`, mapDocument(data));
+  }
+  async deleteSaleCredit(id: number) {
+    await this.request('DELETE', `/SalesCredits/${id}`);
   }
 
-  async getClassifications(): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Classifications');
-    return response.data;
-  }
-
-  async getUnits(): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Units');
-    return response.data;
-  }
-
-  // --- Customers ---
-
-  async listCustomers(params?: ListCustomersParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Customers', {
-      params: this.buildPaginationParams(params)
+  async listProducts(params?: ListProductsParams) {
+    if (params?.productNumber !== undefined) return this.findProduct(params.productNumber);
+    return this.list('/Products', {
+      ...this.pagination(params),
+      ...pickDefined({ familyId: params?.familyId })
     });
-    return response.data;
+  }
+  async getProduct(id: number) {
+    return this.entity('GET', `/Products/${id}`);
+  }
+  async findProduct(number: string) {
+    return this.list('/Products/Find', { number });
+  }
+  async createProduct(data: Record<string, unknown>) {
+    return this.entity('POST', '/Products', mapProduct(data));
+  }
+  async updateProduct(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/Products/${id}`, mapProduct(data));
+  }
+  async deleteProduct(id: number) {
+    await this.request('DELETE', `/Products/${id}`);
   }
 
-  async getCustomer(customerId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/Customers/${customerId}`);
-    return response.data;
+  async listSuppliers(params?: PaginationParams) {
+    return this.list('/Suppliers', this.pagination(params));
+  }
+  async getSupplier(id: number) {
+    return this.entity('GET', `/Suppliers/${id}`);
+  }
+  async createSupplier(data: Record<string, unknown>) {
+    return this.entity('POST', '/Suppliers', mapSupplier(data));
+  }
+  async updateSupplier(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/Suppliers/${id}`, mapSupplier(data));
+  }
+  async deleteSupplier(id: number) {
+    await this.request('DELETE', `/Suppliers/${id}`);
   }
 
-  async getCustomerByInternalId(internalId: string): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/Customers/GetByInternalId/${internalId}`);
-    return response.data;
+  async listReceipts(params?: PaginationParams) {
+    return this.list('/Receipts', this.pagination(params));
   }
-
-  async getCustomerByEmail(email: string): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Customers', { params: { email } });
-    return response.data;
+  async getReceipt(id: number) {
+    return this.entity('GET', `/Receipts/${id}`);
   }
-
-  async createCustomer(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/Customers', data);
-    return response.data;
+  async createReceipt(data: Record<string, unknown>) {
+    return this.entity('POST', '/Receipts', mapReceipt(data));
   }
-
-  async updateCustomer(customerId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/Customers/${customerId}`, data);
-    return response.data;
+  async updateReceipt(id: number, data: Record<string, unknown>) {
+    return this.entity('PUT', `/Receipts/${id}`, mapReceipt(data));
   }
-
-  async deleteCustomer(customerId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/Customers/${customerId}`);
-  }
-
-  // --- Customer Families ---
-
-  async listCustomerFamilies(): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/CustomerFamilies');
-    return response.data;
-  }
-
-  // --- Contacts ---
-
-  async listContacts(params?: PaginationParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Contacts', {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
-  }
-
-  async getContact(contactId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/Contacts/${contactId}`);
-    return response.data;
-  }
-
-  async createContact(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/Contacts', data);
-    return response.data;
-  }
-
-  async updateContact(contactId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/Contacts/${contactId}`, data);
-    return response.data;
-  }
-
-  async deleteContact(contactId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/Contacts/${contactId}`);
-  }
-
-  // --- Sale Invoices ---
-
-  async listSaleInvoices(params?: ListInvoicesParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let queryParams: Record<string, any> = this.buildPaginationParams(params);
-    if (params?.sortBy) queryParams.SortBy = params.sortBy;
-    if (params?.sortDirection) queryParams.SortDirection = params.sortDirection;
-    if (params?.dateFrom) queryParams.DateFrom = params.dateFrom;
-    if (params?.dateTo) queryParams.DateTo = params.dateTo;
-    if (params?.customerId) queryParams.CustomerId = params.customerId;
-    if (params?.status) queryParams.Status = params.status;
-    if (params?.includeCanceled) queryParams.IncludeCanceled = params.includeCanceled;
-    let response = await axios.get('/SaleInvoices', { params: queryParams });
-    return response.data;
-  }
-
-  async getSaleInvoice(invoiceId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/SaleInvoices/${invoiceId}`);
-    return response.data;
-  }
-
-  async createSaleInvoice(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/SaleInvoices', data);
-    return response.data;
-  }
-
-  async updateSaleInvoice(invoiceId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/SaleInvoices/${invoiceId}`, data);
-    return response.data;
-  }
-
-  async deleteSaleInvoice(invoiceId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/SaleInvoices/${invoiceId}`);
-  }
-
-  async finalizeSaleInvoice(invoiceId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post(`/SaleInvoices/Finalize/${invoiceId}`);
-    return response.data;
-  }
-
-  async markSaleInvoiceAsPaid(params: MarkAsPaidParams): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post(`/SaleInvoices/Pay/${params.invoiceId}`, {
-      date: params.date,
-      paymentMethod: params.paymentMethod,
-      metadata: params.metadata
-    });
-    return response.data;
-  }
-
-  async sendSaleInvoiceByEmail(invoiceId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post(`/SaleInvoices/Send/${invoiceId}`);
-    return response.data;
-  }
-
-  async downloadSaleInvoice(invoiceId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/SaleInvoices/Download/${invoiceId}`, {
-      responseType: 'arraybuffer'
-    });
-    return response.data;
-  }
-
-  // --- Sale Quotes ---
-
-  async listSaleQuotes(params?: ListQuotesParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/SaleQuotes', {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
-  }
-
-  async getSaleQuote(quoteId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/SaleQuotes/${quoteId}`);
-    return response.data;
-  }
-
-  async createSaleQuote(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/SaleQuotes', data);
-    return response.data;
-  }
-
-  async updateSaleQuote(quoteId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/SaleQuotes/${quoteId}`, data);
-    return response.data;
-  }
-
-  async deleteSaleQuote(quoteId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/SaleQuotes/${quoteId}`);
-  }
-
-  async sendSaleQuoteByEmail(quoteId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post(`/SaleQuotes/Send/${quoteId}`);
-    return response.data;
-  }
-
-  // --- Sale Credits ---
-
-  async listSaleCredits(params?: ListCreditsParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/SaleCredits', {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
-  }
-
-  async getSaleCredit(creditId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/SaleCredits/${creditId}`);
-    return response.data;
-  }
-
-  async createSaleCredit(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/SaleCredits', data);
-    return response.data;
-  }
-
-  async updateSaleCredit(creditId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/SaleCredits/${creditId}`, data);
-    return response.data;
-  }
-
-  async deleteSaleCredit(creditId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/SaleCredits/${creditId}`);
-  }
-
-  // --- Purchase Invoices ---
-
-  async listPurchaseInvoices(params?: PaginationParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/PurchaseInvoices', {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
-  }
-
-  async createPurchaseInvoiceFromFile(fileData: Uint8Array, fileName: string): Promise<any> {
-    let axios = this.getAxios();
-    let formData = new FormData();
-    let blob = new Blob([fileData], { type: 'application/pdf' });
-    formData.append('file', blob, fileName);
-    let response = await axios.post('/PurchaseInvoices/File', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-    return response.data;
-  }
-
-  async downloadPurchaseInvoice(invoiceId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/PurchaseInvoices/Download/${invoiceId}`, {
-      responseType: 'arraybuffer'
-    });
-    return response.data;
-  }
-
-  // --- Products ---
-
-  async listProducts(params?: ListProductsParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let queryParams: Record<string, any> = this.buildPaginationParams(params);
-    if (params?.productNumber) queryParams.productNumber = params.productNumber;
-    let response = await axios.get('/Products', { params: queryParams });
-    return response.data;
-  }
-
-  async getProduct(productId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/Products/${productId}`);
-    return response.data;
-  }
-
-  async findProduct(productNumber: string): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Products/Find', { params: { productNumber } });
-    return response.data;
-  }
-
-  async createProduct(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/Products', data);
-    return response.data;
-  }
-
-  async updateProduct(productId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/Products/${productId}`, data);
-    return response.data;
-  }
-
-  async deleteProduct(productId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/Products/${productId}`);
-  }
-
-  // --- Suppliers ---
-
-  async listSuppliers(params?: ListSuppliersParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Suppliers', {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
-  }
-
-  async getSupplier(supplierId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/Suppliers/${supplierId}`);
-    return response.data;
-  }
-
-  async createSupplier(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/Suppliers', data);
-    return response.data;
-  }
-
-  async updateSupplier(supplierId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/Suppliers/${supplierId}`, data);
-    return response.data;
-  }
-
-  async deleteSupplier(supplierId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/Suppliers/${supplierId}`);
-  }
-
-  // --- Receipts ---
-
-  async listReceipts(params?: ListReceiptsParams): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Receipts', {
-      params: this.buildPaginationParams(params)
-    });
-    return response.data;
-  }
-
-  async getReceipt(receiptId: number): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.get(`/Receipts/${receiptId}`);
-    return response.data;
-  }
-
-  async createReceipt(data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/Receipts', data);
-    return response.data;
-  }
-
-  async updateReceipt(receiptId: number, data: Record<string, any>): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.put(`/Receipts/${receiptId}`, data);
-    return response.data;
-  }
-
-  async deleteReceipt(receiptId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/Receipts/${receiptId}`);
-  }
-
-  // --- Webhooks ---
-
-  async listWebhooks(): Promise<any[]> {
-    let axios = this.getAxios();
-    let response = await axios.get('/Webhooks');
-    return response.data;
-  }
-
-  async createWebhook(data: WebhookRegistration): Promise<any> {
-    let axios = this.getAxios();
-    let response = await axios.post('/Webhooks', data);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: number): Promise<void> {
-    let axios = this.getAxios();
-    await axios.delete(`/Webhooks/${webhookId}`);
-  }
-
-  // --- Helpers ---
-
-  private buildPaginationParams(params?: PaginationParams): Record<string, any> {
-    let result: Record<string, any> = {};
-    if (params?.pageIndex) result.PageIndex = params.pageIndex;
-    if (params?.pageSize) result.PageSize = params.pageSize;
-    return result;
+  async deleteReceipt(id: number) {
+    await this.request('DELETE', `/Receipts/${id}`);
   }
 }

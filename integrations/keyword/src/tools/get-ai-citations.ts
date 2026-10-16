@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireRecord } from '../lib/response';
 import { spec } from '../spec';
 
 export let getAiCitations = SlateTool.create(spec, {
@@ -39,6 +40,7 @@ export let getAiCitations = SlateTool.create(spec, {
       searchTerms: ctx.input.searchTerms
     });
 
+    requireRecord(data, 'AI citations');
     return {
       output: { citations: data },
       message: `Retrieved AI citation analytics for domain **${ctx.input.domainId}**.`

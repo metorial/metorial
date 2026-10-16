@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import {
+  polygonCursor,
+  polygonOutput,
+  polygonRecords,
+  polygonResponseFields,
+  validatePolygonLimit
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let getStockTradesAndQuotes = SlateTool.create(spec, {
@@ -13,6 +20,7 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: polygonCursor,
       ticker: z.string().describe('Stock ticker symbol (e.g., AAPL)'),
       dataType: z
         .enum(['trades', 'quotes', 'last_trade', 'last_quote'])
@@ -32,6 +40,7 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       trades: z
         .array(
           z.object({
@@ -86,10 +95,12 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePolygonLimit(ctx.input.limit, 50000);
     let client = new PolygonClient(ctx.auth.token);
 
     if (ctx.input.dataType === 'trades') {
       let response = await client.getTrades({
+        cursor: ctx.input.cursor,
         ticker: ctx.input.ticker,
         timestampGte: ctx.input.timestampFrom,
         timestampLte: ctx.input.timestampTo,
@@ -97,10 +108,10 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
         limit: ctx.input.limit,
         sort: ctx.input.sort
       });
-      let trades = (response.results || []).map((t: any) => ({
+      let trades = polygonRecords(response.results).map((t: any) => ({
         price: t.price,
         size: t.size,
-        timestamp: t.sip_timestamp || t.participant_timestamp,
+        timestamp: t.sip_timestamp ?? t.participant_timestamp,
         conditions: t.conditions,
         exchange: t.exchange,
         sequenceNumber: t.sequence_number,
@@ -108,13 +119,14 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
         sipTimestamp: t.sip_timestamp
       }));
       return {
-        output: { trades },
+        output: polygonOutput({ trades }, response),
         message: `Retrieved **${trades.length}** trades for **${ctx.input.ticker}**.`
       };
     }
 
     if (ctx.input.dataType === 'quotes') {
       let response = await client.getQuotes({
+        cursor: ctx.input.cursor,
         ticker: ctx.input.ticker,
         timestampGte: ctx.input.timestampFrom,
         timestampLte: ctx.input.timestampTo,
@@ -122,19 +134,19 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
         limit: ctx.input.limit,
         sort: ctx.input.sort
       });
-      let quotes = (response.results || []).map((q: any) => ({
+      let quotes = polygonRecords(response.results).map((q: any) => ({
         bidPrice: q.bid_price,
         bidSize: q.bid_size,
         askPrice: q.ask_price,
         askSize: q.ask_size,
         bidExchange: q.bid_exchange,
         askExchange: q.ask_exchange,
-        timestamp: q.sip_timestamp || q.participant_timestamp,
+        timestamp: q.sip_timestamp ?? q.participant_timestamp,
         sipTimestamp: q.sip_timestamp,
         conditions: q.conditions
       }));
       return {
-        output: { quotes },
+        output: polygonOutput({ quotes }, response),
         message: `Retrieved **${quotes.length}** quotes for **${ctx.input.ticker}**.`
       };
     }
@@ -143,17 +155,20 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
       let response = await client.getLastTrade(ctx.input.ticker);
       let lt = response.results;
       return {
-        output: {
-          lastTrade: lt
-            ? {
-                price: lt.p,
-                size: lt.s,
-                timestamp: lt.t,
-                exchange: lt.x,
-                conditions: lt.c
-              }
-            : undefined
-        },
+        output: polygonOutput(
+          {
+            lastTrade: lt
+              ? {
+                  price: lt.p,
+                  size: lt.s,
+                  timestamp: lt.t,
+                  exchange: lt.x,
+                  conditions: lt.c
+                }
+              : undefined
+          },
+          response
+        ),
         message: lt
           ? `Last trade for **${ctx.input.ticker}**: $${lt.p} (size: ${lt.s}).`
           : `No last trade found for **${ctx.input.ticker}**.`
@@ -164,19 +179,22 @@ export let getStockTradesAndQuotes = SlateTool.create(spec, {
     let response = await client.getLastQuote(ctx.input.ticker);
     let lq = response.results;
     return {
-      output: {
-        lastQuote: lq
-          ? {
-              bidPrice: lq.P,
-              bidSize: lq.S,
-              askPrice: lq.p,
-              askSize: lq.s,
-              timestamp: lq.t
-            }
-          : undefined
-      },
+      output: polygonOutput(
+        {
+          lastQuote: lq
+            ? {
+                bidPrice: lq.p,
+                bidSize: lq.s,
+                askPrice: lq.P,
+                askSize: lq.S,
+                timestamp: lq.t
+              }
+            : undefined
+        },
+        response
+      ),
       message: lq
-        ? `Last quote for **${ctx.input.ticker}**: Bid $${lq.P} / Ask $${lq.p}.`
+        ? `Last quote for **${ctx.input.ticker}**: Bid $${lq.p} / Ask $${lq.P}.`
         : `No last quote found for **${ctx.input.ticker}**.`
     };
   })

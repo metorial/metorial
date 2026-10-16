@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,7 +27,15 @@ export let getWidget = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
-      widget: z.any().describe('The widget data or rendered content.')
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
+      widget: z.any().describe('The widget data or render confirmation.'),
+      renderedHtml: z
+        .string()
+        .optional()
+        .describe('The rendered HTML returned when render is true.')
     })
   )
   .handleInvocation(async ctx => {
@@ -46,10 +54,20 @@ export let getWidget = SlateTool.create(spec, {
       result = await client.getWidget(ctx.input.widgetId);
     }
 
+    if (ctx.input.render && typeof result.output !== 'string') {
+      throw createApiServiceError(
+        'Brilliant Directories returned a rendered widget without HTML output.'
+      );
+    }
+
     return {
       output: {
         status: result.status,
-        widget: result.message
+        raw: result,
+        widget: result.message,
+        ...(ctx.input.render && typeof result.output === 'string'
+          ? { renderedHtml: result.output }
+          : {})
       },
       message: `Retrieved widget **${ctx.input.widgetId}**${ctx.input.render ? ' (rendered)' : ''}.`
     };
@@ -65,7 +83,12 @@ export let createWidget = SlateTool.create(spec, {
     z.object({
       widgetName: z.string().optional().describe('Name of the widget.'),
       widgetContent: z.string().optional().describe('Content of the widget.'),
-      widgetStatus: z.string().optional().describe('Status of the widget.'),
+      widgetStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy widget_status parameter. Current provider documentation does not define its behavior.'
+        ),
       additionalFields: z
         .record(z.string(), z.string())
         .optional()
@@ -75,6 +98,10 @@ export let createWidget = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       widget: z.any().describe('The newly created widget record.')
     })
   )
@@ -86,7 +113,7 @@ export let createWidget = SlateTool.create(spec, {
 
     let data: Record<string, any> = {};
     if (ctx.input.widgetName) data.widget_name = ctx.input.widgetName;
-    if (ctx.input.widgetContent) data.widget_content = ctx.input.widgetContent;
+    if (ctx.input.widgetContent) data.widget_data = ctx.input.widgetContent;
     if (ctx.input.widgetStatus) data.widget_status = ctx.input.widgetStatus;
     if (ctx.input.additionalFields) {
       for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
@@ -99,6 +126,7 @@ export let createWidget = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         widget: result.message
       },
       message: `Created widget${ctx.input.widgetName ? ` **"${ctx.input.widgetName}"**` : ''}.`
@@ -117,7 +145,12 @@ export let updateWidget = SlateTool.create(spec, {
       widgetId: z.string().describe('The widget ID to update.'),
       widgetName: z.string().optional().describe('Updated name.'),
       widgetContent: z.string().optional().describe('Updated content.'),
-      widgetStatus: z.string().optional().describe('Updated status.'),
+      widgetStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy widget_status parameter. Current provider documentation does not define its behavior.'
+        ),
       additionalFields: z
         .record(z.string(), z.string())
         .optional()
@@ -127,6 +160,10 @@ export let updateWidget = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       widget: z.any().describe('The updated widget record.')
     })
   )
@@ -141,7 +178,7 @@ export let updateWidget = SlateTool.create(spec, {
     };
 
     if (ctx.input.widgetName) data.widget_name = ctx.input.widgetName;
-    if (ctx.input.widgetContent) data.widget_content = ctx.input.widgetContent;
+    if (ctx.input.widgetContent) data.widget_data = ctx.input.widgetContent;
     if (ctx.input.widgetStatus) data.widget_status = ctx.input.widgetStatus;
     if (ctx.input.additionalFields) {
       for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
@@ -154,6 +191,7 @@ export let updateWidget = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         widget: result.message
       },
       message: `Updated widget **${ctx.input.widgetId}**.`
@@ -177,6 +215,10 @@ export let deleteWidget = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       confirmation: z.string().describe('Confirmation message from the API.')
     })
   )
@@ -191,6 +233,7 @@ export let deleteWidget = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
+        raw: result,
         confirmation:
           typeof result.message === 'string' ? result.message : JSON.stringify(result.message)
       },

@@ -95,7 +95,7 @@ export let listExpenses = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let mapped = (expenses || []).map((e: any) => ({
+    let mapped = expenses.map((e: any) => ({
       expenseId: e.id,
       groupId: e.group_id ?? null,
       description: e.description,

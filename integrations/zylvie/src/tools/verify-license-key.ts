@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let verifyLicenseKey = SlateTool.create(spec, {
@@ -15,11 +16,14 @@ export let verifyLicenseKey = SlateTool.create(spec, {
   .input(
     z.object({
       productId: z.string().describe('Product ID for which the license key was issued'),
-      licenseKey: z.string().describe('The license key (UUID) to verify')
+      licenseKey: z
+        .string()
+        .describe('The license key (generated UUID or uploaded custom code) to verify')
     })
   )
   .output(
     z.object({
+      raw: rawResponseSchema,
       key: z.string().describe('The license key'),
       productId: z.string().describe('Associated product ID'),
       buyerEmail: z.string().describe('Email of the purchaser'),
@@ -37,14 +41,15 @@ export let verifyLicenseKey = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         key: result.key as string,
         productId: result.product_id as string,
         buyerEmail: result.buyer_email as string,
         created: result.created as number,
         redeemed: result.redeemed as boolean,
-        redeemedAt: (result.redeemed_at as number | null) ?? null,
+        redeemedAt: result.redeemed_at as number | null,
         refunded: result.refunded as boolean,
-        refundedAt: (result.refunded_at as number | null) ?? null
+        refundedAt: result.refunded_at as number | null
       },
       message: `License key \`${result.key}\` is **${result.refunded ? 'refunded' : result.redeemed ? 'redeemed' : 'valid (not yet redeemed)'}** for product \`${result.product_id}\`.`
     };

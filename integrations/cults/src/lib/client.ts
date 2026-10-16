@@ -1,37 +1,106 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord
+} from 'slates';
+
+type CultsUser = {
+  nick: string;
+  shortUrl: string | null;
+  bio: string | null;
+  imageUrl: string | null;
+  followersCount: number | null;
+  creationsCount: number | null;
+};
+
+let apiAxios = createAxios({ baseURL: 'https://cults3d.com' });
 
 export class CultsClient {
   private authHeader: string;
 
   constructor(config: { token: string; username: string }) {
+    if (!config.username?.trim() || !config.token?.trim()) {
+      throw createApiServiceError('A Cults3D username and API key are required.', {
+        reason: 'cults_missing_credentials'
+      });
+    }
     let basicToken = Buffer.from(`${config.username}:${config.token}`).toString('base64');
     this.authHeader = `Basic ${basicToken}`;
   }
 
   async query<T = any>(graphqlQuery: string, variables?: Record<string, any>): Promise<T> {
-    let axios = createAxios({
-      baseURL: 'https://cults3d.com'
-    });
+    let body: Record<string, unknown> = { query: graphqlQuery };
+    if (variables) body.variables = variables;
 
-    let body: Record<string, any> = { query: graphqlQuery };
-    if (variables) {
-      body.variables = variables;
-    }
-
-    let response = await axios.post('/graphql', body, {
-      headers: {
-        Authorization: this.authHeader,
-        'Content-Type': 'application/json'
+    try {
+      let response = await apiAxios.post('/graphql', body, {
+        headers: {
+          Authorization: this.authHeader,
+          'Content-Type': 'application/json'
+        }
+      });
+      let payload: unknown = response.data;
+      if (!isApiErrorRecord(payload)) {
+        throw createApiServiceError('Cults3D returned an invalid GraphQL response.', {
+          reason: 'cults_invalid_response'
+        });
       }
-    });
-
-    let data = response.data;
-
-    if (data.errors && data.errors.length > 0) {
-      throw new Error(`GraphQL error: ${data.errors.map((e: any) => e.message).join(', ')}`);
+      if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+        throw buildApiServiceError(
+          {
+            response: {
+              status: response.status,
+              data: payload
+            }
+          },
+          { providerLabel: 'Cults3D', reason: 'cults_graphql_error' }
+        );
+      }
+      if (!isApiErrorRecord(payload.data)) {
+        throw createApiServiceError('Cults3D returned no GraphQL data.', {
+          reason: 'cults_invalid_response'
+        });
+      }
+      if ('myself' in payload.data && !isApiErrorRecord(payload.data.myself)) {
+        throw createApiServiceError(
+          'Cults3D could not access the authenticated account. Check your username and API key.',
+          {
+            reason: 'cults_missing_account'
+          }
+        );
+      }
+      return payload.data as T;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Cults3D',
+        reason: 'cults_api_error',
+        extractResponse: (upstreamError, helpers) => helpers.getResponseWithBody(upstreamError)
+      });
     }
+  }
 
-    return data.data as T;
+  private checkMutationResult(operation: string, payload: unknown, resource?: string) {
+    if (!isApiErrorRecord(payload) || !Array.isArray(payload.errors)) {
+      throw createApiServiceError(`Cults3D returned an invalid ${operation} response.`, {
+        reason: 'cults_invalid_mutation_response'
+      });
+    }
+    if (payload.errors.length > 0) {
+      throw buildApiServiceError(
+        {
+          response: {
+            data: payload
+          }
+        },
+        { providerLabel: 'Cults3D', operation, reason: 'cults_mutation_error' }
+      );
+    }
+    if (resource && !isApiErrorRecord(payload[resource])) {
+      throw createApiServiceError(`Cults3D returned no ${resource} after ${operation}.`, {
+        reason: 'cults_missing_mutation_resource'
+      });
+    }
   }
 
   // === Creations ===
@@ -94,6 +163,7 @@ export class CultsClient {
     submittedBefore?: string;
     madeWithAi?: boolean;
   }) {
+    params = { ...params, limit: params.limit ?? 20, offset: params.offset ?? 0 };
     let args: string[] = [];
     let varDefs: string[] = [];
 
@@ -302,8 +372,52 @@ export class CultsClient {
       }
     `;
 
-    let result = await this.query<{ myself: { user: any } }>(query);
-    return result.myself.user;
+    let result = await this.query<{ myself: { user: CultsUser } }>(query);
+    let user = result.myself.user;
+    return this.requireProfile(user);
+  }
+
+  private requireProfile<T extends { nick: string }>(user: T): T {
+    if (!isApiErrorRecord(user) || typeof user.nick !== 'string' || !user.nick.trim()) {
+      throw createApiServiceError('Cults3D returned no authenticated user profile.', {
+        reason: 'cults_missing_profile'
+      });
+    }
+    return user;
+  }
+
+  async getAuthenticationProfile() {
+    let result = await this.query<{
+      myself: { user: { nick: string; imageUrl: string | null } };
+    }>(`{ myself { user { nick imageUrl } } }`);
+    return this.requireProfile(result.myself.user);
+  }
+
+  async getMyLikedCreations(params: { limit?: number; offset?: number }) {
+    let result = await this.query<{
+      myself: { user: { likedCreations: { name: string | null; url: string | null }[] } };
+    }>(
+      `
+      query MyLikedCreations($limit: Int, $offset: Int) {
+        myself {
+          user {
+            likedCreations(limit: $limit, offset: $offset) {
+              name(locale: EN)
+              url(locale: EN)
+            }
+          }
+        }
+      }
+    `,
+      { limit: params.limit ?? 20, offset: params.offset ?? 0 }
+    );
+    let creations = result.myself.user?.likedCreations;
+    if (!Array.isArray(creations)) {
+      throw createApiServiceError('Cults3D returned no liked-design list.', {
+        reason: 'cults_invalid_response'
+      });
+    }
+    return creations;
   }
 
   // === My Creations ===
@@ -365,7 +479,7 @@ export class CultsClient {
     let currency = params.currency ?? 'USD';
 
     let query = `
-      query MySales($limit: Int, $offset: Int) {
+      query MySales($limit: Int, $offset: Int, $currency: Currency!) {
         myself {
           salesBatch(limit: $limit, offset: $offset) {
             total
@@ -373,7 +487,7 @@ export class CultsClient {
               id
               createdAt
               payedOutAt
-              income(currency: ${currency}) {
+              income(currency: $currency) {
                 value
               }
               creation {
@@ -403,7 +517,8 @@ export class CultsClient {
       };
     }>(query, {
       limit: params.limit ?? 20,
-      offset: params.offset ?? 0
+      offset: params.offset ?? 0,
+      currency
     });
 
     return result.myself.salesBatch;
@@ -486,6 +601,11 @@ export class CultsClient {
     `;
 
     let result = await this.query<{ licenses: any[] }>(query);
+    if (!Array.isArray(result.licenses)) {
+      throw createApiServiceError('Cults3D returned no license catalog.', {
+        reason: 'cults_invalid_response'
+      });
+    }
     return result.licenses;
   }
 
@@ -589,9 +709,7 @@ export class CultsClient {
       variables
     );
 
-    if (result.createCreation.errors && result.createCreation.errors.length > 0) {
-      throw new Error(`Failed to create creation: ${result.createCreation.errors.join(', ')}`);
-    }
+    this.checkMutationResult('createCreation', result.createCreation, 'creation');
 
     return result.createCreation.creation;
   }
@@ -684,9 +802,7 @@ export class CultsClient {
       variables
     );
 
-    if (result.updateCreation.errors && result.updateCreation.errors.length > 0) {
-      throw new Error(`Failed to update creation: ${result.updateCreation.errors.join(', ')}`);
-    }
+    this.checkMutationResult('updateCreation', result.updateCreation, 'creation');
 
     return result.updateCreation.creation;
   }
@@ -755,11 +871,7 @@ export class CultsClient {
       }
     );
 
-    if (result.createPrintlist.errors && result.createPrintlist.errors.length > 0) {
-      throw new Error(
-        `Failed to create printlist: ${result.createPrintlist.errors.join(', ')}`
-      );
-    }
+    this.checkMutationResult('createPrintlist', result.createPrintlist, 'printlist');
 
     return result.createPrintlist.printlist;
   }
@@ -788,11 +900,7 @@ export class CultsClient {
       }
     );
 
-    if (result.updatePrintlist.errors && result.updatePrintlist.errors.length > 0) {
-      throw new Error(
-        `Failed to update printlist: ${result.updatePrintlist.errors.join(', ')}`
-      );
-    }
+    this.checkMutationResult('updatePrintlist', result.updatePrintlist, 'printlist');
 
     return result.updatePrintlist.printlist;
   }
@@ -810,11 +918,7 @@ export class CultsClient {
       id: printlistId
     });
 
-    if (result.destroyPrintlist.errors && result.destroyPrintlist.errors.length > 0) {
-      throw new Error(
-        `Failed to destroy printlist: ${result.destroyPrintlist.errors.join(', ')}`
-      );
-    }
+    this.checkMutationResult('destroyPrintlist', result.destroyPrintlist);
   }
 
   async addCreationToPrintlist(params: { creationId: string; printlistId: string }) {
@@ -831,14 +935,7 @@ export class CultsClient {
       printlistId: params.printlistId
     });
 
-    if (
-      result.addCreationToPrintlist.errors &&
-      result.addCreationToPrintlist.errors.length > 0
-    ) {
-      throw new Error(
-        `Failed to add creation to printlist: ${result.addCreationToPrintlist.errors.join(', ')}`
-      );
-    }
+    this.checkMutationResult('addCreationToPrintlist', result.addCreationToPrintlist);
   }
 
   async removeCreationFromPrintlist(params: { creationId: string; printlistId: string }) {
@@ -858,14 +955,10 @@ export class CultsClient {
       }
     );
 
-    if (
-      result.removeCreationFromPrintlist.errors &&
-      result.removeCreationFromPrintlist.errors.length > 0
-    ) {
-      throw new Error(
-        `Failed to remove creation from printlist: ${result.removeCreationFromPrintlist.errors.join(', ')}`
-      );
-    }
+    this.checkMutationResult(
+      'removeCreationFromPrintlist',
+      result.removeCreationFromPrintlist
+    );
   }
 
   // === Discount ===
@@ -878,33 +971,43 @@ export class CultsClient {
     let query = `
       mutation CreateDiscount($creationId: ID!, $discountPercentage: Int!, $discountEndAt: DateTime!) {
         createDiscount(creationId: $creationId, discountPercentage: $discountPercentage, discountEndAt: $discountEndAt) {
-          creation {
-            identifier
-            name(locale: EN)
-            discount {
-              percentage
-              endAt
+          discount {
+            creation {
+              identifier
+              name(locale: EN)
             }
+            percentage
+            endAt
           }
           errors
         }
       }
     `;
 
-    let result = await this.query<{ createDiscount: { creation: any; errors: string[] } }>(
-      query,
-      {
-        creationId: params.creationId,
-        discountPercentage: params.discountPercentage,
-        discountEndAt: params.discountEndAt
-      }
-    );
+    let result = await this.query<{
+      createDiscount: {
+        discount: {
+          creation: { identifier: string; name: string | null };
+          percentage: number | null;
+          endAt: string | null;
+        };
+        errors: string[];
+      };
+    }>(query, {
+      creationId: params.creationId,
+      discountPercentage: params.discountPercentage,
+      discountEndAt: params.discountEndAt
+    });
 
-    if (result.createDiscount.errors && result.createDiscount.errors.length > 0) {
-      throw new Error(`Failed to create discount: ${result.createDiscount.errors.join(', ')}`);
+    this.checkMutationResult('createDiscount', result.createDiscount, 'discount');
+
+    let discount = result.createDiscount.discount;
+    if (!isApiErrorRecord(discount.creation)) {
+      throw createApiServiceError('Cults3D returned no creation after createDiscount.', {
+        reason: 'cults_missing_mutation_resource'
+      });
     }
-
-    return result.createDiscount.creation;
+    return { ...discount.creation, discount };
   }
 
   // === Notifications ===
@@ -923,13 +1026,6 @@ export class CultsClient {
       text: params.text
     });
 
-    if (
-      result.createChangeNotification.errors &&
-      result.createChangeNotification.errors.length > 0
-    ) {
-      throw new Error(
-        `Failed to create notification: ${result.createChangeNotification.errors.join(', ')}`
-      );
-    }
+    this.checkMutationResult('createChangeNotification', result.createChangeNotification);
   }
 }

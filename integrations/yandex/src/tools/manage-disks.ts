@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import * as compute from '../lib/compute';
 import { spec } from '../spec';
@@ -43,7 +43,8 @@ export let listDisks = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let folderId = ctx.input.folderId || ctx.config.folderId;
-    if (!folderId) throw new Error('folderId is required either in input or config');
+    if (!folderId)
+      throw createApiServiceError('folderId is required either in input or config');
 
     let result = await compute.listDisks(
       ctx.auth,
@@ -58,7 +59,7 @@ export let listDisks = SlateTool.create(spec, {
       folderId: d.folderId,
       zoneId: d.zoneId,
       typeId: d.typeId,
-      size: d.size ? Number(d.size) : undefined,
+      size: d.size !== undefined ? Number(d.size) : undefined,
       status: d.status,
       createdAt: d.createdAt,
       labels: d.labels,
@@ -109,9 +110,14 @@ export let manageDisk = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     if (ctx.input.action === 'create') {
       let folderId = ctx.input.folderId || ctx.config.folderId;
-      if (!folderId) throw new Error('folderId is required for disk creation');
-      if (!ctx.input.size) throw new Error('size is required for disk creation');
-      if (!ctx.input.zoneId) throw new Error('zoneId is required for disk creation');
+      if (!folderId) throw createApiServiceError('folderId is required for disk creation');
+      if (!ctx.input.size) throw createApiServiceError('size is required for disk creation');
+      if (!ctx.input.zoneId)
+        throw createApiServiceError('zoneId is required for disk creation');
+
+      if (ctx.input.imageId && ctx.input.snapshotId) {
+        throw createApiServiceError('Specify either imageId or snapshotId, not both.');
+      }
 
       let result = await compute.createDisk(ctx.auth, {
         folderId,
@@ -129,19 +135,19 @@ export let manageDisk = SlateTool.create(spec, {
         output: {
           operationId: result.id,
           diskId: result.metadata?.diskId,
-          done: result.done || false
+          done: result.done
         },
         message: `Disk creation initiated. Operation ID: **${result.id}**.`
       };
     } else {
-      if (!ctx.input.diskId) throw new Error('diskId is required for deletion');
+      if (!ctx.input.diskId) throw createApiServiceError('diskId is required for deletion');
 
       let result = await compute.deleteDisk(ctx.auth, ctx.input.diskId);
 
       return {
         output: {
           operationId: result.id,
-          done: result.done || false
+          done: result.done
         },
         message: `Disk **${ctx.input.diskId}** deletion initiated.`
       };

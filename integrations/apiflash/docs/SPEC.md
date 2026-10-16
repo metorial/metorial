@@ -1,92 +1,47 @@
-Let me get more details on the specific parameters available.The parameters table didn't render properly. Let me search for the specific parameters.I now have enough information to write the specification. Let me compile everything I've gathered.
+# ApiFlash API specification
 
-# Slates Specification for Apiflash
+## API and authentication
 
-## Overview
+ApiFlash exposes one screenshot API. Captures use `GET https://api.apiflash.com/v1/urltoimage` with URL-encoded query parameters, including the connected API access key as `access_key`. The provider also supports POST form data; these tools retain GET requests. Keys come from the dashboard. There is no OAuth flow, account configuration, pagination, or documented identity endpoint in this API.
 
-ApiFlash is a website screenshot API that converts URLs into images. It uses an up-to-date version of Chrome to ensure that all modern web features are fully supported and rendering is accurate. It is built on AWS Lambda and provides built-in integration with Amazon S3 buckets to automatically save screenshots.
+## Operations
 
-## Authentication
+| Tool | Request | Provider response mapping |
+| --- | --- | --- |
+| `capture_screenshot` | GET screenshot endpoint with `response_type=json` | `url` → `screenshotUrl`; optional `extracted_html` and `extracted_text` → extracted file URLs. |
+| `extract_page_content` | GET screenshot endpoint with `response_type=json`; `extract_html` and `extract_text` default to `true` independently | Screenshot URL and optional HTML/text file URLs. |
+| `check_quota` | GET `/v1/urltoimage/quota?access_key=...` | `limit`, `remaining`, and `reset` → quota limit, remaining quota, and reset timestamp in UTC epoch seconds. |
 
-All API calls need to be authenticated using a valid access key that can be found in the dashboard. For a GET request, the access key is passed in the query string as all other parameters.
+Both capture tools prepare downloadable files from the actual provider-returned URLs. Existing URL outputs remain available. All three tools also retain the complete provider JSON response in `raw`. No URL expiration is inferred from the screenshot cache duration.
 
-When you sign up, an access key is automatically created. You can manage all your access keys from your dashboard. To make a successful API call you just have to fill the `access_key` parameter with a valid access key.
+## Capture options
 
-**Method:** API Key (passed as a query parameter or form data field)
+- `format`: `jpeg`, `png`, or `webp`; provider default `jpeg`. `quality` ranges from 0 to 100 with default 80 and applies to JPEG/WebP.
+- `width` and `height`: provider defaults 1920 and 1080. The documented bounds are 0–16350 pixels with a maximum viewport area of 33177600 pixels. Height is ignored for full-page captures. WebP dimensions after scale factor are limited to 16350 pixels each.
+- `full_page`, `scroll_page`, `element`, `element_overlap`, `crop`, `thumbnail_width`, and `scale_factor` control framing. The provider supports scale factors 1 and 2. Element selection and thumbnails are ignored for full-page captures.
+- `wait_until`: `dom_loaded`, `page_loaded`, or `network_idle` (default). `wait_until_timeout` is 1–30 seconds, default 30; after the timeout the provider captures the loaded content anyway. `wait_for` waits up to 15 seconds for a selector before failing. `delay` adds 0–10 seconds after page load.
+- `css`, `js`, `headers`, `cookies`, `accept_language`, and `user_agent` customize rendering. Headers and cookies use semicolon-separated `name=value` pairs. A proxy uses `host:port` or `user:password@host:port`.
+- `latitude`, `longitude`, `accuracy`, `time_zone`, and `ip_location` configure location. IP location requires a custom enterprise plan.
+- `transparent` applies to PNG and also requires a transparent page-body background. `no_ads`, `no_tracking`, and `no_cookie_banners` control blocking.
+- `fail_on_status` is a comma-separated list of status codes or hyphen-separated ranges.
+- `ttl` controls screenshot caching for 0–2592000 seconds (default 86400). `fresh` bypasses cached captures and does not invalidate earlier cached results.
+- `extract_html` and `extract_text` add generated-file URLs to JSON capture responses. Screenshot capture exposes these as optional inputs; content extraction enables both by default.
+- `s3_endpoint`, `s3_region`, `s3_access_key_id`, `s3_secret_key`, `s3_bucket`, and `s3_key` support export to Amazon S3 or compatible storage.
 
-**Base endpoint:** `https://api.apiflash.com/v1/urltoimage`
+Existing input schemas retain their types, requiredness, constraints, and absence of client-side defaults. Existing optional values, including empty strings, false, and zero, continue to be forwarded when present. Only the content-extraction tool supplies the original HTML/text defaults.
 
-**Example (GET):**
+## Quota and errors
 
-```
-GET https://api.apiflash.com/v1/urltoimage?access_key=YOUR_ACCESS_KEY&url=https://example.com
-```
+The dedicated quota endpoint supplies current usage. Cached screenshot response headers can describe quota at the original capture time. New successful captures count toward quota; cached and failed captures do not.
 
-**Example (POST):** The access key is passed as form data along with all other parameters.
+The documented request rate is 20 requests/second with a 400-request burst. Repeated identical failed captures are limited to five requests/hour. Documented HTTP failures are 400 (invalid parameters or unavailable target), 401 (invalid/revoked key), 402 (quota exhausted), 403 (plan restriction), 429 (rate limit), and 500 (capture failure). JSON errors can include `error_type` and `error_message`; these details and the HTTP status are retained in normalized failures.
 
-There is no OAuth flow or other authentication method. Only access key authentication is supported.
+## Product boundaries
 
-## Features
+Screenshot capture, content extraction, and quota lookup belong to the same API product; no tool categories are needed. No profile/account identity endpoint is documented, so quota lookup is not represented as an identity tool. No triggers or webhooks are registered.
 
-### Website Screenshot Capture
+## Official sources
 
-Capture screenshots of any publicly accessible URL. By default the API returns the screenshot image data directly. If the `response_type` parameter is set to `json`, the response contains a JSON document with links to the resulting screenshot.
-
-- **URL:** The target webpage URL (required).
-- **Output format:** Supports PNG, JPEG, and WebP formats.
-- Automatic detection of fully loaded pages before screenshot capture. A `delay` parameter can add additional wait time (useful for animations). A `wait_for` parameter accepts a CSS selector to wait for a specific element to appear.
-
-### Viewport and Layout Control
-
-Configure how the webpage is rendered before capture.
-
-- **Viewport dimensions:** Specify width and height parameters in pixels. The default is 1920x1080 pixels.
-- **Full page capture:** Set the `full_page` parameter to true to scroll through the entire webpage and capture the complete vertical content, not just the initial viewport.
-- **Scale factor:** Control the device scale factor for retina/HiDPI screenshots.
-- **Element capture:** Use the `element` parameter to capture a specific HTML element of the page. It accepts CSS selectors and the first matched element is captured.
-
-### CSS and JavaScript Injection
-
-CSS & JS injection is supported, allowing you to modify the appearance or behavior of a page before the screenshot is taken. This is useful for hiding elements, changing styles, or automating interactions on the page.
-
-### Custom Headers and Cookies
-
-Use the `headers` or `cookies` parameters to pass authentication tokens or session cookies to the target website. This enables capturing screenshots of pages that require authentication.
-
-### Proxy Support
-
-Use the `proxy` parameter to supply your own proxy. This is useful for bypassing bot protection on target websites or routing requests through specific locations.
-
-### IP Geolocation
-
-IP geolocation is available on enterprise plans, allowing screenshots to be captured as if browsing from a specific geographic location. This is useful for capturing region-specific content.
-
-### Accept Language
-
-Use the `accept_language` parameter to set the language of the target website you want to capture.
-
-### Amazon S3 Export
-
-ApiFlash provides built-in integration with Amazon S3 buckets to automatically save webpage screenshot files. This allows direct export of captured images to your own S3 storage.
-
-### Caching Control
-
-API calls made with the same parameters return a cached screenshot. A `fresh` parameter forces ApiFlash to create a new screenshot regardless of any cached versions.
-
-### Cookie Banner Hiding
-
-ApiFlash supports hiding cookie banners from captured screenshots automatically.
-
-### Quota Monitoring
-
-You can monitor quota usage via HTTP headers included in the response, or by calling a dedicated quota endpoint. The quota endpoint returns the total limit, remaining credits, and reset timing.
-
-- **Endpoint:** `GET https://api.apiflash.com/v1/urltoimage/quota?access_key=YOUR_ACCESS_KEY`
-
-### HTML Extraction
-
-HTML extraction is available, allowing you to retrieve the HTML content of the target page alongside or instead of the screenshot.
-
-## Events
-
-The provider does not support events. ApiFlash is a stateless, request-response API for capturing screenshots and does not offer webhooks, event subscriptions, or any built-in polling mechanism.
+- [API documentation](https://apiflash.com/documentation): access, the complete rendered parameter table, JSON file response, quota endpoint, and errors.
+- [FAQ](https://apiflash.com/faq): cached/failed captures do not consume quota, and fresh requests do not invalidate existing cache entries.
+- [Changelog](https://apiflash.com/changelog): September 2026 viewport expansion and JSON error fields.

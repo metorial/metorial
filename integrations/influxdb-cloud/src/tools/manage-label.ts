@@ -1,9 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { optionalString, requireArray, resource } from '../lib/client';
+import { createClient, orgIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
-let labelSchema = z.object({
+export let labelSchema = z.object({
+  raw: z.any().optional().describe('Complete provider resource'),
   labelId: z.string().describe('Unique label ID'),
   name: z.string().describe('Label name'),
   color: z.string().optional().describe('Label color hex code'),
@@ -15,13 +17,17 @@ export let listLabels = SlateTool.create(spec, {
   name: 'List Labels',
   key: 'list_labels',
   description: `List all labels in the organization. Labels can be applied to buckets, tasks, dashboards, and other resources for grouping and filtering.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ orgId: orgIdInput }))
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       labels: z.array(labelSchema).describe('List of labels')
     })
   )
@@ -29,16 +35,17 @@ export let listLabels = SlateTool.create(spec, {
     let client = createClient(ctx);
     let result = await client.listLabels();
 
-    let labels = (result.labels || []).map((l: any) => ({
-      labelId: l.id,
+    let labels = requireArray(result, 'labels').map((l: any) => ({
+      raw: l,
+      labelId: resource(l, ['id', 'name']).id,
       name: l.name,
-      color: l.properties?.color,
-      description: l.properties?.description,
-      orgId: l.orgID
+      color: optionalString(l.properties?.color),
+      description: optionalString(l.properties?.description),
+      orgId: optionalString(l.orgID)
     }));
 
     return {
-      output: { labels },
+      output: { labels, raw: result },
       message: `Found **${labels.length}** label(s).`
     };
   })
@@ -48,12 +55,16 @@ export let createLabel = SlateTool.create(spec, {
   name: 'Create Label',
   key: 'create_label',
   description: `Create a new label for organizing and grouping InfluxDB resources.`,
+  instructions: [
+    'Call list_organizations to discover orgId when organization scope is needed.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       name: z.string().describe('Label name'),
       color: z.string().optional().describe('Label color as hex code (e.g. "#00FF00")'),
       description: z.string().optional().describe('Label description')
@@ -72,11 +83,12 @@ export let createLabel = SlateTool.create(spec, {
 
     return {
       output: {
-        labelId: l.id,
+        raw: l,
+        labelId: resource(l, ['id', 'name']).id,
         name: l.name,
-        color: l.properties?.color,
-        description: l.properties?.description,
-        orgId: l.orgID
+        color: optionalString(l.properties?.color),
+        description: optionalString(l.properties?.description),
+        orgId: optionalString(l.orgID)
       },
       message: `Created label **${l.name}** (ID: ${l.id}).`
     };
@@ -112,11 +124,12 @@ export let updateLabel = SlateTool.create(spec, {
 
     return {
       output: {
-        labelId: l.id,
+        raw: l,
+        labelId: resource(l, ['id', 'name']).id,
         name: l.name,
-        color: l.properties?.color,
-        description: l.properties?.description,
-        orgId: l.orgID
+        color: optionalString(l.properties?.color),
+        description: optionalString(l.properties?.description),
+        orgId: optionalString(l.orgID)
       },
       message: `Updated label **${l.name}** (ID: ${l.id}).`
     };

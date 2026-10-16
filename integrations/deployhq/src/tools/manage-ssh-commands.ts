@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,7 +32,9 @@ export let listSshCommands = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project')
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.')
     })
   )
   .output(
@@ -49,7 +51,7 @@ export let listSshCommands = SlateTool.create(spec, {
 
     let commands = await client.listCommands(ctx.input.projectPermalink);
 
-    let mapped = (Array.isArray(commands) ? commands : []).map((c: any) => ({
+    let mapped = commands.map((c: any) => ({
       commandIdentifier: c.identifier,
       description: c.description,
       command: c.command,
@@ -57,7 +59,7 @@ export let listSshCommands = SlateTool.create(spec, {
       timing: c.timing,
       haltOnError: c.halt_on_error,
       position: c.position,
-      servers: (c.servers || []).map((s: any) => ({
+      servers: c.servers?.map((s: any) => ({
         serverIdentifier: s.identifier,
         name: s.name
       }))
@@ -76,21 +78,25 @@ export let createSshCommand = SlateTool.create(spec, {
   description: `Add a new SSH command to a DeployHQ project. SSH commands execute on servers before or after deployments for tasks like restarting services, running migrations, or clearing caches.`,
   instructions: [
     'Commands run in the $HOME directory of the connecting user unless you cd to another path first.',
-    'Timeout values: 300 (5 min), 1800 (30 min), 3600 (1 hour), or 5400 (1.5 hours).'
+    'Timeout values in seconds: 300, 600, 1800, 3600, 5400, or 10800.'
   ]
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       description: z.string().describe('Description of what this command does'),
       command: z.string().describe('The SSH command to execute'),
       callback: z
-        .enum(['before_changes', 'after_changes'])
+        .enum(['before_changes', 'before_symlink', 'after_changes'])
         .describe('When to run the command relative to file deployment'),
       timing: z
         .enum(['all', 'first', 'after_first'])
         .describe('Which deployments to run on: "all", "first" only, or "after_first"'),
-      timeout: z.number().describe('Command timeout in seconds (300, 1800, 3600, or 5400)'),
+      timeout: z
+        .number()
+        .describe('Command timeout in seconds (300, 600, 1800, 3600, 5400, or 10800)'),
       haltOnError: z.boolean().optional().describe('Stop deployment if the command fails'),
       allServers: z.boolean().optional().describe('Run on all current and future servers'),
       serverIdentifiers: z
@@ -106,6 +112,12 @@ export let createSshCommand = SlateTool.create(spec, {
       email: ctx.auth.email,
       accountName: ctx.config.accountName
     });
+
+    if (![300, 600, 1800, 3600, 5400, 10800].includes(ctx.input.timeout)) {
+      throw createApiServiceError(
+        'timeout must be 300, 600, 1800, 3600, 5400, or 10800 seconds.'
+      );
+    }
 
     let data: Record<string, any> = {
       description: ctx.input.description,
@@ -130,7 +142,7 @@ export let createSshCommand = SlateTool.create(spec, {
         timing: c.timing,
         haltOnError: c.halt_on_error,
         position: c.position,
-        servers: (c.servers || []).map((s: any) => ({
+        servers: c.servers?.map((s: any) => ({
           serverIdentifier: s.identifier,
           name: s.name
         }))
@@ -150,7 +162,9 @@ export let deleteSshCommand = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectPermalink: z.string().describe('The permalink (slug) of the project'),
+      projectPermalink: z
+        .string()
+        .describe('Project permalink or identifier. Call list_projects to discover projects.'),
       commandIdentifier: z.string().describe('The SSH command identifier to delete')
     })
   )
@@ -166,10 +180,13 @@ export let deleteSshCommand = SlateTool.create(spec, {
       accountName: ctx.config.accountName
     });
 
-    await client.deleteCommand(ctx.input.projectPermalink, ctx.input.commandIdentifier);
+    let result = await client.deleteCommand(
+      ctx.input.projectPermalink,
+      ctx.input.commandIdentifier
+    );
 
     return {
-      output: { status: 'deleted' },
+      output: { status: result.status },
       message: `Deleted SSH command \`${ctx.input.commandIdentifier}\`.`
     };
   })

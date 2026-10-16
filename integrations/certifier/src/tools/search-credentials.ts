@@ -10,9 +10,9 @@ export let searchCredentials = SlateTool.create(spec, {
 
 Filterable fields include: **id**, **publicId**, **groupId**, **status** (draft/scheduled/issued/expired), **recipient.name**, **recipient.email**, **issueDate**, **expiryDate**, **createdAt**, **updatedAt**.`,
   instructions: [
-    'String fields support: equals, contains, startsWith, endsWith, in.',
+    'String fields support equals, contains, startsWith, endsWith, and in. UUID publicId and enum status only support equals and in.',
     'Date fields (YYYY-MM-DD) support: equals, lt, lte, gt, gte.',
-    'Use AND/OR/NOT for complex filter logic.',
+    'Use arrays for AND, OR, and NOT. Nest recipient fields, e.g. { recipient: { email: { endsWith: "@example.com" } } }.',
     'Sortable fields: id, createdAt, updatedAt, issueDate, expiryDate.'
   ],
   tags: {
@@ -32,7 +32,10 @@ Filterable fields include: **id**, **publicId**, **groupId**, **status** (draft/
         .optional()
         .describe('Field to sort results by'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
-      limit: z.number().optional().describe('Number of results per page (default: 20)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of results per page (whole number 1–100; default: 20)'),
       cursor: z.string().optional().describe('Pagination cursor for fetching the next page')
     })
   )
@@ -92,10 +95,10 @@ Filterable fields include: **id**, **publicId**, **groupId**, **status** (draft/
     return {
       output: {
         credentials,
-        nextCursor: result.pagination.next,
-        prevCursor: result.pagination.prev
+        nextCursor: result.pagination?.next ?? null,
+        prevCursor: result.pagination?.prev ?? null
       },
-      message: `Found **${credentials.length}** credential(s).${result.pagination.next ? ' More results available.' : ''}`
+      message: `Found **${credentials.length}** credential(s).${result.pagination?.next ? ' More results available.' : ''}`
     };
   })
   .build();

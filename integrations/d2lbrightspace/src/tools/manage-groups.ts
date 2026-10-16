@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { richText } from '../lib/response';
 import { spec } from '../spec';
 
 export let listGroupsAndSections = SlateTool.create(spec, {
@@ -11,7 +12,11 @@ export let listGroupsAndSections = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       groupCategoryId: z
         .string()
         .optional()
@@ -69,10 +74,10 @@ export let listGroupsAndSections = SlateTool.create(spec, {
       let items = Array.isArray(result) ? result : [];
       let sections = items.map((s: any) => ({
         sectionId: String(s.SectionId),
-        name: s.Name,
-        code: s.Code,
-        description: s.Description?.Text || s.Description?.Content,
-        enrollmentCount: s.Enrollments?.length
+        name: s.Name ?? undefined,
+        code: s.Code ?? undefined,
+        description: richText(s.Description),
+        enrollmentCount: s.Enrollments?.length ?? undefined
       }));
 
       return {
@@ -86,10 +91,10 @@ export let listGroupsAndSections = SlateTool.create(spec, {
       let items = Array.isArray(result) ? result : [];
       let groups = items.map((g: any) => ({
         groupId: String(g.GroupId),
-        name: g.Name,
-        code: g.Code,
-        description: g.Description?.Text || g.Description?.Content,
-        enrollmentCount: g.Enrollments?.length
+        name: g.Name ?? undefined,
+        code: g.Code ?? undefined,
+        description: richText(g.Description),
+        enrollmentCount: g.Enrollments?.length ?? undefined
       }));
 
       return {
@@ -102,9 +107,9 @@ export let listGroupsAndSections = SlateTool.create(spec, {
     let items = Array.isArray(result) ? result : [];
     let groupCategories = items.map((c: any) => ({
       groupCategoryId: String(c.GroupCategoryId),
-      name: c.Name,
-      description: c.Description?.Text || c.Description?.Content,
-      maxUsersPerGroup: c.MaxUsersPerGroup
+      name: c.Name ?? undefined,
+      description: richText(c.Description),
+      maxUsersPerGroup: c.MaxUsersPerGroup ?? undefined
     }));
 
     return {
@@ -122,7 +127,11 @@ export let manageGroupEnrollment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID'),
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        ),
       groupCategoryId: z.string().describe('Group category ID'),
       groupId: z.string().describe('Group ID'),
       userId: z.number().describe('User ID'),

@@ -1,28 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fieldOutputSchema, mapField } from '../lib/maps';
 import { spec } from '../spec';
-
-let fieldOutputSchema = z.object({
-  fieldId: z.string().describe('Unique identifier of the field'),
-  listId: z.string().describe('ID of the list the field belongs to'),
-  name: z.string().describe('Display name of the field'),
-  tag: z.string().describe('Tag used to reference the field in custom_fields'),
-  datatype: z
-    .string()
-    .describe('Data type: text, numeric, date, select_single, or select_multiple'),
-  datatypeDisplay: z.string().describe('Display type for select fields: select or radio'),
-  defaultvalue: z.string().describe('Default value for the field'),
-  required: z.boolean().describe('Whether the field is required'),
-  inForm: z.boolean().describe('Whether the field is shown in subscription forms'),
-  inList: z.boolean().describe('Whether the field is shown in list overviews'),
-  options: z
-    .record(z.string(), z.string())
-    .describe('Options for select fields, keyed by option ID'),
-  state: z.string().describe('Current state of the field'),
-  created: z.string().describe('Creation timestamp'),
-  modified: z.string().describe('Last modified timestamp')
-});
 
 export let getFields = SlateTool.create(spec, {
   name: 'Get Fields',
@@ -51,24 +31,7 @@ export let getFields = SlateTool.create(spec, {
       let field = result.field;
       return {
         output: {
-          fields: [
-            {
-              fieldId: field.field_id,
-              listId: field.list_id,
-              name: field.name,
-              tag: field.tag,
-              datatype: field.datatype,
-              datatypeDisplay: field.datatype_display,
-              defaultvalue: field.defaultvalue,
-              required: field.required,
-              inForm: field.in_form,
-              inList: field.in_list,
-              options: field.options,
-              state: field.state,
-              created: field.created,
-              modified: field.modified
-            }
-          ]
+          fields: [mapField(field)]
         },
         message: `Retrieved field **${field.name}** (${field.datatype}).`
       };
@@ -77,22 +40,7 @@ export let getFields = SlateTool.create(spec, {
     let results = await client.getFields(ctx.input.listId);
     let fields = results.map(r => {
       let field = r.field;
-      return {
-        fieldId: field.field_id,
-        listId: field.list_id,
-        name: field.name,
-        tag: field.tag,
-        datatype: field.datatype,
-        datatypeDisplay: field.datatype_display,
-        defaultvalue: field.defaultvalue,
-        required: field.required,
-        inForm: field.in_form,
-        inList: field.in_list,
-        options: field.options,
-        state: field.state,
-        created: field.created,
-        modified: field.modified
-      };
+      return mapField(field);
     });
 
     return {
@@ -153,22 +101,7 @@ export let createField = SlateTool.create(spec, {
 
     let field = result.field;
     return {
-      output: {
-        fieldId: field.field_id,
-        listId: field.list_id,
-        name: field.name,
-        tag: field.tag,
-        datatype: field.datatype,
-        datatypeDisplay: field.datatype_display,
-        defaultvalue: field.defaultvalue,
-        required: field.required,
-        inForm: field.in_form,
-        inList: field.in_list,
-        options: field.options,
-        state: field.state,
-        created: field.created,
-        modified: field.modified
-      },
+      output: mapField(field),
       message: `Created custom field **${field.name}** (${field.datatype}) with tag \`${field.tag}\`.`
     };
   })
@@ -227,22 +160,7 @@ export let updateField = SlateTool.create(spec, {
 
     let field = result.field;
     return {
-      output: {
-        fieldId: field.field_id,
-        listId: field.list_id,
-        name: field.name,
-        tag: field.tag,
-        datatype: field.datatype,
-        datatypeDisplay: field.datatype_display,
-        defaultvalue: field.defaultvalue,
-        required: field.required,
-        inForm: field.in_form,
-        inList: field.in_list,
-        options: field.options,
-        state: field.state,
-        created: field.created,
-        modified: field.modified
-      },
+      output: mapField(field),
       message: `Updated field **${field.name}** (${field.datatype}).`
     };
   })
@@ -270,22 +188,7 @@ export let deleteField = SlateTool.create(spec, {
 
     let field = result.field;
     return {
-      output: {
-        fieldId: field.field_id,
-        listId: field.list_id,
-        name: field.name,
-        tag: field.tag,
-        datatype: field.datatype,
-        datatypeDisplay: field.datatype_display,
-        defaultvalue: field.defaultvalue,
-        required: field.required,
-        inForm: field.in_form,
-        inList: field.in_list,
-        options: field.options,
-        state: field.state,
-        created: field.created,
-        modified: field.modified
-      },
+      output: mapField(field),
       message: `Deleted field **${field.name}** from list ${field.list_id}.`
     };
   })

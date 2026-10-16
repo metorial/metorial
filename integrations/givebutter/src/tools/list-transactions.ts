@@ -21,6 +21,13 @@ let transactionSummarySchema = z.object({
   createdAt: z.string().nullable().describe('When the transaction was created')
 });
 
+let listTransactionsOutputSchema = z.object({
+  transactions: z.array(transactionSummarySchema).describe('List of transactions'),
+  totalCount: z.number().describe('Total number of transactions'),
+  currentPage: z.number().describe('Current page'),
+  lastPage: z.number().describe('Last page')
+});
+
 export let listTransactions = SlateTool.create(spec, {
   name: 'List Transactions',
   key: 'list_transactions',
@@ -32,51 +39,62 @@ export let listTransactions = SlateTool.create(spec, {
   .input(
     z.object({
       page: z.number().optional().describe('Page number for pagination (default: 1)'),
-      scope: z.string().optional().describe('Scope filter (e.g. "beneficiary" or "chapter")')
+      perPage: z.number().optional().describe('Items per page, from 1 to 100'),
+      scope: z.string().optional().describe('Scope filter: all, benefiting, or chapters'),
+      transactedAfter: z
+        .string()
+        .optional()
+        .describe('Transactions after this ISO 8601 timestamp'),
+      transactedBefore: z
+        .string()
+        .optional()
+        .describe('Transactions before this ISO 8601 timestamp'),
+      contacts: z.string().optional().describe('Provider contact filter'),
+      method: z.string().optional().describe('Payment method filter')
     })
   )
-  .output(
-    z.object({
-      transactions: z.array(transactionSummarySchema).describe('List of transactions'),
-      totalCount: z.number().describe('Total number of transactions'),
-      currentPage: z.number().describe('Current page'),
-      lastPage: z.number().describe('Last page')
-    })
-  )
+  .output(listTransactionsOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listTransactions({
       page: ctx.input.page,
-      scope: ctx.input.scope
+      per_page: ctx.input.perPage,
+      scope: ctx.input.scope,
+      transactedAfter: ctx.input.transactedAfter,
+      transactedBefore: ctx.input.transactedBefore,
+      contacts: ctx.input.contacts,
+      method: ctx.input.method
     });
 
     let transactions = result.data.map((t: any) => ({
       transactionId: String(t.id),
-      campaignId: t.campaign_id ?? null,
-      firstName: t.first_name ?? null,
-      lastName: t.last_name ?? null,
-      email: t.email ?? null,
-      phone: t.phone ?? null,
-      status: t.status ?? null,
-      method: t.method ?? null,
-      amount: t.amount ?? null,
-      fee: t.fee ?? null,
-      feeCovered: t.fee_covered ?? null,
-      donated: t.donated ?? null,
-      payout: t.payout ?? null,
-      currency: t.currency ?? null,
-      createdAt: t.created_at ?? null
+      campaignId: t.campaign_id,
+      firstName: t.first_name,
+      lastName: t.last_name,
+      email: t.email,
+      phone: t.phone,
+      status: t.status,
+      method: t.method,
+      amount: t.amount,
+      fee: t.fee,
+      feeCovered: t.fee_covered,
+      donated: t.donated,
+      payout: t.payout,
+      currency: t.currency,
+      createdAt: t.created_at
     }));
 
     return {
-      output: {
+      output: client.output(listTransactionsOutputSchema, {
         transactions,
         totalCount: result.meta.total,
         currentPage: result.meta.current_page,
         lastPage: result.meta.last_page
-      },
-      message: `Found **${result.meta.total}** transactions (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      }),
+      message: client.publicData(
+        `Found **${result.meta.total}** transactions (page ${result.meta.current_page} of ${result.meta.last_page}).`
+      )
     };
   })
   .build();

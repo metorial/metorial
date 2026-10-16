@@ -11,8 +11,12 @@ import {
   deleteRecords,
   deleteWebhook,
   deleteWorkspace,
+  downloadAttachment,
+  downloadDocument,
   fetchRecords,
+  getCurrentUser,
   getDocument,
+  getWorkspace,
   listAttachments,
   listColumns,
   listOrgs,
@@ -20,22 +24,31 @@ import {
   listWebhooks,
   listWorkspaces,
   modifyColumns,
+  restoreDocument,
+  restoreWorkspace,
   runSql,
   updateDocument,
   updateRecords,
-  updateWebhook
+  updateWebhook,
+  updateWorkspace
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     listOrgs,
+    getCurrentUser,
     listWorkspaces,
+    getWorkspace,
+    updateWorkspace,
     createWorkspace,
     deleteWorkspace,
+    restoreWorkspace,
     getDocument,
     createDocument,
     updateDocument,
     deleteDocument,
+    restoreDocument,
+    downloadDocument,
     listTables,
     createTable,
     listColumns,
@@ -50,7 +63,8 @@ export let provider = Slate.create({
     createWebhook,
     updateWebhook,
     deleteWebhook,
-    listAttachments
+    listAttachments,
+    downloadAttachment
   ],
   triggers: []
 });

@@ -28,6 +28,10 @@ export let createContact = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response, including fields not shown in the summary'),
       contactId: z.number().describe('Altoviz contact ID'),
       firstName: z.string().nullable().optional(),
       lastName: z.string().nullable().optional(),
@@ -41,6 +45,7 @@ export let createContact = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         contactId: result.id,
         firstName: result.firstName,
         lastName: result.lastName,

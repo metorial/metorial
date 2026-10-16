@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EodhdClient } from '../lib/client';
+import { EodhdClient, eodhdArray } from '../lib/client';
 import { spec } from '../spec';
 
 let earningSchema = z.object({
@@ -48,7 +48,7 @@ export let getFinancialCalendar = SlateTool.create(spec, {
   description: `Retrieve upcoming financial calendar events including earnings reports, IPOs, and stock splits. Filter by date range and/or specific ticker symbols.`,
   instructions: [
     'Choose one calendar type: earnings, ipos, or splits',
-    'For earnings, you can filter by specific symbols using comma-separated tickers'
+    'For earnings and splits, symbols narrows the date window; provide from/to to search outside the next seven days'
   ],
   tags: {
     readOnly: true
@@ -64,7 +64,9 @@ export let getFinancialCalendar = SlateTool.create(spec, {
       symbols: z
         .string()
         .optional()
-        .describe('Comma-separated ticker symbols to filter by (earnings and splits only)')
+        .describe(
+          'Comma-separated ticker symbols to filter by (earnings and splits only; also provide a date range)'
+        )
     })
   )
   .output(
@@ -85,7 +87,11 @@ export let getFinancialCalendar = SlateTool.create(spec, {
         to: ctx.input.to,
         symbols: ctx.input.symbols
       });
-      let earnings = result?.earnings ?? (Array.isArray(result) ? result : []);
+      let earnings = eodhdArray(
+        result,
+        'earnings calendar',
+        Array.isArray(result) ? undefined : 'earnings'
+      );
       return {
         output: { calendarType, earnings },
         message: `Retrieved **${earnings.length}** upcoming earnings events.`
@@ -97,7 +103,11 @@ export let getFinancialCalendar = SlateTool.create(spec, {
         from: ctx.input.from,
         to: ctx.input.to
       });
-      let ipos = result?.ipos ?? (Array.isArray(result) ? result : []);
+      let ipos = eodhdArray(
+        result,
+        'ipos calendar',
+        Array.isArray(result) ? undefined : 'ipos'
+      );
       return {
         output: { calendarType, ipos },
         message: `Retrieved **${ipos.length}** upcoming IPO events.`
@@ -109,7 +119,17 @@ export let getFinancialCalendar = SlateTool.create(spec, {
       to: ctx.input.to,
       symbols: ctx.input.symbols
     });
-    let splits = result?.splits ?? (Array.isArray(result) ? result : []);
+    let splits = eodhdArray(
+      result,
+      'splits calendar',
+      Array.isArray(result) ? undefined : 'splits'
+    ).map(entry => ({
+      ...entry,
+      old_shares:
+        typeof entry.old_shares === 'number' ? String(entry.old_shares) : entry.old_shares,
+      new_shares:
+        typeof entry.new_shares === 'number' ? String(entry.new_shares) : entry.new_shares
+    }));
     return {
       output: { calendarType, splits },
       message: `Retrieved **${splits.length}** upcoming stock split events.`

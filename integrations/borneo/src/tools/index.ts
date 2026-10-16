@@ -1,4 +1,5 @@
 export * from './create-and-schedule-scan';
+export { getCurrentUser, listAccounts, listConnectors, listScanIterations } from './discover';
 export * from './download-report';
 export * from './export-inventory';
 export * from './get-cloud-account';

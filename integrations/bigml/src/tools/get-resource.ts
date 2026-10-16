@@ -15,6 +15,12 @@ Useful for checking the status of asynchronous operations (source creation, mode
 })
   .input(
     z.object({
+      queryString: z
+        .string()
+        .optional()
+        .describe(
+          'Optional provider retrieval parameters, separated by & or semicolons; credentials cannot be overridden'
+        ),
       resourceId: z
         .string()
         .describe(
@@ -24,6 +30,7 @@ Useful for checking the status of asynchronous operations (source creation, mode
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('Resource ID'),
       name: z.string().optional().describe('Resource name'),
       description: z.string().optional().describe('Resource description'),
@@ -46,14 +53,14 @@ Useful for checking the status of asynchronous operations (source creation, mode
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let result = await client.getResource(ctx.input.resourceId);
+    let result = await client.getResource(ctx.input.resourceId, ctx.input.queryString);
 
     let sCode = result.status?.code;
     let sMessage = result.status?.message;
     let sLabel = sCode !== undefined ? statusLabel(sCode) : undefined;
 
     // Extract key fields from the result, excluding very large or internal fields
-    let resourceData: Record<string, any> = {};
+    let resourceData: Record<string, unknown> = {};
     let excludeKeys = new Set([
       'resource',
       'code',
@@ -73,6 +80,7 @@ Useful for checking the status of asynchronous operations (source creation, mode
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
         description: result.description,

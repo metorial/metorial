@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,9 +17,10 @@ export let auth = SlateAuth.create()
         .describe('BART API key. Register for free at https://api.bart.gov/api/register.aspx')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) throw createApiServiceError('A BART API key is required.');
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey.trim()
         }
       };
     }

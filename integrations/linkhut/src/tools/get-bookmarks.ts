@@ -1,18 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bookmarkSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let bookmarkSchema = z.object({
-  href: z.string().describe('URL of the bookmark'),
-  description: z.string().describe('Title of the bookmark'),
-  extended: z.string().describe('Extended notes'),
-  hash: z.string().describe('MD5 hash of the URL'),
-  tag: z.string().describe('Space-separated tags'),
-  time: z.string().describe('ISO 8601 timestamp of when the bookmark was created'),
-  shared: z.string().describe('Whether the bookmark is public ("yes" or "no")'),
-  toread: z.string().describe('Whether the bookmark is marked as unread ("yes" or "no")')
-});
 
 export let getBookmarks = SlateTool.create(spec, {
   name: 'Get Bookmarks',
@@ -33,20 +23,24 @@ export let getBookmarks = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter by date (format: YYYY-MM-DD). Returns bookmarks from this day only.'
+          'Filter by date (YYYY-MM-DD or UTC YYYY-MM-DDTHH:mm:ssZ). Returns bookmarks from this day only.'
         ),
       url: z.string().optional().describe('Retrieve the bookmark for this specific URL'),
+      includeMeta: z.boolean().optional().describe('Include bookmark change signatures'),
       hashes: z
         .string()
         .optional()
-        .describe('URL-encoded MD5 hashes to fetch specific bookmarks')
+        .describe(
+          'Space-separated MD5 hashes; URL-encoded spaces and plus separators are also accepted'
+        )
     })
   )
   .output(
     z.object({
-      date: z.string().describe('Date of the returned bookmarks'),
-      user: z.string().describe('Username of the bookmark owner'),
-      posts: z.array(bookmarkSchema).describe('List of matching bookmarks')
+      date: z.string().optional().describe('Date of the returned bookmarks'),
+      user: z.string().optional().describe('Username of the bookmark owner'),
+      posts: z.array(bookmarkSchema).describe('List of matching bookmarks'),
+      raw: z.unknown().describe('Original provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -56,7 +50,9 @@ export let getBookmarks = SlateTool.create(spec, {
       tag: ctx.input.tag,
       dt: ctx.input.date,
       url: ctx.input.url,
-      hashes: ctx.input.hashes
+      hashes: ctx.input.hashes,
+      meta:
+        ctx.input.includeMeta === undefined ? undefined : ctx.input.includeMeta ? 'yes' : 'no'
     });
 
     return {

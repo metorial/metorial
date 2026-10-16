@@ -74,7 +74,8 @@ export let getOffers = SlateTool.create(spec, {
       });
     }
 
-    let rawOffers = data.offers ?? (data.order ? [data.order] : []);
+    let rawOffers =
+      data.offers ?? (data.order ? [data.order] : ctx.input.tokenIdentifier ? [data] : []);
     let offers = rawOffers.map((o: any) => {
       let price = o.price?.current ?? o.price ?? {};
       return {
@@ -83,14 +84,16 @@ export let getOffers = SlateTool.create(spec, {
         priceAmount: price.value ?? price.amount ?? null,
         priceSymbol: price.currency ?? price.symbol ?? null,
         priceDecimals: price.decimals ?? null,
-        maker: o.maker?.address ?? o.protocol_data?.parameters?.offerer ?? null,
+        maker:
+          o.maker?.address ??
+          o.protocol_data?.parameters?.offerer ??
+          o.svm_order?.maker ??
+          null,
         offerTimestamp: o.listing_timestamp ?? o.protocol_data?.parameters?.startTime ?? null,
         expirationTimestamp:
           o.expiration_timestamp ?? o.protocol_data?.parameters?.endTime ?? null,
         orderType: o.type ?? o.order_type ?? null,
-        quantity: o.protocol_data?.parameters?.offer?.[0]?.startAmount
-          ? Number(o.protocol_data.parameters.offer[0].startAmount)
-          : null
+        quantity: o.remaining_quantity ?? null
       };
     });
 

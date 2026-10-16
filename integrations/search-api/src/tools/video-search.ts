@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SearchApiClient } from '../lib/client';
+import { resultArray, SearchApiClient } from '../lib/client';
 import { spec } from '../spec';
 
 let videoResultSchema = z.object({
@@ -49,6 +49,7 @@ export let videoSearch = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       searchQuery: z.string().optional().describe('The query that was searched'),
       videos: z.array(videoResultSchema).describe('Video search results'),
       relatedSearches: z.array(z.string()).optional().describe('Related search queries')
@@ -56,10 +57,18 @@ export let videoSearch = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SearchApiClient({ token: ctx.auth.token });
+    let legacySourceDomains: Record<string, string> = {
+      dailymotion: 'dailymotion.com',
+      twitch: 'twitch.tv',
+      vimeo: 'vimeo.com'
+    };
+    let sourceDomain = ctx.input.sourcePlatform
+      ? legacySourceDomains[ctx.input.sourcePlatform]
+      : undefined;
 
     let data = await client.search({
       engine: 'google_videos',
-      q: ctx.input.query,
+      q: sourceDomain ? `${ctx.input.query} site:${sourceDomain}` : ctx.input.query,
       location: ctx.input.location,
       gl: ctx.input.country,
       hl: ctx.input.language,
@@ -67,12 +76,12 @@ export let videoSearch = SlateTool.create(spec, {
       page: ctx.input.page,
       duration: ctx.input.duration,
       quality: ctx.input.quality,
-      source: ctx.input.sourcePlatform,
+      source: sourceDomain ? undefined : ctx.input.sourcePlatform,
       time_period: ctx.input.timePeriod,
-      captioned: ctx.input.captioned ? 1 : undefined
+      captioned: ctx.input.captioned ? 'closed' : undefined
     });
 
-    let videos = (data.videos || []).map((v: any) => ({
+    let videos = resultArray(data.videos, 'videos').map((v: any) => ({
       position: v.position,
       title: v.title,
       link: v.link,
@@ -84,17 +93,18 @@ export let videoSearch = SlateTool.create(spec, {
       thumbnail: v.thumbnail
     }));
 
-    let relatedSearches = (data.related_searches || [])
+    let relatedSearches = resultArray(data.related_searches, 'related_searches')
       .map((r: any) => r.query)
       .filter(Boolean);
 
     return {
       output: {
+        raw: data,
         searchQuery: data.search_parameters?.q || ctx.input.query,
         videos,
         relatedSearches: relatedSearches.length > 0 ? relatedSearches : undefined
       },
-      message: `Found ${videos.length} video${videos.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
+      message: `Found on this page: ${videos.length} video${videos.length !== 1 ? 's' : ''} for "${ctx.input.query}".`
     };
   })
   .build();

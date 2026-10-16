@@ -7,6 +7,9 @@ export let listGroups = SlateTool.create(spec, {
   name: 'List Groups',
   key: 'list_groups',
   description: `Lists access groups in your Heartbeat community with optional filtering. Can filter by parent group or by user membership.`,
+  instructions: [
+    'The current API documents an array response without pagination metadata or joinability. Existing filter and pagination inputs are still forwarded unchanged, but their effect is not documented or verified. Missing metadata is omitted rather than inferred.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -36,12 +39,23 @@ export let listGroups = SlateTool.create(spec, {
             groupId: z.string().describe('Group ID'),
             name: z.string().describe('Group name'),
             description: z.string().describe('Group description'),
-            isJoinable: z.boolean().describe('Whether the group is joinable'),
-            parentGroup: z.string().nullable().describe('Parent group ID')
+            isJoinable: z
+              .boolean()
+              .optional()
+              .describe('Whether the group is joinable, when returned by Heartbeat'),
+            parentGroup: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Parent group ID, when returned by Heartbeat')
           })
         )
         .describe('List of groups'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether more results are available, when returned by Heartbeat'),
+      raw: z.unknown().optional().describe('Complete provider list response')
     })
   )
   .handleInvocation(async ctx => {
@@ -65,7 +79,8 @@ export let listGroups = SlateTool.create(spec, {
     return {
       output: {
         groups,
-        hasMore: result.hasMore
+        hasMore: result.hasMore,
+        raw: result.raw
       },
       message: `Found ${groups.length} group(s).${result.hasMore ? ' More results are available.' : ''}`
     };

@@ -22,6 +22,7 @@ export let getStromkontoBalances = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       balances: z
         .array(
           z.object({
@@ -53,24 +54,22 @@ export let getStromkontoBalances = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getStromkontoBalances({ account: ctx.input.account });
 
-    let balances = (Array.isArray(result) ? result : result.balances || []).map(
-      (bal: any) => ({
-        variation: bal.variation,
-        balance: bal.balance,
-        owned: bal.haben,
-        due: bal.soll,
-        transactions: (bal.txs || []).map((tx: any) => ({
-          transactionId: tx.txid,
-          transactionType: tx.txtype,
-          value: tx.value,
-          timeStamp: tx.timeStamp,
-          cashier: tx.cashier
-        }))
-      })
-    );
+    let balances = (Array.isArray(result) ? result : result.balances || []).map(bal => ({
+      variation: bal.variation,
+      balance: bal.balance,
+      owned: bal.haben,
+      due: bal.soll,
+      transactions: (bal.txs || []).map(tx => ({
+        transactionId: tx.txid,
+        transactionType: tx.txtype,
+        value: tx.value,
+        timeStamp: tx.timeStamp,
+        cashier: tx.cashier
+      }))
+    }));
 
     return {
-      output: { balances },
+      output: { raw: result, balances },
       message: `Retrieved **${balances.length}** balance categories for Stromkonto account \`${ctx.input.account.substring(0, 10)}...\`.`
     };
   })

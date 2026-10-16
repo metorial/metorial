@@ -12,7 +12,12 @@ export let listCurrencies = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      page: z.number().optional().describe('Page number for pagination'),
+      perPage: z.number().optional().describe('Number of results per page')
+    })
+  )
   .output(
     z.object({
       status: z.string().describe('Response status from the API'),
@@ -22,7 +27,7 @@ export let listCurrencies = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.listCurrencies();
+    let result = await client.listCurrencies(ctx.input.page, ctx.input.perPage);
     let currencies = Array.isArray(result.data)
       ? result.data
       : result.data
@@ -31,7 +36,7 @@ export let listCurrencies = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status ?? 'success',
+        status: result.status,
         currencies
       },
       message: `Retrieved ${currencies.length} supported currency(ies).`

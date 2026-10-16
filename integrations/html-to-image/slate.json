@@ -1,6 +1,6 @@
 {
   "name": "@metorial/html-to-image",
-  "description": "Convert HTML/CSS markup and public URLs into images (PNG, JPEG, WebP) and PDFs. Generate screenshots of webpages, create dynamic images from reusable templates with Handlebars variable substitution, and manage generated images. Supports Google Fonts, custom viewport dimensions, device scale, render delays, CSS selector cropping, on-the-fly image resizing, and signed URLs for social sharing (og:image, twitter:image). Images are permanently hosted and CDN-cached.",
+  "description": "Generate downloadable images and PDFs from HTML/CSS, public webpages, and saved templates. Browse generated images, download existing files with resizing, manage templates and versions, delete images, and inspect image usage history.",
   "categories": ["document-processing"],
   "skills": [
     "generate image from HTML/CSS",
@@ -10,7 +10,8 @@
     "manage generated images",
     "resize images dynamically",
     "crop images by CSS selector",
-    "create signed image URLs"
+    "download existing images",
+    "inspect image usage history"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/html-to-image.png"
 }

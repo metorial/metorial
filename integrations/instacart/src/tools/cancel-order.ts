@@ -20,11 +20,13 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   .input(
     z.object({
       userId: z.string().describe('Connect user ID'),
+      raw: z.unknown().optional().describe('Complete provider cancellation result'),
       orderId: z.string().describe('Order ID to cancel')
     })
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider cancellation result'),
       orderId: z.string().describe('Cancelled order ID'),
       status: z.string().describe('Order status after cancellation'),
       cancellationReason: z.string().optional().describe('Reason for cancellation')
@@ -33,13 +35,15 @@ Requires **Connect OAuth** authentication with the \`connect:fulfillment\` scope
   .handleInvocation(async ctx => {
     let client = new ConnectClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.config.environment,
+      baseUrl: ctx.auth.baseUrl
     });
 
     let order = await client.cancelOrder(ctx.input.userId, ctx.input.orderId);
 
     return {
       output: {
+        raw: order.raw,
         orderId: order.orderId,
         status: order.status,
         cancellationReason: order.cancellationReason

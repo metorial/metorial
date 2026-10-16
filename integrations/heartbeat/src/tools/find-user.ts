@@ -8,9 +8,12 @@ let userSchema = z.object({
   email: z.string().describe('User email'),
   firstName: z.string().describe('First name'),
   lastName: z.string().describe('Last name'),
-  roleId: z.string().describe('Role ID'),
+  roleId: z.string().optional().describe('Role ID, when returned by Heartbeat'),
   groups: z.array(z.string()).nullable().describe('Group IDs the user belongs to'),
-  createdAt: z.string().describe('When the user was created'),
+  createdAt: z
+    .string()
+    .optional()
+    .describe('When the user was created, when returned by Heartbeat'),
   bio: z.string().optional().describe('User bio'),
   status: z.string().optional().describe('User status')
 });
@@ -19,6 +22,9 @@ export let findUser = SlateTool.create(spec, {
   name: 'Find User',
   key: 'find_user',
   description: `Finds a user in your Heartbeat community by email address or retrieves a specific user by ID.`,
+  instructions: [
+    'User groups are mapped to their actual IDs. Missing role IDs and creation timestamps are omitted; full provider data is retained in raw.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
@@ -32,7 +38,11 @@ export let findUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      users: z.array(userSchema).describe('Matching users')
+      users: z.array(userSchema).describe('Matching users'),
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, when a request was made')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,7 +64,8 @@ export let findUser = SlateTool.create(spec, {
               bio: user.bio,
               status: user.status
             }
-          ]
+          ],
+          raw: user.raw
         },
         message: `Found user **${user.firstName} ${user.lastName}** (${user.email}).`
       };
@@ -74,7 +85,7 @@ export let findUser = SlateTool.create(spec, {
         status: u.status
       }));
       return {
-        output: { users },
+        output: { users, raw: result.raw },
         message:
           users.length > 0
             ? `Found ${users.length} user(s) matching email **${ctx.input.email}**.`

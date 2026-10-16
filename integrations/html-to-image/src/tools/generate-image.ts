@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
-  description: `Generate an image from HTML/CSS markup. Provide HTML content with optional CSS styling to render a pixel-perfect image using the Chrome rendering engine. Supports Google Fonts, custom viewport dimensions, device scaling, render delays, and CSS selector cropping. Returns a permanent, CDN-cached image URL.`,
+  description: `Generate an image from HTML/CSS markup. Provide HTML content with optional CSS styling to render a pixel-perfect image using the Chrome rendering engine. Supports Google Fonts, custom viewport dimensions, device scaling, render delays, and CSS selector cropping. Returns a hosted image URL and a downloadable file.`,
   instructions: [
     'Provide either `html` or `url` to generate an image, but not both.',
     'If using Google Fonts, separate multiple font names with a pipe character (e.g., "Roboto|Open Sans").',
@@ -66,17 +66,34 @@ export let generateImage = SlateTool.create(spec, {
       blockConsentBanners: z
         .boolean()
         .optional()
-        .describe('Automatically hide cookie consent popups')
+        .describe('Automatically hide cookie consent popups'),
+      format: z
+        .enum(['png', 'jpg', 'webp', 'pdf'])
+        .optional()
+        .describe('Format of the downloadable result; defaults to PNG')
     })
   )
   .output(
     z.object({
       imageId: z.string().describe('Unique identifier for the generated image'),
-      url: z.string().describe('Permanent CDN-cached URL of the generated image'),
+      url: z
+        .string()
+        .describe(
+          'Provider URL of the generated image, hosted while the account remains active'
+        ),
       pngUrl: z.string().describe('Direct URL to the PNG version'),
       jpgUrl: z.string().describe('Direct URL to the JPG version'),
       webpUrl: z.string().describe('Direct URL to the WebP version'),
-      pdfUrl: z.string().describe('Direct URL to the PDF version')
+      pdfUrl: z.string().describe('Direct URL to the PDF version'),
+      deliveryWarning: z
+        .string()
+        .optional()
+        .describe(
+          'File delivery warning if the image was created but could not be prepared for download'
+        ),
+      raw: z
+        .record(z.string(), z.unknown())
+        .describe('Provider response with credentials removed')
     })
   )
   .handleInvocation(async ctx => {
@@ -99,21 +116,28 @@ export let generateImage = SlateTool.create(spec, {
       fullScreen: ctx.input.fullScreen,
       colorScheme: ctx.input.colorScheme,
       timezone: ctx.input.timezone,
-      blockConsentBanners: ctx.input.blockConsentBanners
+      blockConsentBanners: ctx.input.blockConsentBanners,
+      format: ctx.input.format
     });
 
-    let baseUrl = result.url;
+    let format = ctx.input.format ?? 'png';
+    let deliveryWarning: string | undefined;
+    try {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result[`${format}Url`],
+        mimeType:
+          format === 'pdf' ? 'application/pdf' : `image/${format === 'jpg' ? 'jpeg' : format}`,
+        filename: `${result.imageId}.${format}`
+      });
+    } catch {
+      deliveryWarning =
+        'The image was created, but its file could not be prepared for download. Use download_image with this image ID; do not generate another image to retry delivery.';
+    }
 
     return {
-      output: {
-        imageId: result.imageId,
-        url: baseUrl,
-        pngUrl: `${baseUrl}.png`,
-        jpgUrl: `${baseUrl}.jpg`,
-        webpUrl: `${baseUrl}.webp`,
-        pdfUrl: `${baseUrl}.pdf`
-      },
-      message: `Image generated successfully. Available at: ${baseUrl}`
+      output: { ...result, deliveryWarning },
+      message: deliveryWarning ?? 'Image generated successfully. Available for download.'
     };
   })
   .build();

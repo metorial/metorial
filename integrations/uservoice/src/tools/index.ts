@@ -1,6 +1,7 @@
 export * from './add-note';
 export * from './create-suggestion';
 export * from './delete-suggestion';
+export * from './get-current-user';
 export * from './get-suggestion';
 export * from './import-external-users';
 export * from './list-categories';
@@ -8,7 +9,9 @@ export * from './list-comments';
 export * from './list-features';
 export * from './list-forums';
 export * from './list-labels';
+export * from './list-notes';
 export * from './list-nps-ratings';
+export * from './list-status-updates';
 export * from './list-statuses';
 export * from './list-suggestions';
 export * from './list-supporters';

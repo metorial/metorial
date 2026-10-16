@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type SavedSearch } from '../lib/client';
 import { spec } from '../spec';
 
 let propertyTypeEnum = z.enum([
@@ -58,7 +58,7 @@ let reverseTransactionTypeMap: Record<number, string> = {
   1: 'rent'
 };
 
-let savedSearchOutputSchema = z.object({
+export let savedSearchOutputSchema = z.object({
   searchId: z.string().describe('UUID of the saved search'),
   title: z.string().describe('Name of the saved search'),
   propertyTypes: z.array(z.string()).describe('Property types being monitored'),
@@ -75,7 +75,7 @@ let savedSearchOutputSchema = z.object({
   updatedAt: z.string().optional().describe('When the search was last updated')
 });
 
-let mapSearchOutput = (s: any) => ({
+export let mapSearchOutput = (s: SavedSearch) => ({
   searchId: s.uuid ?? s['@id']?.split('/').pop() ?? '',
   title: s.title,
   propertyTypes: (s.propertyTypes ?? []).map(
@@ -246,6 +246,8 @@ export let updateSavedSearch = SlateTool.create(spec, {
       includedZipcodes: z.array(z.string()).optional().describe('Zipcodes to include'),
       excludedCities: z.array(z.string()).optional().describe('City IRIs to exclude'),
       publisherTypes: z.array(publisherTypeEnum).optional().describe('Publisher type filter'),
+      pricePerMeterMin: z.number().optional().describe('Minimum price per m²'),
+      pricePerMeterMax: z.number().optional().describe('Maximum price per m²'),
       furnished: z.boolean().optional().describe('Furnished filter'),
       withVirtualTour: z.boolean().optional().describe('Virtual tour filter'),
       expressions: z.array(z.string()).optional().describe('Full-text search expressions'),
@@ -296,6 +298,10 @@ export let updateSavedSearch = SlateTool.create(spec, {
     if (ctx.input.publisherTypes) {
       body.publisherTypes = ctx.input.publisherTypes.map(t => publisherTypeMap[t]);
     }
+    if (ctx.input.pricePerMeterMin !== undefined)
+      body.pricePerMeterMin = ctx.input.pricePerMeterMin;
+    if (ctx.input.pricePerMeterMax !== undefined)
+      body.pricePerMeterMax = ctx.input.pricePerMeterMax;
     if (ctx.input.furnished !== undefined) body.furnished = ctx.input.furnished;
     if (ctx.input.withVirtualTour !== undefined)
       body.withVirtualTour = ctx.input.withVirtualTour;

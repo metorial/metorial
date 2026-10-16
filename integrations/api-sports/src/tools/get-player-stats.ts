@@ -37,7 +37,7 @@ let playerStatSchema = z.object({
 export let getPlayerStatsTool = SlateTool.create(spec, {
   name: 'Get Player Statistics',
   key: 'get_player_stats',
-  description: `Retrieve player profiles and season statistics. Search players by name, or filter by team, league, and season. Returns player biographical data and per-league performance stats including goals, assists, appearances, cards, and ratings.`,
+  description: `Retrieve football player profiles and season statistics, or player profiles for Basketball, NBA, NFL, Formula 1 drivers and MMA fighters. NBA game statistics are available through get_nba_player_statistics. Other sports do not expose player directories. Search players by name, or filter by team, league, and season. Returns player biographical data and per-league performance stats including goals, assists, appearances, cards, and ratings.`,
   instructions: [
     'When searching by name, provide at least 3 characters.',
     'For season stats, provide a season year along with a league or team filter.'
@@ -65,6 +65,10 @@ export let getPlayerStatsTool = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sport to query. Defaults to the configured sport.'),
+      seasonName: z
+        .string()
+        .optional()
+        .describe('Exact string basketball season from get_seasons; use instead of season'),
       playerId: z.number().optional().describe('Get a specific player by ID'),
       team: z.number().optional().describe('Filter by team ID'),
       league: z.number().optional().describe('Filter by league ID'),
@@ -75,6 +79,10 @@ export let getPlayerStatsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including coverage and pagination metadata'),
       players: z.array(playerStatSchema),
       count: z.number().describe('Number of players returned'),
       totalPages: z.number().nullable().describe('Total number of pages available'),
@@ -89,24 +97,39 @@ export let getPlayerStatsTool = SlateTool.create(spec, {
       playerId: ctx.input.playerId,
       team: ctx.input.team,
       league: ctx.input.league,
-      season: ctx.input.season,
+      season: ctx.input.seasonName ?? ctx.input.season,
       search: ctx.input.search,
       page: ctx.input.page
     });
 
     let results = (data.response ?? []).map((item: any) => {
       let player = item.player ?? item;
-      let stats = item.statistics ?? [];
+      let stats = Array.isArray(item.statistics) ? item.statistics : [];
       return {
         playerId: player.id ?? null,
-        playerName: player.name ?? null,
+        playerName:
+          player.name ??
+          ([player.firstname, player.lastname].filter(Boolean).join(' ') || null),
         firstName: player.firstname ?? null,
         lastName: player.lastname ?? null,
         age: player.age ?? null,
-        nationality: player.nationality ?? null,
-        height: player.height ?? null,
-        weight: player.weight ?? null,
-        photo: player.photo ?? null,
+        nationality:
+          player.nationality ??
+          player.birth?.country ??
+          (typeof player.country === 'string' ? player.country : null),
+        height:
+          typeof player.height === 'string'
+            ? player.height
+            : player.height?.meters != null
+              ? `${player.height.meters} m`
+              : null,
+        weight:
+          typeof player.weight === 'string'
+            ? player.weight
+            : player.weight?.kilograms != null
+              ? `${player.weight.kilograms} kg`
+              : null,
+        photo: player.photo ?? player.image ?? null,
         injured: player.injured ?? null,
         seasonStats: stats.map((s: any) => ({
           leagueName: s.league?.name ?? null,
@@ -129,6 +152,7 @@ export let getPlayerStatsTool = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: data,
         players: results,
         count: results.length,
         totalPages: paging.total ?? null,

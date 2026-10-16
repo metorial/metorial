@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   annotateFeedback,
+  getAccountStatus,
   getCampaigns,
   getCompanies,
   getCustomers,
@@ -9,12 +10,17 @@ import {
   getOutbox,
   getReports,
   getScore,
+  getTemplates,
   getTrends,
+  importFeedback,
   manageCustomers,
   manageSuppressions,
+  resubscribeCustomers,
   sendSurvey,
+  syncCustomerAttributes,
   unsubscribeCustomers
 } from './tools';
+
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,7 +36,12 @@ export let provider = Slate.create({
     getTrends,
     getOutbox,
     manageSuppressions,
-    unsubscribeCustomers
+    unsubscribeCustomers,
+    getAccountStatus,
+    getTemplates,
+    resubscribeCustomers,
+    syncCustomerAttributes,
+    importFeedback
   ],
   triggers: []
 });

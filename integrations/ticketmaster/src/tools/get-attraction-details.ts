@@ -1,8 +1,39 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DiscoveryClient } from '../lib/client';
 import { mapAttraction } from '../lib/mappers';
+import { parseTicketmasterOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  attractionId: z.string(),
+  name: z.string(),
+  type: z.string(),
+  url: z.string().optional(),
+  locale: z.string(),
+  upcomingEvents: z.record(z.string(), z.any()),
+  externalLinks: z.record(z.string(), z.any()),
+  images: z.array(
+    z.object({
+      url: z.string(),
+      width: z.number().nullable(),
+      height: z.number().nullable(),
+      ratio: z.string()
+    })
+  ),
+  classifications: z.array(
+    z.object({
+      primary: z.boolean(),
+      segmentName: z.string(),
+      segmentId: z.string(),
+      genreName: z.string(),
+      genreId: z.string(),
+      subGenreName: z.string(),
+      subGenreId: z.string()
+    })
+  ),
+  aliases: z.array(z.string())
+});
 
 export let getAttractionDetailsTool = SlateTool.create(spec, {
   name: 'Get Attraction Details',
@@ -17,37 +48,7 @@ export let getAttractionDetailsTool = SlateTool.create(spec, {
       attractionId: z.string().describe('Ticketmaster attraction ID')
     })
   )
-  .output(
-    z.object({
-      attractionId: z.string(),
-      name: z.string(),
-      type: z.string(),
-      url: z.string(),
-      locale: z.string(),
-      upcomingEvents: z.record(z.string(), z.any()),
-      externalLinks: z.record(z.string(), z.any()),
-      images: z.array(
-        z.object({
-          url: z.string(),
-          width: z.number().nullable(),
-          height: z.number().nullable(),
-          ratio: z.string()
-        })
-      ),
-      classifications: z.array(
-        z.object({
-          primary: z.boolean(),
-          segmentName: z.string(),
-          segmentId: z.string(),
-          genreName: z.string(),
-          genreId: z.string(),
-          subGenreName: z.string(),
-          subGenreId: z.string()
-        })
-      ),
-      aliases: z.array(z.string())
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DiscoveryClient({
       token: ctx.auth.token,
@@ -59,11 +60,13 @@ export let getAttractionDetailsTool = SlateTool.create(spec, {
     let attraction = mapAttraction(response);
 
     if (!attraction) {
-      throw new Error(`Attraction not found: ${ctx.input.attractionId}`);
+      throw createApiServiceError(`Attraction not found: ${ctx.input.attractionId}`, {
+        reason: 'not_found'
+      });
     }
 
     return {
-      output: attraction,
+      output: parseTicketmasterOutput(outputSchema, attraction, 'get-attraction-details'),
       message: `**${attraction.name}** - ${attraction.classifications
         .map((c: any) => c.segmentName)
         .filter(Boolean)

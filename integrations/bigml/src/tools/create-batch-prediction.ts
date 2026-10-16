@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { supervisedReference } from '../lib/client';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -24,6 +25,14 @@ The batch prediction runs asynchronously; check its status to know when results 
         .string()
         .describe('Dataset resource ID containing test data (e.g., "dataset/abc123")'),
       name: z.string().optional().describe('Name for the batch prediction'),
+      outputDataset: z
+        .boolean()
+        .optional()
+        .describe('Create a dataset containing the batch results'),
+      includeProbability: z
+        .boolean()
+        .optional()
+        .describe('Include predicted class probabilities'),
       allFields: z.boolean().optional().describe('Include all input fields in the output'),
       includeHeader: z.boolean().optional().describe('Include header row in output'),
       includeConfidence: z
@@ -40,6 +49,7 @@ The batch prediction runs asynchronously; check its status to know when results 
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete BigML response'),
       resourceId: z.string().describe('BigML resource ID for the batch prediction'),
       name: z.string().optional().describe('Name of the batch prediction'),
       statusCode: z.number().describe('Status code'),
@@ -50,47 +60,36 @@ The batch prediction runs asynchronously; check its status to know when results 
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let modelId = ctx.input.modelId;
-    let modelType = modelId.split('/')[0];
-
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
+      ...supervisedReference(ctx.input.modelId),
       dataset: ctx.input.datasetId
     };
 
-    if (modelType === 'ensemble') {
-      body.ensemble = modelId;
-    } else if (modelType === 'deepnet') {
-      body.deepnet = modelId;
-    } else if (modelType === 'logisticregression') {
-      body.logisticregression = modelId;
-    } else if (modelType === 'linearregression') {
-      body.linearregression = modelId;
-    } else if (modelType === 'fusion') {
-      body.fusion = modelId;
-    } else {
-      body.model = modelId;
-    }
-
-    if (ctx.input.name) body.name = ctx.input.name;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.allFields !== undefined) body.all_fields = ctx.input.allFields;
     if (ctx.input.includeHeader !== undefined) body.header = ctx.input.includeHeader;
     if (ctx.input.includeConfidence !== undefined)
       body.confidence = ctx.input.includeConfidence;
     if (ctx.input.outputFields) body.output_fields = ctx.input.outputFields;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.projectId) body.project = ctx.input.projectId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.projectId !== undefined) body.project = ctx.input.projectId;
+
+    if (ctx.input.outputDataset !== undefined) body.output_dataset = ctx.input.outputDataset;
+    if (ctx.input.includeProbability !== undefined)
+      body.probability = ctx.input.includeProbability;
 
     let result = await client.createResource('batchprediction', body);
 
     return {
       output: {
+        raw: result,
         resourceId: result.resource,
         name: result.name,
-        statusCode: result.status?.code ?? result.code,
-        statusMessage: result.status?.message ?? 'Created',
+        statusCode: result.status.code,
+        statusMessage: result.status.message,
         created: result.created
       },
-      message: `Batch prediction **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status?.message ?? 'pending'}. Processing is asynchronous — check status with the Get Resource tool.`
+      message: `Batch prediction **${result.resource}** created${result.name ? ` as "${result.name}"` : ''}. Status: ${result.status.message}. Processing is asynchronous — check status with the Get Resource tool.`
     };
   })
   .build();

@@ -28,7 +28,9 @@ Use data type "20" for image posts and "9" for video posts.`,
       postStatus: z
         .string()
         .optional()
-        .describe('Status of the post (e.g., "active", "pending").'),
+        .describe(
+          'Provider status code: "0" for draft, "1" for published, or "3" for pending approval.'
+        ),
       postImage: z.string().optional().describe('URL of the post image.'),
       autoImageImport: z
         .boolean()
@@ -38,11 +40,13 @@ Use data type "20" for image posts and "9" for video posts.`,
       postLiveDate: z
         .string()
         .optional()
-        .describe('Date when the post goes live (YYYY-MM-DD).'),
+        .describe(
+          'Post creation timestamp in YYYYMMDDHHmmss format. Use additionalFields.post_start_date for scheduled publication.'
+        ),
       postExpireDate: z
         .string()
         .optional()
-        .describe('Date when the post expires (YYYY-MM-DD).'),
+        .describe('Expiration timestamp in YYYYMMDDHHmmss format.'),
       additionalFields: z
         .record(z.string(), z.string())
         .optional()
@@ -52,6 +56,10 @@ Use data type "20" for image posts and "9" for video posts.`,
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       post: z.any().describe('The newly created post record.')
     })
   )
@@ -87,6 +95,7 @@ Use data type "20" for image posts and "9" for video posts.`,
     return {
       output: {
         status: result.status,
+        raw: result,
         post: result.message
       },
       message: `Created post${ctx.input.postTitle ? ` **"${ctx.input.postTitle}"**` : ''}.`

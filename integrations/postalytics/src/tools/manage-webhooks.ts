@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PostalyticsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let manageWebhooks = SlateTool.create(spec, {
     'Use action "delete" to remove a webhook.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -69,7 +69,8 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required for get action');
+      if (!ctx.input.webhookId)
+        throw createApiServiceError('webhookId is required for get action');
       let webhook = await client.getWebhook(ctx.input.webhookId);
       return {
         output: { webhook },
@@ -78,8 +79,9 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.campaignId) throw new Error('campaignId is required for create action');
-      if (!ctx.input.url) throw new Error('url is required for create action');
+      if (!ctx.input.campaignId)
+        throw createApiServiceError('campaignId is required for create action');
+      if (!ctx.input.url) throw createApiServiceError('url is required for create action');
       let result = await client.createWebhook({
         campaignId: ctx.input.campaignId,
         isEnabled: ctx.input.isEnabled ?? true,
@@ -92,7 +94,8 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required for update action');
+      if (!ctx.input.webhookId)
+        throw createApiServiceError('webhookId is required for update action');
       let result = await client.updateWebhook(ctx.input.webhookId, {
         campaignId: ctx.input.campaignId,
         isEnabled: ctx.input.isEnabled,
@@ -105,7 +108,8 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required for delete action');
+      if (!ctx.input.webhookId)
+        throw createApiServiceError('webhookId is required for delete action');
       let result = await client.deleteWebhook(ctx.input.webhookId);
       return {
         output: { result },
@@ -113,6 +117,6 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

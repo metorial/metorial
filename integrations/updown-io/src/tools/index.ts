@@ -1,4 +1,5 @@
 export * from './create-check';
+export * from './create-pulse-check';
 export * from './create-status-page';
 export * from './delete-check';
 export * from './delete-status-page';
@@ -6,6 +7,7 @@ export * from './get-check';
 export * from './get-downtimes';
 export * from './get-metrics';
 export * from './list-checks';
+export * from './list-node-ips';
 export * from './list-nodes';
 export * from './list-recipients';
 export * from './list-status-pages';

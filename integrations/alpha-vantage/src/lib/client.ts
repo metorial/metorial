@@ -1,7 +1,14 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  requestAxios
+} from 'slates';
 
 let http = createAxios({
-  baseURL: 'https://www.alphavantage.co'
+  baseURL: 'https://www.alphavantage.co',
+  timeout: 30000
 });
 
 export class Client {
@@ -17,17 +24,43 @@ export class Client {
       }
     }
 
-    let response = await http.get('/query', { params: cleanParams });
+    if (!this.token.trim()) {
+      throw createApiServiceError('An Alpha Vantage API key is required.');
+    }
+    for (let [key, value] of Object.entries(cleanParams)) {
+      if (!value.trim())
+        throw createApiServiceError(`Alpha Vantage parameter ${key} cannot be empty.`);
+    }
+    let response = await requestAxios(
+      String(params.function),
+      () => http.get('/query', { params: cleanParams }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Alpha Vantage',
+          reason: 'alpha_vantage_api_error',
+          operation,
+          detailKeys: ['Error Message', 'Information', 'Note', 'message', 'error'],
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input)
+        })
+    );
     let data = response.data;
-
-    if (data && typeof data === 'object' && 'Error Message' in data) {
-      throw new Error(data['Error Message']);
+    if (!isApiErrorRecord(data) || Object.keys(data).length === 0) {
+      throw createApiServiceError(
+        `Alpha Vantage returned no usable data for ${params.function}. Check the symbol and your API plan.`,
+        {
+          reason: 'alpha_vantage_invalid_response',
+          upstreamStatus: response.status
+        }
+      );
     }
-    if (data && typeof data === 'object' && 'Information' in data) {
-      throw new Error(data.Information);
-    }
-    if (data && typeof data === 'object' && 'Note' in data) {
-      throw new Error(data.Note);
+    for (let key of ['Error Message', 'Information', 'Note']) {
+      if (key in data) {
+        throw createApiServiceError(`Alpha Vantage: ${String(data[key])}`, {
+          reason: 'alpha_vantage_api_error',
+          upstreamStatus: response.status,
+          upstreamCode: key
+        });
+      }
     }
 
     return data;
@@ -42,6 +75,7 @@ export class Client {
     extendedHours?: boolean;
     month?: string;
     outputSize?: string;
+    entitlement?: string;
   }) {
     return this.query({
       function: 'TIME_SERIES_INTRADAY',
@@ -50,6 +84,7 @@ export class Client {
       adjusted: params.adjusted,
       extended_hours: params.extendedHours,
       month: params.month,
+      entitlement: params.entitlement,
       outputsize: params.outputSize
     });
   }
@@ -62,10 +97,15 @@ export class Client {
     });
   }
 
-  async timeSeriesDailyAdjusted(params: { symbol: string; outputSize?: string }) {
+  async timeSeriesDailyAdjusted(params: {
+    symbol: string;
+    outputSize?: string;
+    entitlement?: string;
+  }) {
     return this.query({
       function: 'TIME_SERIES_DAILY_ADJUSTED',
       symbol: params.symbol,
+      entitlement: params.entitlement,
       outputsize: params.outputSize
     });
   }
@@ -100,10 +140,11 @@ export class Client {
 
   // ─── Quote & Search ───
 
-  async globalQuote(params: { symbol: string }) {
+  async globalQuote(params: { symbol: string; entitlement?: string }) {
     return this.query({
       function: 'GLOBAL_QUOTE',
-      symbol: params.symbol
+      symbol: params.symbol,
+      entitlement: params.entitlement
     });
   }
 
@@ -177,20 +218,29 @@ export class Client {
     symbol: string;
     requireGreeks?: boolean;
     contract?: string;
+    expiration?: string;
   }) {
     return this.query({
       function: 'REALTIME_OPTIONS',
       symbol: params.symbol,
       require_greeks: params.requireGreeks,
-      contract: params.contract
+      contract: params.contract,
+      expiration: params.expiration
     });
   }
 
-  async historicalOptions(params: { symbol: string; date?: string }) {
+  async historicalOptions(params: {
+    symbol: string;
+    date?: string;
+    contract?: string;
+    expiration?: string;
+  }) {
     return this.query({
       function: 'HISTORICAL_OPTIONS',
       symbol: params.symbol,
-      date: params.date
+      date: params.date,
+      contract: params.contract,
+      expiration: params.expiration
     });
   }
 
@@ -215,9 +265,10 @@ export class Client {
     });
   }
 
-  async topGainersLosers() {
+  async topGainersLosers(params: { entitlement?: string } = {}) {
     return this.query({
-      function: 'TOP_GAINERS_LOSERS'
+      function: 'TOP_GAINERS_LOSERS',
+      entitlement: params.entitlement
     });
   }
 
@@ -348,6 +399,19 @@ export class Client {
     nbdevup?: number;
     nbdevdn?: number;
     maType?: number;
+    month?: string;
+    entitlement?: string;
+    slowKMaType?: number;
+    slowDMaType?: number;
+    fastDPeriod?: number;
+    fastDMaType?: number;
+    timePeriod1?: number;
+    timePeriod2?: number;
+    timePeriod3?: number;
+    acceleration?: number;
+    maximum?: number;
+    fastLimit?: number;
+    slowLimit?: number;
   }) {
     return this.query({
       function: params.indicatorFunction,
@@ -366,7 +430,35 @@ export class Client {
       signalmatype: params.signalMaType,
       nbdevup: params.nbdevup,
       nbdevdn: params.nbdevdn,
-      matype: params.maType
+      matype: params.maType,
+      month: params.month,
+      entitlement: params.entitlement,
+      slowkmatype: params.slowKMaType,
+      slowdmatype: params.slowDMaType,
+      fastdperiod: params.fastDPeriod,
+      fastdmatype: params.fastDMaType,
+      timeperiod1: params.timePeriod1,
+      timeperiod2: params.timePeriod2,
+      timeperiod3: params.timePeriod3,
+      acceleration: params.acceleration,
+      maximum: params.maximum,
+      fastlimit: params.fastLimit,
+      slowlimit: params.slowLimit
     });
+  }
+  async etfProfile(params: { symbol: string }) {
+    return this.query({ function: 'ETF_PROFILE', symbol: params.symbol });
+  }
+
+  async insiderTransactions(params: { symbol: string; from?: string }) {
+    return this.query({
+      function: 'INSIDER_TRANSACTIONS',
+      symbol: params.symbol,
+      from: params.from
+    });
+  }
+
+  async earningsEstimates(params: { symbol: string }) {
+    return this.query({ function: 'EARNINGS_ESTIMATES', symbol: params.symbol });
   }
 }

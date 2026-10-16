@@ -47,13 +47,23 @@ Use this to browse the workforce, find specific employees, or get an overview of
         .number()
         .optional()
         .default(0)
-        .describe('Number of records to skip for pagination')
+        .describe('Number of records to skip for pagination'),
+      filter: z
+        .string()
+        .optional()
+        .describe('TalentHR directory filter string, for example department=10;location=36;'),
+      customFields: z
+        .string()
+        .optional()
+        .describe('Comma-separated custom field slugs to include')
     })
   )
   .output(
     z.object({
       employees: z.array(employeeSchema).describe('List of employees'),
-      count: z.number().describe('Number of employees returned')
+      count: z.number().describe('Number of employees returned on this page'),
+      total: z.number().optional().describe('Total matching employees reported by TalentHR'),
+      rawResponse: z.any().optional().describe('Full API response')
     })
   )
   .handleInvocation(async ctx => {
@@ -61,7 +71,9 @@ Use this to browse the workforce, find specific employees, or get an overview of
 
     let response = await client.listEmployees({
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      filter: ctx.input.filter,
+      custom_fields: ctx.input.customFields
     });
 
     let employees = response.data.rows.map(emp => ({
@@ -90,7 +102,9 @@ Use this to browse the workforce, find specific employees, or get an overview of
     return {
       output: {
         employees,
-        count: employees.length
+        count: employees.length,
+        total: response.data.total,
+        rawResponse: response
       },
       message: `Retrieved **${employees.length}** employee(s) from the directory.`
     };

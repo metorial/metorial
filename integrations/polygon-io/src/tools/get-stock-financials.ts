@@ -1,6 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  cursorInput,
+  cursorOutput,
+  financialStatement,
+  nextCursor,
+  responseRows
+} from '../lib/response';
 import { spec } from '../spec';
 
 let financialStatementSchema = z
@@ -37,7 +44,7 @@ let financialReportSchema = z.object({
 export let getStockFinancials = SlateTool.create(spec, {
   name: 'Get Stock Financials',
   key: 'get_stock_financials',
-  description: `Retrieve financial reports (10-K and 10-Q) for US companies. Includes income statements, balance sheets, cash flow statements, and comprehensive income data sourced from SEC Edgar.`,
+  description: `Retrieve legacy financial reports (10-K and 10-Q) for US companies. Includes income statements, balance sheets, cash flow statements, and comprehensive income data sourced from SEC Edgar.`,
   instructions: ['Use timeframe "annual" for 10-K reports and "quarterly" for 10-Q reports.'],
   tags: {
     readOnly: true
@@ -45,6 +52,7 @@ export let getStockFinancials = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorInput,
       ticker: z.string().describe('Stock ticker symbol (e.g., "AAPL")'),
       timeframe: z
         .enum(['annual', 'quarterly', 'ttm'])
@@ -67,6 +75,13 @@ export let getStockFinancials = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursor: cursorOutput,
+      rawReports: z
+        .array(z.unknown())
+        .optional()
+        .describe(
+          'Original provider reports, preserving financial source fields and null values.'
+        ),
       reports: z.array(financialReportSchema).describe('Array of financial reports'),
       count: z.number().describe('Number of reports returned')
     })
@@ -83,28 +98,34 @@ export let getStockFinancials = SlateTool.create(spec, {
       periodOfReportDateLte: ctx.input.periodOfReportDateLte,
       includeSources: ctx.input.includeSources,
       order: ctx.input.order,
+      cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
 
-    let reports = (data.results || []).map((r: any) => ({
-      ticker: r.tickers?.[0] || ctx.input.ticker,
-      cik: r.cik,
-      companyName: r.company_name,
-      startDate: r.start_date,
-      endDate: r.end_date,
-      filingDate: r.filing_date,
-      fiscalPeriod: r.fiscal_period,
-      fiscalYear: r.fiscal_year,
-      sourceFilingUrl: r.source_filing_url,
-      sourceFilingFileUrl: r.source_filing_file_url,
-      incomeStatement: r.financials?.income_statement,
-      balanceSheet: r.financials?.balance_sheet,
-      cashFlowStatement: r.financials?.cash_flow_statement,
-      comprehensiveIncome: r.financials?.comprehensive_income
+    let rows = responseRows(data.results);
+    if (!rows)
+      throw createApiServiceError('Polygon.io omitted the required financial results array.');
+    let reports = rows.map((r: any) => ({
+      ticker: r.tickers?.[0] ?? undefined,
+      cik: r.cik ?? undefined,
+      companyName: r.company_name ?? undefined,
+      startDate: r.start_date ?? undefined,
+      endDate: r.end_date ?? undefined,
+      filingDate: r.filing_date ?? undefined,
+      fiscalPeriod: r.fiscal_period ?? undefined,
+      fiscalYear: r.fiscal_year ?? undefined,
+      sourceFilingUrl: r.source_filing_url ?? undefined,
+      sourceFilingFileUrl: r.source_filing_file_url ?? undefined,
+      incomeStatement: financialStatement(r.financials?.income_statement),
+      balanceSheet: financialStatement(r.financials?.balance_sheet),
+      cashFlowStatement: financialStatement(r.financials?.cash_flow_statement),
+      comprehensiveIncome: financialStatement(r.financials?.comprehensive_income)
     }));
 
     return {
       output: {
+        nextCursor: nextCursor(data),
+        rawReports: data.results ?? undefined,
         reports,
         count: reports.length
       },

@@ -3,8 +3,11 @@ import { spec } from './spec';
 import {
   buildTranslationsTool,
   downloadFileTool,
+  getCurrentUserTool,
+  getFileUrl,
   getProjectTool,
   listFilesTool,
+  listLanguagesTool,
   listMembersTool,
   listProjectsTool,
   manageGlossaryTool,
@@ -19,6 +22,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
+    listLanguagesTool,
+    getFileUrl,
     listProjectsTool,
     getProjectTool,
     manageProjectTool,

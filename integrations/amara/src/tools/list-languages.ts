@@ -30,20 +30,7 @@ export let listLanguages = SlateTool.create(spec, {
 
     let result = await client.listLanguages();
 
-    // The API may return either an array of objects or a mapping
-    let languages: Array<{ code: string; name: string }> = [];
-
-    if (Array.isArray(result)) {
-      languages = result.map((l: any) => ({
-        code: l.code || l.language_code || '',
-        name: l.name || ''
-      }));
-    } else if (typeof result === 'object') {
-      languages = Object.entries(result).map(([code, name]) => ({
-        code,
-        name: String(name)
-      }));
-    }
+    let languages = Object.entries(result.languages).map(([code, name]) => ({ code, name }));
 
     return {
       output: { languages },

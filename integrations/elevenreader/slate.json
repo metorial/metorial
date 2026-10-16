@@ -1,21 +1,21 @@
 {
   "name": "@metorial/elevenreader",
-  "description": "Convert text to lifelike speech audio with customizable AI voices, models, languages, and output formats. Transcribe speech to text in real-time or batch mode. Manage, clone, and design voices from audio samples or text prompts. Generate music and sound effects from text descriptions. Dub and translate audio/video content into other languages. Isolate vocals from background noise, change voices in audio, and generate multi-speaker dialogue. Create and manage conversational AI agents with knowledge bases and tool integrations. Manage studio projects for long-form audio productions like audiobooks. Configure pronunciation dictionaries and administer workspace settings, users, and usage analytics.",
+  "description": "Generate and download ElevenLabs speech and sound effects, transcribe audio, design and manage voices, isolate vocals, and create, inspect, download, or delete automatic dubbing projects. Browse voices, models, pronunciation dictionaries, account usage, and generation history. Uses the ElevenLabs API; ElevenReader library access is not provided.",
   "categories": [
     "apis-and-http-requests",
     "language-translation",
     "speech-recognition-and-synthesis"
   ],
   "skills": [
-    "convert text to speech",
-    "transcribe speech to text",
-    "clone and manage voices",
-    "generate music from text",
+    "generate speech audio",
+    "transcribe audio",
+    "discover and manage voices",
+    "design and save voices",
     "generate sound effects",
-    "dub audio into languages",
-    "isolate vocals from audio",
-    "manage conversational AI agents",
-    "create studio audio projects",
-    "manage pronunciation dictionaries"
+    "create and download automatic dubs",
+    "isolate vocals",
+    "download generated audio history",
+    "browse pronunciation dictionaries",
+    "inspect account usage"
   ]
 }

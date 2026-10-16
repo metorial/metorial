@@ -6,6 +6,7 @@ export * from './extract-id-data';
 export * from './generate-business-report';
 export * from './generate-social-media-content';
 export * from './image-to-json';
+export * from './list-modules';
 export * from './pdf-to-json';
 export * from './text-to-flow-diagram';
 export * from './text-to-image';

@@ -18,8 +18,12 @@ let projectOutputSchema = z.object({
 export let listProjectsTool = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
-  description: `Retrieve all projects in Timelink. Returns project details including name, associated client, billing status, and active status. Use this to find project IDs for time entries.`,
+  description: `DEPRECATED — use \`list_records\` instead. Retrieve all projects in Timelink. Returns project details including name, associated client, billing status, and active status. Use this to find project IDs for time entries.`,
+  instructions: [
+    'Use list_records for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -55,8 +59,12 @@ export let listProjectsTool = SlateTool.create(spec, {
 export let getProjectTool = SlateTool.create(spec, {
   name: 'Get Project',
   key: 'get_project',
-  description: `Retrieve details of a specific project by ID. Returns full project information including name, associated client, billing and active status.`,
+  description: `DEPRECATED — use \`get_record\` instead. Retrieve details of a specific project by ID. Returns full project information including name, associated client, billing and active status.`,
+  instructions: [
+    'Use get_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -90,8 +98,12 @@ export let getProjectTool = SlateTool.create(spec, {
 export let createProjectTool = SlateTool.create(spec, {
   name: 'Create Project',
   key: 'create_project',
-  description: `Create a new project in Timelink. Projects can be linked to a client and used to categorize time entries. Configure billing, active status, and an external ID for syncing.`,
+  description: `DEPRECATED — use \`manage_project_record\` instead. Create a new project in Timelink. Projects can be linked to a client and used to categorize time entries. Configure billing, active status, and an external ID for syncing.`,
+  instructions: [
+    'Use manage_project_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -141,8 +153,12 @@ export let createProjectTool = SlateTool.create(spec, {
 export let updateProjectTool = SlateTool.create(spec, {
   name: 'Update Project',
   key: 'update_project',
-  description: `Update an existing project in Timelink. Only the provided fields will be updated; omitted fields remain unchanged. Can reassign the project to a different client.`,
+  description: `DEPRECATED — use \`manage_project_record\` instead. Update an existing project in Timelink. Only the provided fields will be updated; omitted fields remain unchanged. Can reassign the project to a different client.`,
+  instructions: [
+    'Use manage_project_record for the current Timelink API with string IDs; this legacy numeric contract is retained for compatibility.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listPeople = SlateTool.create(spec, {
   name: 'List Organization Members',
   key: 'list_people',
-  description: `List members of the configured Codacy organization. Supports filtering by name/email and pagination. Returns member details including name, email, and role.`,
+  description: `List people associated with the configured Codacy organization, including members and contributors. Supports filtering by name/email and pagination. Returns the provider details for each person.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -26,6 +26,10 @@ export let listPeople = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe('Original Codacy response, including provider metadata.'),
       members: z.array(z.any()).describe('List of organization members.'),
       cursor: z.string().optional().describe('Pagination cursor for the next page.'),
       total: z.number().optional().describe('Total number of members.')
@@ -44,6 +48,7 @@ export let listPeople = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: response,
         members,
         cursor: response.pagination?.cursor,
         total: response.pagination?.total

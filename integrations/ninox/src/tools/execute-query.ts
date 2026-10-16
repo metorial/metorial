@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let executeQuery = SlateTool.create(spec, {
@@ -17,8 +17,10 @@ export let executeQuery = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      databaseId: z.string().describe('ID of the database'),
+      teamId: z.string().describe('Team ID. Use list_teams to discover accessible teams.'),
+      databaseId: z
+        .string()
+        .describe('Database ID. Use list_databases to discover databases.'),
       query: z
         .string()
         .describe('Ninox query expression to execute (e.g. "(select Contact).\'First Name\'")')
@@ -34,10 +36,7 @@ export let executeQuery = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let result = await client.query(ctx.input.teamId, ctx.input.databaseId, ctx.input.query);
 

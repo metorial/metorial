@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { optionalNumber, optionalString, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCompanyProfile = SlateTool.create(spec, {
@@ -21,6 +22,10 @@ Also fetches the company's logo URL when available.`,
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       symbol: z.string().describe('Ticker symbol'),
       name: z.string().optional().describe('Company name'),
       exchange: z.string().optional().describe('Exchange'),
@@ -49,36 +54,35 @@ Also fetches the company's logo URL when available.`,
         exchange: ctx.input.exchange,
         country: ctx.input.country
       }),
-      client
-        .getLogo({
-          symbol: ctx.input.symbol,
-          exchange: ctx.input.exchange,
-          country: ctx.input.country
-        })
-        .catch(() => null)
+      client.getLogo({
+        symbol: ctx.input.symbol,
+        exchange: ctx.input.exchange,
+        country: ctx.input.country
+      })
     ]);
 
     return {
       output: {
-        symbol: profile.symbol || ctx.input.symbol,
-        name: profile.name,
-        exchange: profile.exchange,
-        sector: profile.sector,
-        industry: profile.industry,
-        employees: profile.employees,
-        website: profile.website,
-        description: profile.description,
-        type: profile.type,
-        ceo: profile.CEO,
-        address: profile.address,
-        city: profile.city,
-        state: profile.state,
-        zip: profile.zip,
-        country: profile.country,
-        phone: profile.phone,
-        logoUrl: logo?.url || logo?.logo_base
+        raw: { profile, logo },
+        symbol: requiredString(profile.symbol, 'symbol'),
+        name: optionalString(profile.name),
+        exchange: optionalString(profile.exchange),
+        sector: optionalString(profile.sector),
+        industry: optionalString(profile.industry),
+        employees: optionalNumber(profile.employees),
+        website: optionalString(profile.website),
+        description: optionalString(profile.description),
+        type: optionalString(profile.type),
+        ceo: optionalString(profile.CEO),
+        address: optionalString(profile.address),
+        city: optionalString(profile.city),
+        state: optionalString(profile.state),
+        zip: optionalString(profile.zip),
+        country: optionalString(profile.country),
+        phone: optionalString(profile.phone),
+        logoUrl: optionalString(logo.url) ?? optionalString(logo.logo_base)
       },
-      message: `**${profile.name || ctx.input.symbol}** — ${profile.sector || 'N/A'} / ${profile.industry || 'N/A'}. ${profile.employees ? `${profile.employees.toLocaleString()} employees.` : ''}`
+      message: `Retrieved company profile and logo metadata for **${profile.symbol}**.`
     };
   })
   .build();

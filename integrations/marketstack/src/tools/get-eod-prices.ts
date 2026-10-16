@@ -34,6 +34,7 @@ export let getEodPrices = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       pagination: z.object({
         limit: z.number(),
         offset: z.number(),
@@ -67,6 +68,7 @@ export let getEodPrices = SlateTool.create(spec, {
     let result = ctx.input.latest
       ? await client.getEodLatest({
           symbols: ctx.input.symbols,
+          sort: ctx.input.sort,
           exchange: ctx.input.exchange,
           limit: ctx.input.limit,
           offset: ctx.input.offset
@@ -102,9 +104,10 @@ export let getEodPrices = SlateTool.create(spec, {
     return {
       output: {
         pagination: result.pagination,
+        raw: result.raw,
         prices
       },
-      message: `Retrieved ${prices.length} end-of-day price records for **${ctx.input.symbols}**${ctx.input.latest ? ' (latest)' : ''}. Total available: ${result.pagination.total}.`
+      message: `Retrieved ${prices.length} end-of-day price records for **${ctx.input.symbols}**${ctx.input.latest ? ' (latest)' : ''}.`
     };
   })
   .build();

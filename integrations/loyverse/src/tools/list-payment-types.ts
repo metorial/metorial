@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { spec } from '../spec';
 
 let paymentTypeSchema = z.object({
@@ -27,6 +27,30 @@ export let listPaymentTypes = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      paymentTypeIds: z
+        .array(z.string())
+        .optional()
+        .describe('Only return payment types with these IDs'),
+      createdAtMin: z
+        .string()
+        .optional()
+        .describe('Only return payment types created at or after this ISO 8601 UTC timestamp'),
+      createdAtMax: z
+        .string()
+        .optional()
+        .describe(
+          'Only return payment types created at or before this ISO 8601 UTC timestamp'
+        ),
+      updatedAtMin: z
+        .string()
+        .optional()
+        .describe('Only return payment types updated at or after this ISO 8601 UTC timestamp'),
+      updatedAtMax: z
+        .string()
+        .optional()
+        .describe(
+          'Only return payment types updated at or before this ISO 8601 UTC timestamp'
+        ),
       limit: z
         .number()
         .min(1)
@@ -46,6 +70,11 @@ export let listPaymentTypes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listPaymentTypes({
+      paymentTypeIds: joinIds(ctx.input.paymentTypeIds),
+      createdAtMin: ctx.input.createdAtMin,
+      createdAtMax: ctx.input.createdAtMax,
+      updatedAtMin: ctx.input.updatedAtMin,
+      updatedAtMax: ctx.input.updatedAtMax,
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       showDeleted: ctx.input.showDeleted

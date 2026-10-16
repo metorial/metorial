@@ -148,9 +148,9 @@ export let mapReceipt = (r: any): z.infer<typeof receiptSchema> => ({
   pointsEarned: r.points_earned,
   pointsDeducted: r.points_deducted,
   pointsBalance: r.points_balance,
-  totalDiscounts: (r.total_discounts ?? []).map(mapAppliedDiscount),
-  totalTaxes: (r.total_taxes ?? []).map(mapAppliedTax),
-  lineItems: (r.line_items ?? []).map((li: any) => ({
+  totalDiscounts: r.total_discounts?.map(mapAppliedDiscount),
+  totalTaxes: r.total_taxes?.map(mapAppliedTax),
+  lineItems: r.line_items?.map((li: any) => ({
     lineItemId: li.id,
     itemId: li.item_id,
     variantId: li.variant_id,
@@ -166,9 +166,9 @@ export let mapReceipt = (r: any): z.infer<typeof receiptSchema> => ({
     lineNote: li.line_note,
     totalDiscount: li.total_discount,
     totalTax: li.total_tax ?? sumMoney(li.line_taxes ?? []),
-    lineTaxes: (li.line_taxes ?? []).map(mapAppliedTax),
-    lineDiscounts: (li.line_discounts ?? []).map(mapAppliedDiscount),
-    lineModifiers: (li.line_modifiers ?? []).map((m: any) => ({
+    lineTaxes: li.line_taxes?.map(mapAppliedTax),
+    lineDiscounts: li.line_discounts?.map(mapAppliedDiscount),
+    lineModifiers: li.line_modifiers?.map((m: any) => ({
       modifierId: m.id,
       modifierOptionId: m.modifier_option_id,
       name: m.name,
@@ -177,7 +177,7 @@ export let mapReceipt = (r: any): z.infer<typeof receiptSchema> => ({
       moneyAmount: m.money_amount
     }))
   })),
-  payments: (r.payments ?? []).map((p: any) => ({
+  payments: r.payments?.map((p: any) => ({
     paymentTypeId: p.payment_type_id,
     moneyAmount: p.money_amount,
     paymentName: p.name,

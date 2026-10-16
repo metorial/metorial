@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let brandSchema = z.object({
+export let brandSchema = z.object({
+  raw: z.record(z.string(), z.any()).optional().describe('Complete provider resource'),
   brandId: z.string().describe('Unique identifier of the brand'),
   name: z.string().describe('Name of the brand'),
+  websiteURL: z.string().optional().describe('Brand website URL'),
   logoURL: z.string().optional().describe('URL to the brand logo'),
   live: z.boolean().optional().describe('Whether the brand is in live mode'),
   accountId: z.string().optional().describe('Account ID the brand belongs to'),
@@ -31,6 +33,7 @@ export let createBrand = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Name of the brand'),
       logoURL: z.string().optional().describe('URL to the brand logo image'),
+      websiteURL: z.string().optional().describe('Brand website URL'),
       metadata: z
         .record(z.string(), z.any())
         .optional()
@@ -43,20 +46,23 @@ export let createBrand = SlateTool.create(spec, {
     let brand = await client.createBrand({
       name: ctx.input.name,
       logoURL: ctx.input.logoURL,
+      websiteURL: ctx.input.websiteURL,
       metadata: ctx.input.metadata
     });
 
     return {
       output: {
+        raw: brand,
         brandId: brand.id,
         name: brand.name,
-        logoURL: brand.logoURL,
+        logoURL: brand.logoURL ?? brand.logoUrl ?? undefined,
+        websiteURL: brand.websiteURL ?? undefined,
         live: brand.live,
-        accountId: brand.accountId,
+        accountId: brand.accountId ?? undefined,
         consent: brand.consent,
         created: brand.created,
         updated: brand.updated,
-        metadata: brand.metadata
+        metadata: brand.metadata ?? undefined
       },
       message: `Brand **${brand.name}** created with ID \`${brand.id}\`.`
     };
@@ -84,15 +90,17 @@ export let getBrand = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: brand,
         brandId: brand.id,
         name: brand.name,
-        logoURL: brand.logoURL,
+        logoURL: brand.logoURL ?? brand.logoUrl ?? undefined,
+        websiteURL: brand.websiteURL ?? undefined,
         live: brand.live,
-        accountId: brand.accountId,
+        accountId: brand.accountId ?? undefined,
         consent: brand.consent,
         created: brand.created,
         updated: brand.updated,
-        metadata: brand.metadata
+        metadata: brand.metadata ?? undefined
       },
       message: `Retrieved brand **${brand.name}** (\`${brand.id}\`).`
     };
@@ -110,40 +118,58 @@ export let listBrands = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe('JSON.stringify(last) from the previous page. Do not URL-encode it.'),
+      order: z.enum(['asc', 'desc']).optional().describe('Sort by creation date'),
       start: z.number().optional().describe('Offset for pagination'),
+      name: z.string().optional().describe('Filter by brand name'),
       limit: z.number().optional().describe('Maximum number of brands to return')
     })
   )
   .output(
     z.object({
       brands: z.array(brandSchema).describe('List of brands'),
-      count: z.number().optional().describe('Total number of brands')
+      last: z
+        .any()
+        .optional()
+        .describe('Provider continuation key; serialize it as JSON for cursor'),
+      raw: z.record(z.string(), z.any()).optional().describe('Complete provider response'),
+      count: z.number().optional().describe('Number of returned brands')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listBrands({
       start: ctx.input.start,
-      limit: ctx.input.limit
+      cursor: ctx.input.cursor,
+      order: ctx.input.order,
+      limit: ctx.input.limit,
+      name: ctx.input.name
     });
 
     let items = data?.items ?? [];
     let brands = items.map((b: any) => ({
+      raw: b,
       brandId: b.id,
       name: b.name,
-      logoURL: b.logoURL,
+      logoURL: b.logoURL ?? b.logoUrl ?? undefined,
+      websiteURL: b.websiteURL ?? undefined,
       live: b.live,
-      accountId: b.accountId,
+      accountId: b.accountId ?? undefined,
       consent: b.consent,
       created: b.created,
       updated: b.updated,
-      metadata: b.metadata
+      metadata: b.metadata ?? undefined
     }));
 
     return {
       output: {
         brands,
-        count: data?.resource?.total ?? brands.length
+        count: data?.count,
+        last: data?.last,
+        raw: data.rawResponse ?? data
       },
       message: `Found **${brands.length}** brand(s).`
     };
@@ -153,7 +179,7 @@ export let listBrands = SlateTool.create(spec, {
 export let updateBrand = SlateTool.create(spec, {
   name: 'Update Brand',
   key: 'update_brand',
-  description: `Updates an existing Brand's name, logo, or metadata.`,
+  description: `Updates an existing Brand's logo, website, or metadata. The legacy name field is retained, but name changes are not documented by Fidel.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -162,8 +188,14 @@ export let updateBrand = SlateTool.create(spec, {
   .input(
     z.object({
       brandId: z.string().describe('ID of the brand to update'),
-      name: z.string().optional().describe('New name for the brand'),
+      name: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy name update; this field is not documented by the current Fidel endpoint'
+        ),
       logoURL: z.string().optional().describe('New URL for the brand logo'),
+      websiteURL: z.string().optional().describe('Brand website URL'),
       metadata: z
         .record(z.string(), z.any())
         .optional()
@@ -176,20 +208,23 @@ export let updateBrand = SlateTool.create(spec, {
     let brand = await client.updateBrand(ctx.input.brandId, {
       name: ctx.input.name,
       logoURL: ctx.input.logoURL,
+      websiteURL: ctx.input.websiteURL,
       metadata: ctx.input.metadata
     });
 
     return {
       output: {
+        raw: brand,
         brandId: brand.id,
         name: brand.name,
-        logoURL: brand.logoURL,
+        logoURL: brand.logoURL ?? brand.logoUrl ?? undefined,
+        websiteURL: brand.websiteURL ?? undefined,
         live: brand.live,
-        accountId: brand.accountId,
+        accountId: brand.accountId ?? undefined,
         consent: brand.consent,
         created: brand.created,
         updated: brand.updated,
-        metadata: brand.metadata
+        metadata: brand.metadata ?? undefined
       },
       message: `Brand **${brand.name}** (\`${brand.id}\`) updated successfully.`
     };

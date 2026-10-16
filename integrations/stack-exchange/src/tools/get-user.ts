@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate, providerDate } from '../lib/response';
 import { spec } from '../spec';
 
 let badgeCountSchema = z.object({
@@ -82,16 +83,16 @@ export let getUser = SlateTool.create(spec, {
       let result = await client.getUsers({ inName: ctx.input.displayName, pageSize: 1 });
       user = result.items[0];
     } else {
-      throw new Error('Either userId or displayName must be provided.');
+      throw createApiServiceError('Either userId or displayName must be provided.');
     }
 
     if (!user) {
-      throw new Error('User not found.');
+      throw createApiServiceError('User not found.');
     }
 
     let topTags: any[] | undefined;
-    if (ctx.input.includeTopTags && ctx.input.userId !== 'me') {
-      let uid = ctx.input.userId ?? String(user.user_id);
+    if (ctx.input.includeTopTags) {
+      let uid = String(user.user_id);
       let tagsResult = await client.getUserTopTags(uid);
       topTags = tagsResult.items.map((t: any) => ({
         tagName: t.tag_name,
@@ -117,10 +118,8 @@ export let getUser = SlateTool.create(spec, {
         : undefined,
       questionCount: user.question_count,
       answerCount: user.answer_count,
-      creationDate: new Date(user.creation_date * 1000).toISOString(),
-      lastAccessDate: user.last_access_date
-        ? new Date(user.last_access_date * 1000).toISOString()
-        : undefined,
+      creationDate: providerDate(user.creation_date),
+      lastAccessDate: optionalProviderDate(user.last_access_date),
       location: user.location,
       websiteUrl: user.website_url,
       aboutMe: user.about_me,

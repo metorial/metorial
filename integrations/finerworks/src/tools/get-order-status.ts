@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requiredArray, requiredNumber, requiredString } from '../lib/client';
 import { spec } from '../spec';
 
 let shipmentSchema = z.object({
@@ -34,6 +34,7 @@ export let getOrderStatus = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       orders: z
         .array(
           z.object({
@@ -63,17 +64,13 @@ export let getOrderStatus = SlateTool.create(spec, {
       orderPos: ctx.input.orderPos
     });
 
-    if (!data.status?.success) {
-      throw new Error(data.status?.message || 'Failed to fetch order status');
-    }
-
-    let orders = (data.orders ?? []).map((o: any) => ({
-      orderId: o.order_id,
-      orderPo: o.order_po ?? '',
-      orderConfirmationId: o.order_confirmation_id,
-      orderStatusId: o.order_status_id,
-      orderStatusLabel: o.order_status_label ?? '',
-      shipments: (o.shipments ?? []).map((s: any) => ({
+    let orders = requiredArray(data.orders, 'orders').map((o: any) => ({
+      orderId: requiredNumber(o.order_id, 'order_id'),
+      orderPo: requiredString(o.order_po, 'order_po'),
+      orderConfirmationId: o.order_confirmation_id ?? undefined,
+      orderStatusId: requiredNumber(o.order_status_id, 'order_status_id'),
+      orderStatusLabel: requiredString(o.order_status_label, 'order_status_label'),
+      shipments: o.shipments?.map((s: any) => ({
         shipmentDate: s.shipment_date ?? null,
         deliveryDate: s.delivery_date ?? null,
         weight: s.weight ?? null,
@@ -87,7 +84,7 @@ export let getOrderStatus = SlateTool.create(spec, {
     }));
 
     return {
-      output: { orders },
+      output: { orders, raw: data },
       message: `Retrieved status for **${orders.length}** order(s). ${orders.map((o: any) => `Order \`${o.orderPo}\` (ID: ${o.orderId}): **${o.orderStatusLabel}**`).join('; ')}`
     };
   })

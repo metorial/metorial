@@ -58,6 +58,7 @@ Use **layers** for single-page designs or **pages** for multi-page templates (ca
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       templateId: z.string().optional(),
       name: z.string().optional(),
       width: z.number().optional(),
@@ -80,6 +81,7 @@ Use **layers** for single-page designs or **pages** for multi-page templates (ca
 
     return {
       output: {
+        raw: result,
         templateId: result.id,
         name: result.name,
         width: result.width,

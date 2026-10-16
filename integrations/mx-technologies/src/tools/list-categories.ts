@@ -67,11 +67,14 @@ export let listCategories = SlateTool.create(spec, {
         recordsPerPage: ctx.input.recordsPerPage
       });
     } else {
-      result = await client.listDefaultCategories();
+      result = await client.listDefaultCategories({
+        page: ctx.input.page,
+        recordsPerPage: ctx.input.recordsPerPage
+      });
     }
 
     let categories = (result.categories || []).map((c: any) => ({
-      guid: c.guid,
+      guid: c.guid ?? undefined,
       name: c.name,
       parentGuid: c.parent_guid,
       isDefault: c.is_default,

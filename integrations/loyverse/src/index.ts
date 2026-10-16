@@ -29,6 +29,7 @@ import {
   listItems,
   listModifiers,
   listPaymentTypes,
+  listPosDevices,
   listReceipts,
   listShifts,
   listStores,
@@ -74,6 +75,7 @@ export let provider = Slate.create({
     listStores,
     listShifts,
     listPaymentTypes,
+    listPosDevices,
     getMerchant
   ],
   triggers: []

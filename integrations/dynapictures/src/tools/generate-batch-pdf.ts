@@ -1,17 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateLayers } from '../lib/client';
+import { layerParamsSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let layerParamsSchema = z.object({
-  name: z.string().describe('Name of the template layer to customize'),
-  text: z.string().optional().describe('Text content for a text layer'),
-  color: z.string().optional().describe('Text or foreground color (hex, rgb, or rgba)'),
-  backgroundColor: z.string().optional().describe('Background color (hex, rgb, or rgba)'),
-  imageUrl: z.string().optional().describe('URL of an image for an image layer'),
-  imagePosition: z.string().optional().describe('Image cropping mode'),
-  opacity: z.number().optional().describe('Layer opacity (0.0–1.0)')
-});
 
 let batchPageSchema = z.object({
   templateId: z
@@ -49,38 +40,50 @@ export let generateBatchPdf = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      imageId: z.string().describe('ID of the generated PDF'),
-      templateId: z.string().describe('Default template ID'),
-      imageUrl: z.string().describe('URL of the generated PDF'),
-      thumbnailUrl: z.string().describe('URL of the PDF thumbnail'),
+      imageId: z.string().optional().describe('ID of the generated PDF'),
+      templateId: z.string().optional().describe('Default template ID'),
+      imageUrl: z.string().optional().describe('URL of the generated PDF'),
+      thumbnailUrl: z.string().optional().describe('URL of the PDF thumbnail'),
       pdfUrl: z.string().optional().describe('Direct PDF URL'),
-      metadata: z.string().describe('Custom metadata'),
-      width: z.number().describe('Page width in pixels'),
-      height: z.number().describe('Page height in pixels')
+      metadata: z.string().optional().describe('Custom metadata'),
+      width: z.number().optional().describe('Page width in pixels'),
+      height: z.number().optional().describe('Page height in pixels'),
+      mimeType: z.string().optional().describe('Content type of the generated document'),
+      size: z.number().optional().describe('Generated document size in bytes'),
+      requestContext: z
+        .object({
+          templateId: z.string().describe('Default template ID submitted for generation'),
+          metadata: z.string().optional().describe('Metadata submitted for the PDF pages')
+        })
+        .optional()
+        .describe('Submitted generation options; not provider response metadata')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.generateBatchPdf({
+    for (let page of ctx.input.pages) validateLayers(page.layers);
+    let content = await client.generateBatchPdf({
       templateId: ctx.input.templateId,
       format: 'pdf',
       metadata: ctx.input.metadata,
       pages: ctx.input.pages
     });
 
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(Buffer.from(content), {
+        headers: { 'content-type': 'application/pdf' }
+      }),
+      filename: 'generated-document.pdf'
+    });
     return {
       output: {
-        imageId: result.id,
-        templateId: result.templateId,
-        imageUrl: result.imageUrl,
-        thumbnailUrl: result.thumbnailUrl,
-        pdfUrl: result.pdfUrl,
-        metadata: result.metadata || '',
-        width: result.width,
-        height: result.height
+        mimeType: 'application/pdf',
+        size: content.byteLength,
+        requestContext: { templateId: ctx.input.templateId, metadata: ctx.input.metadata }
       },
-      message: `Generated batch PDF with **${ctx.input.pages.length}** page(s). [View PDF](${result.pdfUrl || result.imageUrl})`
+      message: `Generated a downloadable PDF with **${ctx.input.pages.length}** page(s).`
     };
   })
   .build();

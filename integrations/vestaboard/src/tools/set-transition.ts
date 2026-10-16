@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CloudClient } from '../lib/client';
 import { spec } from '../spec';
@@ -40,7 +40,7 @@ Only available via the **Cloud API** for Flagship and Vestaboard Note devices (n
     let { apiType } = ctx.auth;
 
     if (apiType !== 'cloud') {
-      throw new Error('Transition effects are only available via the Cloud API.');
+      throw createApiServiceError('Transition effects are only available via the Cloud API.');
     }
 
     let client = new CloudClient(ctx.auth.token);

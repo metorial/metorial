@@ -33,7 +33,16 @@ export let sendMessage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      messageId: z.number().describe('ID of the sent message')
+      messageId: z.number().describe('ID of the sent message'),
+      messageUrl: z
+        .string()
+        .optional()
+        .describe('Message permalink returned by supported servers'),
+      messageLink: z
+        .string()
+        .optional()
+        .describe('Markdown message link returned by supported servers'),
+      raw: z.any().optional().describe('Complete provider send result')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,7 +61,10 @@ export let sendMessage = SlateTool.create(spec, {
 
     return {
       output: {
-        messageId: result.id
+        messageId: result.id,
+        messageUrl: result.message_url,
+        messageLink: result.message_link,
+        raw: result
       },
       message: `Message sent successfully (ID: ${result.id})`
     };

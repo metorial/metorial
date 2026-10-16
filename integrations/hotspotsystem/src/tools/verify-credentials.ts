@@ -15,6 +15,7 @@ export let verifyCredentials = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete original account response'),
       userId: z.string().describe('Authenticated user ID'),
       operatorName: z.string().describe('Operator name associated with the account'),
       apiReachable: z.boolean().describe('Whether the API is reachable')
@@ -23,20 +24,21 @@ export let verifyCredentials = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let me = await client.getMe();
+    let { data: me, raw } = await client.getMe();
 
     let apiReachable = false;
     try {
       let pong = await client.ping();
-      apiReachable = pong.ping === 'pong';
+      apiReachable = pong.data.ping === 'pong';
     } catch {
       apiReachable = false;
     }
 
     return {
       output: {
-        userId: String(me.userId ?? ''),
-        operatorName: me.operator ?? '',
+        raw,
+        userId: String(me.userId),
+        operatorName: me.operator,
         apiReachable
       },
       message: `Credentials verified. Operator: **${me.operator}** (User ID: ${me.userId}). API is ${apiReachable ? 'reachable' : 'not reachable'}.`

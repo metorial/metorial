@@ -9,7 +9,8 @@ export let browseCategories = SlateTool.create(spec, {
   description: `Browse and search Best Buy product categories. Returns category hierarchy including IDs, names, paths, and subcategories. Useful for discovering category IDs to use with product searches and recommendations.`,
   instructions: [
     'Use query to filter categories, e.g. "name=TVs*" for wildcard name matching or "id=abcat0101000" for a specific category.',
-    'Leave query empty to browse top-level categories.'
+    'Leave query empty to browse all categories. Use id=cat00000 and show=id,name,subCategories to inspect the root category.',
+    'Use browse_catalog with resource=categories for cursor pagination through more than ten pages.'
   ],
   tags: {
     destructive: false,
@@ -22,6 +23,7 @@ export let browseCategories = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Category filter query, e.g. "name=Laptops*" or "id=abcat0502000"'),
+      sort: z.string().optional().describe('Sort order such as name.asc or id.asc'),
       show: z
         .string()
         .optional()
@@ -50,6 +52,7 @@ export let browseCategories = SlateTool.create(spec, {
 
     let result = await client.searchCategories({
       query: ctx.input.query,
+      sort: ctx.input.sort,
       show: ctx.input.show,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
@@ -62,7 +65,9 @@ export let browseCategories = SlateTool.create(spec, {
         totalPages: result.totalPages,
         categories: result.categories
       },
-      message: `Found **${result.total}** categories (page ${result.currentPage} of ${result.totalPages}, showing ${result.categories.length} results).`
+      message: client.redactMessage(
+        `Found **${result.total}** categories (page ${result.currentPage} of ${result.totalPages}, showing ${result.categories.length} results).`
+      )
     };
   })
   .build();

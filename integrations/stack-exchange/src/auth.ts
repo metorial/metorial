@@ -1,19 +1,28 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { parseProviderData, stackExchangeError } from './lib/response';
 
 let oauthAxios = createAxios({
   baseURL: 'https://stackoverflow.com'
 });
 
-let apiAxios = createAxios({
-  baseURL: 'https://api.stackexchange.com/2.3'
-});
+oauthAxios.interceptors.response.use(
+  response => response,
+  error => Promise.reject(stackExchangeError(error))
+);
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      key: z.string()
+      key: z.string(),
+      expiresAt: z.string().optional()
     })
   )
   .addOauth({
@@ -34,11 +43,6 @@ export let auth = SlateAuth.create()
         scope: 'write_access'
       },
       {
-        title: 'Private Info',
-        description: 'Access to your private information such as email address.',
-        scope: 'private_info'
-      },
-      {
         title: 'No Expiry',
         description: 'Produces an access token that does not expire.',
         scope: 'no_expiry'
@@ -52,6 +56,10 @@ export let auth = SlateAuth.create()
     }),
 
     getAuthorizationUrl: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError(
+          'Provide the API key generated for your Stack Apps application.'
+        );
       let scopeStr = ctx.scopes.join(',');
       let params = new URLSearchParams({
         client_id: ctx.clientId,
@@ -67,6 +75,10 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError(
+          'Provide the API key generated for your Stack Apps application.'
+        );
       let response = await oauthAxios.post(
         '/oauth/access_token/json',
         new URLSearchParams({
@@ -82,38 +94,53 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
+      let data = parseProviderData(
+        z.object({
+          access_token: z.string().min(1),
+          expires: z.number().nonnegative().optional()
+        }),
+        response.data,
+        'OAuth token response'
+      );
+      let token = normalizeOAuthTokenResponse(
+        { ...data, expires_in: data.expires },
+        { providerLabel: 'Stack Exchange' }
+      );
 
       return {
         output: {
-          token: data.access_token,
-          key: ctx.input.apiKey
+          token: token.token,
+          key: ctx.input.apiKey,
+          expiresAt: token.expiresAt
         },
         input: ctx.input
       };
     },
 
+    handleTokenRefresh: async () => {
+      throw createApiServiceError(
+        'Stack Exchange does not provide refresh tokens. Reconnect with OAuth to obtain a new access token.'
+      );
+    },
+
     getProfile: async (ctx: {
-      output: { token: string; key: string };
-      input: { apiKey: string };
-      scopes: string[];
+      output: { token: string; key: string; expiresAt?: string };
     }) => {
-      let response = await apiAxios.get('/me', {
-        params: {
-          site: 'stackoverflow',
-          access_token: ctx.output.token,
-          key: ctx.output.key,
-          filter: '!nNPvSNVZJS'
-        }
-      });
-
-      let user = response.data.items?.[0];
-
+      let result = await new Client({
+        token: ctx.output.token,
+        key: ctx.output.key,
+        site: 'stackoverflow'
+      }).getMe();
+      let user = result.items[0];
+      if (!user)
+        throw createApiServiceError(
+          'No Stack Overflow profile was returned for this connection.'
+        );
       return {
         profile: {
-          id: String(user?.user_id ?? ''),
-          name: user?.display_name ?? '',
-          imageUrl: user?.profile_image ?? ''
+          id: String(user.user_id),
+          name: user.display_name,
+          ...(typeof user.profile_image === 'string' ? { imageUrl: user.profile_image } : {})
         }
       };
     }
@@ -130,6 +157,10 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError(
+          'Provide the API key generated for your Stack Apps application.'
+        );
       return {
         output: {
           token: '',

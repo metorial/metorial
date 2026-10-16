@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ThanksIoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -33,6 +33,7 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
         .describe('Mailing list name/description (for create)'),
       subAccountId: z.number().optional().describe('Sub-account ID to associate (for create)'),
       qrcodeUrl: z.string().optional().describe('Default QR code URL (for create)'),
+      page: z.number().int().positive().optional().describe('Page number for list operations'),
       itemsPerPage: z.number().optional().describe('Items per page (for list)'),
       recipientLimit: z
         .number()
@@ -60,6 +61,10 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
         .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('List of recipients'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider response including pagination'),
       totalCount: z.number().optional().describe('Total count of results'),
       deleted: z.boolean().optional().describe('Whether the mailing list was deleted')
     })
@@ -70,6 +75,7 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
 
     if (action === 'list') {
       let result = await client.listMailingLists({
+        page: ctx.input.page,
         itemsPerPage: ctx.input.itemsPerPage
       });
       let data = (result.data || []) as Record<string, unknown>[];
@@ -77,14 +83,16 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
       return {
         output: {
           mailingLists: data,
-          totalCount: meta?.total as number | undefined
+          raw: result,
+          totalCount: (meta?.total ?? result.total) as number | undefined
         },
         message: `Found **${meta?.total || data.length}** mailing list(s).`
       };
     }
 
     if (action === 'create') {
-      if (!ctx.input.description) throw new Error('description is required for create action');
+      if (!ctx.input.description)
+        throw createApiServiceError('description is required for create action');
       let result = await client.createMailingList({
         description: ctx.input.description,
         subAccountId: ctx.input.subAccountId,
@@ -93,6 +101,7 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
       return {
         output: {
           mailingListId: result.id as number,
+          raw: result,
           mailingListDescription: result.description as string
         },
         message: `Created mailing list **#${result.id}**: "${result.description}".`
@@ -101,11 +110,12 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
 
     if (action === 'get') {
       if (!ctx.input.mailingListId)
-        throw new Error('mailingListId is required for get action');
+        throw createApiServiceError('mailingListId is required for get action');
       let result = await client.getMailingList(ctx.input.mailingListId);
       return {
         output: {
           mailingListId: result.id as number,
+          raw: result,
           mailingListDescription: result.description as string | null
         },
         message: `Retrieved mailing list **#${result.id}**: "${result.description}".`
@@ -114,7 +124,7 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
 
     if (action === 'delete') {
       if (!ctx.input.mailingListId)
-        throw new Error('mailingListId is required for delete action');
+        throw createApiServiceError('mailingListId is required for delete action');
       await client.deleteMailingList(ctx.input.mailingListId);
       return {
         output: {
@@ -127,9 +137,10 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
 
     if (action === 'list_recipients') {
       if (!ctx.input.mailingListId)
-        throw new Error('mailingListId is required for list_recipients action');
+        throw createApiServiceError('mailingListId is required for list_recipients action');
       let result = await client.listMailingListRecipients(ctx.input.mailingListId, {
         limit: ctx.input.recipientLimit,
+        page: ctx.input.page,
         updatedSince: ctx.input.updatedSince
       });
       let data = (result.data || []) as Record<string, unknown>[];
@@ -138,12 +149,13 @@ Mailing lists organize recipients for targeted mail campaigns and can be associa
         output: {
           mailingListId: ctx.input.mailingListId,
           recipients: data,
-          totalCount: meta?.total as number | undefined
+          raw: result,
+          totalCount: (meta?.total ?? result.total) as number | undefined
         },
         message: `Found **${meta?.total || data.length}** recipient(s) in mailing list **#${ctx.input.mailingListId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

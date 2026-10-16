@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -46,15 +47,11 @@ export let manageTags = SlateTool.create(spec, {
     let { resourceType, resourceId, action, tagNames } = ctx.input;
 
     if (action === 'get') {
-      let data: any;
-      if (resourceType === 'candidates') data = await client.getCandidateTags(resourceId);
-      else if (resourceType === 'contacts') data = await client.getContactTags(resourceId);
-      else if (resourceType === 'companies') data = await client.getCompanyTags(resourceId);
-      else data = await client.getJobTags(resourceId);
+      let items = await client.getRecordTags(resourceType, resourceId);
 
-      let tags = (data?._embedded?.tags ?? []).map((t: any) => ({
+      let tags = items.map((t: any) => ({
         tagId: t.id?.toString(),
-        tagName: t.tag ?? t.name
+        tagName: t.title ?? t.tag ?? t.name ?? undefined
       }));
 
       return {
@@ -63,21 +60,36 @@ export let manageTags = SlateTool.create(spec, {
       };
     }
 
-    let names = tagNames ?? [];
-    if (action === 'add') {
-      if (resourceType === 'candidates') await client.attachCandidateTags(resourceId, names);
-      else if (resourceType === 'contacts') await client.attachContactTags(resourceId, names);
-      else if (resourceType === 'companies') await client.attachCompanyTags(resourceId, names);
-      else await client.attachJobTags(resourceId, names);
-    } else if (resourceType === 'candidates') {
-      await client.replaceCandidateTags(resourceId, names);
-    } else if (resourceType === 'contacts') {
-      await client.attachContactTags(resourceId, names);
-    } else if (resourceType === 'companies') {
-      await client.attachCompanyTags(resourceId, names);
-    } else {
-      await client.attachJobTags(resourceId, names);
+    if (tagNames === undefined)
+      throw createApiServiceError(
+        'tagNames is required for add and replace. Pass [] explicitly to remove all tags with replace.'
+      );
+    if (action === 'add' && tagNames.length === 0)
+      throw createApiServiceError('Provide at least one tag name to add.');
+    let available: Record<string, any>[] = [];
+    if (tagNames.length) {
+      for (let page = 1; ; page++) {
+        let data = await client.listTags({ page, perPage: 100 });
+        let tags = collection(data, 'tags');
+        available.push(...tags);
+        if (
+          tags.length < 100 ||
+          (typeof data.total === 'number' && available.length >= data.total)
+        )
+          break;
+        if (page >= 1000) throw createApiServiceError('Too many tag pages to resolve names.');
+      }
     }
+    let tags = [...new Set(tagNames)].map(name => {
+      let matches = available.filter(tag => tag.title === name);
+      if (matches.length !== 1)
+        throw createApiServiceError(
+          `Tag "${name}" was not found uniquely. Use list_tags to choose an existing, unambiguous tag name.`
+        );
+      return { id: Number(requiredId(matches[0]?.id, 'tag')) };
+    });
+    if (action === 'add') await client.attachTags(resourceType, resourceId, tags);
+    else await client.replaceTags(resourceType, resourceId, tags);
 
     return {
       output: { updated: true },

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, pickDefined, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { FinmeiClient, optionalString, requireId, requireRecord } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,6 +22,8 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiToken.trim())
+        throw createApiServiceError('A Finmei API token is required.');
       return {
         output: {
           token: ctx.input.apiToken
@@ -29,27 +32,18 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiToken: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://app.finmei.com/api',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await client.get('/profile');
-      let data = response.data as {
-        id?: string;
-        name?: string;
-        email?: string;
-        business_name?: string;
-      };
-
+      let result = await new FinmeiClient(ctx.output.token).getProfile();
+      let envelope = requireRecord(result, 'profile');
+      let profile = requireRecord('data' in envelope ? envelope.data : envelope, 'profile');
       return {
-        profile: {
-          id: data.id ? String(data.id) : undefined,
-          name: data.name || data.business_name,
-          email: data.email
-        }
+        profile: pickDefined({
+          id: requireId(profile.business_id ?? profile.id, 'business ID'),
+          name: optionalString(
+            profile.business_title ?? profile.name ?? profile.company_name,
+            'business title'
+          ),
+          email: optionalString(profile.email, 'profile email')
+        })
       };
     }
   });

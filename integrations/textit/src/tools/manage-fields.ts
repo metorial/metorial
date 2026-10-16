@@ -28,6 +28,7 @@ export let manageFields = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       fieldKey: z.string().describe('Key of the field'),
       name: z.string().describe('Display name of the field'),
       type: z.string().describe('Data type of the field')
@@ -35,7 +36,7 @@ export let manageFields = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
-    let field: any;
+    let field: Awaited<ReturnType<Client['createField']>>;
 
     if (ctx.input.action === 'create') {
       field = await client.createField({ name: ctx.input.name, type: ctx.input.type });
@@ -48,6 +49,7 @@ export let manageFields = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: field,
         fieldKey: field.key,
         name: field.name,
         type: field.type

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getMemberspotList } from '../lib/responses';
 import { spec } from '../spec';
 
 export let manageCustomPropertiesTool = SlateTool.create(spec, {
@@ -41,28 +42,34 @@ export let manageCustomPropertiesTool = SlateTool.create(spec, {
       result: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Result of setting properties (when updating)')
+        .describe('Result of setting properties (when updating)'),
+      raw: z.any().optional().describe('Unmodified provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (ctx.input.email && ctx.input.properties && ctx.input.properties.length > 0) {
+    if (ctx.input.email !== undefined || ctx.input.properties !== undefined) {
+      if (!ctx.input.email?.trim() || !ctx.input.properties?.length) {
+        throw createApiServiceError(
+          'Provide both a user email and at least one property to update, or omit both to list definitions.'
+        );
+      }
       let result = await client.setCustomProperties({
         email: ctx.input.email,
         properties: ctx.input.properties
       });
       return {
-        output: { result },
+        output: { result, raw: result },
         message: `Set **${ctx.input.properties.length}** custom property/properties on **${ctx.input.email}**.`
       };
     }
 
     let result = await client.listCustomProperties();
-    let customProperties = Array.isArray(result) ? result : (result?.properties ?? [result]);
+    let customProperties = getMemberspotList(result, ['properties', 'data']);
 
     return {
-      output: { customProperties },
+      output: { customProperties, raw: result },
       message: `Retrieved **${customProperties.length}** custom property definition(s).`
     };
   })

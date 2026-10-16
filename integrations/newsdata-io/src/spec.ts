@@ -4,9 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'newsapi',
-  name: 'Newsdata.io',
+  name: 'NewsAPI',
   description:
-    'Search and retrieve current and historic news articles from over 150,000 worldwide sources using NewsAPI.',
+    'Search news articles, retrieve top headlines, and discover publishers with NewsAPI.org.',
   metadata: {},
   config,
   auth

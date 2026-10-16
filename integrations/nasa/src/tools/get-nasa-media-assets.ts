@@ -22,6 +22,7 @@ export let getNasaMediaAssets = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.any().optional().describe('Complete provider response'),
       nasaId: z.string().describe('NASA ID of the media item'),
       assetUrls: z.array(z.string()).describe('List of URLs for all available asset files')
     })
@@ -32,11 +33,12 @@ export let getNasaMediaAssets = SlateTool.create(spec, {
     let result = await client.getNasaImageAsset(ctx.input.nasaId);
     let assetUrls = (result.collection?.items || []).map((item: any) => item.href);
 
+    for (let url of assetUrls) {
+      await ctx.addAttachment({ type: 'url', url });
+    }
+
     return {
-      output: {
-        nasaId: ctx.input.nasaId,
-        assetUrls
-      },
+      output: { raw: result, nasaId: ctx.input.nasaId, assetUrls },
       message: `Found **${assetUrls.length}** asset files for NASA ID "${ctx.input.nasaId}".`
     };
   })

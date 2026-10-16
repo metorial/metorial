@@ -24,7 +24,11 @@ export let manageLogicblock = SlateTool.create(spec, {
       logicblockId: z.string().describe('ID of the managed logicblock'),
       name: z.string().describe('Name of the logicblock'),
       active: z.boolean().describe('New active state of the logicblock'),
-      result: z.boolean().nullable().describe('Last evaluation result'),
+      result: z
+        .boolean()
+        .nullable()
+        .optional()
+        .describe('Last evaluation result, when returned'),
       updatedAt: z.string().describe('When the logicblock was last updated')
     })
   )

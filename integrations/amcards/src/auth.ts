@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client, resourceId } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,7 +16,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Your AMcards API key. Found in your AMcards account settings.')
+        .describe(
+          'Your AMcards access token. Generate one at https://amcards.com/user/generate-access-token/.'
+        )
     }),
 
     getOutput: async ctx => {
@@ -27,22 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://amcards.com/.api/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/user/');
+      let { user } = await new Client({ token: ctx.output.token }).getUser();
 
       return {
         profile: {
-          id: String(response.data.id ?? ''),
-          name:
-            [response.data.first_name, response.data.last_name].filter(Boolean).join(' ') ||
-            undefined,
-          email: response.data.email || undefined
+          id: resourceId(user)!,
+          name: [user.first_name, user.last_name].filter(Boolean).join(' ') || undefined,
+          email: user.email || undefined
         }
       };
     }

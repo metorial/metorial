@@ -19,7 +19,7 @@ export let getSyncCommittee = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Include the list of validators assigned to this sync committee period'),
-      pageSize: z.number().optional().describe('Number of validator results per page (1-100)'),
+      pageSize: z.number().optional().describe('Number of validator results per page (1-10)'),
       cursor: z.string().optional().describe('Pagination cursor for validator list')
     })
   )

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -67,10 +67,48 @@ export let upsertCustomer = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      Object.values(ctx.input.identifier).filter(value => value !== undefined).length !== 1
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one customer identifier: emailAddress, customerId, or externalId'
+      );
+    }
+    let createEmail = ctx.input.onCreate.email;
+    if (!createEmail && ctx.input.identifier.emailAddress) {
+      createEmail = { email: ctx.input.identifier.emailAddress };
+    }
+    if (!createEmail && ctx.input.identifier.customerId) {
+      createEmail = (await client.getCustomerById(ctx.input.identifier.customerId)).email;
+    }
+    if (!createEmail && ctx.input.identifier.externalId) {
+      createEmail = (await client.getCustomerByExternalId(ctx.input.identifier.externalId))
+        .email;
+    }
+    if (!createEmail) {
+      throw createApiServiceError(
+        'Provide onCreate.email when creating a customer without an emailAddress identifier'
+      );
+    }
+    let onUpdate = ctx.input.onUpdate;
     let res = await client.upsertCustomer({
       identifier: ctx.input.identifier,
-      onCreate: ctx.input.onCreate,
-      onUpdate: ctx.input.onUpdate || {}
+      onCreate: {
+        ...ctx.input.onCreate,
+        externalId: ctx.input.onCreate.externalId ?? ctx.input.identifier.externalId,
+        email: { email: createEmail.email, isVerified: createEmail.isVerified ?? false }
+      },
+      onUpdate: pickDefined({
+        fullName: onUpdate?.fullName === undefined ? undefined : { value: onUpdate.fullName },
+        shortName:
+          onUpdate?.shortName === undefined ? undefined : { value: onUpdate.shortName },
+        externalId:
+          onUpdate?.externalId === undefined ? undefined : { value: onUpdate.externalId },
+        email:
+          onUpdate?.email === undefined
+            ? undefined
+            : { email: onUpdate.email.email, isVerified: onUpdate.email.isVerified ?? false }
+      })
     });
 
     let customer = res.customer;

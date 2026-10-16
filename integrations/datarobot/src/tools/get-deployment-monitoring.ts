@@ -1,7 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataRobotClient } from '../lib/client';
+import { parseOutput } from '../lib/output';
 import { spec } from '../spec';
+
+let outputSchema = z.object({
+  deploymentId: z.string().describe('Deployment ID'),
+  serviceStats: z
+    .record(z.string(), z.any())
+    .optional()
+    .nullable()
+    .describe('Service statistics (request count, latency, etc.)'),
+  accuracy: z
+    .record(z.string(), z.any())
+    .optional()
+    .nullable()
+    .describe('Model accuracy metrics'),
+  dataDrift: z.any().optional().nullable().describe('Feature drift data'),
+  targetDrift: z.any().optional().nullable().describe('Target drift data')
+});
 
 export let getDeploymentMonitoring = SlateTool.create(spec, {
   name: 'Get Deployment Monitoring',
@@ -33,27 +50,11 @@ export let getDeploymentMonitoring = SlateTool.create(spec, {
         .describe('End time for monitoring window (ISO 8601, top-of-hour)')
     })
   )
-  .output(
-    z.object({
-      deploymentId: z.string().describe('Deployment ID'),
-      serviceStats: z
-        .record(z.string(), z.any())
-        .optional()
-        .nullable()
-        .describe('Service statistics (request count, latency, etc.)'),
-      accuracy: z
-        .record(z.string(), z.any())
-        .optional()
-        .nullable()
-        .describe('Model accuracy metrics'),
-      dataDrift: z.any().optional().nullable().describe('Feature drift data'),
-      targetDrift: z.any().optional().nullable().describe('Target drift data')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DataRobotClient({
       token: ctx.auth.token,
-      endpointUrl: ctx.config.endpointUrl
+      endpointUrl: ctx.auth.endpointUrl ?? ctx.config.endpointUrl
     });
 
     let timeParams = {
@@ -73,35 +74,19 @@ export let getDeploymentMonitoring = SlateTool.create(spec, {
       !ctx.input.includeTargetDrift;
 
     if (includeAll || ctx.input.includeServiceStats) {
-      try {
-        serviceStats = await client.getServiceStats(ctx.input.deploymentId, timeParams);
-      } catch (err: any) {
-        ctx.warn(`Could not fetch service stats: ${err.message}`);
-      }
+      serviceStats = await client.getServiceStats(ctx.input.deploymentId, timeParams);
     }
 
     if (includeAll || ctx.input.includeAccuracy) {
-      try {
-        accuracy = await client.getAccuracy(ctx.input.deploymentId, timeParams);
-      } catch (err: any) {
-        ctx.warn(`Could not fetch accuracy: ${err.message}`);
-      }
+      accuracy = await client.getAccuracy(ctx.input.deploymentId, timeParams);
     }
 
     if (includeAll || ctx.input.includeDataDrift) {
-      try {
-        dataDrift = await client.getDataDrift(ctx.input.deploymentId, timeParams);
-      } catch (err: any) {
-        ctx.warn(`Could not fetch data drift: ${err.message}`);
-      }
+      dataDrift = await client.getDataDrift(ctx.input.deploymentId, timeParams);
     }
 
     if (includeAll || ctx.input.includeTargetDrift) {
-      try {
-        targetDrift = await client.getTargetDrift(ctx.input.deploymentId, timeParams);
-      } catch (err: any) {
-        ctx.warn(`Could not fetch target drift: ${err.message}`);
-      }
+      targetDrift = await client.getTargetDrift(ctx.input.deploymentId, timeParams);
     }
 
     let sections: string[] = [];
@@ -111,13 +96,13 @@ export let getDeploymentMonitoring = SlateTool.create(spec, {
     if (targetDrift) sections.push('target drift');
 
     return {
-      output: {
+      output: parseOutput(outputSchema, {
         deploymentId: ctx.input.deploymentId,
         serviceStats,
         accuracy,
         dataDrift,
         targetDrift
-      },
+      }),
       message: `Monitoring data retrieved for deployment **${ctx.input.deploymentId}**: ${sections.length > 0 ? sections.join(', ') : 'no data available'}.`
     };
   })

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createAttendanceMeeting = SlateTool.create(spec, {
@@ -15,7 +15,14 @@ export let createAttendanceMeeting = SlateTool.create(spec, {
   .input(
     z.object({
       courseId: z.string().describe('Course identifier'),
-      title: z.string().optional().describe('Meeting title'),
+      title: z
+        .string()
+        .optional()
+        .describe('Meeting title; required by the provider when creating a meeting'),
+      description: z
+        .string()
+        .optional()
+        .describe('Meeting description (defaults to an empty description)'),
       start: z.string().optional().describe('Meeting start time (ISO 8601)'),
       end: z.string().optional().describe('Meeting end time (ISO 8601)')
     })
@@ -24,24 +31,27 @@ export let createAttendanceMeeting = SlateTool.create(spec, {
     z.object({
       meetingId: z.string().describe('Meeting ID'),
       title: z.string().optional().describe('Meeting title'),
+      description: z.string().optional().describe('Meeting description'),
       start: z.string().optional().describe('Start time'),
       end: z.string().optional().describe('End time'),
       created: z.string().optional().describe('Creation timestamp')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let meeting = await client.createAttendanceMeeting(ctx.input.courseId, {
       title: ctx.input.title,
+      description: ctx.input.description,
       start: ctx.input.start,
       end: ctx.input.end
     });
 
     return {
       output: {
-        meetingId: meeting.id,
+        meetingId: String(meeting.id),
         title: meeting.title,
+        description: meeting.description,
         start: meeting.start,
         end: meeting.end,
         created: meeting.created
@@ -79,14 +89,14 @@ export let listAttendanceMeetings = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let result = await client.listAttendanceMeetings(ctx.input.courseId, {
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
 
     let meetings = (result.results || []).map(m => ({
-      meetingId: m.id,
+      meetingId: String(m.id),
       title: m.title,
       start: m.start,
       end: m.end,
@@ -123,7 +133,7 @@ export let recordAttendance = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let record = await client.updateAttendanceRecord(
       ctx.input.courseId,
@@ -137,7 +147,7 @@ export let recordAttendance = SlateTool.create(spec, {
         userId: record.userId,
         meetingId: record.meetingId,
         status: record.status,
-        modified: record.modified
+        modified: record.modifiedTime ?? record.modified
       },
       message: `Recorded **${ctx.input.status}** for user **${ctx.input.userId}** in meeting **${ctx.input.meetingId}**.`
     };
@@ -171,7 +181,7 @@ export let listAttendanceRecords = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = createClient(ctx);
     let result = await client.listAttendanceRecords(ctx.input.courseId, ctx.input.meetingId, {
       offset: ctx.input.offset,
       limit: ctx.input.limit
@@ -180,7 +190,7 @@ export let listAttendanceRecords = SlateTool.create(spec, {
     let records = (result.results || []).map(r => ({
       userId: r.userId,
       status: r.status,
-      modified: r.modified
+      modified: r.modifiedTime ?? r.modified
     }));
 
     return {

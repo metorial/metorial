@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getWaiverForms = SlateTool.create(spec, {
   name: 'Get Waiver Forms',
   key: 'get_waiver_forms',
-  description: `Retrieve waiver form definitions from your WaiverFile account. Returns form details including agreement text, field configuration, participant fields, signing options, and form settings. Can fetch only active forms or all forms including inactive ones.`,
+  description: `Retrieve waiver form definitions from your WaiverFile account. Returns form details including agreement text, field configuration, participant fields, signing options, and form settings. Can fetch only active forms or all forms including deleted ones.`,
   tags: {
     readOnly: true
   }
@@ -17,12 +17,14 @@ export let getWaiverForms = SlateTool.create(spec, {
         .boolean()
         .optional()
         .default(false)
-        .describe('Whether to include inactive forms. Defaults to only active forms.')
+        .describe(
+          'Whether to include all forms, including deleted forms. Defaults to only active forms.'
+        )
     })
   )
   .output(
     z.object({
-      forms: z.any().describe('Array of waiver form definitions')
+      forms: z.any().describe('Complete waiver form response')
     })
   )
   .handleInvocation(async ctx => {
@@ -35,11 +37,9 @@ export let getWaiverForms = SlateTool.create(spec, {
       ? await client.getAllWaiverForms()
       : await client.getActiveWaiverForms();
 
-    let results = Array.isArray(forms) ? forms : [forms];
-
     return {
-      output: { forms: results },
-      message: `Retrieved **${results.length}** waiver form(s)${ctx.input.includeInactive ? ' (including inactive)' : ''}.`
+      output: { forms },
+      message: 'Retrieved the waiver form response.'
     };
   })
   .build();

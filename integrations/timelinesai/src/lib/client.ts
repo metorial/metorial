@@ -1,21 +1,53 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://app.timelines.ai/integrations/api';
 
+export let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'TimelinesAI',
+    reason: 'timelinesai_api_error',
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    detailKeys: ['message', 'msg', 'error', 'error_code', 'detail'],
+    extractUpstreamCode: (_error, response) =>
+      isApiErrorRecord(response?.data) && typeof response.data.error_code === 'string'
+        ? response.data.error_code
+        : undefined
+  });
+
+export let requireArray = (value: unknown, field: string): any[] => {
+  if (!Array.isArray(value)) {
+    throw createApiServiceError(`TimelinesAI returned an invalid ${field} list.`);
+  }
+  return value;
+};
+
+export let numericId = (value: unknown): number => {
+  let id = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
+    throw createApiServiceError('TimelinesAI returned an invalid resource ID.');
+  }
+  return id;
+};
+
 export class Client {
-  private token: string;
+  private axios;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private get axios() {
-    return createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json'
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: apiError
+    });
+    this.axios.interceptors.response.use(response => {
+      if (isApiErrorRecord(response.data) && response.data.status === 'error') {
+        throw apiError({ response: { status: response.status, data: response.data } });
       }
+      return response;
     });
   }
 
@@ -34,6 +66,9 @@ export class Client {
       page?: number;
       createdAfter?: string;
       createdBefore?: string;
+      chatgptAutoresponseEnabled?: boolean;
+      whatsappPhone?: string;
+      withMessage?: boolean;
     } = {}
   ): Promise<any> {
     let query: Record<string, any> = {};
@@ -45,7 +80,16 @@ export class Client {
     if (params.phone) query.phone = params.phone;
     if (params.read !== undefined) query.read = params.read;
     if (params.closed !== undefined) query.closed = params.closed;
-    if (params.page) query.page = params.page;
+    if (params.page !== undefined) {
+      if (!Number.isSafeInteger(params.page) || params.page < 1) {
+        throw createApiServiceError('page must be a positive whole number.');
+      }
+      query.page = params.page;
+    }
+    if (params.chatgptAutoresponseEnabled !== undefined)
+      query.chatgpt_autoresponse_enabled = params.chatgptAutoresponseEnabled;
+    if (params.whatsappPhone !== undefined) query.whatsapp_phone = params.whatsappPhone;
+    if (params.withMessage !== undefined) query.with_msg = params.withMessage;
     if (params.createdAfter) query.created_after = params.createdAfter;
     if (params.createdBefore) query.created_before = params.createdBefore;
 
@@ -65,9 +109,16 @@ export class Client {
       responsible?: string;
       closed?: boolean;
       read?: boolean;
+      chatgptAutoresponseEnabled?: boolean;
     }
   ): Promise<any> {
-    let response = await this.axios.patch(`/chats/${chatId}`, data);
+    let { chatgptAutoresponseEnabled, ...body } = data;
+    let response = await this.axios.patch(`/chats/${chatId}`, {
+      ...body,
+      ...(chatgptAutoresponseEnabled === undefined
+        ? {}
+        : { chatgpt_autoresponse_enabled: chatgptAutoresponseEnabled })
+    });
     return response.data;
   }
 
@@ -82,6 +133,7 @@ export class Client {
       afterMessage?: string;
       beforeMessage?: string;
       sortingOrder?: 'asc' | 'desc';
+      page?: number;
     } = {}
   ): Promise<any> {
     let query: Record<string, any> = {};
@@ -91,6 +143,12 @@ export class Client {
     if (params.afterMessage) query.after_message = params.afterMessage;
     if (params.beforeMessage) query.before_message = params.beforeMessage;
     if (params.sortingOrder) query.sorting_order = params.sortingOrder;
+    if (params.page !== undefined) {
+      if (!Number.isSafeInteger(params.page) || params.page < 1) {
+        throw createApiServiceError('page must be a positive whole number.');
+      }
+      query.page = params.page;
+    }
 
     let response = await this.axios.get(`/chats/${chatId}/messages`, { params: query });
     return response.data;
@@ -169,12 +227,14 @@ export class Client {
   }
 
   async getMessage(messageUid: string): Promise<any> {
-    let response = await this.axios.get(`/messages/${messageUid}`);
+    let response = await this.axios.get(`/messages/${encodeURIComponent(messageUid)}`);
     return response.data;
   }
 
   async getMessageStatusHistory(messageUid: string): Promise<any> {
-    let response = await this.axios.get(`/messages/${messageUid}/status_history`);
+    let response = await this.axios.get(
+      `/messages/${encodeURIComponent(messageUid)}/status_history`
+    );
     return response.data;
   }
 
@@ -235,12 +295,32 @@ export class Client {
   }
 
   async getFile(fileUid: string): Promise<any> {
-    let response = await this.axios.get(`/files/${fileUid}`);
+    let response = await this.axios.get(`/files/${encodeURIComponent(fileUid)}`);
     return response.data;
   }
 
+  async getFileDownload(fileUid: string) {
+    // GET /files/{file_uid} documents a 15-minute URL. Renew one minute early,
+    // measured before the metadata request so network time cannot extend its life.
+    let requestedAt = Date.now();
+    let result = await this.getFile(fileUid);
+    let file = result?.data ?? result;
+    let parsedUrl =
+      typeof file?.temporary_download_url === 'string'
+        ? URL.canParse(file.temporary_download_url) && new URL(file.temporary_download_url)
+        : false;
+    if (!parsedUrl || !['https:', 'http:'].includes(parsedUrl.protocol)) {
+      throw createApiServiceError('TimelinesAI did not return a usable file download URL.');
+    }
+    return {
+      file,
+      url: file.temporary_download_url,
+      expiresAt: new Date(requestedAt + 14 * 60 * 1000).toISOString()
+    };
+  }
+
   async deleteFile(fileUid: string): Promise<any> {
-    let response = await this.axios.delete(`/files/${fileUid}`);
+    let response = await this.axios.delete(`/files/${encodeURIComponent(fileUid)}`);
     return response.data;
   }
 
@@ -260,6 +340,11 @@ export class Client {
 
   async getWorkspaceQuotas(): Promise<any> {
     let response = await this.axios.get('/workspace/quotas');
+    return response.data;
+  }
+
+  async getWorkspace(): Promise<any> {
+    let response = await this.axios.get('/workspace');
     return response.data;
   }
 
@@ -315,12 +400,17 @@ export class Client {
   // --- Reactions ---
 
   async getMessageReactions(messageUid: string): Promise<any> {
-    let response = await this.axios.get(`/messages/${messageUid}/reactions`);
+    let response = await this.axios.get(
+      `/messages/${encodeURIComponent(messageUid)}/reactions`
+    );
     return response.data;
   }
 
   async setMessageReaction(messageUid: string, reaction: string): Promise<any> {
-    let response = await this.axios.patch(`/messages/${messageUid}/reactions`, { reaction });
+    let response = await this.axios.patch(
+      `/messages/${encodeURIComponent(messageUid)}/reactions`,
+      { reaction }
+    );
     return response.data;
   }
 }

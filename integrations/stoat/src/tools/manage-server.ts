@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createServer = SlateTool.create(spec, {
   name: 'Create Server',
   key: 'create_server',
-  description: `Create a new Revolt server with a name and optional description.`,
+  description: `Create a new Stoat server with a name and optional description.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -41,7 +41,7 @@ export let createServer = SlateTool.create(spec, {
       output: {
         serverId: server._id,
         name: server.name,
-        channels: result.channels ?? server.channels ?? []
+        channels: server.channels
       },
       message: `Created server **${ctx.input.name}**`
     };
@@ -51,7 +51,7 @@ export let createServer = SlateTool.create(spec, {
 export let fetchServer = SlateTool.create(spec, {
   name: 'Fetch Server',
   key: 'fetch_server',
-  description: `Fetch details about a Revolt server including its name, description, channels, roles, and settings.`,
+  description: `Fetch details about a Stoat server including its name, description, channels, roles, and settings.`,
   tags: {
     readOnly: true
   }
@@ -72,8 +72,13 @@ export let fetchServer = SlateTool.create(spec, {
       name: z.string().describe('Server name'),
       description: z.string().optional().describe('Server description'),
       channelIds: z.array(z.string()).describe('IDs of channels in the server'),
-      nsfw: z.boolean().describe('Whether the server is NSFW'),
-      discoverable: z.boolean().describe('Whether the server is discoverable')
+      nsfw: z.boolean().optional().describe('Whether the server is NSFW'),
+      discoverable: z.boolean().optional().describe('Whether the server is discoverable'),
+      roles: z
+        .record(z.string(), z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Server roles keyed by role ID'),
+      defaultPermissions: z.number().optional().describe('Default server permission bitfield')
     })
   )
   .handleInvocation(async ctx => {
@@ -88,9 +93,11 @@ export let fetchServer = SlateTool.create(spec, {
         ownerId: server.owner,
         name: server.name,
         description: server.description ?? undefined,
-        channelIds: server.channels ?? [],
-        nsfw: server.nsfw ?? false,
-        discoverable: server.discoverable ?? false
+        channelIds: server.channels,
+        nsfw: server.nsfw ?? undefined,
+        discoverable: server.discoverable ?? undefined,
+        roles: server.roles ?? undefined,
+        defaultPermissions: server.default_permissions ?? undefined
       },
       message: `Fetched server **${server.name}** (\`${server._id}\`)`
     };
@@ -100,7 +107,7 @@ export let fetchServer = SlateTool.create(spec, {
 export let editServer = SlateTool.create(spec, {
   name: 'Edit Server',
   key: 'edit_server',
-  description: `Edit a Revolt server's settings including name, description, icon, banner, discoverability, and analytics. Only fields provided will be updated.`,
+  description: `Edit a Stoat server's settings including name, description, icon, banner, discoverability, and analytics. Only fields provided will be updated.`,
   tags: {
     destructive: false,
     readOnly: false

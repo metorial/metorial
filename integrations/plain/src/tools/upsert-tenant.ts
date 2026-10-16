@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -21,7 +21,12 @@ export let upsertTenant = SlateTool.create(spec, {
         })
         .describe('Identifier for the tenant (provide one)'),
       name: z.string().describe('Tenant name'),
-      externalId: z.string().optional().describe('External ID to set on the tenant'),
+      externalId: z
+        .string()
+        .optional()
+        .describe(
+          'External ID to set; defaults to identifier.externalId or the existing tenant external ID'
+        ),
       url: z.string().optional().describe('URL associated with the tenant')
     })
   )
@@ -35,16 +40,30 @@ export let upsertTenant = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (
+      Object.values(ctx.input.identifier).filter(value => value !== undefined).length !== 1
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one tenant identifier: tenantId or externalId'
+      );
+    }
 
+    let externalId = ctx.input.externalId ?? ctx.input.identifier.externalId;
+    if (externalId === undefined && ctx.input.identifier.tenantId) {
+      externalId = (await client.getTenant(ctx.input.identifier.tenantId)).externalId;
+    }
+    if (!externalId) {
+      throw createApiServiceError(
+        'Provide an externalId or identify an existing tenant by tenantId'
+      );
+    }
     let input: any = {
       identifier: ctx.input.identifier,
-      name: ctx.input.name
+      name: ctx.input.name,
+      externalId
     };
-    if (ctx.input.externalId) {
-      input.externalId = ctx.input.externalId;
-    }
-    if (ctx.input.url) {
-      input.url = ctx.input.url;
+    if (ctx.input.url !== undefined) {
+      input.url = { value: ctx.input.url };
     }
 
     let res = await client.upsertTenant(input);

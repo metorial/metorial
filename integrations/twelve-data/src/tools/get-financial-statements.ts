@@ -1,16 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwelveDataClient } from '../lib/client';
+import { record, records, requiredString } from '../lib/response';
 import { spec } from '../spec';
 
 export let getFinancialStatements = SlateTool.create(spec, {
   name: 'Get Financial Statements',
   key: 'get_financial_statements',
   description: `Retrieve financial statements for a company: Income Statement, Balance Sheet, and/or Cash Flow Statement.
-Choose which statement type(s) to fetch. Historical data is available from the 1980s–90s depending on the company.
+Select one statement type per call. Coverage and historical depth depend on the company and subscription.
 Supports both annual and quarterly reporting periods.`,
   instructions: [
-    'Specify one or more statement types to fetch.',
+    'Select the statement type to fetch.',
     'Use "annual" period for yearly data or "quarterly" for quarterly reports.'
   ],
   tags: {
@@ -35,8 +36,14 @@ Supports both annual and quarterly reporting periods.`,
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, preserving unavailable values and metadata'),
       symbol: z.string().describe('Ticker symbol'),
-      statementType: z.string().describe('Type of statement returned'),
+      statementType: z
+        .string()
+        .describe('Requested financial-statement endpoint corresponding to the returned rows'),
       statements: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of financial statement records')
@@ -63,18 +70,15 @@ Supports both annual and quarterly reporting periods.`,
       result = await client.getCashFlow(baseParams);
     }
 
-    let statements =
-      result[ctx.input.statementType] ||
-      result.income_statement ||
-      result.balance_sheet ||
-      result.cash_flow ||
-      [];
+    let meta = record(result.meta, 'meta');
+    let statements = records(result[ctx.input.statementType], ctx.input.statementType);
 
     return {
       output: {
-        symbol: result.meta?.symbol || ctx.input.symbol,
+        raw: result,
+        symbol: requiredString(meta.symbol, 'meta.symbol'),
         statementType: ctx.input.statementType,
-        statements: Array.isArray(statements) ? statements : [statements]
+        statements
       },
       message: `Retrieved **${ctx.input.statementType.replace('_', ' ')}** for **${ctx.input.symbol}** (${ctx.input.period || 'annual'}).`
     };

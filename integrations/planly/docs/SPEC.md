@@ -1,6 +1,6 @@
-Based on my research, the Planly API documentation does not mention any webhook or event subscription functionality. Now I have all the information needed to write the specification.
+# Planly API Specification
 
-# Slates Specification for Planly
+API source: [Planly API Reference](https://docs.planly.com/), checked 2026-10-15.
 
 ## Overview
 
@@ -24,7 +24,7 @@ No OAuth2 or other authentication methods are documented. There are no scopes or
 
 ### Team Management
 
-Create, list, edit, and delete teams. You can use the API to manage your channels and much more. Teams are the top-level organizational unit in Planly. You can also list team members, transfer team ownership, and remove users from a team. Most API operations require a `teamId` parameter, so teams are central to all workflows.
+Create, list, retrieve, edit, and delete teams. Team details expose permissions and plan limits as well as member and connected/disconnected channel counts. You can also list team members, transfer team ownership, and remove users from a team. Discover team IDs with `list_teams` before scoped operations.
 
 ### Channel Management
 
@@ -33,6 +33,8 @@ List and delete connected social media channels within a team. Planly supports I
 ### Post Scheduling
 
 Schedule posts to one or more social media channels with platform-specific options. Posts can be scheduled for a future date/time or published immediately. Each social network supports specific options:
+
+Use `channelPlatformOptions` for different social networks in one call. Each channel receives its own network options. Global `platformOptions` accepts one network and applies to channels without a per-channel override. Twitter thread media IDs are translated to the provider's `id` field. Created schedule groups and schedules are read from the response's `data.upsert` collection.
 
 - **Facebook**: Post type (Reels, Story, default), first comment, link embedding, location tagging.
 - **Instagram**: Post type (Post, Story; Reels auto-detected), first comment, location tagging, share to feed for Reels, up to 3 collaborators.
@@ -50,7 +52,7 @@ Group multiple schedules together for coordinated publishing. Schedule groups al
 
 ### Media Management
 
-Upload, import, list, and delete media files. The upload process is two-step: first request a pre-signed upload URL, then confirm the upload after the file has been transferred. Media can also be imported directly from a URL. Supported media types include `video/mp4`, `image/png`, `image/jpeg`, and `image/webp`. Uploaded media is associated with a team and can be attached to scheduled posts.
+Upload, import, list, and delete media files. Request upload authorization, transfer the exact declared number of bytes using the returned method and headers, and then confirm the upload. Media can also be imported directly from a URL. Supported import types include `video/mp4`, `image/png`, `image/jpeg`, and `image/webp`. Media URLs are retained as source metadata for scheduling. Numeric media type codes and object dimensions are exposed alongside the original metadata without changing existing string fields.
 
 ### AI Content Generation
 
@@ -62,4 +64,8 @@ Retrieve the list of Pinterest boards for a connected Pinterest channel. This is
 
 ## Events
 
-The provider does not support events. The Planly API documentation does not include any webhook, event subscription, or callback mechanisms.
+The public API reference does not document webhook registration, event subscriptions, or callbacks. It also does not document a current-user/profile endpoint; `list_teams` provides authorized-container discovery.
+
+## Response handling
+
+Paginated media and schedule lists read `data.rows` and return the provider's `next` cursor. Original provider records preserve nullable fields and additional details. Legacy string role/status summaries contain the decimal representation of numeric provider codes. Optional string summaries omit incompatible null/object values while the original record retains them. Missing required identifiers, names, credit counts, or mutation acknowledgements produce an actionable service error. Provider error envelopes are checked even when HTTP succeeds.

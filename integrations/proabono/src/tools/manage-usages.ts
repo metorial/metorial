@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProAbonoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -88,9 +88,10 @@ Can retrieve all usages for a customer, update a single feature, or batch update
     let { action } = ctx.input;
 
     if (action === 'get') {
-      if (!ctx.input.referenceFeature) throw new Error('referenceFeature is required for get');
+      if (!ctx.input.referenceFeature)
+        throw createApiServiceError('referenceFeature is required for get');
       if (!ctx.input.referenceCustomer)
-        throw new Error('referenceCustomer is required for get');
+        throw createApiServiceError('referenceCustomer is required for get');
       let result = await client.getUsage(
         ctx.input.referenceFeature,
         ctx.input.referenceCustomer
@@ -98,11 +99,16 @@ Can retrieve all usages for a customer, update a single feature, or batch update
       let usage = mapUsage(result);
       return {
         output: { usage },
-        message: `Feature **${usage.referenceFeature}** for customer **${usage.referenceCustomer}**: quantity ${usage.quantityCurrent ?? 0}/${usage.quantityIncluded ?? '∞'}, enabled: ${usage.isEnabled ?? 'n/a'}`
+        message: `Feature **${usage.referenceFeature}** for customer **${usage.referenceCustomer}**: quantity ${usage.quantityCurrent ?? 'not returned'}/${usage.quantityIncluded ?? '∞'}, enabled: ${usage.isEnabled ?? 'n/a'}`
       };
     }
 
     if (action === 'list') {
+      if (!ctx.input.referenceCustomer && !ctx.input.referenceFeature) {
+        throw createApiServiceError(
+          'Provide referenceCustomer or referenceFeature to list usages.'
+        );
+      }
       let result = await client.listUsages({
         ReferenceCustomer: ctx.input.referenceCustomer,
         ReferenceFeature: ctx.input.referenceFeature,
@@ -117,13 +123,14 @@ Can retrieve all usages for a customer, update a single feature, or batch update
           totalItems: result?.TotalItems,
           page: result?.Page
         },
-        message: `Found **${usages.length}** usage records (total: ${result?.TotalItems || 0})`
+        message: `Found **${usages.length}** usage records on this page`
       };
     }
 
     if (action === 'update') {
       if (!ctx.input.referenceFeature)
-        throw new Error('referenceFeature is required for update');
+        throw createApiServiceError('referenceFeature is required for update');
+      validateUsageUpdate(ctx.input);
       let result = await client.updateUsage({
         ReferenceFeature: ctx.input.referenceFeature,
         ReferenceCustomer: ctx.input.referenceCustomer,
@@ -137,17 +144,18 @@ Can retrieve all usages for a customer, update a single feature, or batch update
       let usage = mapUsage(result);
       return {
         output: { usage },
-        message: `Updated usage for feature **${usage.referenceFeature}**: quantity ${usage.quantityCurrent ?? 0}, enabled: ${usage.isEnabled ?? 'n/a'}`
+        message: `Updated usage for feature **${usage.referenceFeature}**: quantity ${usage.quantityCurrent ?? 'not returned'}, enabled: ${usage.isEnabled ?? 'n/a'}`
       };
     }
 
     if (action === 'batch_update') {
       if (!ctx.input.batchItems || ctx.input.batchItems.length === 0) {
-        throw new Error('batchItems is required for batch_update');
+        throw createApiServiceError('batchItems is required for batch_update');
       }
       if (ctx.input.batchItems.length > 50) {
-        throw new Error('Batch updates are limited to 50 items per request');
+        throw createApiServiceError('Batch updates are limited to 50 items per request');
       }
+      for (let item of ctx.input.batchItems) validateUsageUpdate(item);
       let items = ctx.input.batchItems.map(item => ({
         ReferenceFeature: item.referenceFeature,
         ReferenceCustomer: item.referenceCustomer,
@@ -167,7 +175,7 @@ Can retrieve all usages for a customer, update a single feature, or batch update
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
 
@@ -182,3 +190,29 @@ let mapUsage = (raw: any) => ({
   datePeriodStart: raw?.DatePeriodStart,
   datePeriodEnd: raw?.DatePeriodEnd
 });
+
+let validateUsageUpdate = (input: {
+  referenceCustomer?: string;
+  subscriptionId?: number;
+  dateStamp?: string;
+  increment?: number;
+  quantityCurrent?: number;
+  isEnabled?: boolean;
+}) => {
+  if (!input.referenceCustomer && input.subscriptionId === undefined) {
+    throw createApiServiceError(
+      'Each usage update requires referenceCustomer or subscriptionId.'
+    );
+  }
+  if (!input.dateStamp)
+    throw createApiServiceError(
+      'Each usage update requires dateStamp as its idempotency timestamp.'
+    );
+  let operations = [input.increment, input.quantityCurrent, input.isEnabled].filter(
+    value => value !== undefined
+  );
+  if (operations.length !== 1)
+    throw createApiServiceError(
+      'Each usage update requires exactly one of increment, quantityCurrent, or isEnabled.'
+    );
+};

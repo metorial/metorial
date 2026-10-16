@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Bidsketch
 
-Create, send, and track professional business proposals. Manage clients with contact details and notes. Create and organize reusable fee items (fixed, hourly, monthly, yearly, or custom) and content sections. Build proposals from scratch or templates with configurable taxes, discounts, and approval messages.
+Create and manage business proposals, clients, saved fees, reusable sections, and read-only proposal templates. The 33 tools cover creation, updates, deletion, paginated discovery, proposal statistics, full proposal content, and individual saved or proposal-specific content items.
+
+Connect with an administrator-created API token from Account Settings > API & Integration. The API supports preparing and tracking proposals; sending proposals and changing their lifecycle status are not documented API operations. Collections default to 100 records per page. Fee lists return summaries in one request; use the individual fee tools for per-unit amounts and other full details omitted from summaries.
 
 ## License
 

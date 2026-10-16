@@ -1,9 +1,27 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 let retentlyAxios = createAxios({
   baseURL: 'https://app.retently.com'
 });
+
+retentlyAxios.interceptors.response.use(
+  response => response,
+  error =>
+    Promise.reject(
+      buildApiServiceError(error, {
+        providerLabel: 'Retently',
+        reason: 'retently_oauth_error',
+        operation: 'token exchange'
+      })
+    )
+);
 
 export let auth = SlateAuth.create()
   .output(
@@ -56,26 +74,30 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Retently',
+          required: true
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      clientId: string;
+      clientSecret: string;
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+    }) => {
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError(
+          'Retently refresh token is missing. Reconnect the account.'
+        );
       let response = await retentlyAxios.post(
         '/api/oauth/token',
         new URLSearchParams({
           grant_type: 'refresh_token',
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken || ''
+          refresh_token: ctx.output.refreshToken
         }).toString(),
         {
           headers: {
@@ -84,15 +106,14 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Retently',
+          operation: 'token refresh',
+          required: true,
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     }
   })

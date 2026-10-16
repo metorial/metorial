@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,13 +8,13 @@ export let manageDatabaseValues = SlateTool.create(spec, {
   key: 'manage_database_values',
   description: `Add, update, or delete barcode values in a CodeREADr database. Supports single value operations as well as bulk upsert of up to 100 values at once. Use "add" for new values, "upsert" to insert or update, "edit" to modify metadata of existing values, or "delete" to remove values.`,
   instructions: [
-    'Barcode values must be 100 characters or less.',
+    'Barcode values must be 500 characters or less.',
     'For bulk operations, use "upsert" with the "values" array (max 100 per request).',
     'For single value operations, provide "value" directly.'
   ],
   constraints: [
     'Maximum 100 values per bulk upsert request.',
-    'Individual barcode values must be 100 characters or less.'
+    'Individual barcode values must be 500 characters or less.'
   ]
 })
   .input(
@@ -26,7 +26,7 @@ export let manageDatabaseValues = SlateTool.create(spec, {
       value: z
         .string()
         .optional()
-        .describe('Barcode value for single operations (max 100 chars)'),
+        .describe('Barcode value for single operations (max 500 chars)'),
       response: z
         .string()
         .optional()
@@ -61,6 +61,21 @@ export let manageDatabaseValues = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let { operation, databaseId, value, response, validity, values } = ctx.input;
 
+    if (
+      values !== undefined &&
+      (operation !== 'upsert' || values.length === 0 || values.length > 100)
+    )
+      throw createApiServiceError(
+        'values must contain between 1 and 100 entries and is only supported for upsert.'
+      );
+    if (values !== undefined && value !== undefined)
+      throw createApiServiceError('Provide either value or values, not both.');
+    if (
+      [...(values ?? []), ...(value === undefined ? [] : [{ value }])].some(
+        entry => Array.from(entry.value).length > 500
+      )
+    )
+      throw createApiServiceError('Barcode values must contain at most 500 characters.');
     if (operation === 'upsert' && values && values.length > 0) {
       await client.upsertMultiValues(databaseId, values);
       return {
@@ -70,7 +85,7 @@ export let manageDatabaseValues = SlateTool.create(spec, {
     }
 
     if (!value) {
-      throw new Error('A "value" is required for single-value operations.');
+      throw createApiServiceError('A "value" is required for single-value operations.');
     }
 
     if (operation === 'add') {

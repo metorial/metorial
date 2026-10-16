@@ -1,6 +1,6 @@
 {
   "name": "@metorial/gist",
-  "description": "Manage contacts, conversations, and marketing campaigns on the Gist customer messaging platform. Create, update, search, and delete contacts with custom properties, tags, and segments. Send and manage conversations across chat, email, Facebook, Twitter, and API channels — assign, snooze, close, prioritize, and add internal notes. Subscribe and unsubscribe contacts from drip email campaigns with performance metrics. Manage knowledge base articles and collections with multi-language support. Track custom events, manage forms and submissions, and control email subscription types. Full e-commerce integration: create stores, manage customers, products, variants, carts, and orders with financial and fulfillment tracking. View teams, teammates, and workspace metadata.",
+  "description": "Manage Gist workspace contacts, conversations, marketing subscriptions, knowledge base articles, teams, and commerce data. Import contacts and inspect batch status, read paginated conversation messages, manage tags and forms, and sync store-scoped customers, products, carts, and orders.",
   "categories": ["crm-and-sales-tools"],
   "skills": [
     "manage contacts and leads",
@@ -11,7 +11,8 @@
     "manage e-commerce orders",
     "bulk tag contacts",
     "manage forms and submissions",
-    "schedule meeting webhooks",
-    "search and filter conversations"
+    "search and filter conversations",
+    "check contact import status",
+    "identify authorized workspace"
   ]
 }

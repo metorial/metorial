@@ -38,8 +38,8 @@ export let listBooths = SlateTool.create(spec, {
       output: {
         booths: booths.map(b => ({
           name: b.name,
-          exhibitors: b.exhibitors ?? [],
-          isSpecialSection: b.isSpecialSection ?? false
+          exhibitors: b.exhibitors,
+          isSpecialSection: b.isSpecialSection
         }))
       },
       message: `Found **${booths.length}** booth(s) for event ${ctx.input.eventId}.`

@@ -20,7 +20,7 @@ export let trackPurchase = SlateTool.create(spec, {
     z.object({
       campaignId: z
         .string()
-        .describe('ID of the Deadline Funnel campaign to track the sale for'),
+        .describe('Campaign ID. Call list_campaigns to discover available campaign IDs.'),
       email: z.string().describe('Email address of the subscriber who made the purchase'),
       amount: z.number().describe('Purchase amount'),
       currency: z.string().describe('Currency code (e.g., "USD", "EUR", "GBP")'),

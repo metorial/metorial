@@ -1,12 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BTCPayClient } from '../lib/client';
+import { storeIdSchema } from '../lib/schemas';
+import { providerAmount } from '../lib/values';
 import { spec } from '../spec';
 
 let invoiceSchema = z.object({
   invoiceId: z.string().describe('Invoice ID'),
   status: z.string().describe('Invoice status'),
-  amount: z.number().optional().describe('Invoice amount'),
+  amount: z
+    .number()
+    .optional()
+    .describe('Invoice amount as a number; amountExact retains the provider decimal.'),
+  amountExact: z
+    .string()
+    .optional()
+    .describe('Exact invoice amount as returned by the provider'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Complete invoice data'),
   currency: z.string().optional().describe('Invoice currency'),
   checkoutLink: z.string().optional().describe('Checkout page URL'),
   createdTime: z.string().optional().describe('Creation timestamp'),
@@ -26,7 +36,7 @@ export let getInvoices = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      storeId: z.string().describe('Store ID'),
+      storeId: storeIdSchema,
       invoiceId: z
         .string()
         .optional()
@@ -73,7 +83,9 @@ export let getInvoices = SlateTool.create(spec, {
           invoice: {
             invoiceId: invoice.id as string,
             status: invoice.status as string,
-            amount: invoice.amount as number | undefined,
+            amount: providerAmount(invoice.amount, 'invoice.amount'),
+            amountExact: typeof invoice.amount === 'string' ? invoice.amount : undefined,
+            raw: invoice,
             currency: invoice.currency as string | undefined,
             checkoutLink: invoice.checkoutLink as string | undefined,
             createdTime:
@@ -106,7 +118,9 @@ export let getInvoices = SlateTool.create(spec, {
       return {
         invoiceId: inv.id as string,
         status: inv.status as string,
-        amount: inv.amount as number | undefined,
+        amount: providerAmount(inv.amount, 'invoice.amount'),
+        amountExact: typeof inv.amount === 'string' ? inv.amount : undefined,
+        raw: inv,
         currency: inv.currency as string | undefined,
         checkoutLink: inv.checkoutLink as string | undefined,
         createdTime: inv.createdTime !== undefined ? String(inv.createdTime) : undefined,

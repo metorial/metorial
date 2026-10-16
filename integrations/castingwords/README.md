@@ -1,6 +1,10 @@
-# Castingwords
+# CastingWords
 
-Order human-powered transcriptions of audio and video files across multiple tiers (Budget, 7 Day, 1 Day) with add-ons like timestamps, captions, and verbatim transcription. Track audiofile status, retrieve completed transcripts in multiple formats (TXT, DOC, RTF, HTML), upgrade or cancel orders, view invoices, and check prepay balance.
+Order audio and video transcription, follow processing status and billing holds, download transcripts and captions, upgrade or cancel audiofiles, review invoices and balance, and read the account notification URL.
+
+Use `download_transcript` for TXT, DOC, RTF, HTML, DOCX, timestamped text, SRT, or VTT files. The existing `retrieve_transcript` tool also returns its original transcript text. Caption and timestamp formats require the relevant service on the order.
+
+Connect with the API key from your [CastingWords account](https://castingwords.com/customer/info). API behavior follows the [official API4 reference](https://castingwords.com/docs/developer/SimpleAPI.html).
 
 ## License
 

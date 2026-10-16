@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,6 +28,10 @@ Covers content types like articles, videos, jobs, events, coupons, audios, and d
   .output(
     z.object({
       status: z.string().describe('Response status from the API.'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('The complete provider response, including any pagination metadata.'),
       post: z.any().describe('The post record(s) returned.')
     })
   )
@@ -40,15 +44,18 @@ Covers content types like articles, videos, jobs, events, coupons, audios, and d
     let result: any;
     if (ctx.input.postId) {
       result = await client.getPost(ctx.input.postId);
-    } else if (ctx.input.property && ctx.input.propertyValue) {
+    } else if (ctx.input.property && ctx.input.propertyValue !== undefined) {
       result = await client.getPostByProperty(ctx.input.property, ctx.input.propertyValue);
     } else {
-      throw new Error('Either postId or both property and propertyValue must be provided.');
+      throw createApiServiceError(
+        'Either postId or both property and propertyValue must be provided.'
+      );
     }
 
     return {
       output: {
         status: result.status,
+        raw: result,
         post: result.message
       },
       message: `Retrieved post data successfully.`

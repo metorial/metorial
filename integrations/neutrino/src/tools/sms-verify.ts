@@ -49,7 +49,8 @@ export let smsVerifyTool = SlateTool.create(spec, {
       numberValid: z.boolean().describe('Whether the phone number is valid'),
       securityCode: z
         .string()
-        .describe('The security code that was sent (use with Verify Security Code tool)')
+        .describe('The security code that was sent (use with Verify Security Code tool)'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -71,9 +72,10 @@ export let smsVerifyTool = SlateTool.create(spec, {
 
     return {
       output: {
-        sent: result.sent ?? false,
-        numberValid: result.numberValid ?? false,
-        securityCode: result.securityCode ?? ''
+        raw: result.raw,
+        sent: result.sent,
+        numberValid: result.numberValid,
+        securityCode: result.securityCode
       },
       message: result.sent
         ? `SMS verification code sent to **${ctx.input.number}**.`

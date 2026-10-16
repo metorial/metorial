@@ -1,9 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PilvioClient } from '../lib/client';
 import { spec } from '../spec';
 
 let diskSchema = z.object({
+  raw: z.unknown().optional().describe('Complete provider response for this resource'),
   diskUuid: z.string().describe('Disk UUID'),
   displayName: z.string().optional().describe('Display name'),
   sizeGb: z.number().optional().describe('Disk size in GB'),
@@ -15,33 +16,62 @@ let diskSchema = z.object({
 export let manageBlockStorage = SlateTool.create(spec, {
   name: 'Manage Block Storage',
   key: 'manage_block_storage',
-  description: `Create, list, get, modify, attach, detach, or delete standalone block storage disks. Disks can be initialized as empty, from an OS image, from an existing disk, or from a snapshot.`,
+  description: `Create, list, get, modify, attach, detach, or delete standalone block storage disks. Add a disk to a VM, resize an attached disk, or delete an attached data disk. Disks can be initialized as empty, from an OS image, from an existing disk, or from a snapshot.`,
   instructions: [
     'Use "list" to view all standalone disks.',
     'Use "get" to retrieve details for a specific disk.',
     'Use "create" to create a new standalone disk.',
     'Use "modify" to update disk display name or billing account.',
     'Use "attach" or "detach" to connect/disconnect a disk from a VM.',
-    'Use "delete" to permanently remove a disk and all its snapshots.'
+    'Use "delete" to permanently remove a disk and all its snapshots.',
+    'Use "add_to_vm" with vmUuid and sizeGb to create an attached disk.',
+    'Use "resize" with vmUuid, diskUuid, and sizeGb to grow an attached disk.',
+    'Use "delete_attached" with vmUuid and diskUuid to permanently delete an attached data disk. Primary boot disks cannot be deleted.'
   ],
   constraints: [
     'Disk size can only be increased, not decreased.',
     'Deleting a disk also deletes all its snapshots.'
-  ]
+  ],
+  tags: { destructive: true }
 })
   .input(
     z.object({
       action: z
-        .enum(['list', 'get', 'create', 'modify', 'attach', 'detach', 'delete'])
+        .enum([
+          'list',
+          'get',
+          'create',
+          'modify',
+          'attach',
+          'detach',
+          'delete',
+          'add_to_vm',
+          'resize',
+          'delete_attached'
+        ])
         .describe('Operation to perform'),
       diskUuid: z
         .string()
         .optional()
         .describe('Disk UUID (required for get, modify, attach, detach, delete)'),
       vmUuid: z.string().optional().describe('VM UUID (required for attach/detach)'),
-      sizeGb: z.number().optional().describe('Disk size in GB (for create)'),
+      sizeGb: z
+        .number()
+        .optional()
+        .describe('Disk size in GB (for create, add_to_vm, resize)'),
+      readOnlyBootable: z
+        .boolean()
+        .optional()
+        .describe(
+          'Filter bootable disks when listing, or set bootable-media status when modifying'
+        ),
       displayName: z.string().optional().describe('Disk display name (for create/modify)'),
-      billingAccountId: z.number().optional().describe('Billing account ID'),
+      billingAccountId: z
+        .number()
+        .optional()
+        .describe(
+          'Call list_billing_accounts to discover billing account IDs. Billing account ID'
+        ),
       sourceImageType: z
         .enum(['OS_BASE', 'DISK', 'SNAPSHOT', 'EMPTY'])
         .optional()
@@ -70,16 +100,17 @@ export let manageBlockStorage = SlateTool.create(spec, {
     let mapDisk = (d: any) => ({
       diskUuid: d.uuid,
       displayName: d.display_name || d.name,
-      sizeGb: d.size_gb,
-      status: d.status,
-      createdAt: d.created_at,
-      attachedTo: d.vm_uuid
+      sizeGb: d.size_gb ?? undefined,
+      status: d.status ?? undefined,
+      createdAt: d.created_at ?? undefined,
+      attachedTo: d.vm_uuid ?? undefined,
+      raw: d
     });
 
     switch (action) {
       case 'list': {
-        let disks = await client.listDisks();
-        let mapped = (Array.isArray(disks) ? disks : []).map(mapDisk);
+        let disks = await client.listDisks(ctx.input.readOnlyBootable);
+        let mapped = disks.map(mapDisk);
         return {
           output: { disks: mapped, success: true },
           message: `Found **${mapped.length}** block storage disk(s).`
@@ -87,7 +118,8 @@ export let manageBlockStorage = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.diskUuid) throw new Error('diskUuid is required for get action');
+        if (!ctx.input.diskUuid)
+          throw createApiServiceError('diskUuid is required for get action');
         let disk = await client.getDisk(ctx.input.diskUuid);
         return {
           output: { disk: mapDisk(disk), success: true },
@@ -110,10 +142,12 @@ export let manageBlockStorage = SlateTool.create(spec, {
       }
 
       case 'modify': {
-        if (!ctx.input.diskUuid) throw new Error('diskUuid is required for modify action');
+        if (!ctx.input.diskUuid)
+          throw createApiServiceError('diskUuid is required for modify action');
         let disk = await client.modifyDisk(ctx.input.diskUuid, {
           displayName: ctx.input.displayName,
-          billingAccountId: ctx.input.billingAccountId
+          billingAccountId: ctx.input.billingAccountId,
+          readOnlyBootable: ctx.input.readOnlyBootable
         });
         return {
           output: { disk: mapDisk(disk), success: true },
@@ -123,7 +157,7 @@ export let manageBlockStorage = SlateTool.create(spec, {
 
       case 'attach': {
         if (!ctx.input.diskUuid || !ctx.input.vmUuid)
-          throw new Error('diskUuid and vmUuid are required for attach action');
+          throw createApiServiceError('diskUuid and vmUuid are required for attach action');
         await client.attachDisk(ctx.input.vmUuid, ctx.input.diskUuid);
         return {
           output: { success: true },
@@ -133,7 +167,7 @@ export let manageBlockStorage = SlateTool.create(spec, {
 
       case 'detach': {
         if (!ctx.input.diskUuid || !ctx.input.vmUuid)
-          throw new Error('diskUuid and vmUuid are required for detach action');
+          throw createApiServiceError('diskUuid and vmUuid are required for detach action');
         await client.detachDisk(ctx.input.vmUuid, ctx.input.diskUuid);
         return {
           output: { success: true },
@@ -141,8 +175,49 @@ export let manageBlockStorage = SlateTool.create(spec, {
         };
       }
 
+      case 'add_to_vm': {
+        if (!ctx.input.vmUuid || ctx.input.sizeGb === undefined) {
+          throw createApiServiceError('vmUuid and sizeGb are required for add_to_vm.');
+        }
+        let disk = await client.addDiskToVm(ctx.input.vmUuid, ctx.input.sizeGb);
+        return {
+          output: {
+            disk: { ...mapDisk(disk), sizeGb: disk.size ?? disk.size_gb },
+            success: true
+          },
+          message: `Added a disk to VM **${ctx.input.vmUuid}**.`
+        };
+      }
+      case 'resize': {
+        if (!ctx.input.vmUuid || !ctx.input.diskUuid || ctx.input.sizeGb === undefined) {
+          throw createApiServiceError('vmUuid, diskUuid, and sizeGb are required for resize.');
+        }
+        let disk = await client.modifyVmDisk(
+          ctx.input.vmUuid,
+          ctx.input.diskUuid,
+          ctx.input.sizeGb
+        );
+        return {
+          output: {
+            disk: { ...mapDisk(disk), sizeGb: disk.size ?? disk.size_gb },
+            success: true
+          },
+          message: `Resized disk **${ctx.input.diskUuid}** to ${ctx.input.sizeGb} GB.`
+        };
+      }
+      case 'delete_attached': {
+        if (!ctx.input.vmUuid || !ctx.input.diskUuid) {
+          throw createApiServiceError('vmUuid and diskUuid are required for delete_attached.');
+        }
+        await client.deleteVmDisk(ctx.input.vmUuid, ctx.input.diskUuid);
+        return {
+          output: { success: true },
+          message: `Deleted attached disk **${ctx.input.diskUuid}**.`
+        };
+      }
       case 'delete': {
-        if (!ctx.input.diskUuid) throw new Error('diskUuid is required for delete action');
+        if (!ctx.input.diskUuid)
+          throw createApiServiceError('diskUuid is required for delete action');
         await client.deleteDisk(ctx.input.diskUuid);
         return {
           output: { success: true },

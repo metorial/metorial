@@ -1,4 +1,4 @@
-# Slates Specification for Clickmeeting
+# ClickMeeting API Specification
 
 ## Overview
 
@@ -39,7 +39,7 @@ If the access type is set to token-protected for a specific event, you can gener
 
 ClickMeeting allows attendees registration; turn on registration if you would like participants to register before attending the conference. Using API you are able to register new attendees, receive list of all registered participants.
 
-- Registrations can be retrieved by status (active, pending) for a conference or for a specific session.
+- Registrations can be retrieved by status (active, all); the legacy pending input remains available for existing callers for a conference or for a specific session.
 
 ### Session & Attendee Data
 
@@ -53,11 +53,11 @@ Send email invitations for a conference room to specified recipients. The invita
 
 ### Auto-login URLs
 
-Generate auto-login hash URLs for conference rooms, allowing participants to join directly without manually entering credentials. Role-based hashes are available (host, presenter, listener).
+Generate auto-login hash URLs for conference rooms, allowing participants to join directly without manually entering credentials. Role-based hashes are available for host, presenter, listener, moderator, and guest speaker. Legacy numeric roles are translated to their named roles.
 
 ### File Library (Storage)
 
-Upload, download, list, and delete files in your account's file library. Files can also be associated with specific conference rooms. Recordings from sessions can be retrieved and managed (listed or deleted) per conference.
+Upload, download, list, and delete files in your account's file library. Files can also be associated with specific conference rooms. Recordings can be listed across the account or per conference, published, unpublished, and deleted. File and chat downloads require the account API key; completed PDF reports are downloadable.
 
 ### Contacts
 
@@ -73,4 +73,8 @@ Retrieve chat session logs, including the ability to download full chat content 
 
 ## Events
 
-The provider does not support events. ClickMeeting's API does not offer webhooks, callback URLs, or any built-in event subscription mechanism for real-time notifications.
+This integration includes request/response tools and no event triggers. The audited REST reference does not document webhook registration.
+
+## Reference
+
+[Official API guide](https://dev.clickmeeting.com/api-guide/) and [function reference](https://dev.clickmeeting.com/api-doc/).

@@ -15,6 +15,7 @@ export let archiveProposal = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional(),
       proposalId: z.string(),
       title: z.string(),
       status: z.string(),
@@ -22,11 +23,12 @@ export let archiveProposal = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.archiveProposal(ctx.input.proposalId);
 
     return {
       output: {
+        raw: result.raw,
         proposalId: result.proposalId,
         title: result.title,
         status: result.status,

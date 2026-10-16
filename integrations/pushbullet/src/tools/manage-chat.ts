@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -41,23 +41,23 @@ export let manageChat = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.email) {
-        throw new Error('email is required for creating a chat');
+        throw createApiServiceError('email is required for creating a chat');
       }
       let chat = await client.createChat(ctx.input.email);
       return {
         output: {
           chatIden: chat.iden,
           action: 'create',
-          contactName: chat.with.name,
-          contactEmail: chat.with.email,
+          contactName: chat.with?.name,
+          contactEmail: chat.with?.email,
           muted: chat.muted
         },
-        message: `Created chat with **${chat.with.name || chat.with.email}**.`
+        message: `Created chat with **${chat.with?.name || chat.with?.email || chat.iden}**.`
       };
     }
 
     if (!ctx.input.chatIden) {
-      throw new Error('chatIden is required for mute, unmute, and delete actions');
+      throw createApiServiceError('chatIden is required for mute, unmute, and delete actions');
     }
 
     if (ctx.input.action === 'mute' || ctx.input.action === 'unmute') {
@@ -67,11 +67,11 @@ export let manageChat = SlateTool.create(spec, {
         output: {
           chatIden: chat.iden,
           action: ctx.input.action,
-          contactName: chat.with.name,
-          contactEmail: chat.with.email,
+          contactName: chat.with?.name,
+          contactEmail: chat.with?.email,
           muted: chat.muted
         },
-        message: `Chat with **${chat.with.name || chat.with.email}** has been **${ctx.input.action}d**.`
+        message: `Chat with **${chat.with?.name || chat.with?.email || chat.iden}** has been **${ctx.input.action}d**.`
       };
     }
 

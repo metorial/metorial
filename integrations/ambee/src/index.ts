@@ -18,7 +18,9 @@ import {
   getWeatherForecast,
   getWeatherHistory,
   getWildfire,
-  getWildfireRisk
+  getWildfireRisk,
+  queryDisasters,
+  queryEnvironment
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -40,7 +42,9 @@ export let provider = Slate.create({
     getWaterVapor,
     getNdvi,
     getElevation,
-    geocode
+    geocode,
+    queryEnvironment,
+    queryDisasters
   ],
   triggers: []
 });

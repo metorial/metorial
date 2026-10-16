@@ -26,7 +26,7 @@ export let listFiles = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: Record<string, unknown>[];
 
     if (ctx.input.roomId) {
       result = await client.listConferenceFiles(ctx.input.roomId);
@@ -34,7 +34,7 @@ export let listFiles = SlateTool.create(spec, {
       result = await client.listFiles();
     }
 
-    let files = Array.isArray(result) ? result : [];
+    let files = result;
 
     return {
       output: { files },

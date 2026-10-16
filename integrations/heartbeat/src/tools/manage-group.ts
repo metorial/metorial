@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,6 +7,9 @@ export let manageGroup = SlateTool.create(spec, {
   name: 'Manage Group',
   key: 'manage_group',
   description: `Creates a new group or manages group membership in your Heartbeat community. Can create groups, add users to groups, or remove users from groups. When adding a user, you can optionally remove them from sibling groups (groups sharing a parent), useful for moving users between stages.`,
+  instructions: [
+    'Membership changes first look up the user ID with the same API key to resolve the documented email body. A failed lookup stops the request before any mutation. Group creation returns IDs and names only when Heartbeat actually supplies them.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -42,7 +45,8 @@ export let manageGroup = SlateTool.create(spec, {
     z.object({
       groupId: z.string().optional().describe('ID of the group'),
       groupName: z.string().optional().describe('Name of the group'),
-      action: z.string().describe('Action that was performed')
+      action: z.string().describe('Action that was performed'),
+      raw: z.unknown().optional().describe('Complete provider mutation response, if any')
     })
   )
   .handleInvocation(async ctx => {
@@ -50,7 +54,7 @@ export let manageGroup = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('Group name is required for create action');
+        throw createApiServiceError('Group name is required for create action');
       }
       let group = await client.createGroup({
         name: ctx.input.name,
@@ -62,24 +66,26 @@ export let manageGroup = SlateTool.create(spec, {
         output: {
           groupId: group.id,
           groupName: group.name,
-          action: 'created'
+          action: 'created',
+          raw: group.raw
         },
-        message: `Created group **${group.name}**.`
+        message: `Heartbeat accepted creation of group **${ctx.input.name}**.`
       };
     }
 
     if (ctx.input.action === 'add_user') {
       if (!ctx.input.groupId || !ctx.input.userId) {
-        throw new Error('groupId and userId are required for add_user action');
+        throw createApiServiceError('groupId and userId are required for add_user action');
       }
-      await client.addUserToGroup(ctx.input.groupId, {
+      let response = await client.addUserToGroup(ctx.input.groupId, {
         userId: ctx.input.userId,
         removeFromSiblingGroups: ctx.input.removeFromSiblingGroups
       });
       return {
         output: {
           groupId: ctx.input.groupId,
-          action: 'user_added'
+          action: 'user_added',
+          raw: response
         },
         message: `Added user **${ctx.input.userId}** to group **${ctx.input.groupId}**.${ctx.input.removeFromSiblingGroups ? ' Removed from sibling groups.' : ''}`
       };
@@ -87,18 +93,19 @@ export let manageGroup = SlateTool.create(spec, {
 
     if (ctx.input.action === 'remove_user') {
       if (!ctx.input.groupId || !ctx.input.userId) {
-        throw new Error('groupId and userId are required for remove_user action');
+        throw createApiServiceError('groupId and userId are required for remove_user action');
       }
-      await client.removeUserFromGroup(ctx.input.groupId, ctx.input.userId);
+      let response = await client.removeUserFromGroup(ctx.input.groupId, ctx.input.userId);
       return {
         output: {
           groupId: ctx.input.groupId,
-          action: 'user_removed'
+          action: 'user_removed',
+          raw: response
         },
         message: `Removed user **${ctx.input.userId}** from group **${ctx.input.groupId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,8 +1,16 @@
 # <img src="https://provider-logos.metorial-cdn.com/algolia-logo.jpeg" height="20"> Algolia
 
-Search, index, and manage records and indices using Algolia's hosted search platform. Perform full-text search with typo tolerance, faceting, filtering, geo-search, and multi-language support. Configure index settings, searchable attributes, custom ranking, synonyms, and query rules. Track user events (clicks, conversions, views, purchases) to power analytics, personalization, and recommendations. Run A/B tests on index configurations. Generate product recommendations including related products, frequently bought together, and trending items. Manage API keys with fine-grained permissions and restrictions. Set up automated data ingestion pipelines from external sources. Crawl websites to extract and index content. Monitor infrastructure status, latency, and indexing performance.
+Search, index, and manage records and indices using Algolia's hosted search platform. Perform full-text search with typo tolerance, faceting, filtering, geo-search, and multi-language support. Configure index settings, searchable attributes, custom ranking, synonyms, and query rules. Track user events (clicks, conversions, views, purchases) to power analytics, personalization, and recommendations. Run A/B tests on index configurations. Generate product recommendations including related products, frequently bought together, and trending items. Manage API keys with fine-grained permissions and restrictions. Monitor infrastructure status, latency, and indexing performance.
 
 ## Tools
+
+### Browse Records
+
+Read a page of index records and follow the returned cursor to continue beyond search pagination limits.
+
+### Get Task Status
+
+Check whether an asynchronous indexing task has been published before relying on a write result.
 
 ### Get Recommendations
 
@@ -59,3 +67,10 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
 </div>
+
+## Usage notes
+
+- Enable `clickAnalytics` in Search Index and pass the returned `queryId` to Send Events for after-search analytics.
+- Rule and synonym searches accept `page` and `hitsPerPage`.
+- Monitoring discovers the application's clusters using `servers`; optional `clusters` selects explicit names. Infrastructure metrics require a Monitoring API key and an eligible plan.
+- Manage A/B Tests preserves the legacy v2 API contract. Algolia recommends v3 for new implementations.

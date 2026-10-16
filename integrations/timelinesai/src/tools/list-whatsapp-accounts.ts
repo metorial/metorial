@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWhatsAppAccounts = SlateTool.create(spec, {
@@ -34,15 +34,17 @@ export let listWhatsAppAccounts = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getWhatsAppAccounts();
 
-    let accounts = (result?.data?.whatsapp_accounts || []).map((a: any) => ({
-      accountId: a.id,
-      phone: a.phone,
-      status: a.status,
-      ownerName: a.owner_name,
-      ownerEmail: a.owner_email,
-      accountName: a.account_name,
-      connectedOn: a.connected_on
-    }));
+    let accounts = requireArray(result?.data?.whatsapp_accounts, 'WhatsApp accounts').map(
+      (a: any) => ({
+        accountId: a.id,
+        phone: a.phone,
+        status: a.status,
+        ownerName: a.owner_name,
+        ownerEmail: a.owner_email,
+        accountName: a.account_name,
+        connectedOn: a.connected_on
+      })
+    );
 
     return {
       output: { accounts },

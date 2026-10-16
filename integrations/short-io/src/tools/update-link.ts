@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { domainIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateLink = SlateTool.create(spec, {
@@ -18,6 +19,24 @@ export let updateLink = SlateTool.create(spec, {
       linkId: z
         .string()
         .describe('The ID of the link to update (e.g., "lnk_abc123_abcdef" or numeric ID).'),
+      domainId: domainIdSchema.optional(),
+      ttl: z.string().optional().describe('Time-to-live in milliseconds or an ISO timestamp.'),
+      archived: z
+        .boolean()
+        .optional()
+        .describe('Hide the link from the dashboard; redirects continue working.'),
+      passwordContact: z
+        .boolean()
+        .optional()
+        .describe('Offer visitors the owner contact email to request the password.'),
+      splitURL: z.string().optional().describe('Alternate destination for split testing.'),
+      splitPercent: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Percentage of traffic sent to splitURL.'),
       originalURL: z.string().optional().describe('New destination URL.'),
       path: z.string().optional().describe('New custom slug/path.'),
       title: z.string().optional().describe('New title for the link.'),
@@ -53,14 +72,14 @@ export let updateLink = SlateTool.create(spec, {
       cloaking: z.boolean().nullable().describe('Whether cloaking is enabled.'),
       archived: z.boolean().describe('Whether the link is archived.'),
       updatedAt: z.string().describe('Last updated timestamp.'),
-      domainId: z.number().describe('The domain ID the link belongs to.')
+      domainId: domainIdSchema
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let { linkId, ...updateParams } = ctx.input;
-    let link = await client.updateLink(linkId, updateParams);
+    let { linkId, domainId, ...updateParams } = ctx.input;
+    let link = await client.updateLink(linkId, updateParams, domainId ?? ctx.config.domainId);
 
     return {
       output: {

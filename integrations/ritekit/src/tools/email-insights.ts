@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RiteKitClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,17 +46,36 @@ Combines multiple email validation checks into a single call. Use this for lead 
 
     let insights = await client.fullEmailInsights(ctx.input.email);
 
+    let info = isApiErrorRecord(insights.info) ? insights.info : undefined;
+    let firstName =
+      typeof insights.name === 'string'
+        ? insights.name
+        : typeof info?.givenName === 'string'
+          ? info.givenName
+          : undefined;
+    let lastName =
+      typeof insights.surname === 'string'
+        ? insights.surname
+        : typeof info?.surname === 'string'
+          ? info.surname
+          : undefined;
+
     return {
       output: {
         email: ctx.input.email,
-        isFreemail: insights.freemail as boolean | undefined,
-        isDisposable: insights.disposable as boolean | undefined,
-        typoSuggestions: insights.suggestions as string[] | undefined,
-        firstName: insights.name as string | undefined,
-        lastName: insights.surname as string | undefined,
+        isFreemail: typeof insights.freemail === 'boolean' ? insights.freemail : undefined,
+        isDisposable:
+          typeof insights.disposable === 'boolean' ? insights.disposable : undefined,
+        typoSuggestions:
+          Array.isArray(insights.suggestions) &&
+          insights.suggestions.every(value => typeof value === 'string')
+            ? insights.suggestions
+            : undefined,
+        firstName: firstName,
+        lastName: lastName,
         fullInsights: insights
       },
-      message: `Analyzed email **${ctx.input.email}**: ${insights.freemail ? 'freemail' : 'business email'}${insights.disposable ? ', disposable' : ''}${insights.name ? `, name: ${insights.name} ${insights.surname || ''}` : ''}`
+      message: `Retrieved provider-reported email insights for **${ctx.input.email}**.`
     };
   })
   .build();

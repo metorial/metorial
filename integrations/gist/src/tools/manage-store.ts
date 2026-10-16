@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, requireValue, responseList } from '../lib/response';
 import { spec } from '../spec';
 
 export let manageStore = SlateTool.create(spec, {
@@ -18,12 +19,24 @@ export let manageStore = SlateTool.create(spec, {
       abandonedCartInterval: z
         .number()
         .optional()
-        .describe('Abandoned cart interval in minutes'),
-      autoTagging: z.boolean().optional().describe('Enable auto-tagging')
+        .describe('Abandoned cart interval in minutes; converted to hours for Gist'),
+      autoTagging: z
+        .boolean()
+        .optional()
+        .describe('Legacy field; use contactTags to select tags for store contacts.'),
+      contactTags: z
+        .string()
+        .optional()
+        .describe('Comma-separated tags applied to store contacts'),
+      status: z
+        .enum(['connected', 'disconnected'])
+        .optional()
+        .describe('Whether store automations are active')
     })
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       stores: z
         .array(
           z.object({
@@ -47,8 +60,12 @@ export let manageStore = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GistClient({ token: ctx.auth.token });
 
+    if (ctx.input.autoTagging !== undefined)
+      throw createApiServiceError(
+        'Gist requires explicit contactTags rather than an autoTagging boolean. Provide contactTags.'
+      );
     let mapStore = (s: any) => ({
-      storeId: String(s.id),
+      storeId: requiredId(s.id),
       name: s.name,
       domain: s.domain,
       currency: s.currency
@@ -57,49 +74,54 @@ export let manageStore = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'list': {
         let data = await client.listStores();
-        let stores = (data.stores || []).map(mapStore);
+        let stores = responseList(data.stores).map(mapStore);
         return {
-          output: { stores },
+          output: { rawResponse: client.responses, stores },
           message: `Found **${stores.length}** stores.`
         };
       }
 
       case 'get': {
-        if (!ctx.input.storeId) throw new Error('storeId is required');
+        if (!ctx.input.storeId) throw createApiServiceError('storeId is required');
         let data = await client.getStore(ctx.input.storeId);
         return {
-          output: { store: mapStore(data.store || data) },
+          output: { rawResponse: client.responses, store: mapStore(data.store || data) },
           message: `Retrieved store **${ctx.input.storeId}**.`
         };
       }
 
       case 'create': {
+        requireValue(ctx.input.name, 'Store name');
+        requireValue(ctx.input.domain, 'Store domain');
+        requireValue(ctx.input.currency, 'Store currency');
         let body: Record<string, any> = {};
         if (ctx.input.name) body.name = ctx.input.name;
         if (ctx.input.domain) body.domain = ctx.input.domain;
-        if (ctx.input.currency) body.currency = ctx.input.currency;
+        if (ctx.input.currency) body.currency_code = ctx.input.currency;
         if (ctx.input.abandonedCartInterval !== undefined)
-          body.abandoned_cart_interval = ctx.input.abandonedCartInterval;
-        if (ctx.input.autoTagging !== undefined) body.auto_tagging = ctx.input.autoTagging;
+          body.abandon_cart_interval = ctx.input.abandonedCartInterval / 60;
+        if (ctx.input.contactTags !== undefined) body.contact_tags = ctx.input.contactTags;
+        if (ctx.input.status !== undefined) body.status = ctx.input.status;
         let data = await client.createStore(body);
         return {
-          output: { store: mapStore(data.store || data) },
+          output: { rawResponse: client.responses, store: mapStore(data.store || data) },
           message: `Created store **${(data.store || data).name || (data.store || data).id}**.`
         };
       }
 
       case 'update': {
-        if (!ctx.input.storeId) throw new Error('storeId is required');
+        if (!ctx.input.storeId) throw createApiServiceError('storeId is required');
         let body: Record<string, any> = {};
         if (ctx.input.name) body.name = ctx.input.name;
         if (ctx.input.domain) body.domain = ctx.input.domain;
-        if (ctx.input.currency) body.currency = ctx.input.currency;
+        if (ctx.input.currency) body.currency_code = ctx.input.currency;
         if (ctx.input.abandonedCartInterval !== undefined)
-          body.abandoned_cart_interval = ctx.input.abandonedCartInterval;
-        if (ctx.input.autoTagging !== undefined) body.auto_tagging = ctx.input.autoTagging;
+          body.abandon_cart_interval = ctx.input.abandonedCartInterval / 60;
+        if (ctx.input.contactTags !== undefined) body.contact_tags = ctx.input.contactTags;
+        if (ctx.input.status !== undefined) body.status = ctx.input.status;
         let data = await client.updateStore(ctx.input.storeId, body);
         return {
-          output: { store: mapStore(data.store || data) },
+          output: { rawResponse: client.responses, store: mapStore(data.store || data) },
           message: `Updated store **${ctx.input.storeId}**.`
         };
       }

@@ -13,6 +13,14 @@ export let getLiveScoreboard = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      classification: z
+        .enum(['fbs', 'fcs', 'ii', 'ii/iii', 'iii'])
+        .optional()
+        .describe('Division classification for the scoreboard'),
+      conference: z
+        .string()
+        .optional()
+        .describe('Conference name or abbreviation for the scoreboard'),
       gameId: z.number().optional().describe('Specific game ID for detailed live game data')
     })
   )
@@ -26,10 +34,13 @@ export let getLiveScoreboard = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let results: any = {};
 
-    if (ctx.input.gameId) {
+    if (ctx.input.gameId !== undefined) {
       results.liveGame = await client.getLiveGame(ctx.input.gameId);
     } else {
-      results.scoreboard = await client.getScoreboard();
+      results.scoreboard = await client.getScoreboard({
+        classification: ctx.input.classification,
+        conference: ctx.input.conference
+      });
     }
 
     if (results.liveGame) {

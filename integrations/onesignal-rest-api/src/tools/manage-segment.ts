@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { appIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let segmentSchema = z.object({
@@ -18,7 +19,7 @@ let segmentSchema = z.object({
 export let createSegment = SlateTool.create(spec, {
   name: 'Create Segment',
   key: 'create_segment',
-  description: `Create a dynamic audience segment with filter rules. Segments automatically update as users match the criteria. Combine filters with AND/OR operators.`,
+  description: `Create a dynamic audience segment with filter rules. Segments automatically update as users match the criteria. Combine filters with AND/OR operators. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   instructions: [
     'Filters use fields like "tag", "last_session", "first_session", "session_count", "language", "app_version", "country".',
     'Filter relations include "=", "!=", ">", "<", "exists", "not_exists", "time_elapsed_gt", "time_elapsed_lt".',
@@ -31,6 +32,7 @@ export let createSegment = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      appId: appIdSchema,
       name: z.string().describe('Segment name'),
       filters: z
         .array(z.record(z.string(), z.any()))
@@ -48,9 +50,11 @@ export let createSegment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
+    if (ctx.input.filters.length < 1 || ctx.input.filters.length > 200)
+      throw createApiServiceError('Provide from 1 to 200 filters and operators.');
     let result = await client.createSegment(ctx.input.name, ctx.input.filters);
 
     return {
@@ -68,13 +72,14 @@ export let createSegment = SlateTool.create(spec, {
 export let listSegments = SlateTool.create(spec, {
   name: 'List Segments',
   key: 'list_segments',
-  description: `Retrieve all segments for the app with pagination support.`,
+  description: `Retrieve all segments for the app with pagination support. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       offset: z.number().optional().describe('Pagination offset (default 0)'),
       limit: z
         .number()
@@ -91,7 +96,7 @@ export let listSegments = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let result = await client.listSegments({
@@ -121,13 +126,14 @@ export let listSegments = SlateTool.create(spec, {
 export let deleteSegment = SlateTool.create(spec, {
   name: 'Delete Segment',
   key: 'delete_segment',
-  description: `Delete a segment by its ID. System (read-only) segments cannot be deleted.`,
+  description: `Delete a segment by its ID. System (read-only) segments cannot be deleted. Provide appId from list_apps with an Organization API Key, or Settings > Keys & IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      appId: appIdSchema,
       segmentId: z.string().describe('ID of the segment to delete')
     })
   )
@@ -139,7 +145,7 @@ export let deleteSegment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      appId: ctx.config.appId
+      appId: ctx.input.appId ?? ctx.config.appId
     });
 
     let result = await client.deleteSegment(ctx.input.segmentId);

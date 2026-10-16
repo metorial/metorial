@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, responseList, validatePagination } from '../lib/response';
 import { spec } from '../spec';
 
 export let listArticles = SlateTool.create(spec, {
@@ -25,6 +26,7 @@ export let listArticles = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       articles: z.array(
         z.object({
           articleId: z.string(),
@@ -38,17 +40,22 @@ export let listArticles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination({ page: ctx.input.page, perPage: ctx.input.perPage });
     let client = new GistClient({ token: ctx.auth.token });
 
     let articles: any[];
     let pages: any;
 
     if (ctx.input.searchQuery) {
-      let data = await client.searchArticles({
-        query: ctx.input.searchQuery,
-        locale: ctx.input.searchLocale
-      });
-      articles = data.articles || [];
+      let data = await client.searchArticles(
+        {
+          search_text: ctx.input.searchQuery,
+          locale: ctx.input.searchLocale
+        },
+        { page: ctx.input.page, per_page: ctx.input.perPage }
+      );
+      articles = responseList(data.articles);
+      pages = data.pages;
     } else {
       let data = await client.listArticles({
         page: ctx.input.page,
@@ -57,20 +64,20 @@ export let listArticles = SlateTool.create(spec, {
         collection_id: ctx.input.collectionId,
         author_id: ctx.input.authorId
       });
-      articles = data.articles || [];
+      articles = responseList(data.articles);
       pages = data.pages;
     }
 
     let mapped = articles.map((a: any) => ({
-      articleId: String(a.id),
+      articleId: requiredId(a.id),
       defaultLocale: a.default_locale,
-      parentId: a.parent_id ? String(a.parent_id) : undefined,
+      parentId: a.parent_id !== undefined ? String(a.parent_id) : undefined,
       translations: a.translations,
       statistics: a.statistics
     }));
 
     return {
-      output: { articles: mapped, pages },
+      output: { rawResponse: client.responses, articles: mapped, pages },
       message: `Found **${mapped.length}** articles.`
     };
   })

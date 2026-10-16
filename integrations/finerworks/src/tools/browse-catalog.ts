@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, requiredArray, requiredNumber, requiredString } from '../lib/client';
 import { spec } from '../spec';
 
 export let browseCatalog = SlateTool.create(spec, {
@@ -21,6 +21,7 @@ export let browseCatalog = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response'),
       productTypes: z
         .array(
           z.object({
@@ -90,66 +91,60 @@ export let browseCatalog = SlateTool.create(spec, {
 
     if (ctx.input.catalogType === 'product_types') {
       let data = await client.listProductTypes(ids);
-      if (!data.status?.success)
-        throw new Error(data.status?.message || 'Failed to list product types');
 
-      let productTypes = (data.product_types ?? []).map((pt: any) => ({
-        typeId: pt.id,
-        name: pt.name ?? '',
-        description: pt.description || undefined,
-        mediaIds: pt.media_ids ?? []
+      let productTypes = requiredArray(data.product_types, 'product_types').map((pt: any) => ({
+        typeId: requiredNumber(pt.id, 'id'),
+        name: requiredString(pt.name, 'name'),
+        description: pt.description ?? undefined,
+        mediaIds: pt.media_ids ?? undefined
       }));
 
       return {
-        output: { productTypes },
+        output: { productTypes, raw: data },
         message: `Found **${productTypes.length}** product type(s): ${productTypes.map((pt: any) => pt.name).join(', ')}`
       };
     }
 
     if (ctx.input.catalogType === 'media_types') {
       let data = await client.listMediaTypes(ids);
-      if (!data.status?.success)
-        throw new Error(data.status?.message || 'Failed to list media types');
 
-      let mediaTypes = (data.media_types ?? []).map((mt: any) => ({
-        typeId: mt.id,
-        productTypeId: mt.product_type_id,
-        name: mt.name ?? '',
-        description: mt.description || undefined,
-        styleIds: mt.style_ids ?? []
+      let mediaTypes = requiredArray(data.media_types, 'media_types').map((mt: any) => ({
+        typeId: requiredNumber(mt.id, 'id'),
+        productTypeId: requiredNumber(mt.product_type_id, 'product_type_id'),
+        name: requiredString(mt.name, 'name'),
+        description: mt.description ?? undefined,
+        styleIds: mt.style_ids ?? undefined
       }));
 
       return {
-        output: { mediaTypes },
+        output: { mediaTypes, raw: data },
         message: `Found **${mediaTypes.length}** media type(s): ${mediaTypes.map((mt: any) => mt.name).join(', ')}`
       };
     }
 
     // style_types
     let data = await client.listStyleTypes(ids);
-    if (!data.status?.success)
-      throw new Error(data.status?.message || 'Failed to list style types');
 
-    let styleTypes = (data.style_types ?? []).map((st: any) => ({
-      typeId: st.id,
-      name: st.name ?? '',
-      description: st.description || undefined,
-      canFrame: st.can_frame,
-      canMat: st.can_mat,
-      frameClassIds: st.frame_class_ids ?? [],
-      customSizing: st.custom_sizing,
+    let styleTypes = requiredArray(data.style_types, 'style_types').map((st: any) => ({
+      typeId: requiredNumber(st.id, 'id'),
+      name: requiredString(st.name, 'name'),
+      description: st.description ?? undefined,
+      canFrame: st.can_frame ?? undefined,
+      canMat: st.can_mat ?? undefined,
+      frameClassIds: st.frame_class_ids ?? undefined,
+      customSizing: st.custom_sizing ?? undefined,
       minWidth: st.min?.width,
       minHeight: st.min?.height,
       maxWidth: st.max?.width,
       maxHeight: st.max?.height,
-      availableSizes: (st.available_sizes ?? []).map((s: any) => ({
+      availableSizes: st.available_sizes?.map((s: any) => ({
         width: s.width,
         height: s.height
       }))
     }));
 
     return {
-      output: { styleTypes },
+      output: { styleTypes, raw: data },
       message: `Found **${styleTypes.length}** style type(s): ${styleTypes.map((st: any) => st.name).join(', ')}`
     };
   })

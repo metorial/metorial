@@ -13,7 +13,7 @@ export let createCustomer = SlateTool.create(spec, {
       email: z.string().describe('Customer email address (required)'),
       firstName: z.string().optional().describe('Customer first name'),
       lastName: z.string().optional().describe('Customer last name'),
-      groupId: z.string().optional().describe('Customer group ID to assign'),
+      groupId: z.string().optional().describe('Group ID from list_customer_groups to assign'),
       newsletter: z.boolean().optional().describe('Subscribe to newsletter'),
       marketing: z.boolean().optional().describe('Opt-in to marketing communications'),
       active: z.boolean().optional().describe('Whether the account is active'),
@@ -22,6 +22,7 @@ export let createCustomer = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional(),
       customerId: z.string(),
       email: z.string().optional(),
       firstName: z.string().optional(),
@@ -54,11 +55,12 @@ export let createCustomer = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: res,
         customerId: c.id,
-        email: c.attributes.email,
-        firstName: c.attributes.first_name,
-        lastName: c.attributes.last_name,
-        dateAdded: c.attributes.date_added
+        email: c.attributes.email ?? undefined,
+        firstName: c.attributes.first_name ?? undefined,
+        lastName: c.attributes.last_name ?? undefined,
+        dateAdded: c.attributes.date_added ?? undefined
       },
       message: `Created customer **${c.attributes.email}** (ID: ${c.id}).`
     };

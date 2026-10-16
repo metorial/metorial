@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { rawResponseSchema } from '../lib/response';
 import { spec } from '../spec';
 
 export let updateCoupon = SlateTool.create(spec, {
@@ -27,10 +28,22 @@ export let updateCoupon = SlateTool.create(spec, {
       products: z.array(z.string()).optional().describe('Product IDs this coupon applies to'),
       isLive: z.boolean().optional().describe('Whether the coupon is active'),
       limit: z.number().optional().describe('Maximum number of redemptions'),
+      limitOnePerEmail: z
+        .boolean()
+        .optional()
+        .describe('Allow each customer email to redeem the coupon only once'),
+      validForDays: z
+        .number()
+        .optional()
+        .describe(
+          'Per-email eligibility window in days. Use grant_coupon_eligibility when the customer becomes eligible'
+        ),
       durationInMonths: z
         .number()
         .optional()
-        .describe('For subscriptions: how many months the discount applies'),
+        .describe(
+          'Number of discounted charges. For weekly or yearly subscriptions, repeating discounts may not map one-to-one to charges'
+        ),
       start: z.string().optional().describe('Start date in ISO 8601 format'),
       end: z.string().optional().describe('Expiration date in ISO 8601 format'),
       affiliateId: z.string().optional().describe('Affiliate ID to associate'),
@@ -42,6 +55,7 @@ export let updateCoupon = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponseSchema,
       couponId: z.string().describe('ID of the updated coupon'),
       code: z.string().describe('Coupon code'),
       type: z.string().describe('Discount type'),
@@ -65,6 +79,9 @@ export let updateCoupon = SlateTool.create(spec, {
     if (ctx.input.products !== undefined) data.products = ctx.input.products;
     if (ctx.input.isLive !== undefined) data.is_live = ctx.input.isLive;
     if (ctx.input.limit !== undefined) data.limit = ctx.input.limit;
+    if (ctx.input.limitOnePerEmail !== undefined)
+      data.limit_one_per_email = ctx.input.limitOnePerEmail;
+    if (ctx.input.validForDays !== undefined) data.valid_for_days = ctx.input.validForDays;
     if (ctx.input.durationInMonths !== undefined)
       data.duration_in_months = ctx.input.durationInMonths;
     if (ctx.input.start !== undefined) data.start = ctx.input.start;
@@ -77,6 +94,7 @@ export let updateCoupon = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         couponId: result.id as string,
         code: result.code as string,
         type: result.type as string,

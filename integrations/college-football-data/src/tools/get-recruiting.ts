@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,6 +52,15 @@ export let getRecruiting = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.includePlayerRankings &&
+      !ctx.input.includeTeamRankings &&
+      !ctx.input.includePositionGroups
+    ) {
+      throw createApiServiceError('Select at least one result to retrieve.', {
+        reason: 'no_result_selected'
+      });
+    }
     let client = new Client({ token: ctx.auth.token });
     let results: any = {};
 
@@ -75,6 +84,7 @@ export let getRecruiting = SlateTool.create(spec, {
     if (ctx.input.includePositionGroups) {
       results.positionGroups = await client.getRecruitingGroups({
         team: ctx.input.team,
+        recruitType: ctx.input.classification,
         startYear: ctx.input.year,
         endYear: ctx.input.year
       });

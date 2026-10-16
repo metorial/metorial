@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, rawSchema } from '../lib/client';
 import { spec } from '../spec';
 
 export let getUnsubscribed = SlateTool.create(spec, {
@@ -9,7 +9,7 @@ export let getUnsubscribed = SlateTool.create(spec, {
   description: `Retrieve contacts that have been unsubscribed or removed from the account. Supports filtering by date range.
 Returns the email, unsubscription date, and reason for each contact.`,
   constraints: [
-    'Date filters must include timezone offset (e.g. 2024-01-01T00:00:00+00:00). URL-encode the "+" as "%2B" if needed.'
+    'Date filters must include a timezone offset (e.g. 2024-01-01T00:00:00+00:00). Supply the original value; it is encoded automatically.'
   ],
   tags: {
     destructive: false,
@@ -31,13 +31,17 @@ Returns the email, unsubscription date, and reason for each contact.`,
   )
   .output(
     z.object({
+      raw: rawSchema
+        .optional()
+        .describe('Original provider response, with credentials removed'),
       contacts: z
         .array(
           z.object({
             email: z.string().describe('Contact email address'),
-            unsubscriptionDate: z.string().describe('Date of unsubscription'),
+            unsubscriptionDate: z.string().optional().describe('Date of unsubscription'),
             unsubscriptionType: z
               .string()
+              .optional()
               .describe('Type/reason of unsubscription (e.g. hardBounce, manual, abuseLink)')
           })
         )
@@ -62,7 +66,7 @@ Returns the email, unsubscription date, and reason for each contact.`,
       pageSize: ctx.input.pageSize
     });
 
-    let contacts = (result.items ?? []).map(c => ({
+    let contacts = result.items.map(c => ({
       email: c.email,
       unsubscriptionDate: c.unsubscriptionDate,
       unsubscriptionType: c.unsubscriptionType
@@ -70,6 +74,7 @@ Returns the email, unsubscription date, and reason for each contact.`,
 
     return {
       output: {
+        raw: result.raw,
         contacts,
         totalCount: result.itemsCount,
         currentPage: result.currentPage,

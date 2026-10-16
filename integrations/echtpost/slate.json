@@ -1,6 +1,6 @@
 {
   "name": "@metorial/echtpost",
-  "description": "Send real physical postcards programmatically through the German EchtPost platform. Create and schedule postcard deliveries using pre-designed templates, manage recipient contacts and groups, and list available postcard templates. Supports scheduling delivery dates, configuring email notifications for send events, specifying recipients inline or by contact/group ID, and sending bulk postcards to recipient groups. Requires a prepaid account balance for sending.",
+  "description": "Send physical postcards using saved EchtPost templates. Create, update, and organize recipient contacts and groups, find templates, schedule mailings, inspect postcard status, queue cancellation, and check the connected account, prepaid balance, and prices.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "send physical postcards",
@@ -10,7 +10,9 @@
     "list postcard templates",
     "send postcards to groups",
     "configure send notifications",
-    "preview postcard templates"
+    "preview postcard templates",
+    "check prepaid balance and prices",
+    "inspect and cancel postcards"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/echtpost.svg"
 }

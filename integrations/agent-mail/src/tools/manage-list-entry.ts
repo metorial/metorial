@@ -8,7 +8,7 @@ export let manageListEntry = SlateTool.create(spec, {
   key: 'manage_list_entry',
   description: `Add or remove entries from email allow/block lists. Lists control which emails or domains can send to or receive from your inboxes. Specify \`direction\` (send or receive) and \`listType\` (allow or block) to target the correct list.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })

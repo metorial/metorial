@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,7 +47,7 @@ export let listTransactions = SlateTool.create(spec, {
       fromDate: z.string().optional().describe('Start date filter (YYYY-MM-DD)'),
       toDate: z.string().optional().describe('End date filter (YYYY-MM-DD)'),
       page: z.number().optional().describe('Page number'),
-      recordsPerPage: z.number().optional().describe('Records per page (max: 100)')
+      recordsPerPage: z.number().optional().describe('Records per page (max: 1000)')
     })
   )
   .output(
@@ -66,6 +66,10 @@ export let listTransactions = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new MxClient({ token: ctx.auth.token, environment: ctx.config.environment });
 
+    if (ctx.input.accountGuid && ctx.input.memberGuid)
+      throw createApiServiceError(
+        'Provide either accountGuid or memberGuid to filter transactions.'
+      );
     let result: any;
     let paginationParams = {
       page: ctx.input.page,
@@ -91,15 +95,15 @@ export let listTransactions = SlateTool.create(spec, {
     }
 
     let transactions = (result.transactions || []).map((t: any) => ({
-      guid: t.guid,
-      userGuid: t.user_guid,
+      guid: t.guid ?? undefined,
+      userGuid: t.user_guid ?? undefined,
       accountGuid: t.account_guid,
       memberGuid: t.member_guid,
       amount: t.amount,
       category: t.category,
       categoryGuid: t.category_guid,
-      description: t.description,
-      cleanedDescription: t.cleansed_description,
+      description: t.original_description,
+      cleanedDescription: t.description ?? t.cleansed_description,
       date: t.date,
       postedAt: t.posted_at,
       transactedAt: t.transacted_at,
@@ -152,15 +156,15 @@ export let readTransaction = SlateTool.create(spec, {
 
     return {
       output: {
-        guid: t.guid,
-        userGuid: t.user_guid,
+        guid: t.guid ?? undefined,
+        userGuid: t.user_guid ?? undefined,
         accountGuid: t.account_guid,
         memberGuid: t.member_guid,
         amount: t.amount,
         category: t.category,
         categoryGuid: t.category_guid,
-        description: t.description,
-        cleanedDescription: t.cleansed_description,
+        description: t.original_description,
+        cleanedDescription: t.description ?? t.cleansed_description,
         date: t.date,
         postedAt: t.posted_at,
         transactedAt: t.transacted_at,

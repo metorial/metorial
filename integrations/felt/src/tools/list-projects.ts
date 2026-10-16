@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,7 +38,10 @@ export let listProjects = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let projects = await client.listProjects(ctx.input.workspaceId);
 
-    let mapped = (Array.isArray(projects) ? projects : []).map((p: any) => ({
+    if (!Array.isArray(projects)) {
+      throw createApiServiceError('Felt returned an invalid projects list. Try again.');
+    }
+    let mapped = projects.map((p: any) => ({
       projectId: p.id,
       name: p.name ?? null,
       visibility: p.visibility ?? null,

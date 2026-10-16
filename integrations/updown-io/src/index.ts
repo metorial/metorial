@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createCheck,
+  createPulseCheck,
   createRecipient,
   createStatusPage,
   deleteCheck,
@@ -11,6 +12,7 @@ import {
   getDowntimes,
   getMetrics,
   listChecks,
+  listNodeIps,
   listNodes,
   listRecipients,
   listStatusPages,
@@ -23,6 +25,7 @@ export let provider = Slate.create({
     listChecks,
     getCheck,
     createCheck,
+    createPulseCheck,
     updateCheck,
     deleteCheck,
     getDowntimes,
@@ -34,7 +37,8 @@ export let provider = Slate.create({
     createStatusPage,
     updateStatusPage,
     deleteStatusPage,
-    listNodes
+    listNodes,
+    listNodeIps
   ],
   triggers: []
 });

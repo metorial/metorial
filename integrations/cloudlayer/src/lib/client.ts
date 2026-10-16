@@ -1,247 +1,108 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import { recordResponse } from './responses';
 
-let BASE_URL = 'https://api.cloudlayer.io/v2';
+type GenerationParams = Record<string, unknown>;
+type ListParams = { limit?: number; offset?: number; startAfterId?: string };
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        'X-API-Key': config.token,
-        'Content-Type': 'application/json'
-      }
+    if (!config.token.trim()) throw createApiServiceError('Provide a Cloudlayer API key.');
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.cloudlayer.io/v2',
+      authHeader: { name: 'X-API-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Cloudlayer',
+          reason: 'cloudlayer_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error),
+          detailKeys: ['message', 'error', 'errors']
+        })
     });
   }
 
-  // ---- PDF Generation ----
-
-  async generatePdfFromHtml(params: {
-    html: string;
-    filename?: string;
-    landscape?: boolean;
-    format?: string;
-    width?: string;
-    height?: string;
-    margin?: { top?: string; bottom?: string; left?: string; right?: string };
-    pageRanges?: string;
-    printBackground?: boolean;
-    preferCSSPageSize?: boolean;
-    scale?: number;
-    headerTemplate?: Record<string, unknown>;
-    footerTemplate?: Record<string, unknown>;
-    delay?: number;
-    timeout?: number;
-    waitUntil?: string;
-    waitForSelector?: Record<string, unknown>;
-    autoScroll?: boolean;
-    timeZone?: string;
-    viewPort?: Record<string, unknown>;
-    generatePreview?: Record<string, unknown>;
-    projectId?: string;
-    inline?: boolean;
-    webhook?: string;
-  }) {
-    let response = await this.axios.post('/html/pdf', params);
-    return response.data;
+  private async generate(path: string, params: GenerationParams) {
+    let body = { ...params };
+    if (params.waitForSelector !== undefined) {
+      let { timeout, ...wait } = recordResponse(params.waitForSelector);
+      let options = wait.options === undefined ? {} : recordResponse(wait.options);
+      body.waitForSelector = {
+        ...wait,
+        options: pickDefined({ ...options, timeout: options.timeout ?? timeout })
+      };
+    }
+    if (params.generatePreview !== undefined) {
+      let { imageType, ...preview } = recordResponse(params.generatePreview);
+      body.generatePreview = pickDefined({ ...preview, type: preview.type ?? imageType });
+    }
+    let response = await this.axios.post(path, body);
+    let result = recordResponse(response.data);
+    if (
+      result.status === 'error' &&
+      !result.id &&
+      !result.jobId &&
+      typeof result.message === 'string'
+    ) {
+      throw createApiServiceError(
+        `Cloudlayer could not generate the document: ${result.message}`
+      );
+    }
+    return result;
   }
 
-  async generatePdfFromUrl(params: {
-    url?: string;
-    batch?: string[];
-    filename?: string;
-    landscape?: boolean;
-    format?: string;
-    width?: string;
-    height?: string;
-    margin?: { top?: string; bottom?: string; left?: string; right?: string };
-    pageRanges?: string;
-    printBackground?: boolean;
-    preferCSSPageSize?: boolean;
-    scale?: number;
-    headerTemplate?: Record<string, unknown>;
-    footerTemplate?: Record<string, unknown>;
-    delay?: number;
-    timeout?: number;
-    waitUntil?: string;
-    waitForSelector?: Record<string, unknown>;
-    autoScroll?: boolean;
-    timeZone?: string;
-    viewPort?: Record<string, unknown>;
-    generatePreview?: Record<string, unknown>;
-    projectId?: string;
-    inline?: boolean;
-    authentication?: { username: string; password: string };
-    cookies?: Array<{
-      name: string;
-      value: string;
-      domain?: string;
-      path?: string;
-      expires?: number;
-      httpOnly?: boolean;
-      secure?: boolean;
-      sameSite?: string;
-    }>;
-    webhook?: string;
-  }) {
-    let response = await this.axios.post('/url/pdf', params);
-    return response.data;
+  async generatePdfFromHtml(params: GenerationParams) {
+    return this.generate('/html/pdf', params);
   }
-
-  async generatePdfFromTemplate(params: {
-    templateId?: string;
-    template?: string;
-    data?: Record<string, unknown>;
-    filename?: string;
-    landscape?: boolean;
-    format?: string;
-    width?: string;
-    height?: string;
-    margin?: { top?: string; bottom?: string; left?: string; right?: string };
-    pageRanges?: string;
-    printBackground?: boolean;
-    preferCSSPageSize?: boolean;
-    scale?: number;
-    headerTemplate?: Record<string, unknown>;
-    footerTemplate?: Record<string, unknown>;
-    delay?: number;
-    timeout?: number;
-    waitUntil?: string;
-    waitForSelector?: Record<string, unknown>;
-    autoScroll?: boolean;
-    timeZone?: string;
-    viewPort?: Record<string, unknown>;
-    generatePreview?: Record<string, unknown>;
-    projectId?: string;
-    inline?: boolean;
-    webhook?: string;
-  }) {
-    let response = await this.axios.post('/template/pdf', params);
-    return response.data;
+  async generatePdfFromUrl(params: GenerationParams) {
+    let { batch, ...rest } = params;
+    // Retain the public array input while sending the documented batch object.
+    return this.generate('/url/pdf', {
+      ...rest,
+      ...(batch === undefined ? {} : { batch: { urls: batch } })
+    });
   }
-
-  // ---- Image Generation ----
-
-  async generateImageFromHtml(params: {
-    html: string;
-    imageType?: string;
-    transparent?: boolean;
-    trim?: boolean;
-    filename?: string;
-    width?: string;
-    height?: string;
-    landscape?: boolean;
-    preferCSSPageSize?: boolean;
-    scale?: number;
-    delay?: number;
-    timeout?: number;
-    waitUntil?: string;
-    waitForSelector?: Record<string, unknown>;
-    autoScroll?: boolean;
-    timeZone?: string;
-    viewPort?: Record<string, unknown>;
-    projectId?: string;
-    inline?: boolean;
-    webhook?: string;
-  }) {
-    let response = await this.axios.post('/html/image', params);
-    return response.data;
+  async generatePdfFromTemplate(params: GenerationParams) {
+    return this.generate('/template/pdf', params);
   }
-
-  async generateImageFromUrl(params: {
-    url: string;
-    imageType?: string;
-    transparent?: boolean;
-    trim?: boolean;
-    filename?: string;
-    width?: string;
-    height?: string;
-    landscape?: boolean;
-    preferCSSPageSize?: boolean;
-    scale?: number;
-    delay?: number;
-    timeout?: number;
-    waitUntil?: string;
-    waitForSelector?: Record<string, unknown>;
-    autoScroll?: boolean;
-    timeZone?: string;
-    viewPort?: Record<string, unknown>;
-    projectId?: string;
-    inline?: boolean;
-    authentication?: { username: string; password: string };
-    cookies?: Array<{
-      name: string;
-      value: string;
-      domain?: string;
-      path?: string;
-      expires?: number;
-      httpOnly?: boolean;
-      secure?: boolean;
-      sameSite?: string;
-    }>;
-    webhook?: string;
-  }) {
-    let response = await this.axios.post('/url/image', params);
-    return response.data;
+  async generateImageFromHtml(params: GenerationParams) {
+    return this.generate('/html/image', params);
   }
-
-  async generateImageFromTemplate(params: {
-    templateId?: string;
-    template?: string;
-    data?: Record<string, unknown>;
-    imageType?: string;
-    transparent?: boolean;
-    trim?: boolean;
-    filename?: string;
-    width?: string;
-    height?: string;
-    landscape?: boolean;
-    preferCSSPageSize?: boolean;
-    scale?: number;
-    delay?: number;
-    timeout?: number;
-    waitUntil?: string;
-    waitForSelector?: Record<string, unknown>;
-    autoScroll?: boolean;
-    timeZone?: string;
-    viewPort?: Record<string, unknown>;
-    projectId?: string;
-    inline?: boolean;
-    webhook?: string;
-  }) {
-    let response = await this.axios.post('/template/image', params);
-    return response.data;
+  async generateImageFromUrl(params: GenerationParams) {
+    return this.generate('/url/image', params);
   }
-
-  // ---- Jobs ----
+  async generateImageFromTemplate(params: GenerationParams) {
+    return this.generate('/template/image', params);
+  }
 
   async getJob(jobId: string) {
-    let response = await this.axios.get(`/jobs/${jobId}`);
-    return response.data;
+    let response = await this.axios.get(`/jobs/${encodeURIComponent(jobId)}`);
+    return recordResponse(response.data);
   }
-
-  async listJobs(params?: { limit?: number; offset?: number }) {
+  async listJobs(params?: ListParams): Promise<unknown> {
     let response = await this.axios.get('/jobs', { params });
     return response.data;
   }
-
-  // ---- Assets ----
-
   async getAsset(assetId: string) {
-    let response = await this.axios.get(`/assets/${assetId}`);
-    return response.data;
+    let response = await this.axios.get(`/assets/${encodeURIComponent(assetId)}`);
+    return recordResponse(response.data);
   }
-
-  async listAssets(params?: { limit?: number; offset?: number }) {
+  async listAssets(params?: ListParams): Promise<unknown> {
     let response = await this.axios.get('/assets', { params });
     return response.data;
   }
-
-  // ---- Account Status ----
-
   async getStatus() {
+    // Existing connections retain the legacy status endpoint.
     let response = await this.axios.get('/getStatus');
-    return response.data;
+    return recordResponse(response.data);
+  }
+  async getAccount() {
+    let response = await this.axios.get('/account');
+    return recordResponse(response.data);
   }
 }

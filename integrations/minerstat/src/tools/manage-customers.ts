@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageCustomersTool = SlateTool.create(spec, {
   description: `List, create, update, or delete customer (sub-account) records. Customers represent sub-accounts that can have their own workers, tags, and configurations. When listing, you can request specific fields like created, accessKey, name, email, packageName, packageWorkers, and packageExpiry.`,
   constraints: ['Requires a Bearer token (private API)'],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -39,7 +39,7 @@ export let manageCustomersTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.token) {
-      throw new Error(
+      throw createApiServiceError(
         'Bearer token is required for customer management. Use the "API Credentials" authentication method.'
       );
     }
@@ -62,16 +62,24 @@ export let manageCustomersTool = SlateTool.create(spec, {
         break;
       }
       case 'update': {
+        if (
+          ctx.input.customerId === undefined &&
+          typeof ctx.input.customerData?.user !== 'number'
+        ) {
+          throw createApiServiceError(
+            'customerId is required to update a customer. Discover IDs with manage_customers using action list.'
+          );
+        }
         ctx.progress('Updating customer...');
         result = await client.updateCustomer({
-          user: ctx.input.customerId,
-          ...(ctx.input.customerData ?? {})
+          ...(ctx.input.customerData ?? {}),
+          ...(ctx.input.customerId === undefined ? {} : { user: ctx.input.customerId })
         });
         break;
       }
       case 'delete': {
-        if (!ctx.input.customerId) {
-          throw new Error('customerId is required to delete a customer.');
+        if (ctx.input.customerId === undefined) {
+          throw createApiServiceError('customerId is required to delete a customer.');
         }
         ctx.progress(`Deleting customer ${ctx.input.customerId}...`);
         result = await client.deleteCustomer({ user: ctx.input.customerId });

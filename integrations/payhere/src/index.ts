@@ -6,13 +6,15 @@ import {
   getCompany,
   getCustomer,
   getPayment,
+  getSubscription,
   listCustomers,
   listPayments,
   listPlans,
   listSubscriptions,
   refundPayment,
   updateCompany,
-  updatePlan
+  updatePlan,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -28,7 +30,9 @@ export let provider = Slate.create({
     cancelSubscription,
     refundPayment,
     getCompany,
-    updateCompany
+    updateCompany,
+    getSubscription,
+    whoAmI
   ],
   triggers: []
 });

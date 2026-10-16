@@ -15,6 +15,14 @@ export let getServerInfo = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete server information'),
+      rawCurrentUser: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete current user information'),
       version: z.string().optional().describe('BTCPay Server version'),
       supportedPaymentMethods: z
         .array(z.string())
@@ -48,10 +56,14 @@ export let getServerInfo = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: serverInfo,
+        rawCurrentUser: user,
         version: serverInfo.version as string | undefined,
         supportedPaymentMethods: serverInfo.supportedPaymentMethods as string[] | undefined,
         fullySynched: serverInfo.fullySynched as boolean | undefined,
-        syncStatuses: serverInfo.syncStatuses as Record<string, unknown>[] | undefined,
+        syncStatuses: (serverInfo.syncStatuses ?? serverInfo.syncStatus) as
+          | Record<string, unknown>[]
+          | undefined,
         currentUser: {
           userId: user.id as string | undefined,
           email: user.email as string | undefined,

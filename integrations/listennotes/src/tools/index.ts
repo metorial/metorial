@@ -6,8 +6,18 @@ export * from './get-episode';
 export * from './get-genres-and-regions';
 export * from './get-playlists';
 export * from './get-podcast';
+export { getPodcastsByDomain } from './get-podcasts-by-domain';
 export * from './get-recommendations';
+export {
+  addPlaylistItem,
+  createPlaylist,
+  deletePlaylist,
+  removePlaylistItem,
+  updatePlaylist,
+  updatePlaylistItem
+} from './playlist-management';
 export * from './random-episode';
+export { searchEpisodeTitles } from './search-episode-titles';
 export * from './search-podcasts';
 export * from './submit-podcast';
 export * from './typeahead-search';

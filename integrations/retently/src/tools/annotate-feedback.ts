@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,7 +20,10 @@ You can choose to append new topics/tags to existing ones or replace them entire
         .array(
           z.object({
             name: z.string().describe('Topic name'),
-            sentiment: z.enum(['positive', 'neutral', 'negative']).describe('Topic sentiment')
+            sentiment: z
+              .enum(['positive', 'neutral', 'negative'])
+              .optional()
+              .describe('Topic sentiment (default: neutral)')
           })
         )
         .optional()
@@ -39,20 +42,23 @@ You can choose to append new topics/tags to existing ones or replace them entire
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.topics === undefined && ctx.input.tags === undefined) {
+      throw createApiServiceError('Provide topics or tags to update the feedback response.');
+    }
     let client = new Client(ctx.auth.token);
     let topicsUpdated = false;
     let tagsUpdated = false;
 
-    if (ctx.input.topics && ctx.input.topics.length > 0) {
+    if (ctx.input.topics !== undefined) {
       await client.setResponseTopics(
         ctx.input.responseId,
-        ctx.input.topics,
+        ctx.input.topics.map(topic => ({ ...topic, sentiment: topic.sentiment ?? 'neutral' })),
         ctx.input.operation
       );
       topicsUpdated = true;
     }
 
-    if (ctx.input.tags && ctx.input.tags.length > 0) {
+    if (ctx.input.tags !== undefined) {
       await client.setResponseTags(ctx.input.responseId, ctx.input.tags, ctx.input.operation);
       tagsUpdated = true;
     }

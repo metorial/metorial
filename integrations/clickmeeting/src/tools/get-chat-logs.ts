@@ -30,14 +30,21 @@ export let getChatLogs = SlateTool.create(spec, {
       chatTranscript: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Chat transcript for a specific session')
+        .describe('Download metadata for the ZIP chat transcript for a specific session')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.sessionId) {
-      let transcript = await client.getChatSession(ctx.input.sessionId);
+      let downloadUrl = `https://api.clickmeeting.com/v1/chats/${encodeURIComponent(ctx.input.sessionId)}`;
+      await ctx.addAttachment({
+        type: 'url',
+        url: downloadUrl,
+        headers: { 'X-Api-Key': ctx.auth.token },
+        mimeType: 'application/zip'
+      });
+      let transcript = { sessionId: ctx.input.sessionId, downloadUrl };
       return {
         output: { chatTranscript: transcript },
         message: `Retrieved chat transcript for session **${ctx.input.sessionId}**.`
@@ -45,7 +52,7 @@ export let getChatLogs = SlateTool.create(spec, {
     }
 
     let result = await client.listChats();
-    let chatSessions = Array.isArray(result) ? result : [];
+    let chatSessions = result;
 
     return {
       output: { chatSessions },

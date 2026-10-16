@@ -1,4 +1,5 @@
 export * from './create-dataset';
+export * from './download-resources';
 export * from './get-competition-details';
 export * from './get-dataset-details';
 export * from './get-kernel-details';

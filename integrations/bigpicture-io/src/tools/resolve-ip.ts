@@ -43,13 +43,17 @@ Returns the matched company profile along with a confidence score, match type (b
       geo: ipGeoSchema.nullable().optional().describe('IP geolocation data'),
       company: companySchema.nullable().optional().describe('Matched company profile'),
       whois: whoisSchema.nullable().optional().describe('WHOIS registration data'),
-      asn: asnSchema.nullable().optional().describe('Autonomous System Number data')
+      asn: asnSchema.nullable().optional().describe('Autonomous System Number data'),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Original response returned by BigPicture.io')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.findCompanyByIp(ctx.input.ip);
+    let { data: result, rawResponse } = await client.findCompanyByIp(ctx.input.ip);
 
     if (!result) {
       return {
@@ -62,7 +66,8 @@ Returns the matched company profile along with a confidence score, match type (b
           geo: null,
           company: null,
           whois: null,
-          asn: null
+          asn: null,
+          rawResponse
         },
         message: `No company found for IP **${ctx.input.ip}**.`
       };
@@ -82,7 +87,8 @@ Returns the matched company profile along with a confidence score, match type (b
         geo: result.geo ?? null,
         company: result.company ?? null,
         whois: result.whois ?? null,
-        asn: result.asn ?? null
+        asn: result.asn ?? null,
+        rawResponse
       },
       message: `Resolved IP **${ctx.input.ip}** → **${companyName}** (${result.type ?? 'unknown'}, confidence: ${confidencePercent}${result.fuzzy ? ', fuzzy match' : ''})`
     };

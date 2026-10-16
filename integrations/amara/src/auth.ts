@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,32 +18,24 @@ export let auth = SlateAuth.create()
       username: z.string().describe('Your Amara username')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim() || !ctx.input.username.trim()) {
+        throw createApiServiceError('Provide your Amara API key and username.');
+      }
       return {
         output: {
-          token: ctx.input.token,
-          username: ctx.input.username
+          token: ctx.input.token.trim(),
+          username: ctx.input.username.trim()
         }
       };
     },
     getProfile: async (ctx: { output: { token: string; username: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://amara.org/api'
-      });
-
-      let response = await client.get(`/users/${ctx.output.username}/`, {
-        headers: {
-          'X-api-key': ctx.output.token,
-          'X-api-username': ctx.output.username,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let user = response.data;
+      let client = new Client(ctx.output);
+      let user = await client.getUser(ctx.output.username);
 
       return {
         profile: {
           id: user.id,
-          name: user.full_name || user.username,
+          name: user.full_name || user.username || user.id,
           imageUrl: user.avatar
         }
       };

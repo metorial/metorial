@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, quotaSchema } from '../lib/client';
 import { spec } from '../spec';
 
 let articleDetailSchema = z.object({
@@ -11,7 +11,7 @@ let articleDetailSchema = z.object({
   url: z.string().describe('URL to the original article'),
   image: z.string().nullable().describe('URL of the main article image'),
   video: z.string().nullable().describe('URL of the associated video'),
-  publishDate: z.string().describe('ISO date when the article was published'),
+  publishDate: z.string().describe('Publication date and time reported by the provider'),
   authors: z.array(z.string()).describe('List of article authors'),
   category: z.string().nullable().describe('Article category'),
   language: z.string().describe('ISO 639-1 language code'),
@@ -34,6 +34,7 @@ export let retrieveArticleTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      quota: quotaSchema.optional().describe('API point usage, when returned by the provider'),
       articles: z.array(articleDetailSchema).describe('Retrieved article details')
     })
   )
@@ -42,7 +43,7 @@ export let retrieveArticleTool = SlateTool.create(spec, {
 
     let result = await client.retrieveNews(ctx.input.articleIds);
 
-    let articles = (result.news || []).map(article => ({
+    let articles = result.news.map(article => ({
       articleId: article.id,
       title: article.title,
       text: article.text,
@@ -60,6 +61,7 @@ export let retrieveArticleTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...(result.quota ? { quota: result.quota } : {}),
         articles
       },
       message: `Retrieved **${articles.length}** article(s).`

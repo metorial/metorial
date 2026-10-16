@@ -5,7 +5,7 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'memberspot',
   name: 'Memberspot',
-  description: undefined,
+  description: 'Manage Memberspot members, course access, learning progress, and exam results',
   metadata: {},
   config,
   auth

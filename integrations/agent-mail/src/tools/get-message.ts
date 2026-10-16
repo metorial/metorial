@@ -41,12 +41,24 @@ export let getMessage = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Extracted reply HTML without quoted history'),
+      headers: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Original message headers'),
+      inReplyTo: z.string().optional().describe('Message this email replies to'),
+      references: z
+        .array(z.string())
+        .optional()
+        .describe('Earlier message IDs in the conversation'),
+      updatedAt: z.string().optional().describe('Last update timestamp'),
       preview: z.string().optional().describe('Text preview'),
       attachments: z
         .array(
           z.object({
             attachmentId: z.string().describe('Attachment identifier'),
-            filename: z.string().describe('Filename'),
+            filename: z
+              .string()
+              .describe('Filename, or the attachment ID when no filename was supplied'),
             size: z.number().describe('Size in bytes'),
             contentType: z.string().optional().describe('MIME type')
           })
@@ -79,9 +91,13 @@ export let getMessage = SlateTool.create(spec, {
         extractedText: m.extracted_text,
         extractedHtml: m.extracted_html,
         preview: m.preview,
+        headers: m.headers,
+        inReplyTo: m.in_reply_to,
+        references: m.references,
+        updatedAt: m.updated_at,
         attachments: m.attachments?.map(a => ({
           attachmentId: a.attachment_id,
-          filename: a.filename,
+          filename: a.filename ?? a.attachment_id,
           size: a.size,
           contentType: a.content_type
         })),

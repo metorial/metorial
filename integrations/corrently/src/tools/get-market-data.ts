@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,12 +18,21 @@ export let getMarketData = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().describe('Complete provider response'),
       prices: z
         .array(
           z.object({
             startTimestamp: z.number().describe('Start of pricing interval (milliseconds)'),
             endTimestamp: z.number().describe('End of pricing interval (milliseconds)'),
-            marketPrice: z.number().describe('Regional green power price in EUR per MWh')
+            marketPrice: z
+              .number()
+              .describe('German wholesale electricity price in EUR per MWh'),
+            localPrice: z
+              .number()
+              .optional()
+              .describe('Local electricity price in EUR per MWh'),
+            localCell: z.string().optional(),
+            unit: z.string().optional()
           })
         )
         .describe('Time-stamped electricity pricing intervals')
@@ -32,7 +41,7 @@ export let getMarketData = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let zip = ctx.input.zip || ctx.config.zip;
     if (!zip) {
-      throw new Error('A German postal code (zip) is required.');
+      throw createApiServiceError('A German postal code (zip) is required.');
     }
 
     let client = new Client({ token: ctx.auth.token });
@@ -41,11 +50,14 @@ export let getMarketData = SlateTool.create(spec, {
     let prices = (result.data || []).map(item => ({
       startTimestamp: item.start_timestamp,
       endTimestamp: item.end_timestamp,
-      marketPrice: item.marketprice
+      marketPrice: item.marketprice,
+      localPrice: item.localprice,
+      localCell: item.localcell,
+      unit: item.unit
     }));
 
     return {
-      output: { prices },
+      output: { raw: result, prices },
       message: `Retrieved **${prices.length}** pricing intervals for postal code **${zip}**.`
     };
   })

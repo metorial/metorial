@@ -15,22 +15,20 @@ export let getBalance = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      balance: z.number().describe('Current account balance in USD')
+      balance: z.number().describe('Current account balance in USD'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
     let client = new TwoCaptchaClient({ token: ctx.auth.token });
     let result = await client.getBalance();
 
-    if (result.errorId !== 0) {
-      throw new Error(`2Captcha error: ${result.errorCode} - ${result.errorDescription}`);
-    }
-
     return {
       output: {
-        balance: result.balance ?? 0
+        balance: result.balance,
+        raw: result
       },
-      message: `Current account balance: **$${(result.balance ?? 0).toFixed(4)}**`
+      message: `Current account balance: **$${result.balance.toFixed(4)}**`
     };
   })
   .build();

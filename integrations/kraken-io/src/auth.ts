@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let apiAxios = createAxios({
-  baseURL: 'https://api.kraken.io'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -35,21 +32,7 @@ export let auth = SlateAuth.create()
       output: { apiKey: string; apiSecret: string };
       input: { apiKey: string; apiSecret: string };
     }) => {
-      let response = await apiAxios.post('/user_status', {
-        auth: {
-          api_key: ctx.output.apiKey,
-          api_secret: ctx.output.apiSecret
-        }
-      });
-
-      let data = response.data as {
-        success: boolean;
-        active: boolean;
-        plan_name: string;
-        quota_total: number;
-        quota_used: number;
-        quota_remaining: number;
-      };
+      let data = await new Client(ctx.output).getUserStatus();
 
       return {
         profile: {

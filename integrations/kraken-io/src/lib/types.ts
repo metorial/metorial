@@ -4,6 +4,7 @@ export interface KrakenAuth {
 }
 
 export interface KrakenResizeOptions {
+  size?: number;
   width?: number;
   height?: number;
   strategy:
@@ -65,6 +66,7 @@ export interface KrakenOptimizeRequest {
 }
 
 export interface KrakenOptimizeResponse {
+  [key: string]: unknown;
   success: boolean;
   file_name?: string;
   original_size?: number;
@@ -79,6 +81,7 @@ export interface KrakenOptimizeResponse {
 }
 
 export interface KrakenImageSetResult {
+  [key: string]: unknown;
   file_name: string;
   original_size: number;
   kraked_size: number;
@@ -91,6 +94,7 @@ export interface KrakenImageSetResult {
 }
 
 export interface KrakenImageSetResponse {
+  [key: string]: unknown;
   success: boolean;
   results?: Record<string, KrakenImageSetResult>;
   timestamp?: number;
@@ -98,12 +102,14 @@ export interface KrakenImageSetResponse {
 }
 
 export interface KrakenCallbackResponse {
+  [key: string]: unknown;
   id?: string;
-  success: boolean;
+  success?: boolean;
   message?: string;
 }
 
 export interface KrakenUserStatusResponse {
+  [key: string]: unknown;
   success: boolean;
   active: boolean;
   plan_name: string;

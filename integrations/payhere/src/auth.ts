@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let apiClient = createAxios({
-  baseURL: 'https://api.payhere.co/api/v1'
-});
+import { PayhereClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,19 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await apiClient.get('/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data.data;
+      let user = await new PayhereClient({ token: ctx.output.token }).getUser();
 
       return {
         profile: {
-          id: String(user.id),
+          id: String(user.userId),
           email: user.email,
-          name: user.display_name
+          name: user.displayName
         }
       };
     }

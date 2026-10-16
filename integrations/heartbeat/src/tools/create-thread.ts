@@ -8,7 +8,8 @@ export let createThread = SlateTool.create(spec, {
   key: 'create_thread',
   description: `Creates a new thread in a specific channel. Content can be plain text or rich text (HTML). When rich text is provided, plain text is ignored. Supported HTML tags: p, a, b, h1, h2, h3, ul, li, br.`,
   instructions: [
-    'Either text or richText should be provided. If richText is set, text is ignored.'
+    'Either text or richText should be provided. If richText is set, text is ignored.',
+    'Title remains accepted and is forwarded unchanged, but the current API reference does not document its effect.'
   ],
   tags: {
     destructive: false,
@@ -36,7 +37,8 @@ export let createThread = SlateTool.create(spec, {
     z.object({
       threadId: z.string().describe('ID of the created thread'),
       channelId: z.string().describe('Channel ID where the thread was created'),
-      createdAt: z.string().describe('Timestamp when the thread was created')
+      createdAt: z.string().describe('Timestamp when the thread was created'),
+      raw: z.unknown().optional().describe('Complete provider thread response')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,7 +56,8 @@ export let createThread = SlateTool.create(spec, {
       output: {
         threadId: thread.id,
         channelId: thread.channelId,
-        createdAt: thread.createdAt
+        createdAt: thread.createdAt,
+        raw: thread.raw
       },
       message: `Created thread${ctx.input.title ? ` **${ctx.input.title}**` : ''} in channel **${ctx.input.channelId}**.`
     };

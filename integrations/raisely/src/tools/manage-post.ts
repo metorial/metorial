@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RaiselyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,7 +51,7 @@ export let managePost = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       if (!ctx.input.profileUuid) {
-        throw new Error('profileUuid is required for listing posts');
+        throw createApiServiceError('profileUuid is required for listing posts');
       }
       let result = await client.listPosts(ctx.input.profileUuid, {
         limit: ctx.input.limit,
@@ -66,7 +66,9 @@ export let managePost = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.campaignUuid || !ctx.input.profileUuid) {
-        throw new Error('campaignUuid and profileUuid are required for creating a post');
+        throw createApiServiceError(
+          'campaignUuid and profileUuid are required for creating a post'
+        );
       }
       let data: Record<string, any> = {};
       if (ctx.input.title) data.title = ctx.input.title;
@@ -87,7 +89,7 @@ export let managePost = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.postUuid) {
-        throw new Error('postUuid is required for updating a post');
+        throw createApiServiceError('postUuid is required for updating a post');
       }
       let data: Record<string, any> = {};
       if (ctx.input.title) data.title = ctx.input.title;
@@ -104,7 +106,7 @@ export let managePost = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.postUuid) {
-        throw new Error('postUuid is required for deleting a post');
+        throw createApiServiceError('postUuid is required for deleting a post');
       }
       await client.deletePost(ctx.input.postUuid);
       return {
@@ -113,6 +115,6 @@ export let managePost = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

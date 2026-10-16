@@ -1,0 +1,91 @@
+{
+  "key": "get_route",
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "routeId": {
+        "type": "number",
+        "description": "The route identifier"
+      },
+      "includeStreams": {
+        "description": "Include route streams (latlng, distance, altitude)",
+        "type": "boolean"
+      },
+      "exportFormat": {
+        "description": "Export route in GPX or TCX format",
+        "type": "string",
+        "enum": ["gpx", "tcx"]
+      }
+    },
+    "required": ["routeId"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "routeId": {
+        "type": "number",
+        "description": "Route identifier"
+      },
+      "name": {
+        "type": "string",
+        "description": "Route name"
+      },
+      "description": {
+        "description": "Route description",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "distance": {
+        "type": "number",
+        "description": "Route distance in meters"
+      },
+      "elevationGain": {
+        "type": "number",
+        "description": "Total elevation gain in meters"
+      },
+      "type": {
+        "description": "Route type (1=ride, 2=run)",
+        "type": "number"
+      },
+      "subType": {
+        "description": "Route sub-type",
+        "type": "number"
+      },
+      "starred": {
+        "description": "Whether the route is starred",
+        "type": "boolean"
+      },
+      "timestamp": {
+        "description": "Route creation timestamp",
+        "type": "number"
+      },
+      "streams": {
+        "description": "Route streams data",
+        "type": "array",
+        "items": {}
+      },
+      "exportedFile": {
+        "description": "Exported route file content (GPX or TCX)",
+        "type": "string"
+      }
+    },
+    "required": ["routeId", "name", "distance", "elevationGain"],
+    "additionalProperties": false
+  },
+  "handlerSha256": "a05d50730021bb7ee74b82e823a06252bb424e4bb5406d9b9563985242d75f13",
+  "clientMethods": {
+    "getRoute": "a7d3f6fdef85524337be540afc7a7fd888f2f18f2355ac83034bf25fdfa87561",
+    "getRouteStreams": "275ced3afeb4f951386766408b7873c20b5b6ae31543b039517c7e6304206b89",
+    "exportRouteGpx": "3fd077f0ce5e9ea72d5e1502f377cb63396656cc26f32435fa8bd90a3924e08f",
+    "exportRouteTcx": "23cd6d710a28ce3481cf9eef45f61af754c4197afa9e13cfb13c472a8bc21e02"
+  }
+}

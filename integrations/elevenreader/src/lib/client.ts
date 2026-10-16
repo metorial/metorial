@@ -1,30 +1,83 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord
+} from 'slates';
+import {
+  createDubbingResponse,
+  createdVoiceResponse,
+  dictionariesResponse,
+  dubbingResponse,
+  historyItemResponse,
+  historyResponse,
+  modelsResponse,
+  parseProviderResponse,
+  statusResponse,
+  transcriptionResponse,
+  userResponse,
+  voiceResponse,
+  voicesResponse
+} from './responses';
 
 export class ElevenLabsClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.elevenlabs.io',
-      headers: {
-        'xi-api-key': token
-      }
+      authHeader: { name: 'xi-api-key', value: token },
+      contentType: false,
+      errorMapping: {
+        extractResponseData: response => {
+          let data: unknown = response.data;
+          if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+            let body =
+              data instanceof ArrayBuffer
+                ? Buffer.from(data)
+                : Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+            try {
+              return JSON.parse(body.toString('utf8'));
+            } catch {
+              return body.toString('utf8');
+            }
+          }
+          return data;
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ElevenLabs',
+          reason: 'elevenlabs_api_error',
+          detailKeys: ['message', 'detail', 'status', 'code'],
+          nestedKeys: ['detail', 'errors'],
+          extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+          extractUpstreamCode: (_input, response) => {
+            let data = response?.data;
+            if (!isApiErrorRecord(data)) return undefined;
+            let detail = isApiErrorRecord(data.detail) ? data.detail : data;
+            return typeof detail.status === 'string'
+              ? detail.status
+              : typeof detail.code === 'string'
+                ? detail.code
+                : undefined;
+          }
+        })
     });
   }
 
   // ── Models ──
 
-  async listModels(): Promise<any[]> {
+  async listModels() {
     let response = await this.axios.get('/v1/models');
-    return response.data;
+    return {
+      models: parseProviderResponse(modelsResponse, response.data, 'models'),
+      raw: response.data
+    };
   }
 
   // ── Voices ──
-
-  async listVoices(): Promise<any> {
-    let response = await this.axios.get('/v1/voices');
-    return response.data;
-  }
 
   async searchVoices(params: {
     search?: string;
@@ -35,7 +88,7 @@ export class ElevenLabsClient {
     voiceType?: string;
     category?: string;
     includeTotalCount?: boolean;
-  }): Promise<any> {
+  }) {
     let response = await this.axios.get('/v2/voices', {
       params: {
         search: params.search,
@@ -48,12 +101,18 @@ export class ElevenLabsClient {
         include_total_count: params.includeTotalCount
       }
     });
-    return response.data;
+    return {
+      ...parseProviderResponse(voicesResponse, response.data, 'searchVoices'),
+      raw: response.data
+    };
   }
 
-  async getVoice(voiceId: string): Promise<any> {
-    let response = await this.axios.get(`/v1/voices/${voiceId}`);
-    return response.data;
+  async getVoice(voiceId: string) {
+    let response = await this.axios.get(`/v1/voices/${encodeURIComponent(voiceId)}`);
+    return {
+      ...parseProviderResponse(voiceResponse, response.data, 'getVoice'),
+      raw: response.data
+    };
   }
 
   async editVoice(
@@ -63,17 +122,27 @@ export class ElevenLabsClient {
       description?: string;
       labels?: Record<string, string>;
     }
-  ): Promise<any> {
-    let response = await this.axios.patch(`/v1/voices/${voiceId}`, {
-      name: params.name,
-      description: params.description,
-      labels: params.labels
-    });
-    return response.data;
+  ) {
+    let form = new FormData();
+    form.append('name', params.name);
+    if (params.description !== undefined) form.append('description', params.description);
+    if (params.labels !== undefined) form.append('labels', JSON.stringify(params.labels));
+    let response = await this.axios.post(
+      `/v1/voices/${encodeURIComponent(voiceId)}/edit`,
+      form
+    );
+    return {
+      ...parseProviderResponse(statusResponse, response.data, 'voice update'),
+      raw: response.data
+    };
   }
 
-  async deleteVoice(voiceId: string): Promise<void> {
-    await this.axios.delete(`/v1/voices/${voiceId}`);
+  async deleteVoice(voiceId: string) {
+    let response = await this.axios.delete(`/v1/voices/${encodeURIComponent(voiceId)}`);
+    return {
+      ...parseProviderResponse(statusResponse, response.data, 'voice deletion'),
+      raw: response.data
+    };
   }
 
   // ── Text to Speech ──
@@ -96,7 +165,8 @@ export class ElevenLabsClient {
       previousText?: string;
       nextText?: string;
       applyTextNormalization?: string;
-    }
+    },
+    requireContentType = false
   ): Promise<{ audioBase64: string; contentType: string }> {
     let voiceSettings = params.voiceSettings
       ? {
@@ -109,7 +179,7 @@ export class ElevenLabsClient {
       : undefined;
 
     let response = await this.axios.post(
-      `/v1/text-to-speech/${voiceId}`,
+      `/v1/text-to-speech/${encodeURIComponent(voiceId)}`,
       {
         text: params.text,
         model_id: params.modelId || 'eleven_multilingual_v2',
@@ -130,7 +200,13 @@ export class ElevenLabsClient {
 
     let buffer = Buffer.from(response.data);
     let audioBase64 = buffer.toString('base64');
-    let contentType = String(response.headers['content-type'] ?? 'audio/mpeg');
+    let responseContentType = getResponseHeaderValue(response.headers, 'content-type');
+    if (requireContentType && !responseContentType) {
+      throw createApiServiceError(
+        'ElevenLabs did not return the audio MIME type. Retry the generation.'
+      );
+    }
+    let contentType = responseContentType ?? 'audio/mpeg';
 
     return { audioBase64, contentType };
   }
@@ -146,7 +222,10 @@ export class ElevenLabsClient {
     timestampsGranularity?: string;
     tagAudioEvents?: boolean;
     fileName?: string;
-  }): Promise<any> {
+  }) {
+    if (Boolean(params.audioBase64) === Boolean(params.cloudStorageUrl)) {
+      throw createApiServiceError('Provide exactly one of audioBase64 or cloudStorageUrl.');
+    }
     let formData = new FormData();
 
     formData.append('model_id', params.modelId || 'scribe_v2');
@@ -177,24 +256,26 @@ export class ElevenLabsClient {
       formData.append('tag_audio_events', String(params.tagAudioEvents));
     }
 
-    let response = await this.axios.post('/v1/speech-to-text', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
+    let response = await this.axios.post('/v1/speech-to-text', formData);
 
-    return response.data;
+    return {
+      ...parseProviderResponse(transcriptionResponse, response.data, 'speechToText'),
+      raw: response.data
+    };
   }
 
   // ── Sound Effects ──
 
-  async generateSoundEffect(params: {
-    text: string;
-    durationSeconds?: number;
-    promptInfluence?: number;
-    loop?: boolean;
-    outputFormat?: string;
-  }): Promise<{ audioBase64: string; contentType: string }> {
+  async generateSoundEffect(
+    params: {
+      text: string;
+      durationSeconds?: number;
+      promptInfluence?: number;
+      loop?: boolean;
+      outputFormat?: string;
+    },
+    requireContentType = false
+  ): Promise<{ audioBase64: string; contentType: string }> {
     let response = await this.axios.post(
       '/v1/sound-generation',
       {
@@ -213,7 +294,13 @@ export class ElevenLabsClient {
 
     let buffer = Buffer.from(response.data);
     let audioBase64 = buffer.toString('base64');
-    let contentType = String(response.headers['content-type'] ?? 'audio/mpeg');
+    let responseContentType = getResponseHeaderValue(response.headers, 'content-type');
+    if (requireContentType && !responseContentType) {
+      throw createApiServiceError(
+        'ElevenLabs did not return the audio MIME type. Retry the generation.'
+      );
+    }
+    let contentType = responseContentType ?? 'audio/mpeg';
 
     return { audioBase64, contentType };
   }
@@ -230,7 +317,7 @@ export class ElevenLabsClient {
     dropBackgroundAudio?: boolean;
     disableVoiceCloning?: boolean;
     highestResolution?: boolean;
-  }): Promise<{ dubbingId: string; expectedDurationSec: number }> {
+  }) {
     let formData = new FormData();
 
     if (params.sourceUrl) {
@@ -267,33 +354,41 @@ export class ElevenLabsClient {
       formData.append('highest_resolution', String(params.highestResolution));
     }
 
-    let response = await this.axios.post('/v1/dubbing', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-
+    let response = await this.axios.post('/v1/dubbing', formData);
+    let result = parseProviderResponse(
+      createDubbingResponse,
+      response.data,
+      'dubbing creation'
+    );
     return {
-      dubbingId: response.data.dubbing_id,
-      expectedDurationSec: response.data.expected_duration_sec
+      dubbingId: result.dubbing_id,
+      expectedDurationSec: result.expected_duration_sec,
+      raw: response.data
     };
   }
 
-  async getDubbing(dubbingId: string): Promise<any> {
-    let response = await this.axios.get(`/v1/dubbing/${dubbingId}`);
-    return response.data;
+  async getDubbing(dubbingId: string) {
+    let response = await this.axios.get(`/v1/dubbing/${encodeURIComponent(dubbingId)}`);
+    return {
+      ...parseProviderResponse(dubbingResponse, response.data, 'getDubbing'),
+      raw: response.data
+    };
   }
 
-  async deleteDubbing(dubbingId: string): Promise<void> {
-    await this.axios.delete(`/v1/dubbing/${dubbingId}`);
+  async deleteDubbing(dubbingId: string) {
+    let response = await this.axios.delete(`/v1/dubbing/${encodeURIComponent(dubbingId)}`);
+    return parseProviderResponse(statusResponse, response.data, 'dubbing deletion');
   }
 
   // ── Audio Isolation ──
 
-  async isolateAudio(params: {
-    audioBase64: string;
-    fileName?: string;
-  }): Promise<{ audioBase64: string; contentType: string }> {
+  async isolateAudio(
+    params: {
+      audioBase64: string;
+      fileName?: string;
+    },
+    requireContentType = false
+  ): Promise<{ audioBase64: string; contentType: string }> {
     let formData = new FormData();
 
     let buffer = Buffer.from(params.audioBase64, 'base64');
@@ -301,15 +396,18 @@ export class ElevenLabsClient {
     formData.append('audio', blob, params.fileName || 'audio.mp3');
 
     let response = await this.axios.post('/v1/audio-isolation', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
       responseType: 'arraybuffer'
     });
 
     let resultBuffer = Buffer.from(response.data);
     let audioBase64 = resultBuffer.toString('base64');
-    let contentType = String(response.headers['content-type'] ?? 'audio/mpeg');
+    let responseContentType = getResponseHeaderValue(response.headers, 'content-type');
+    if (requireContentType && !responseContentType) {
+      throw createApiServiceError(
+        'ElevenLabs did not return the audio MIME type. Retry the generation.'
+      );
+    }
+    let contentType = responseContentType ?? 'audio/mpeg';
 
     return { audioBase64, contentType };
   }
@@ -332,6 +430,24 @@ export class ElevenLabsClient {
     return response.data;
   }
 
+  async createVoiceFromPreview(params: {
+    voiceName: string;
+    voiceDescription: string;
+    generatedVoiceId: string;
+    labels?: Record<string, string>;
+  }) {
+    let response = await this.axios.post('/v1/text-to-voice', {
+      voice_name: params.voiceName,
+      voice_description: params.voiceDescription,
+      generated_voice_id: params.generatedVoiceId,
+      labels: params.labels
+    });
+    return {
+      ...parseProviderResponse(createdVoiceResponse, response.data, 'voice creation'),
+      raw: response.data
+    };
+  }
+
   // ── History ──
 
   async listHistory(params?: {
@@ -339,7 +455,7 @@ export class ElevenLabsClient {
     startAfterHistoryItemId?: string;
     voiceId?: string;
     search?: string;
-  }): Promise<any> {
+  }) {
     let response = await this.axios.get('/v1/history', {
       params: {
         page_size: params?.pageSize || 20,
@@ -348,42 +464,46 @@ export class ElevenLabsClient {
         search: params?.search
       }
     });
-    return response.data;
+    return {
+      ...parseProviderResponse(historyResponse, response.data, 'listHistory'),
+      raw: response.data
+    };
   }
 
-  async getHistoryItem(historyItemId: string): Promise<any> {
-    let response = await this.axios.get(`/v1/history/${historyItemId}`);
-    return response.data;
-  }
-
-  async deleteHistoryItem(historyItemId: string): Promise<void> {
-    await this.axios.delete(`/v1/history/${historyItemId}`);
+  async getHistoryItem(historyItemId: string) {
+    let response = await this.axios.get(`/v1/history/${encodeURIComponent(historyItemId)}`);
+    return {
+      ...parseProviderResponse(historyItemResponse, response.data, 'getHistoryItem'),
+      raw: response.data
+    };
   }
 
   // ── Pronunciation Dictionaries ──
 
-  async listPronunciationDictionaries(params?: {
-    pageSize?: number;
-    cursor?: string;
-  }): Promise<any> {
+  async listPronunciationDictionaries(params?: { pageSize?: number; cursor?: string }) {
     let response = await this.axios.get('/v1/pronunciation-dictionaries', {
       params: {
         page_size: params?.pageSize || 30,
         cursor: params?.cursor
       }
     });
-    return response.data;
+    return {
+      ...parseProviderResponse(
+        dictionariesResponse,
+        response.data,
+        'listPronunciationDictionaries'
+      ),
+      raw: response.data
+    };
   }
 
   // ── User ──
 
-  async getUser(): Promise<any> {
+  async getUser() {
     let response = await this.axios.get('/v1/user');
-    return response.data;
-  }
-
-  async getUserSubscription(): Promise<any> {
-    let response = await this.axios.get('/v1/user/subscription');
-    return response.data;
+    return {
+      ...parseProviderResponse(userResponse, response.data, 'getUser'),
+      raw: response.data
+    };
   }
 }

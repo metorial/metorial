@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords, type ProviderResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let getIndices = SlateTool.create(spec, {
@@ -25,7 +25,9 @@ export let getIndices = SlateTool.create(spec, {
       indexId: z
         .number()
         .optional()
-        .describe('Index ID (required for holdings and performance queries)'),
+        .describe(
+          'Index ID (required for holdings and performance queries). Call get_indices with queryType=list to discover IDs'
+        ),
       startDate: z
         .string()
         .optional()
@@ -40,12 +42,16 @@ export let getIndices = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       indices: z.array(z.record(z.string(), z.any())).describe('Array of index data records')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
+    let result: ProviderResponse;
 
     if (ctx.input.queryType === 'list') {
       result = await client.getIndices({
@@ -54,13 +60,19 @@ export let getIndices = SlateTool.create(spec, {
         page: ctx.input.page
       });
     } else if (ctx.input.queryType === 'holdings') {
-      if (!ctx.input.indexId) {
-        throw new Error('indexId is required for holdings query');
+      if (ctx.input.indexId === undefined) {
+        throw createApiServiceError(
+          'indexId is required for holdings query. Call get_indices with queryType=list to discover indices.',
+          { reason: 'missing_index_id' }
+        );
       }
       result = await client.getIndicesHoldings(ctx.input.indexId);
     } else {
-      if (!ctx.input.indexId) {
-        throw new Error('indexId is required for performance query');
+      if (ctx.input.indexId === undefined) {
+        throw createApiServiceError(
+          'indexId is required for performance query. Call get_indices with queryType=list to discover indices.',
+          { reason: 'missing_index_id' }
+        );
       }
       result = await client.getIndicesPerformance({
         indexId: ctx.input.indexId,
@@ -71,10 +83,10 @@ export let getIndices = SlateTool.create(spec, {
       });
     }
 
-    let indices = result?.data ?? [];
+    let indices = getRecords(result);
 
     return {
-      output: { indices },
+      output: { indices, raw: result },
       message: `Retrieved **${indices.length}** index ${ctx.input.queryType} record(s).`
     };
   })

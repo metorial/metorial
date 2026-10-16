@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, numericId, requireArray } from '../lib/client';
 import { spec } from '../spec';
 
 let chatSchema = z.object({
@@ -28,6 +28,20 @@ export let getChats = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      chatgptAutoresponseEnabled: z
+        .boolean()
+        .optional()
+        .describe('Filter by whether the AI Agent is enabled'),
+      whatsappPhone: z
+        .string()
+        .optional()
+        .describe(
+          'Contact phone numbers, comma-separated; includes groups containing the contacts'
+        ),
+      withMessage: z
+        .boolean()
+        .optional()
+        .describe('Include the full last message in the provider response'),
       label: z.string().optional().describe('Filter by labels (comma-separated)'),
       whatsappAccountId: z
         .string()
@@ -72,21 +86,24 @@ export let getChats = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getChats(ctx.input);
 
-    let chats = (result?.data?.chats || []).map((c: any) => ({
-      chatId: c.id || c.chat_id,
+    let chats = requireArray(result?.data?.chats, 'chats').map((c: any) => ({
+      chatId: numericId(c.id ?? c.chat_id),
       name: c.name,
       phone: c.phone,
       isGroup: c.is_group,
-      responsible: c.responsible,
-      lastMessageText: c.last_message_text || c.last_message?.text,
-      lastMessageTimestamp: c.last_message_timestamp || c.last_message?.timestamp,
+      responsible: c.responsible_email ?? c.responsible,
+      lastMessageText: c.last_message_text ?? c.last_message?.text,
+      lastMessageTimestamp: c.last_message_timestamp ?? c.last_message?.timestamp,
       isRead: c.read,
       isClosed: c.closed,
       labels: c.labels,
       whatsappAccountId: c.whatsapp_account_id
     }));
 
-    let hasMorePages = result?.data?.has_more_pages || false;
+    let hasMorePages = result?.data?.has_more_pages;
+    if (typeof hasMorePages !== 'boolean') {
+      throw createApiServiceError('TimelinesAI did not return chat pagination state.');
+    }
 
     return {
       output: { chats, hasMorePages },

@@ -29,6 +29,18 @@ export let sendEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          'Unique send key. Reuse the same key only when retrying the same email within 24 hours.'
+        ),
+      trackOpens: z
+        .boolean()
+        .optional()
+        .describe(
+          'Track the first open; requires HTML and a custom domain with tracking enabled.'
+        ),
       inboxId: z.string().describe('Inbox to send the email from'),
       to: z.array(z.string()).describe('Recipient email addresses'),
       cc: z.array(z.string()).optional().describe('CC recipient email addresses'),
@@ -52,6 +64,8 @@ export let sendEmail = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, podId: ctx.config.podId });
 
     let result = await client.sendMessage(ctx.input.inboxId, {
+      idempotencyKey: ctx.input.idempotencyKey,
+      trackOpens: ctx.input.trackOpens,
       to: ctx.input.to,
       cc: ctx.input.cc,
       bcc: ctx.input.bcc,

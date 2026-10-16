@@ -1,67 +1,35 @@
-# Slates Specification for Heap
+# Heap API Specification
 
-## Overview
+Heap provides server-side ingestion for events, user identities, user properties, and account properties, plus asynchronous analytics-user deletion.
 
-Heap is a digital analytics platform that automatically captures user interactions (clicks, taps, pageviews, form submissions) on websites and mobile apps without manual event tagging. It provides product analytics, funnel analysis, segmentation, and retroactive analysis capabilities. Heap also offers server-side APIs for enriching autocaptured data with custom events, user properties, and account properties.
+## Authentication and regions
 
-## Authentication
+Ingestion sends the App ID as `app_id` in JSON; an API Key is only needed for deletion. App ID and API Key are owned by authentication, with the ingestion datacenter selected in connection configuration. Deletion requires the Main Production environment App ID. The integration validates nonempty credentials locally without writing test data.
 
-Heap uses two authentication mechanisms depending on the API operation:
+US ingestion uses `https://heapanalytics.com`; EU ingestion uses `https://c.eu.heap-api.com`. The documented privacy API uses `https://heapanalytics.com` for both regions. A Basic-authenticated `POST /api/public/v0/auth_token` returns `access_token`, which is used as a Bearer token for privacy requests. A fresh token is obtained for each invocation.
 
-**1. App ID (Environment ID)**
+## Supported operations
 
-- Heap supports API key based authentication.
-- Most server-side API operations (Track, Add User Properties, Add Account Properties) require an **App ID** (also called Environment ID), which is included in the JSON request body as the `app_id` field.
-- Both the App ID and API Key can be found within the left hand side menu via: 'Administration' -> 'Account' -> 'Manage' -> 'Privacy & Security'. Select the 'Use the API' tab.
-- The base URL for standard server-side API calls is `https://heapanalytics.com/api/`.
-- If your Heap data is in an EU datacenter, you must send server-side API calls to `https://c.eu.heap-api.com` instead of `https://heapanalytics.com`.
-- No additional authorization headers are needed for data ingestion endpoints; the `app_id` in the request body serves as authentication.
+| Tool | Endpoint | Behavior |
+| --- | --- | --- |
+| `track_event` | `POST /api/track` | One event or up to 1,000 events; each requires exactly one identity or Heap user ID. |
+| `identify_user` | `POST /api/v1/identify` | Associate an anonymous Heap user ID with a permanent identity. |
+| `manage_user_properties` | `POST /api/add_user_properties` | One user or up to 1,000 users. All casings of the property name `id` are reserved. |
+| `manage_account_properties` | `POST /api/add_account_properties` | One account or up to 1,000 accounts; configure the account-ID setting in Heap first. |
+| `delete_user` | `POST /api/public/v0/user_deletion` | Submit one user or up to 10,000 users; returns request ID and provider status. |
+| `get_deletion_status` | `GET /api/public/v0/deletion_status/:id` | Confirm whether a deletion request has completed. |
 
-**2. Auth Token (for User Deletion)**
+Single and bulk inputs cannot be combined. User IDs remain strings in tool inputs and must represent integers between zero and `2^53 - 1`. Deletion serializes them as JSON numbers, matching the provider example. Existing property unions continue to support string, number, and boolean values.
 
-- The User Deletion API requires an auth token, which you can generate.
-- The auth token is obtained by calling `POST https://heapanalytics.com/api/public/v0/auth_token` using HTTP Basic Authentication with your App ID and API Key as credentials.
-- The token generated expires in 5 minutes and is used as a Bearer token in the Authorization header for deletion requests.
+Ingestion responses are acknowledgments, so counts report submitted entities. Deletion is asynchronous: `deleted` is true only for provider status `complete`. Missing or malformed required deletion fields fail clearly rather than inventing success. Upstream HTTP and body-level errors retain provider details and HTTP status, with credentials removed from messages and raw request data excluded from the error chain.
 
-**3. OAuth 2.0 (for Partner/Segment Sync Integrations)**
+The published server-side API has no account/profile identity endpoint. The client-side `identity` and `userID` APIs require a browser SDK session and cannot identify this API connection. No identity tool is fabricated. Webhook and segment-sync APIs are outside this integration's supported surface.
 
-- Authorization for the Segment Sync / Partner Integration API is obtained via OAuth 2.0, using a Client ID, Client Secret, and Redirect URI.
-- This is used when building integrations that receive segment data from Heap via webhooks.
+## Official references
 
-## Features
-
-### Custom Event Tracking
-
-Send custom events to Heap server-side, recommended for events that need to exactly match your backend, such as completed order transaction info, or events that are not available for Heap to capture on the client-side. Events can be sent individually or in bulk. Each event requires either a user identity or user ID, an event name, and optional key-value property pairs.
-
-### User Identity Management
-
-Attach a unique identity and maintain user histories across sessions, devices, and browsers under a single profile in Heap. The server-side Identify API allows linking anonymous users to known identities. Heap does not allow you to change an already applied identity or assign multiple identities to the same user.
-
-### User Properties
-
-Attach custom properties at the user level, such as user-level info from your database or demographic info. The server-side add_user_properties API allows you to set user-level properties without having to tie them to an existing session, useful for backfilling values that may not have been available at the time someone was visiting your site. Properties can be added individually or in bulk.
-
-### Account Properties
-
-Attach custom properties at the account level to group users by organization or account. Account properties can be added individually or in bulk, and are useful for B2B analytics where you want to associate attributes like company name, plan tier, or industry with groups of users.
-
-### User Deletion
-
-The User Deletion API allows you to delete users and their data from your Heap workspace. The user deletion API checks all environments in your account for a matching user and deletes their records and data. You can delete users using either their identity or their user ID. This is primarily used for data privacy compliance (GDPR, CCPA).
-
-### Segment Sync (Data Out)
-
-You can use the Segments Sync API to build private integrations that send segment data to your internal systems. These do not need to be published to be used within your own account. Heap will call a configured webhook endpoint every 4 hours with information about which users have entered or exited the segment since the last call.
-
-## Events
-
-Heap supports webhooks for two categories of outbound events:
-
-### Event-Based Webhooks (Beta)
-
-Webhooks are available, but it is a beta feature with limited support. These webhooks fire when a defined event occurs in Heap. You configure a webhook by selecting a labeled event as the trigger and specifying a destination URL. You can determine what information is included about users when they take the action, such as their identity, device, and referrer, by selecting properties to pass through.
-
-### Segment Sync Webhooks
-
-Heap calls a configured webhook endpoint to receive segmentation data. Heap will call this endpoint every 4 hours with information about which users have entered or exited the segment since the last call. This allows syncing user segment membership to external systems. You can configure which user identity property is used to match users between Heap and the receiving system. Webhook callbacks from Heap contain a Heap-Hash header that contains information to validate the authenticity of the message.
+- [Server-side API overview](https://developers.heap.io/reference/server-side-apis-overview)
+- [Track](https://developers.heap.io/reference/track-1) and [bulk track](https://developers.heap.io/reference/bulk-track)
+- [Identify](https://developers.heap.io/reference/identify-1)
+- [User properties](https://developers.heap.io/reference/add-user-properties) and [bulk user properties](https://developers.heap.io/reference/bulk-add-user-properties)
+- [Account properties](https://developers.heap.io/reference/add-account-properties) and [bulk account properties](https://developers.heap.io/reference/bulk-add-account-properties)
+- [User deletion and status](https://developers.heap.io/reference/user-deletion)

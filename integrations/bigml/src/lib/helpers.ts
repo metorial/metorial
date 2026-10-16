@@ -1,4 +1,4 @@
-import { type BigMLRegion, Client } from './client';
+import { Client } from './client';
 
 export type ContextLike = {
   auth: {
@@ -17,7 +17,7 @@ export let createClient = (ctx: ContextLike): Client => {
   return new Client({
     username: ctx.auth.username,
     token: ctx.auth.token,
-    region: ctx.config.region as BigMLRegion,
+    region: ctx.config.region,
     devMode: ctx.config.devMode,
     organizationId: ctx.auth.organizationId,
     projectId: ctx.auth.projectId
@@ -61,7 +61,8 @@ export let RESOURCE_TYPES = [
   'sample',
   'correlation',
   'statisticaltest',
-  'configuration'
+  'configuration',
+  'composite'
 ] as const;
 
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
@@ -73,6 +74,7 @@ export let RESOURCE_STATUS = {
   IN_PROGRESS: 3,
   SUMMARIZED: 4,
   FINISHED: 5,
+  UPLOADING: 6,
   FAULTY: -1,
   UNKNOWN: -2,
   RUNNABLE: -3
@@ -92,6 +94,8 @@ export let statusLabel = (code: number): string => {
       return 'summarized';
     case 5:
       return 'finished';
+    case 6:
+      return 'uploading';
     case -1:
       return 'faulty';
     case -2:

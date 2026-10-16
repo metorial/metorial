@@ -1,6 +1,6 @@
-# <img src="logo.png" height="20"> Pushover
+# <img src="logo.svg" height="20"> Pushover
 
-Send real-time push notifications to Android, iOS, and desktop devices. Deliver messages with configurable priority levels (silent, low, normal, high, emergency), HTML formatting, image attachments, custom sounds, and URLs. Track emergency-priority message acknowledgements via receipts and callbacks. Manage delivery groups by adding, removing, enabling, or disabling users. Push silent data updates (title, text, count, percent) to smartwatch widgets via Glances. Validate user and group keys. Create inbound webhooks to convert external JSON payloads into Pushover notifications. Manage user subscriptions and licenses for Teams accounts.
+Send push notifications with configurable priorities, HTML or monospace formatting, images, custom sounds, and links. Track emergency acknowledgements and cancel retries. Discover and manage delivery groups and members, validate recipient keys, update smartwatch widgets, inspect account message limits, and migrate existing user keys to subscriptions.
 
 ## License
 

@@ -42,7 +42,8 @@ export let urlInfoTool = SlateTool.create(spec, {
       serverCountryCode: z.string().describe('Server country ISO code'),
       loadTime: z.number().describe('Page load time in seconds'),
       isTimeout: z.boolean().describe('Whether the request timed out'),
-      content: z.string().describe('Page content (if fetchContent was enabled)')
+      content: z.string().describe('Page content (if fetchContent was enabled)'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -60,21 +61,22 @@ export let urlInfoTool = SlateTool.create(spec, {
 
     return {
       output: {
-        valid: result.valid ?? false,
-        url: result.url ?? ctx.input.url,
-        httpStatus: result.httpStatus ?? 0,
-        httpStatusMessage: result.httpStatusMessage ?? '',
-        contentType: result.contentType ?? '',
-        contentLength: result.contentLength ?? 0,
-        title: result.title ?? '',
-        language: result.language ?? '',
-        serverIp: result.serverIp ?? '',
-        serverHostname: result.serverHostname ?? '',
-        serverCountry: result.serverCountry ?? '',
-        serverCountryCode: result.serverCountryCode ?? '',
-        loadTime: result.loadTime ?? 0,
-        isTimeout: result.isTimeout ?? false,
-        content: result.content ?? ''
+        raw: result.raw,
+        valid: result.valid,
+        url: result.url,
+        httpStatus: result.httpStatus,
+        httpStatusMessage: result.httpStatusMessage,
+        contentType: result.contentType,
+        contentLength: result.contentSize,
+        title: result.title,
+        language: result.languageCode,
+        serverIp: result.serverIp,
+        serverHostname: result.serverHostname,
+        serverCountry: result.serverCountry,
+        serverCountryCode: result.serverCountryCode,
+        loadTime: result.loadTime,
+        isTimeout: result.isTimeout,
+        content: result.content
       },
       message: result.valid
         ? `**${result.title || result.url}** — HTTP ${result.httpStatus} (${result.contentType}). Server: ${result.serverHostname || result.serverIp} in ${result.serverCountry || 'unknown'}. Load time: ${result.loadTime}s.`

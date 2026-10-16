@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GistClient } from '../lib/client';
+import { requiredId, responseList, validatePagination } from '../lib/response';
 import { spec } from '../spec';
 
 export let searchConversations = SlateTool.create(spec, {
   name: 'Search Conversations',
   key: 'search_conversations',
-  description: `Search and filter conversations in Gist. Filter by assignee, team, channel, tags, and contact. Also retrieves conversation counts.`,
+  description: `Search and filter conversations in Gist. Filter by assignee, team, channel, tags, and contact.`,
   tags: { readOnly: true }
 })
   .input(
@@ -25,6 +26,7 @@ export let searchConversations = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResponse: z.any().optional().describe('Complete provider response data'),
       conversations: z.array(
         z.object({
           conversationId: z.string(),
@@ -41,34 +43,51 @@ export let searchConversations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination({ page: ctx.input.page, perPage: ctx.input.perPage });
     let client = new GistClient({ token: ctx.auth.token });
 
-    let params: Record<string, any> = {};
-    if (ctx.input.assigneeId) params.assignee_id = ctx.input.assigneeId;
-    if (ctx.input.teamId) params.team_id = ctx.input.teamId;
-    if (ctx.input.channel) params.channel = ctx.input.channel;
-    if (ctx.input.tagId) params.tag_id = ctx.input.tagId;
-    if (ctx.input.contactId) params.contact_id = ctx.input.contactId;
-    if (ctx.input.page) params.page = ctx.input.page;
-    if (ctx.input.perPage) params.per_page = ctx.input.perPage;
-
-    let data = await client.searchConversations(params);
-    let conversations = (data.conversations || []).map((c: any) => ({
-      conversationId: String(c.id),
+    let filters: Record<string, unknown>[] = [];
+    for (let [key, value] of Object.entries({
+      teammate_assigned_id: ctx.input.assigneeId,
+      team_assigned_id: ctx.input.teamId,
+      channel: ctx.input.channel,
+      conversation_tags: ctx.input.tagId,
+      'contact.id': ctx.input.contactId
+    })) {
+      if (value !== undefined) {
+        let filterValue: string | number = value;
+        if (key !== 'channel') {
+          if (
+            !/^\d+$/.test(value) ||
+            !Number.isSafeInteger(Number(value)) ||
+            Number(value) < 1
+          )
+            throw createApiServiceError(`${key} must be a positive numeric ID.`);
+          filterValue = Number(value);
+        }
+        filters.push({ criteria: [{ key, operator: '=', value: filterValue }] });
+      }
+    }
+    let data = filters.length
+      ? await client.searchConversations({
+          filter_query: filters,
+          page: ctx.input.page,
+          per_page: ctx.input.perPage
+        })
+      : await client.listConversations({ page: ctx.input.page, per_page: ctx.input.perPage });
+    let conversations = responseList(data.conversations).map((c: any) => ({
+      conversationId: requiredId(c.id),
       subject: c.subject,
-      contactId: c.contact_id ? String(c.contact_id) : undefined,
-      assigneeId: c.assignee_id ? String(c.assignee_id) : undefined,
-      teamId: c.team_id ? String(c.team_id) : undefined,
+      contactId: c.contact_id !== undefined ? String(c.contact_id) : undefined,
+      assigneeId: c.assignee_id !== undefined ? String(c.assignee_id) : undefined,
+      teamId: c.team_id !== undefined ? String(c.team_id) : undefined,
       status: c.status,
       priority: c.priority,
-      createdAt: c.created_at ? String(c.created_at) : undefined
+      createdAt: c.created_at !== undefined ? String(c.created_at) : undefined
     }));
 
     return {
-      output: {
-        conversations,
-        pages: data.pages
-      },
+      output: { rawResponse: client.responses, conversations, pages: data.pages },
       message: `Found **${conversations.length}** conversations.`
     };
   })

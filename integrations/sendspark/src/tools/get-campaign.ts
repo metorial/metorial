@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let videoAssetSchema = z.object({
@@ -36,6 +37,7 @@ export let getCampaign = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       campaignId: z.string().describe('ID of the dynamic video campaign to retrieve')
     })
   )
@@ -48,17 +50,19 @@ export let getCampaign = SlateTool.create(spec, {
       dynamicBackground: z.boolean().optional(),
       videoAssets: z.array(videoAssetSchema).optional(),
       voiceCloning: voiceCloningSchema.optional(),
-      transcription: transcriptionSchema.optional()
+      transcription: transcriptionSchema.optional(),
+      videoAssetIds: z
+        .array(z.string())
+        .optional()
+        .describe('Video asset IDs returned by the provider'),
+      raw: z.unknown().optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret,
-      workspaceId: ctx.config.workspaceId
-    });
+    let client = createClient(ctx);
 
-    let campaign = await client.getCampaign(ctx.input.campaignId);
+    let result = await client.getCampaign(ctx.input.campaignId);
+    let campaign = result.response || result;
 
     return {
       output: {
@@ -67,13 +71,15 @@ export let getCampaign = SlateTool.create(spec, {
         status: campaign.status,
         combinedVideo: campaign.combinedVideo,
         dynamicBackground: campaign.dynamicBackground,
-        videoAssets: campaign.videosAssets?.map((a: any) => ({
-          assetId: a.assetId || a._id,
-          provider: a.provider,
-          url: a.url,
-          assetUrl: a.assetUrl,
-          duration: a.duration
-        })),
+        videoAssets: campaign.videosAssets
+          ?.filter((a: any) => typeof a === 'object' && a !== null)
+          .map((a: any) => ({
+            assetId: a.assetId || a._id,
+            provider: a.provider,
+            url: a.url,
+            assetUrl: a.assetUrl,
+            duration: a.duration
+          })),
         voiceCloning: campaign.features?.voiceCloning
           ? {
               enable: campaign.features.voiceCloning.enable,
@@ -90,9 +96,11 @@ export let getCampaign = SlateTool.create(spec, {
               status: campaign.features.transcription.status,
               language: campaign.features.transcription.language
             }
-          : undefined
+          : undefined,
+        videoAssetIds: campaign.videosAssets?.filter((a: any) => typeof a === 'string'),
+        raw: result
       },
-      message: `Retrieved campaign **${campaign.name}** (status: ${campaign.status || 'unknown'}).`
+      message: `Retrieved campaign **${campaign.name}**${campaign.status !== undefined ? ` (status: ${campaign.status})` : ''}.`
     };
   })
   .build();

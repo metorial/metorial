@@ -8,7 +8,7 @@ export let addUserToProduct = SlateTool.create(spec, {
   key: 'add_user_to_product',
   description: `Add a user to a specific product in MemberVault. If the user doesn't have an account yet, one will be created automatically. If the user already exists, they are simply granted access to the specified product — no duplicates are created.
 Set **productId** to \`-1\` to create the user account without granting access to any product.`,
-  instructions: ['Use the "List Products" tool first to find the correct product ID.']
+  instructions: ['Use get_courses first to find the correct product ID.']
 })
   .input(
     z.object({
@@ -24,7 +24,8 @@ Set **productId** to \`-1\` to create the user account without granting access t
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation completed successfully')
+      success: z.boolean().describe('Whether the operation completed successfully'),
+      raw: z.unknown().optional().describe('Original response from MemberVault')
     })
   )
   .handleInvocation(async ctx => {
@@ -33,7 +34,7 @@ Set **productId** to \`-1\` to create the user account without granting access t
       subdomain: ctx.config.subdomain
     });
 
-    await client.addUserToProduct({
+    let raw = await client.addUserToProduct({
       email: ctx.input.email,
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
@@ -46,7 +47,7 @@ Set **productId** to \`-1\` to create the user account without granting access t
         : `to product **${ctx.input.productId}**`;
 
     return {
-      output: { success: true },
+      output: { success: true, raw },
       message: `Added user **${ctx.input.email}** ${productLabel}.`
     };
   })

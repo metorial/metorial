@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deviceName, rawResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let servoControl = SlateTool.create(spec, {
@@ -16,6 +17,7 @@ export let servoControl = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      deviceName,
       pin: z.string().describe('The pin number the servo signal wire is connected to (0–4)'),
       angle: z
         .number()
@@ -26,6 +28,7 @@ export let servoControl = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: rawResponse,
       success: z.string().describe('Whether the operation was successful ("1" for success)'),
       resultValue: z.string().describe('Response value from the device')
     })
@@ -33,13 +36,14 @@ export let servoControl = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      deviceName: ctx.auth.deviceName
+      deviceName: ctx.input.deviceName ?? ctx.auth.deviceName
     });
 
     let response = await client.servoWrite(ctx.input.pin, ctx.input.angle);
 
     return {
       output: {
+        raw: response,
         success: response.success,
         resultValue: response.value
       },

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRecords } from '../lib/client';
 import { spec } from '../spec';
 
 export let getQuantMetrics = SlateTool.create(spec, {
@@ -26,6 +26,10 @@ export let getQuantMetrics = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete provider response, including pagination and original null values'),
       quantMetrics: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of quantitative metric records')
@@ -46,10 +50,10 @@ export let getQuantMetrics = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let quantMetrics = result?.data ?? [];
+    let quantMetrics = getRecords(result);
 
     return {
-      output: { quantMetrics },
+      output: { quantMetrics, raw: result },
       message: `Retrieved **${quantMetrics.length}** quantitative metric record(s).`
     };
   })

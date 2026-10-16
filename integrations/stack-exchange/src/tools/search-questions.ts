@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalProviderDate, providerDate } from '../lib/response';
 import { spec } from '../spec';
 
 let questionSchema = z.object({
@@ -84,12 +85,20 @@ export let searchQuestions = SlateTool.create(spec, {
       ctx.input.query ||
       ctx.input.hasAcceptedAnswer !== undefined ||
       ctx.input.isClosed !== undefined ||
-      ctx.input.minAnswers ||
-      ctx.input.minViews ||
+      ctx.input.minAnswers !== undefined ||
+      ctx.input.minViews !== undefined ||
       ctx.input.fromDate ||
       ctx.input.toDate
     );
 
+    if (!useAdvanced && !ctx.input.tagged && !ctx.input.inTitle)
+      throw createApiServiceError(
+        'Provide query, inTitle, tagged, or an advanced search filter.'
+      );
+    if (ctx.input.notTagged && !ctx.input.tagged && !useAdvanced)
+      throw createApiServiceError(
+        'Basic search with notTagged also requires tagged; use query for advanced search.'
+      );
     let result: any;
     if (useAdvanced) {
       result = await client.searchAdvanced({
@@ -128,11 +137,9 @@ export let searchQuestions = SlateTool.create(spec, {
       answerCount: q.answer_count,
       viewCount: q.view_count,
       isAnswered: q.is_answered,
-      tags: q.tags ?? [],
-      creationDate: new Date(q.creation_date * 1000).toISOString(),
-      lastActivityDate: q.last_activity_date
-        ? new Date(q.last_activity_date * 1000).toISOString()
-        : undefined,
+      tags: q.tags,
+      creationDate: providerDate(q.creation_date),
+      lastActivityDate: optionalProviderDate(q.last_activity_date),
       ownerDisplayName: q.owner?.display_name,
       ownerUserId: q.owner?.user_id,
       body: q.body

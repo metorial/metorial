@@ -59,11 +59,14 @@ export let getCommentsTool = SlateTool.create(spec, {
     }
 
     let comments = result.items.map((comment: any) => ({
-      commentId: comment.CommentID || comment.Uri || undefined,
-      text: comment.Text || '',
-      author: comment.User?.NickName || comment.Name || undefined,
-      dateCreated: comment.DateCreated || undefined,
-      uri: comment.Uri || undefined
+      commentId:
+        comment.CommentID !== undefined && comment.CommentID !== null
+          ? String(comment.CommentID)
+          : (comment.Uri ?? undefined),
+      text: comment.Text,
+      author: comment.User?.NickName ?? comment.Name ?? undefined,
+      dateCreated: comment.DateCreated ?? undefined,
+      uri: comment.Uri ?? undefined
     }));
 
     return {

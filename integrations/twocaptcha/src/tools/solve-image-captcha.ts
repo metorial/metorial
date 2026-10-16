@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwoCaptchaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,7 @@ The task is processed asynchronously — use **Get Task Result** to poll for the
         .number()
         .optional()
         .describe(
-          '0 = any characters (default), 1 = digits only, 2 = letters only, 3 = either digits or letters'
+          '0 = any characters (default), 1 = digits only, 2 = letters only, 3 = either digits or letters, 4 = both digits and letters'
         ),
       math: z
         .boolean()
@@ -70,9 +70,11 @@ The task is processed asynchronously — use **Get Task Result** to poll for the
         ),
 
       languagePool: z
-        .enum(['en', 'rn'])
+        .enum(['en', 'rn', 'ru'])
         .optional()
-        .describe('Language pool for workers: "en" (English) or "rn" (Russian)'),
+        .describe(
+          'Language pool for workers: "en" (English) or "ru" (Russian; legacy "rn" is also accepted)'
+        ),
       callbackUrl: z
         .string()
         .optional()
@@ -81,7 +83,8 @@ The task is processed asynchronously — use **Get Task Result** to poll for the
   )
   .output(
     z.object({
-      taskId: z.number().describe('ID of the created task, use this to poll for results')
+      taskId: z.number().describe('ID of the created task, use this to poll for results'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -90,7 +93,7 @@ The task is processed asynchronously — use **Get Task Result** to poll for the
 
     if (ctx.input.captchaType === 'image') {
       if (!ctx.input.imageBody) {
-        throw new Error('imageBody is required for image captcha type');
+        throw createApiServiceError('imageBody is required for image captcha type');
       }
       task = client.buildImageToTextTask({
         body: ctx.input.imageBody,
@@ -105,7 +108,7 @@ The task is processed asynchronously — use **Get Task Result** to poll for the
       });
     } else {
       if (!ctx.input.textQuestion) {
-        throw new Error('textQuestion is required for text captcha type');
+        throw createApiServiceError('textQuestion is required for text captcha type');
       }
       task = client.buildTextCaptchaTask({
         comment: ctx.input.textQuestion
@@ -117,13 +120,10 @@ The task is processed asynchronously — use **Get Task Result** to poll for the
       languagePool: ctx.input.languagePool
     });
 
-    if (result.errorId !== 0) {
-      throw new Error(`2Captcha error: ${result.errorCode} - ${result.errorDescription}`);
-    }
-
     return {
       output: {
-        taskId: result.taskId!
+        taskId: result.taskId,
+        raw: result
       },
       message: `**${ctx.input.captchaType}** captcha task created with ID **${result.taskId}**. Poll using Get Task Result to retrieve the solution.`
     };

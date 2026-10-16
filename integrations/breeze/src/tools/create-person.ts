@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, serializeProfileFields } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let createPerson = SlateTool.create(spec, {
@@ -9,7 +9,7 @@ export let createPerson = SlateTool.create(spec, {
   description: `Create a new person record in the church database. Requires first and last name, and optionally accepts custom profile field values. Use **List Profile Fields** to discover available custom fields and their IDs before setting field values.`,
   instructions: [
     'Use the List Profile Fields tool first to discover the field IDs and types available for your account.',
-    'Custom field values are passed as a JSON object mapping field IDs to values.'
+    'Custom field values are passed as a JSON object mapping field IDs to values. For compound fields, use an object with response and details matching the Breeze field format.'
   ]
 })
   .input(
@@ -32,7 +32,9 @@ export let createPerson = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let fieldsJson = ctx.input.fields ? JSON.stringify(ctx.input.fields) : undefined;
+    let fieldsJson = ctx.input.fields
+      ? await serializeProfileFields(client, ctx.input.fields)
+      : undefined;
 
     let person = await client.addPerson(ctx.input.firstName, ctx.input.lastName, fieldsJson);
 

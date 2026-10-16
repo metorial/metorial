@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -36,9 +36,30 @@ export let generateSessionPdf = SlateTool.create(spec, {
       ctx.input.language
     );
 
+    if (
+      typeof result.status !== 'string' ||
+      !['NEW', 'IN_PROGRESS', 'FINISHED', 'FAILED'].includes(result.status)
+    ) {
+      throw createApiServiceError(
+        'ClickMeeting returned a PDF response without a valid generation status.'
+      );
+    }
+    if (result.status === 'FINISHED') {
+      if (
+        typeof result.url !== 'string' ||
+        !URL.canParse(result.url) ||
+        !['http:', 'https:'].includes(new URL(result.url).protocol)
+      ) {
+        throw createApiServiceError(
+          'ClickMeeting returned a finished PDF report without a valid download URL.'
+        );
+      }
+      await ctx.addAttachment({ type: 'url', url: result.url, mimeType: 'application/pdf' });
+    }
+
     return {
       output: { pdf: result },
-      message: `Generated PDF report for session **${ctx.input.sessionId}** in ${ctx.input.language}.`
+      message: `PDF report for session **${ctx.input.sessionId}**: ${result.status}.`
     };
   })
   .build();

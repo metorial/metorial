@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { optionalString, requiredString, requireRecords } from '../lib/response';
 import { spec } from '../spec';
 
 export let listCustomers = SlateTool.create(spec, {
@@ -14,6 +15,12 @@ export let listCustomers = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z
+        .unknown()
+        .optional()
+        .describe(
+          'Complete provider response, including values without a compatible summary field'
+        ),
       customers: z.array(
         z.object({
           customerId: z.string().describe('Unique customer identifier'),
@@ -40,23 +47,23 @@ export let listCustomers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let customers = await client.getCustomers();
 
-    let mapped = (Array.isArray(customers) ? customers : []).map((c: any) => ({
-      customerId: c.customerId ?? '',
-      firstName: c.firstName ?? '',
-      lastName: c.lastName ?? '',
-      email: c.email ?? '',
-      phone: c.phone || undefined,
-      address: c.address || undefined,
-      companyName: c.companyName || undefined,
-      clients: (Array.isArray(c.clients) ? c.clients : []).map((cl: any) => ({
-        clientId: cl.clientId ?? '',
-        name: cl.name ?? '',
-        email: cl.email ?? ''
+    let mapped = requireRecords(customers, true).map(customer => ({
+      customerId: requiredString(customer.customerId, 'customerId'),
+      firstName: requiredString(customer.firstName, 'firstName'),
+      lastName: requiredString(customer.lastName, 'lastName'),
+      email: requiredString(customer.email, 'customer email'),
+      phone: optionalString(customer.phone),
+      address: optionalString(customer.address),
+      companyName: optionalString(customer.companyName),
+      clients: requireRecords(customer.clients).map(contact => ({
+        clientId: requiredString(contact.clientId, 'clientId'),
+        name: requiredString(contact.name, 'client name'),
+        email: requiredString(contact.email, 'client email')
       }))
     }));
 
     return {
-      output: { customers: mapped },
+      output: { customers: mapped, raw: customers },
       message: `Found **${mapped.length}** customer(s) in the workspace.`
     };
   })

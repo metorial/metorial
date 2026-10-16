@@ -1,36 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEventWithOdds, sportOddsSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let outcomeSchema = z.object({
-  name: z.string().describe('Outcome name'),
-  price: z.number().describe('Odds price'),
-  point: z.number().optional().describe('Point spread or total value')
-});
-
-let marketSchema = z.object({
-  marketKey: z.string().describe('Market type key'),
-  lastUpdate: z.string().optional().describe('ISO timestamp of the last odds update'),
-  outcomes: z.array(outcomeSchema)
-});
-
-let bookmakerSchema = z.object({
-  bookmakerKey: z.string().describe('Bookmaker identifier'),
-  title: z.string().describe('Bookmaker display name'),
-  lastUpdate: z.string().describe('ISO timestamp of the last update'),
-  markets: z.array(marketSchema)
-});
-
-let eventSchema = z.object({
-  eventId: z.string().describe('Unique event identifier'),
-  sportKey: z.string().describe('Sport key'),
-  sportTitle: z.string().describe('Sport display name'),
-  commenceTime: z.string().describe('ISO timestamp of event start time'),
-  homeTeam: z.string().nullable().describe('Home team name'),
-  awayTeam: z.string().nullable().describe('Away team name'),
-  bookmakers: z.array(bookmakerSchema)
-});
 
 export let getHistoricalOddsTool = SlateTool.create(spec, {
   name: 'Get Historical Odds',
@@ -51,7 +23,11 @@ export let getHistoricalOddsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      sport: z.string().describe('Sport key (e.g. "americanfootball_nfl")'),
+      includeRotationNumbers: z
+        .boolean()
+        .optional()
+        .describe('Include home and away rotation numbers when available'),
+      sport: z.string().describe('Sport key from list_sports (e.g. "americanfootball_nfl")'),
       regions: z.string().describe('Comma-separated bookmaker regions: us, us2, uk, au, eu'),
       markets: z.string().describe('Comma-separated markets: h2h, spreads, totals, outrights'),
       date: z
@@ -76,7 +52,7 @@ export let getHistoricalOddsTool = SlateTool.create(spec, {
         .string()
         .nullable()
         .describe('Timestamp of the next snapshot (null if none)'),
-      events: z.array(eventSchema)
+      events: z.array(sportOddsSchema)
     })
   )
   .handleInvocation(async ctx => {
@@ -84,6 +60,7 @@ export let getHistoricalOddsTool = SlateTool.create(spec, {
     let { sport, regions, markets, date, oddsFormat, eventIds, bookmakers } = ctx.input;
 
     let response = await client.getHistoricalOdds({
+      includeRotationNumbers: ctx.input.includeRotationNumbers,
       sport,
       regions,
       markets,
@@ -93,28 +70,7 @@ export let getHistoricalOddsTool = SlateTool.create(spec, {
       bookmakers
     });
 
-    let events = response.data.map(e => ({
-      eventId: e.id,
-      sportKey: e.sport_key,
-      sportTitle: e.sport_title,
-      commenceTime: e.commence_time,
-      homeTeam: e.home_team,
-      awayTeam: e.away_team,
-      bookmakers: e.bookmakers.map(b => ({
-        bookmakerKey: b.key,
-        title: b.title,
-        lastUpdate: b.last_update,
-        markets: b.markets.map(m => ({
-          marketKey: m.key,
-          lastUpdate: m.last_update,
-          outcomes: m.outcomes.map(o => ({
-            name: o.name,
-            price: o.price,
-            point: o.point
-          }))
-        }))
-      }))
-    }));
+    let events = response.data.map(event => mapEventWithOdds(event));
 
     return {
       output: {

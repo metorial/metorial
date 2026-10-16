@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface UploadcareAuth {
   publicKey: string;
@@ -37,7 +37,7 @@ export interface GroupObject {
   files_count: number;
   cdn_url: string;
   url: string;
-  files: FileObject[];
+  files?: Array<FileObject | null> | null;
 }
 
 export interface WebhookObject {
@@ -51,10 +51,10 @@ export interface WebhookObject {
 }
 
 export interface ProjectObject {
-  name: string;
-  pub_key: string;
-  autostore_enabled: boolean;
-  collaborators: Array<{ email: string; name: string }>;
+  name?: string;
+  pub_key?: string;
+  autostore_enabled?: boolean;
+  collaborators?: Array<{ email: string; name: string }> | null;
 }
 
 export interface ConversionResult {
@@ -78,13 +78,19 @@ export class Client {
   }
 
   private getAxios() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: 'https://api.uploadcare.com/',
       headers: {
         Accept: 'application/vnd.uploadcare-v0.7+json',
         Authorization: `Uploadcare.Simple ${this.auth.publicKey}:${this.auth.secretKey}`,
         'Content-Type': 'application/json'
-      }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Uploadcare',
+          reason: 'uploadcare_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
   }
 
@@ -105,7 +111,7 @@ export class Client {
 
   async getFile(fileId: string, include?: string): Promise<FileObject> {
     let axios = this.getAxios();
-    let response = await axios.get(`/files/${fileId}/`, {
+    let response = await axios.get(`/files/${encodeURIComponent(fileId)}/`, {
       params: include ? { include } : undefined
     });
     return response.data;
@@ -113,13 +119,13 @@ export class Client {
 
   async storeFile(fileId: string): Promise<FileObject> {
     let axios = this.getAxios();
-    let response = await axios.put(`/files/${fileId}/storage/`);
+    let response = await axios.put(`/files/${encodeURIComponent(fileId)}/storage/`);
     return response.data;
   }
 
   async deleteFile(fileId: string): Promise<FileObject> {
     let axios = this.getAxios();
-    let response = await axios.delete(`/files/${fileId}/storage/`);
+    let response = await axios.delete(`/files/${encodeURIComponent(fileId)}/storage/`);
     return response.data;
   }
 
@@ -136,6 +142,48 @@ export class Client {
   ): Promise<{ status: string; problems: Record<string, string>; result: FileObject[] }> {
     let axios = this.getAxios();
     let response = await axios.delete('/files/storage/', { data: fileIds });
+    return response.data;
+  }
+
+  async searchFiles(
+    body: { query: string; is_image?: boolean; fuzziness?: boolean },
+    params: { limit?: number; offset?: number; include?: string }
+  ): Promise<PaginatedResponse<FileObject>> {
+    let response = await this.getAxios().post('/files/search/', body, { params });
+    return response.data;
+  }
+
+  async getFileTags(fileId: string): Promise<{ tags: string[] }> {
+    let response = await this.getAxios().get(`/files/${encodeURIComponent(fileId)}/tags/`);
+    return response.data;
+  }
+
+  async replaceFileTags(
+    fileId: string,
+    tags: string[]
+  ): Promise<{
+    tags: string[];
+    added: string[];
+    deleted: string[];
+  }> {
+    let response = await this.getAxios().put(`/files/${encodeURIComponent(fileId)}/tags/`, {
+      tags
+    });
+    return response.data;
+  }
+
+  async updateFileTags(
+    fileId: string,
+    changes: { add?: string[]; delete?: string[] }
+  ): Promise<{
+    tags: string[];
+    added: string[];
+    deleted: string[];
+  }> {
+    let response = await this.getAxios().patch(
+      `/files/${encodeURIComponent(fileId)}/tags/`,
+      changes
+    );
     return response.data;
   }
 
@@ -172,20 +220,22 @@ export class Client {
 
   async getMetadata(fileId: string): Promise<Record<string, string>> {
     let axios = this.getAxios();
-    let response = await axios.get(`/files/${fileId}/metadata/`);
+    let response = await axios.get(`/files/${encodeURIComponent(fileId)}/metadata/`);
     return response.data;
   }
 
   async getMetadataKey(fileId: string, key: string): Promise<string> {
     let axios = this.getAxios();
-    let response = await axios.get(`/files/${fileId}/metadata/${key}/`);
+    let response = await axios.get(
+      `/files/${encodeURIComponent(fileId)}/metadata/${encodeURIComponent(key)}/`
+    );
     return response.data;
   }
 
   async updateMetadataKey(fileId: string, key: string, value: string): Promise<string> {
     let axios = this.getAxios();
     let response = await axios.put(
-      `/files/${fileId}/metadata/${key}/`,
+      `/files/${encodeURIComponent(fileId)}/metadata/${encodeURIComponent(key)}/`,
       JSON.stringify(value),
       {
         headers: { 'Content-Type': 'application/json' }
@@ -196,7 +246,9 @@ export class Client {
 
   async deleteMetadataKey(fileId: string, key: string): Promise<void> {
     let axios = this.getAxios();
-    await axios.delete(`/files/${fileId}/metadata/${key}/`);
+    await axios.delete(
+      `/files/${encodeURIComponent(fileId)}/metadata/${encodeURIComponent(key)}/`
+    );
   }
 
   // ── File Groups ──
@@ -213,19 +265,19 @@ export class Client {
 
   async getGroup(groupId: string): Promise<GroupObject> {
     let axios = this.getAxios();
-    let response = await axios.get(`/groups/${groupId}/`);
+    let response = await axios.get(`/groups/${encodeURIComponent(groupId)}/`);
     return response.data;
   }
 
   async storeGroup(groupId: string): Promise<GroupObject> {
     let axios = this.getAxios();
-    let response = await axios.put(`/groups/${groupId}/storage/`);
+    let response = await axios.put(`/groups/${encodeURIComponent(groupId)}/storage/`);
     return response.data;
   }
 
   async deleteGroup(groupId: string): Promise<void> {
     let axios = this.getAxios();
-    await axios.delete(`/groups/${groupId}/`);
+    await axios.delete(`/groups/${encodeURIComponent(groupId)}/`);
   }
 
   // ── Webhooks ──
@@ -298,7 +350,7 @@ export class Client {
     let axios = this.getAxios();
     let body: Record<string, any> = { target };
     if (params) body.params = params;
-    let response = await axios.post(`/addons/${addonName}/execute/`, body);
+    let response = await axios.post(`/addons/${encodeURIComponent(addonName)}/execute/`, body);
     return response.data.request_id;
   }
 
@@ -307,9 +359,12 @@ export class Client {
     requestId: string
   ): Promise<{ status: string; result?: Record<string, any> }> {
     let axios = this.getAxios();
-    let response = await axios.get(`/addons/${addonName}/execute/status/`, {
-      params: { request_id: requestId }
-    });
+    let response = await axios.get(
+      `/addons/${encodeURIComponent(addonName)}/execute/status/`,
+      {
+        params: { request_id: requestId }
+      }
+    );
     return response.data;
   }
 

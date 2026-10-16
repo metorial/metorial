@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -40,22 +40,24 @@ export let manageTag = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'create_tag':
-        if (!ctx.input.name) throw new Error('name is required to create a tag');
+        if (!ctx.input.name) throw createApiServiceError('name is required to create a tag');
         result = await client.addTag(ctx.input.name, ctx.input.folderId);
         message = `Created tag **${ctx.input.name}**.`;
         break;
       case 'delete_tag':
-        if (!ctx.input.tagId) throw new Error('tagId is required to delete a tag');
+        if (!ctx.input.tagId) throw createApiServiceError('tagId is required to delete a tag');
         result = await client.deleteTag(ctx.input.tagId);
         message = `Deleted tag (ID: ${ctx.input.tagId}).`;
         break;
       case 'create_folder':
-        if (!ctx.input.name) throw new Error('name is required to create a folder');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required to create a folder');
         result = await client.addTagFolder(ctx.input.name, ctx.input.parentFolderId);
         message = `Created tag folder **${ctx.input.name}**.`;
         break;
       case 'delete_folder':
-        if (!ctx.input.folderId) throw new Error('folderId is required to delete a folder');
+        if (!ctx.input.folderId)
+          throw createApiServiceError('folderId is required to delete a folder');
         result = await client.deleteTagFolder(ctx.input.folderId);
         message = `Deleted tag folder (ID: ${ctx.input.folderId}).`;
         break;

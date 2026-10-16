@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prepareRenderFiles } from '../lib/files';
 import { spec } from '../spec';
 
 let layerModificationSchema = z
@@ -69,7 +70,23 @@ Use **layers** for single-page modifications or **pages** for per-page modificat
         .array(pageSchema)
         .optional()
         .describe('Per-page layer modifications for multi-page templates'),
-      merge: z.boolean().optional().describe('Merge multi-page renders into a single PDF')
+      merge: z.boolean().optional().describe('Merge multi-page renders into a single PDF'),
+      zip: z
+        .boolean()
+        .optional()
+        .describe('Bundle generated pages as a ZIP; cannot combine with merge'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Return immediately and receive completed render metadata through webhookUrl'
+        ),
+      webhookUrl: z
+        .string()
+        .optional()
+        .describe(
+          'URL to receive completed render metadata; required for asynchronous ZIP generation'
+        )
     })
   )
   .output(
@@ -81,6 +98,11 @@ Use **layers** for single-page modifications or **pages** for per-page modificat
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
+
+    if (ctx.input.zip && ctx.input.merge)
+      throw createApiServiceError('zip and merge cannot both be enabled.');
+    if (ctx.input.zip && ctx.input.async && !ctx.input.webhookUrl)
+      throw createApiServiceError('webhookUrl is required for asynchronous ZIP generation.');
 
     let result = await client.createRender({
       template: ctx.input.templateId,
@@ -99,9 +121,13 @@ Use **layers** for single-page modifications or **pages** for per-page modificat
       fps: ctx.input.fps,
       layers: ctx.input.layers,
       pages: ctx.input.pages,
-      merge: ctx.input.merge
+      merge: ctx.input.merge,
+      zip: ctx.input.zip,
+      async: ctx.input.async,
+      webhookUrl: ctx.input.webhookUrl
     });
 
+    let warnings = ctx.input.async ? [] : await prepareRenderFiles(ctx, result);
     let format = ctx.input.format || 'jpg';
     let isArray = Array.isArray(result);
     let count = isArray ? result.length : 1;
@@ -109,7 +135,9 @@ Use **layers** for single-page modifications or **pages** for per-page modificat
 
     return {
       output: result,
-      message: `Generated ${count} render(s) in **${format}** format.${url ? ` Output: ${url}` : ''}`
+      message: ctx.input.async
+        ? 'Render request accepted. Use get_render with the returned render ID to inspect it, or wait for the configured webhook. Do not create it again while processing.'
+        : `Templated returned ${count} render result(s) in **${format}** format.${url ? ` Output: ${url}` : ''}${warnings.length ? ` ${warnings.join(' ')}` : ''}`
     };
   })
   .build();

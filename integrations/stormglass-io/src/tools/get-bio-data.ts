@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getResponseRows } from '../lib/client';
 import { spec } from '../spec';
 
 let sourceValueSchema = z
@@ -16,7 +16,8 @@ Useful for marine ecology research, water quality monitoring, agricultural soil 
   instructions: [
     'Provide latitude and longitude for the target location.',
     'Specify bio parameters to retrieve. Ocean parameters include "chlorophyll", "iron", "nitrate", "phytoplankton", "oxygen", "ph", "phosphate", "silicate", "salinity".',
-    'Land parameters include "soilMoisture", "soilTemperature" at different depth ranges.'
+    'Land parameters include soilMoisture and soilTemperature at 0-10 cm; suffixes 10cm, 40cm, and 100cm select the 10-40, 40-100, and 100-200 cm layers.',
+    'Salinity is in per mille; soil moisture is volumetric water content. Biological concentration units vary by parameter.'
   ],
   tags: {
     readOnly: true
@@ -29,13 +30,20 @@ Useful for marine ecology research, water quality monitoring, agricultural soil 
       parameters: z
         .array(z.string())
         .describe(
-          'Bio parameters to retrieve (e.g., "chlorophyll", "iron", "nitrate", "phytoplankton", "oxygen", "ph", "phosphate", "silicate", "salinity", "soilMoisture0To10cm", "soilTemperature0To10cm")'
+          'Bio parameters to retrieve (e.g., "chlorophyll", "iron", "nitrate", "phytoplankton", "oxygen", "ph", "phosphate", "silicate", "salinity", "soilMoisture", "soilTemperature", "soilMoisture10cm", "soilTemperature100cm")'
         ),
       start: z
         .string()
         .optional()
-        .describe('Start time in ISO 8601 or UNIX timestamp format.'),
-      end: z.string().optional().describe('End time in ISO 8601 or UNIX timestamp format.'),
+        .describe(
+          'Start time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets.'
+        ),
+      end: z
+        .string()
+        .optional()
+        .describe(
+          'End time in UTC ISO 8601 or UNIX seconds. Provider ignores ISO timezone offsets.'
+        ),
       sources: z
         .array(z.string())
         .optional()
@@ -55,7 +63,11 @@ Useful for marine ecology research, water quality monitoring, agricultural soil 
         .describe('Hourly bio data points'),
       meta: z
         .record(z.string(), z.any())
-        .describe('Request metadata including coordinates, quota, and request count')
+        .describe('Request metadata including coordinates, quota, and request count'),
+      raw: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Complete original provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -70,14 +82,15 @@ Useful for marine ecology research, water quality monitoring, agricultural soil 
       source: ctx.input.sources
     });
 
-    let hourCount = result.hours?.length ?? 0;
+    let hours = getResponseRows(result, 'data', 'hours');
 
     return {
       output: {
-        hours: result.hours ?? [],
-        meta: result.meta ?? {}
+        hours,
+        meta: result.meta,
+        raw: result
       },
-      message: `Retrieved **${hourCount}** hourly bio data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
+      message: `Retrieved **${hours.length}** hourly bio data points for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}) with parameters: ${ctx.input.parameters.join(', ')}.`
     };
   })
   .build();

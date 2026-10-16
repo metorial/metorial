@@ -3,15 +3,22 @@ import { spec } from './spec';
 import {
   assignThread,
   changeThreadPriority,
+  createNote,
   createThread,
   createTimelineEvent,
   deleteCustomer,
+  getCurrentUser,
   getCustomer,
+  getTenant,
   getThread,
+  listCompanies,
   listCustomerGroups,
   listCustomers,
   listLabelTypes,
+  listTenants,
   listThreads,
+  listThreadTimeline,
+  listUsers,
   manageCustomerGroups,
   manageCustomerTenants,
   manageThreadLabels,
@@ -44,7 +51,14 @@ export let provider = Slate.create({
     upsertTenant,
     manageCustomerTenants,
     manageCustomerGroups,
-    listCustomerGroups
+    listCustomerGroups,
+    getCurrentUser,
+    listUsers,
+    listCompanies,
+    listTenants,
+    getTenant,
+    createNote,
+    listThreadTimeline
   ],
   triggers: []
 });

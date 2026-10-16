@@ -25,7 +25,10 @@ export let getOrder = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(buildClientConfig(ctx));
 
-    let response = await client.getOrder(ctx.input.orderId, ['customer', 'lines']);
+    let response = await client.getOrder(ctx.input.orderId, [
+      'customer',
+      'lines.planning.stock_item_plannings.stock_item'
+    ]);
     let order = flattenSingleResource(response);
 
     return {

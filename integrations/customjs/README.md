@@ -1,6 +1,10 @@
-# Customjs
+# CustomJS
 
-Execute custom JavaScript and Python code via API. Generate PDFs from HTML, merge, split, compress, and extract text from PDFs. Convert HTML to PNG images and capture website screenshots. Scrape web content and automate browser interactions with Puppeteer. Host static HTML pages and forms. Create mail hooks that forward incoming emails to webhooks. Process data with JSON Path selectors and Regex operations. Run stored reusable functions and check SSL certificates.
+Run inline JavaScript and saved functions, generate PDFs and PNG images, convert documents, process PDF files, extract website data, and manage hosted HTML pages. The integration also provides account details, JSONPath and regular expression processing, and SSL certificate checks.
+
+File-producing tools provide downloadable results and retain their existing result fields for compatibility. The legacy Python action and several older document helpers remain available, but their execution contracts are absent from the current public API reference.
+
+See [the specification](docs/SPEC.md) for supported operations and [the official API documentation](https://www.customjs.space/integration/native-api/documentation/) for provider behavior.
 
 ## License
 

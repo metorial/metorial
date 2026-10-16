@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +20,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.publicKey.trim() || !ctx.input.secretKey.trim()) {
+        throw createApiServiceError(
+          'Both the Uploadcare public and secret keys are required.'
+        );
+      }
       return {
         output: {
           publicKey: ctx.input.publicKey,
@@ -31,21 +37,12 @@ export let auth = SlateAuth.create()
       output: { publicKey: string; secretKey: string };
       input: { publicKey: string; secretKey: string };
     }) => {
-      let client = createAxios({
-        baseURL: 'https://api.uploadcare.com/'
-      });
-
-      let response = await client.get('/project/', {
-        headers: {
-          Accept: 'application/vnd.uploadcare-v0.7+json',
-          Authorization: `Uploadcare.Simple ${ctx.output.publicKey}:${ctx.output.secretKey}`
-        }
-      });
+      let project = await new Client(ctx.output).getProject();
 
       return {
         profile: {
           id: ctx.output.publicKey,
-          name: response.data.name
+          name: project.name ?? project.pub_key ?? ctx.output.publicKey
         }
       };
     }

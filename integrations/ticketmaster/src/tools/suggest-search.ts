@@ -24,6 +24,10 @@ let suggestionSchema = z.object({
   )
 });
 
+let outputSchema = z.object({
+  suggestions: z.array(suggestionSchema)
+});
+
 export let suggestSearchTool = SlateTool.create(spec, {
   name: 'Suggest Search',
   key: 'suggest_search',
@@ -37,6 +41,18 @@ export let suggestSearchTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      geoPoint: z.string().optional().describe('Geohash for location search'),
+      radius: z.string().optional().describe('Search radius'),
+      unit: z.string().optional().describe('Radius unit: miles or km'),
+      segmentId: z.string().optional().describe('Classification segment ID'),
+      includeTBA: z
+        .string()
+        .optional()
+        .describe('Include dates to be announced: yes, no, or only'),
+      includeTBD: z
+        .string()
+        .optional()
+        .describe('Include dates to be determined: yes, no, or only'),
       keyword: z.string().describe('Search keyword for autocomplete suggestions'),
       resource: z
         .string()
@@ -49,11 +65,7 @@ export let suggestSearchTool = SlateTool.create(spec, {
       size: z.number().optional().describe('Number of suggestions to return (default 5)')
     })
   )
-  .output(
-    z.object({
-      suggestions: z.array(suggestionSchema)
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
     let client = new DiscoveryClient({
       token: ctx.auth.token,
@@ -62,6 +74,12 @@ export let suggestSearchTool = SlateTool.create(spec, {
     });
 
     let response = await client.suggest({
+      geoPoint: ctx.input.geoPoint,
+      radius: ctx.input.radius,
+      unit: ctx.input.unit,
+      segmentId: ctx.input.segmentId,
+      includeTBA: ctx.input.includeTBA,
+      includeTBD: ctx.input.includeTBD,
       keyword: ctx.input.keyword,
       resource: ctx.input.resource,
       countryCode: ctx.input.countryCode,
@@ -74,12 +92,12 @@ export let suggestSearchTool = SlateTool.create(spec, {
 
     for (let [resourceType, resourceData] of Object.entries(embedded)) {
       let items = (Array.isArray(resourceData) ? resourceData : []).map((item: any) => ({
-        resourceId: item.id || '',
-        name: item.name || '',
-        url: item.url || '',
-        locale: item.locale || '',
+        resourceId: item.id ?? undefined,
+        name: item.name ?? undefined,
+        url: item.url ?? undefined,
+        locale: item.locale ?? undefined,
         images: (item.images || []).slice(0, 3).map((img: any) => ({
-          url: img.url || '',
+          url: img.url ?? undefined,
           width: img.width ?? null,
           height: img.height ?? null
         }))

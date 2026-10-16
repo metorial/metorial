@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { DemioClient } from '../lib/client';
+import { DemioClient, type RegisterInput } from '../lib/client';
 import { spec } from '../spec';
 
 export let registerParticipant = SlateTool.create(spec, {
@@ -52,12 +52,35 @@ export let registerParticipant = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.eventId) === Boolean(ctx.input.referenceUrl)) {
+      throw createApiServiceError('Provide either eventId or referenceUrl, not both.');
+    }
+    if (ctx.input.dateId !== undefined && !ctx.input.eventId) {
+      throw createApiServiceError('dateId can only be used together with eventId.');
+    }
+
+    let numericId = (value: string, label: string) => {
+      let id = Number(value);
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(id) || id <= 0) {
+        throw createApiServiceError(`${label} must be a positive numeric Demio ID.`);
+      }
+      return id;
+    };
+    let protectedFields = new Set(['id', 'date_id', 'ref_url', 'name', 'email']);
+    for (let key of Object.keys(ctx.input.customFields ?? {})) {
+      if (protectedFields.has(key)) {
+        throw createApiServiceError(
+          `Use the dedicated input for ${key} instead of customFields.`
+        );
+      }
+    }
+
     let client = new DemioClient({
       token: ctx.auth.token,
       apiSecret: ctx.auth.apiSecret
     });
 
-    let data: Record<string, unknown> = {
+    let data: RegisterInput = {
       name: ctx.input.name,
       email: ctx.input.email
     };
@@ -65,9 +88,9 @@ export let registerParticipant = SlateTool.create(spec, {
     if (ctx.input.referenceUrl) {
       data.ref_url = ctx.input.referenceUrl;
     } else if (ctx.input.eventId) {
-      data.id = Number(ctx.input.eventId);
-      if (ctx.input.dateId) {
-        data.date_id = Number(ctx.input.dateId);
+      data.id = numericId(ctx.input.eventId, 'eventId');
+      if (ctx.input.dateId !== undefined) {
+        data.date_id = numericId(ctx.input.dateId, 'dateId');
       }
     }
 
@@ -77,7 +100,7 @@ export let registerParticipant = SlateTool.create(spec, {
       }
     }
 
-    let result = await client.register(data as any);
+    let result = await client.register(data);
 
     return {
       output: {

@@ -13,14 +13,15 @@ export let sendPostcard = SlateTool.create(spec, {
   key: 'send_postcard',
   description: `Send a physical postcard via U.S. mail through DocuPost. Provide recipient and sender addresses along with front and back image URLs for the postcard. Supports 4x6 and 6x9 postcard sizes.`,
   instructions: [
-    'Front and back images must be 1875 x 1275 pixels in PNG format.',
+    'This submits physical mail and can incur charges. Check the dashboard before retrying an uncertain request.',
+    'Front and back images must be 1875 x 1275 pixels; PNG is recommended.',
     'States must be 2-letter U.S. abbreviations (e.g., "CA", "NY").',
-    'Names must be under 40 characters.',
+    'Recipient and sender names must be fewer than 40 characters.',
     'Ensure addresses are valid; invalid addresses will cause the mailing to fail.'
   ],
   constraints: [
-    'Images must be exactly 1875 x 1275 pixels in PNG format.',
-    'Names (recipient and sender) must be less than 40 characters.',
+    'Images must be exactly 1875 x 1275 pixels; PNG is recommended.',
+    'Names (recipient and sender) must be fewer than 40 characters.',
     'Only U.S. addresses are supported.'
   ],
   tags: {
@@ -30,7 +31,10 @@ export let sendPostcard = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      recipientName: z.string().max(40).describe('Recipient full name (max 40 characters)'),
+      recipientName: z
+        .string()
+        .max(40)
+        .describe('Recipient full name. DocuPost requires fewer than 40 characters.'),
       recipientAddress1: z.string().describe('Recipient street address'),
       recipientAddress2: z
         .string()
@@ -39,7 +43,10 @@ export let sendPostcard = SlateTool.create(spec, {
       recipientCity: z.string().describe('Recipient city'),
       recipientState: usStateSchema,
       recipientZip: z.string().describe('Recipient 5-digit ZIP code'),
-      senderName: z.string().max(40).describe('Sender full name (max 40 characters)'),
+      senderName: z
+        .string()
+        .max(40)
+        .describe('Sender full name. DocuPost requires fewer than 40 characters.'),
       senderAddress1: z.string().describe('Sender street address'),
       senderAddress2: z
         .string()
@@ -63,7 +70,12 @@ export let sendPostcard = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      status: z.string().describe('Status of the send postcard request'),
+      status: z
+        .string()
+        .describe(
+          'Provider request status when supplied; otherwise the HTTP status code as text. This is not mail delivery status.'
+        ),
+      httpStatus: z.number().optional().describe('HTTP status code returned by DocuPost'),
       response: z.any().optional().describe('Raw response from the DocuPost API')
     })
   )
@@ -89,19 +101,14 @@ export let sendPostcard = SlateTool.create(spec, {
       description: ctx.input.description
     });
 
-    ctx.info({
-      message: 'Postcard sent successfully',
-      recipientName: ctx.input.recipientName,
-      recipientCity: ctx.input.recipientCity,
-      recipientState: ctx.input.recipientState
-    });
-
     return {
       output: {
-        status: 'success',
-        response: result
+        status: result.status,
+        httpStatus: result.httpStatus,
+        response: result.response
       },
-      message: `Postcard (${ctx.input.size ?? '4x6'}) sent to **${ctx.input.recipientName}** at ${ctx.input.recipientCity}, ${ctx.input.recipientState} ${ctx.input.recipientZip}.`
+      message:
+        'Postcard request completed. Check the DocuPost dashboard for processing status and any available cancellation option.'
     };
   })
   .build();

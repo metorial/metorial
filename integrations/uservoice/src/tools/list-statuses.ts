@@ -6,14 +6,19 @@ import { spec } from '../spec';
 let statusSchema = z.object({
   statusId: z.number().describe('Unique ID of the status'),
   name: z.string().describe('Display name of the status'),
-  isOpen: z.boolean().describe('Whether suggestions with this status are considered open'),
+  isOpen: z
+    .boolean()
+    .optional()
+    .describe('Whether suggestions with this status are considered open'),
   hexColor: z.string().nullable().describe('Color hex code for display'),
-  position: z.number().describe('Display order position'),
+  position: z.number().optional().describe('Display order position'),
   allowComments: z
     .boolean()
+    .optional()
     .describe('Whether comments are allowed on suggestions with this status'),
-  createdAt: z.string().describe('When the status was created'),
-  updatedAt: z.string().describe('When the status was last updated')
+  createdAt: z.string().optional().describe('When the status was created'),
+  updatedAt: z.string().optional().describe('When the status was last updated'),
+  raw: z.record(z.string(), z.unknown()).optional().describe('Full provider record')
 });
 
 export let listStatuses = SlateTool.create(spec, {
@@ -30,14 +35,15 @@ export let listStatuses = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      statuses: z.array(statusSchema),
-      totalRecords: z.number().describe('Total number of statuses')
+      statuses: z.array(statusSchema).optional(),
+      totalRecords: z.number().optional().describe('Total number of statuses')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
+      subdomain: ctx.auth.subdomain,
+      legacySubdomain: ctx.config.subdomain
     });
 
     let result = await client.listStatuses({
@@ -45,23 +51,24 @@ export let listStatuses = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let statuses = result.statuses.map((s: any) => ({
+    let statuses = result.statuses?.map((s: any) => ({
       statusId: s.id,
       name: s.name,
-      isOpen: s.is_open ?? true,
-      hexColor: s.hex_color || null,
-      position: s.position || 0,
-      allowComments: s.allow_comments ?? true,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at
+      isOpen: s.is_open,
+      hexColor: s.hex_color ?? null,
+      position: s.position ?? undefined,
+      allowComments: s.allow_comments,
+      createdAt: s.created_at ?? undefined,
+      updatedAt: s.updated_at ?? undefined,
+      raw: s
     }));
 
     return {
       output: {
         statuses,
-        totalRecords: result.pagination?.totalRecords || statuses.length
+        totalRecords: result.pagination?.totalRecords
       },
-      message: `Found **${statuses.length}** statuses: ${statuses.map((s: any) => s.name).join(', ')}.`
+      message: 'Retrieved UserVoice records.'
     };
   })
   .build();

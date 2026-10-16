@@ -59,7 +59,7 @@ Optionally specify a connection name if multiple MySQL databases are configured.
 
     return {
       output: { result },
-      message: `Executed MySQL ${ctx.input.queryType} successfully.`
+      message: `Received the MySQL ${ctx.input.queryType} response.`
     };
   })
   .build();

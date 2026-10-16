@@ -1,102 +1,41 @@
-Now let me fetch the API reference to understand the full feature set:Now I have enough information to write the specification.
+# Altoviz integration
 
-# Slates Specification for Altoviz
+Altoviz is an invoicing and accounting service for small businesses. This integration uses the current v1 REST API and API-key authentication through `X-API-KEY`.
 
-## Overview
+## Sources
 
-Altoviz is a cloud-based invoicing and accounting platform for small businesses and freelancers. The platform provides free RESTful APIs to deal with quotes, invoices, contacts, customers and products. It also supports suppliers, receipts, and metadata on entities.
+- [Official API reference](https://developer.altoviz.com/api)
+- [Official OpenAPI contract](https://developer.altoviz.com/openapi.yaml), inspected 2026-10-15
+- [Developer getting started guide](https://developer.altoviz.com/docs/getting-started)
+- [August 2026 API changes](https://developer.altoviz.com/blog/2026-08-17-changelog)
+- [September 2026 price changes](https://developer.altoviz.com/blog/2026-09-14-changelog)
 
-## Authentication
+## Supported workflows
 
-Altoviz uses API key-based authentication. API keys can be obtained from your Altoviz account settings.
+Customers, contacts, products, suppliers, sales invoices, quotes, credits, and receipts have collection tools and create/update/delete operations. `get_customer` supports provider ID, internal ID, and unambiguous email discovery. `get_record` retrieves full details of the other seven resource types. `get_current_user` returns the connected user's `userId` and profile.
 
-There are three ways to pass the API key:
+Invoices can be finalized, paid, and emailed. Quotes can be emailed. `download_sale_document` delivers a PDF for an invoice, quote, or credit using the authenticated provider download endpoint. `get_settings` also returns optional VAT, classification, and unit reference data.
 
-1. **Header (recommended):** Include the API key in the `X-API-KEY` request header.
-   - Example: `curl -iH "x-api-key:YOUR_API_KEY" https://api.altoviz.com/v1/settings`
+## Request compatibility
 
-2. **HTTP Basic Authentication:** Basic authentication is also supported using `apikey` as the username and the API key as the password.
-   - Example: `curl -u "apikey:YOUR_API_KEY" https://api.altoviz.com/hello`
+- Public `Sale` tool names are retained, while documented invoice, quote, and credit endpoints use `SalesInvoices`, `SalesQuotes`, and `SalesCredits`.
+- `mark_invoice_as_paid` sends `invoiceId`, `date`, `paymentMethod`, and `finalizeInvoice: true` to `POST /v1/SalesInvoices/MarkAsPaid`. Legacy payment-method aliases `BankTransfer` and `CreditCard` map to `Transfer` and `Card`. Optional partial amounts, references, update flags, and finalization dates are supported; the returned `paid` flag is the provider's actual `isPaid` state.
+- Legacy invoice filters map `dateFrom`/`dateTo` to `From`/`To`, sorting to `OrderBy`, and `includeCanceled` to the current `Cancelled` tri-state filter. Explicit `cancelled` takes precedence.
+- Customer email lookup uses `/Customers/Find?email=...`; exact product-number lookup uses `/Products/Find?number=...`. These find operations do not support pagination.
+- Product `salePrice` maps to `taxExcludedPrice`. Explicit `taxExcludedPrice` takes precedence. `taxIncludedPrice`, VAT ID, and unit code are also available.
+- Document line `unitPrice` maps to `taxExcludedPrice`, `vatId` to `vat.id`, string `unit` to `unit.code`, and numeric `discount` to a discount object with `type: Percent` unless `discountType: Fixed` is selected.
+- Supplier `companyName` maps to the provider's `name`. Receipt `description` maps to `notes`. Receipts are customer payments: the retained legacy `supplierId` field raises a clear validation error because the provider has no supplier link on receipts. Use the additive customer fields instead.
 
-3. **URL Parameter (discouraged):** You can send the API key using a query parameter named `apikey`, though this method is discouraged as the API key appears in logs, web analytics services, or caches.
-   - Example: `https://api.altoviz.com/hello?apikey=YOUR_API_KEY`
+## Response contracts
 
-The API base URL is `https://api.altoviz.com/v1`. You can verify your API key by calling the `/hello` endpoint.
+All pre-existing tool keys and input/output field types, nullability, requiredness, and enum members are preserved. Full provider objects are exposed additively as `raw`, retaining metadata, nulls, nested fields, lines, pricing, and lifecycle state. Numeric identifiers are validated rather than fabricated. A null optional unit ID is omitted from the numeric summary and retained in its raw record. VAT IDs and rates keep their existing required numeric contract and fail clearly if malformed or null.
 
-## Features
+`get_settings.settings` remains the complete settings object. Provider HTTP errors retain status, body messages, validation details, and available upstream error codes through structured service errors.
 
-### Customers & Contacts Management
+## Boundaries and limitations
 
-Create, list, update, and delete customers and contacts. Entities support "internal ids" so you can map your own application IDs to Altoviz entities rather than storing Altoviz IDs. Customer families can also be managed and retrieved by internal ID. Customers can be searched by email.
+The existing `update_sale_quote` tool keeps `PUT /v1/SaleQuotes/{id}`. Neither the current `SalesQuotes` nor legacy `SaleQuotes` OpenAPI paths documents PUT, so runtime support remains unverified. Contact metadata is retained as an existing input although the current Contact model does not document it.
 
-### Sales Invoices
+No purchase-invoice upload, bank-account management, accounting exports, statistics, product-image tools, or webhook triggers are registered. These provider capabilities require separate focused work. The provider documents no purchase-invoice collection endpoint, so this integration does not claim one.
 
-Create, update, delete, list, finalize, and download sales invoices. Invoices can be updated and deleted as long as they are still in draft mode. Invoices can be marked as paid by setting the date and payment method. Invoices can be sent by email directly through the API. Results can be sorted and filtered by dates, customer, or status, and can include canceled invoices.
-
-### Sales Quotes
-
-Create, list, update, and delete sales quotes. Quotes can be sent by email through the API.
-
-### Sales Credits
-
-Just like sales invoices, you can list, add, edit and remove sales credits.
-
-### Purchase Invoices
-
-Purchase invoices can be created by sending a PDF file to the API. Purchase invoices can also be downloaded.
-
-### Products
-
-Create, list, update, and delete products. Products can be searched by product number. Product images can be added, updated, and retrieved.
-
-### Suppliers & Receipts
-
-You can list, add, edit and delete receipts and suppliers.
-
-### Metadata
-
-Metadata allows you to store important information for your app on Altoviz entities. Metadata can also be passed to the mark-as-paid API, where it will be stored on the payment.
-
-### Settings & Reference Data
-
-Retrieve account settings including timezone, logo, VAT number, and VAT mode. List available VAT rates and classifications (accounting registers). List all available units.
-
-### User Information
-
-Retrieve information about the currently authenticated user via `/v1/Users/me`.
-
-## Events
-
-Altoviz supports webhooks that notify your application when specific data changes occur. Webhooks are registered via the API by providing a public URL and selecting the event types to listen for. You can optionally set a secret key during registration, which will be included in every call for verification. Altoviz generates signatures using HMAC with SHA-256 for integrity verification.
-
-### Contact Events
-
-- `ContactCreated` — Fired after a contact is created.
-- `ContactUpdated` — Fired after a contact is updated.
-- `ContactDeleted` — Fired after a contact is deleted.
-
-### Customer Events
-
-- `CustomerCreated` — Fired after a customer is created.
-- `CustomerUpdated` — Fired after a customer is updated.
-- `CustomerDeleted` — Fired after a customer is deleted.
-
-### Invoice Events
-
-- `InvoiceCreated` — Fired after a sales invoice is created.
-- `InvoiceUpdated` — Fired after a sales invoice is updated.
-- `InvoiceDeleted` — Fired after a sales invoice is deleted.
-
-### Quote Events
-
-- `QuoteCreated` — Fired after a quote is created.
-- `QuoteUpdated` — Fired after a quote is updated.
-- `QuoteDeleted` — Fired after a quote is deleted.
-
-### Product Events
-
-- `ProductCreated` — Fired after a product is created.
-- `ProductUpdated` — Fired after a product is updated.
-- `ProductDeleted` — Fired after a product is deleted.
-
-When registering a webhook, you specify a name, a list of event types to subscribe to, and the target URL. Multiple event types can be combined in a single webhook registration.
+The integration is a single product and has no sub-product tool categories. No live provider calls, E2E, or tool-use evals were run in this refresh.

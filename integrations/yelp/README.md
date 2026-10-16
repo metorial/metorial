@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Yelp
 
-Search for local businesses by keyword, category, location, phone number, price level, and transaction type. Retrieve detailed business information including name, address, phone, photos, ratings, hours, and price levels. Access review excerpts and review highlights for businesses. Provide real-time autocomplete suggestions for business, term, and category searches. Match businesses by name and address to obtain Yelp Business IDs. Use conversational AI chat for natural language local business discovery. Manage business listings, respond to reviews, handle leads, book reservations, and manage advertising programs via partner APIs. Retrieve engagement metrics, advertising performance data, and location analytics.
+Search local businesses by keyword, category, location, phone number, price level, and delivery availability. Retrieve business details, review excerpts, and autocomplete suggestions, match known businesses to Yelp IDs, and discover category aliases for search filters. Use Yelp AI for conversational business discovery with an API key that has AI API access.
+
+Review excerpts require an Enhanced or Premium plan. API plans and Yelp approval determine endpoint access and available data. Partner listing management, review responses, leads, reservations, advertising, and analytics are not implemented by this integration.
 
 ## License
 

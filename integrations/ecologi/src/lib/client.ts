@@ -1,81 +1,136 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
-let BASE_URL = 'https://public.ecologi.com';
-
-export interface PurchaseTreesRequest {
-  number: number;
+export interface PurchaseOptions {
   name?: string;
   test?: boolean;
+  recipientEmail?: string;
 }
 
-export interface PurchaseTreesResponse {
+export interface PurchaseTreesRequest extends PurchaseOptions {
+  number: number;
+}
+
+export interface PurchaseResponse extends Record<string, unknown> {
   amount: number;
   currency: string;
+  name?: string;
+  recipientEmail?: string;
+  projectDetails?: Record<string, unknown>[];
+  tileUrl?: string;
+}
+
+export interface PurchaseTreesResponse extends PurchaseResponse {
   treeUrl: string;
   name: string;
 }
 
-export interface PurchaseCarbonRequest {
+export interface PurchaseCarbonRequest extends PurchaseOptions {
   number: number;
   units: 'KG' | 'Tonnes';
-  test?: boolean;
 }
 
-export interface PurchaseCarbonResponse {
+export interface PurchaseCarbonResponse extends PurchaseResponse {
   number: number;
   units: string;
   numberInTonnes: number;
-  amount: number;
-  currency: string;
 }
 
-export interface TreesResponse {
+export interface MetricResponse extends Record<string, unknown> {
   total: number;
   pending: number;
 }
 
-export interface CarbonOffsetResponse {
-  total: number;
-  pending: number;
-}
-
-export interface ImpactResponse {
+export interface ImpactResponse extends Record<string, unknown> {
   trees: number;
   carbonOffset: number;
-  treesIncPending?: number;
-  carbonOffsetIncPending?: number;
+  carbonRemoval?: number;
+  habitatRestoration?: number;
+  pending?: {
+    trees?: number;
+    carbonOffset?: number;
+    carbonRemoval?: number;
+    habitatRestoration?: number;
+  };
 }
 
 export class EcologiClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private token?: string;
 
   constructor(token?: string) {
-    this.axios = createAxios({
-      baseURL: BASE_URL,
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    this.token = token?.trim();
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://public.ecologi.com',
+      authHeader: this.token ? { value: `Bearer ${this.token}` } : undefined,
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Ecologi',
+          reason: 'ecologi_api_error',
+          extractResponse: (error, helpers) => helpers.getResponseWithBody(error)
+        })
     });
   }
 
-  async purchaseTrees(request: PurchaseTreesRequest): Promise<PurchaseTreesResponse> {
-    let response = await this.axios.post<PurchaseTreesResponse>('/impact/trees', request);
+  private async purchase<T extends PurchaseResponse>(
+    path: string,
+    request: PurchaseOptions & { number: number },
+    idempotencyKey?: string
+  ): Promise<T> {
+    if (!this.token) {
+      throw createApiServiceError(
+        'An Ecologi API key is required to purchase impact. Connect using API Key authentication.',
+        { reason: 'ecologi_missing_api_key' }
+      );
+    }
+    let response = await this.axios.post<T>(path, pickDefined(request), {
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined
+    });
     return response.data;
   }
 
-  async purchaseCarbon(request: PurchaseCarbonRequest): Promise<PurchaseCarbonResponse> {
-    let response = await this.axios.post<PurchaseCarbonResponse>('/impact/carbon', request);
-    return response.data;
+  purchaseTrees(request: PurchaseTreesRequest, idempotencyKey?: string) {
+    return this.purchase<PurchaseTreesResponse>('/impact/trees', request, idempotencyKey);
   }
 
-  async getTrees(username: string): Promise<TreesResponse> {
-    let response = await this.axios.get<TreesResponse>(
-      `/users/${encodeURIComponent(username)}/trees`
+  purchaseLocalTrees(
+    request: PurchaseTreesRequest & { country: 'UK' | 'US' | 'AU' | 'BR' },
+    idempotencyKey?: string
+  ) {
+    return this.purchase<PurchaseTreesResponse>(
+      '/impact/local-trees',
+      request,
+      idempotencyKey
     );
-    return response.data;
   }
 
-  async getCarbonOffset(username: string): Promise<CarbonOffsetResponse> {
-    let response = await this.axios.get<CarbonOffsetResponse>(
-      `/users/${encodeURIComponent(username)}/carbon-offset`
+  purchaseCarbon(request: PurchaseCarbonRequest, idempotencyKey?: string) {
+    return this.purchase<PurchaseCarbonResponse>('/impact/carbon', request, idempotencyKey);
+  }
+
+  purchaseCarbonRemoval(request: PurchaseTreesRequest, idempotencyKey?: string) {
+    return this.purchase<PurchaseResponse>('/impact/carbon-removal', request, idempotencyKey);
+  }
+
+  purchaseHabitatRestoration(request: PurchaseTreesRequest, idempotencyKey?: string) {
+    return this.purchase<PurchaseResponse>(
+      '/impact/habitat-restoration',
+      request,
+      idempotencyKey
+    );
+  }
+
+  async getMetric(
+    username: string,
+    metric: 'trees' | 'carbon-offset' | 'carbon-removal' | 'habitat-restoration'
+  ): Promise<MetricResponse> {
+    let response = await this.axios.get<MetricResponse>(
+      `/users/${encodeURIComponent(username)}/${metric}`
     );
     return response.data;
   }

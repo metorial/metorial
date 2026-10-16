@@ -13,6 +13,12 @@ export let getHistoricalEvents = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Results to skip for pagination; premium only'),
       text: z
         .string()
         .optional()
@@ -27,6 +33,7 @@ export let getHistoricalEvents = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Original provider response'),
       events: z
         .array(
           z.object({
@@ -42,6 +49,7 @@ export let getHistoricalEvents = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let params: Record<string, string | number> = {};
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
     if (ctx.input.text) params.text = ctx.input.text;
     if (ctx.input.year !== undefined) params.year = ctx.input.year;
     if (ctx.input.month !== undefined) params.month = ctx.input.month;
@@ -52,10 +60,11 @@ export let getHistoricalEvents = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: result,
         events: events.map((e: any) => ({
-          year: String(e.year),
-          month: String(e.month),
-          day: String(e.day),
+          year: e.year,
+          month: e.month,
+          day: e.day,
           event: e.event
         }))
       },

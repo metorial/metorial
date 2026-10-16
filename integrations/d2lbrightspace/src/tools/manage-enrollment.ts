@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { optionalId } from '../lib/response';
 import { spec } from '../spec';
 
 let enrollmentSchema = z.object({
@@ -82,7 +83,7 @@ export let unenrollUser = SlateTool.create(spec, {
 export let listEnrollments = SlateTool.create(spec, {
   name: 'List Enrollments',
   key: 'list_enrollments',
-  description: `List enrollments for a specific user or org unit. Provide either a userId to see all their enrollments, or an orgUnitId to see all enrolled users.`,
+  description: `List enrollments for a specific user or org unit. Provide a userId to see their enrollments, an orgUnitId to see enrolled users, or neither to discover the current user’s course IDs.`,
   tags: { readOnly: true }
 })
   .input(
@@ -112,9 +113,9 @@ export let listEnrollments = SlateTool.create(spec, {
       let items = result?.Items || (Array.isArray(result) ? result : []);
       let enrollments = items.map((e: any) => ({
         orgUnitId: ctx.input.orgUnitId,
-        userId: String(e.User?.Identifier),
-        roleId: String(e.Role?.Id),
-        roleName: e.Role?.Name
+        userId: optionalId(e.User?.Identifier),
+        roleId: optionalId(e.Role?.Id),
+        roleName: e.Role?.Name ?? undefined
       }));
 
       return {
@@ -135,11 +136,11 @@ export let listEnrollments = SlateTool.create(spec, {
 
       let items = result?.Items || (Array.isArray(result) ? result : []);
       let enrollments = items.map((e: any) => ({
-        orgUnitId: String(e.OrgUnit?.Id),
-        orgUnitName: e.OrgUnit?.Name,
+        orgUnitId: optionalId(e.OrgUnit?.Id),
+        orgUnitName: e.OrgUnit?.Name ?? undefined,
         userId: ctx.input.userId,
-        roleId: String(e.Role?.Id),
-        roleName: e.Role?.Name
+        roleId: optionalId(e.Role?.Id),
+        roleName: e.Role?.Name ?? undefined
       }));
 
       return {
@@ -158,8 +159,8 @@ export let listEnrollments = SlateTool.create(spec, {
 
     let items = result?.Items || (Array.isArray(result) ? result : []);
     let enrollments = items.map((e: any) => ({
-      orgUnitId: String(e.OrgUnit?.Id),
-      orgUnitName: e.OrgUnit?.Name
+      orgUnitId: optionalId(e.OrgUnit?.Id),
+      orgUnitName: e.OrgUnit?.Name ?? undefined
     }));
 
     return {
@@ -181,7 +182,11 @@ export let getClasslist = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgUnitId: z.string().describe('Course org unit ID')
+      orgUnitId: z
+        .string()
+        .describe(
+          'Course org unit ID. Call list_enrollments or list_org_units to discover IDs.'
+        )
     })
   )
   .output(
@@ -208,11 +213,11 @@ export let getClasslist = SlateTool.create(spec, {
     let items = Array.isArray(classlist) ? classlist : classlist?.Items || [];
     let students = items.map((s: any) => ({
       userId: String(s.Identifier),
-      userName: s.Username,
-      firstName: s.FirstName,
-      lastName: s.LastName,
-      email: s.Email,
-      orgDefinedId: s.OrgDefinedId,
+      userName: s.Username ?? undefined,
+      firstName: s.FirstName ?? undefined,
+      lastName: s.LastName ?? undefined,
+      email: s.Email ?? undefined,
+      orgDefinedId: s.OrgDefinedId ?? undefined,
       roleId: s.RoleId ? String(s.RoleId) : undefined
     }));
 

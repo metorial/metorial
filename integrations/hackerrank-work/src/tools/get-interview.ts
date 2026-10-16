@@ -37,12 +37,8 @@ export let getInterview = SlateTool.create(spec, {
 
     let transcript: any;
     if (ctx.input.includeTranscript) {
-      try {
-        let transcriptResult = await client.getInterviewTranscript(ctx.input.interviewId);
-        transcript = transcriptResult.data ?? transcriptResult;
-      } catch {
-        // Transcript may not be available for all interviews
-      }
+      let transcriptResult = await client.getInterviewTranscript(ctx.input.interviewId);
+      transcript = transcriptResult.data ?? transcriptResult;
     }
 
     return {
@@ -50,6 +46,6 @@ export let getInterview = SlateTool.create(spec, {
         interview,
         transcript
       },
-      message: `Retrieved interview **${interview.title ?? ctx.input.interviewId}** (status: ${interview.current_status ?? 'unknown'}).${transcript ? ' Transcript included.' : ''}`
+      message: `Retrieved interview **${interview.title ?? ctx.input.interviewId}** ${interview.current_status === undefined ? '' : `(status: ${interview.current_status})`}.${transcript ? ' Transcript included.' : ''}`
     };
   });

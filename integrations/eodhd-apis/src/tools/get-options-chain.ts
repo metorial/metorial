@@ -12,6 +12,9 @@ Filter by expiration date range or specific contract name.`,
     'Use from/to to filter by expiration dates',
     'Use tradeDateFrom/tradeDateTo to filter by trade dates'
   ],
+  constraints: [
+    'Uses the legacy options endpoint; availability depends on your account. The newer US Options Marketplace API uses a separate contract.'
+  ],
   tags: {
     readOnly: true
   }

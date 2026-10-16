@@ -4,19 +4,22 @@ import {
   checkinAttendeeTool,
   confirmCheckoutTool,
   createCheckoutTool,
+  createFreeTicketTypeTool,
   fillOrderTool,
   getAttendeeTool,
   getCategoriesTool,
   getEventTicketsTool,
   getEventTool,
   getTransactionTool,
+  getUserTool,
   listAttendeesTool,
   listEventsTool,
   listTransactionsTool,
   listUsersTool,
   manageOrderTool,
   prepareCheckoutTool,
-  toggleEventSalesTool
+  toggleEventSalesTool,
+  updateFreeTicketTypeTool
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -36,7 +39,10 @@ export let provider = Slate.create({
     fillOrderTool,
     confirmCheckoutTool,
     listUsersTool,
-    getCategoriesTool
+    getCategoriesTool,
+    getUserTool,
+    createFreeTicketTypeTool,
+    updateFreeTicketTypeTool
   ],
   triggers: []
 });

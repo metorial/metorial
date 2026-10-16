@@ -14,6 +14,7 @@ export let getAccount = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      raw: z.unknown().optional().describe('Complete provider response'),
       email: z.string().optional(),
       name: z.string().optional(),
       apiUsage: z.number().optional(),
@@ -28,6 +29,7 @@ export let getAccount = SlateTool.create(spec, {
 
     return {
       output: {
+        raw: account,
         email: account.email,
         name: account.name,
         apiUsage: account.apiUsage,

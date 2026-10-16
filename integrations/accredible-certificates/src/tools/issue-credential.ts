@@ -123,7 +123,7 @@ export let issueCredential = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment ?? (ctx.config as { environment?: string }).environment
     });
 
     let credential = await client.createCredential({

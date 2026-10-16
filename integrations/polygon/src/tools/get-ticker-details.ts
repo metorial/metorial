@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PolygonClient } from '../lib/client';
+import { polygonOutput, polygonResponseFields } from '../lib/response';
 import { spec } from '../spec';
 
 export let getTickerDetails = SlateTool.create(spec, {
@@ -24,6 +25,7 @@ export let getTickerDetails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...polygonResponseFields,
       ticker: z.string().optional().describe('Ticker symbol'),
       name: z.string().optional().describe('Company or asset name'),
       market: z.string().optional().describe('Market type (e.g., stocks, crypto, fx)'),
@@ -74,47 +76,50 @@ export let getTickerDetails = SlateTool.create(spec, {
     let r = response.results;
     if (!r) {
       return {
-        output: { ticker: ctx.input.ticker } as any,
+        output: polygonOutput({ ticker: ctx.input.ticker }, response),
         message: `No details found for **${ctx.input.ticker}**.`
       };
     }
 
     return {
-      output: {
-        ticker: r.ticker,
-        name: r.name,
-        market: r.market,
-        locale: r.locale,
-        active: r.active,
-        currencyName: r.currency_name,
-        primaryExchange: r.primary_exchange,
-        type: r.type,
-        marketCap: r.market_cap,
-        description: r.description,
-        homepageUrl: r.homepage_url,
-        totalEmployees: r.total_employees,
-        listDate: r.list_date,
-        phoneNumber: r.phone_number,
-        sicCode: r.sic_code,
-        sicDescription: r.sic_description,
-        cik: r.cik,
-        compositeFigi: r.composite_figi,
-        shareClassFigi: r.share_class_figi,
-        shareClassSharesOutstanding: r.share_class_shares_outstanding,
-        weightedSharesOutstanding: r.weighted_shares_outstanding,
-        roundLot: r.round_lot,
-        tickerRoot: r.ticker_root,
-        address: r.address
-          ? {
-              address1: r.address.address1,
-              city: r.address.city,
-              state: r.address.state,
-              postalCode: r.address.postal_code
-            }
-          : undefined,
-        brandingIconUrl: r.branding?.icon_url,
-        brandingLogoUrl: r.branding?.logo_url
-      },
+      output: polygonOutput(
+        {
+          ticker: r.ticker,
+          name: r.name,
+          market: r.market,
+          locale: r.locale,
+          active: r.active,
+          currencyName: r.currency_name,
+          primaryExchange: r.primary_exchange,
+          type: r.type,
+          marketCap: r.market_cap,
+          description: r.description,
+          homepageUrl: r.homepage_url,
+          totalEmployees: r.total_employees,
+          listDate: r.list_date,
+          phoneNumber: r.phone_number,
+          sicCode: r.sic_code,
+          sicDescription: r.sic_description,
+          cik: r.cik,
+          compositeFigi: r.composite_figi,
+          shareClassFigi: r.share_class_figi,
+          shareClassSharesOutstanding: r.share_class_shares_outstanding,
+          weightedSharesOutstanding: r.weighted_shares_outstanding,
+          roundLot: r.round_lot,
+          tickerRoot: r.ticker_root,
+          address: r.address
+            ? {
+                address1: r.address.address1,
+                city: r.address.city,
+                state: r.address.state,
+                postalCode: r.address.postal_code
+              }
+            : undefined,
+          brandingIconUrl: r.branding?.icon_url,
+          brandingLogoUrl: r.branding?.logo_url
+        },
+        response
+      ),
       message: `**${r.name}** (${r.ticker}) — ${r.market} market${r.market_cap ? `, Market Cap: $${(r.market_cap / 1e9).toFixed(2)}B` : ''}.`
     };
   })

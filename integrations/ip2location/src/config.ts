@@ -29,6 +29,8 @@ export let config = SlateConfig.create(
         'zh-tw'
       ])
       .default('en')
-      .describe('Language code for translated geolocation results (ISO 639-1)')
+      .describe(
+        'Translation language for single-IP geolocation details; requires a Plus or Security plan'
+      )
   })
 );

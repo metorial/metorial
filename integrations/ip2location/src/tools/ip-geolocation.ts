@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapGeolocation, parseResponse, providerDataSchema } from '../lib/responses';
 import { spec } from '../spec';
 
 let proxySchema = z
@@ -71,7 +72,7 @@ Available data varies by plan tier - higher plans include proxy detection, conti
       latitude: z.number().describe('Latitude coordinate'),
       longitude: z.number().describe('Longitude coordinate'),
       zipCode: z.string().describe('ZIP or postal code'),
-      timeZone: z.string().describe('Timezone identifier'),
+      timeZone: z.string().describe('UTC offset including daylight saving time'),
       asn: z.string().describe('Autonomous System Number'),
       asName: z.string().describe('Autonomous System name'),
       isp: z.string().optional().describe('Internet Service Provider name'),
@@ -85,63 +86,89 @@ Available data varies by plan tier - higher plans include proxy detection, conti
       district: z.string().optional().describe('District name'),
       isProxy: z.boolean().describe('Whether the IP is detected as a proxy'),
       proxy: proxySchema,
-      timezoneInfo: timezoneInfoSchema
+      timezoneInfo: timezoneInfoSchema,
+      fraudScore: z
+        .number()
+        .optional()
+        .describe('Fraud score from 0 to 99; higher is riskier'),
+      asInfo: providerDataSchema.describe(
+        'Autonomous system metadata, including CIDR and usage type'
+      ),
+      continent: providerDataSchema.describe('Continent details and requested translation'),
+      country: providerDataSchema.describe(
+        'Country details, currency, language, and translation'
+      ),
+      region: providerDataSchema.describe('Region details and requested translation'),
+      city: providerDataSchema.describe('City details and requested translation'),
+      geotargeting: providerDataSchema.describe('Geotargeting metro information'),
+      providerData: providerDataSchema
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.getGeolocation(ctx.input.ipAddress, ctx.config.language);
-
+    let result = parseResponse(
+      z.object({ ip: z.string().min(1) }).passthrough(),
+      await client.getGeolocation(ctx.input.ipAddress, ctx.config.language),
+      'geolocation'
+    );
+    let stringValue = (value: unknown) => (typeof value === 'string' ? value : undefined);
+    let objectValue = (value: unknown) => (isApiErrorRecord(value) ? value : undefined);
+    let proxy = objectValue(result.proxy);
+    let timezone = objectValue(result.time_zone_info);
+    let fraudScore = typeof result.fraud_score === 'number' ? result.fraud_score : undefined;
+    let mappedProxy = proxy
+      ? {
+          lastSeen: proxy.last_seen,
+          proxyType: proxy.proxy_type,
+          threat: proxy.threat,
+          provider: proxy.provider,
+          isVpn: proxy.is_vpn,
+          isTor: proxy.is_tor,
+          isDataCenter: proxy.is_data_center,
+          isPublicProxy: proxy.is_public_proxy,
+          isWebProxy: proxy.is_web_proxy,
+          isWebCrawler: proxy.is_web_crawler,
+          isResidentialProxy: proxy.is_residential_proxy,
+          isConsumerPrivacyNetwork: proxy.is_consumer_privacy_network,
+          isEnterprisePrivateNetwork: proxy.is_enterprise_private_network,
+          isSpammer: proxy.is_spammer,
+          isScanner: proxy.is_scanner,
+          isBotnet: proxy.is_botnet,
+          fraudScore: fraudScore ?? proxy.fraud_score
+        }
+      : undefined;
+    let mappedTimezone = timezone
+      ? {
+          olson: timezone.olson,
+          currentTime: timezone.current_time,
+          gmtOffset: timezone.gmt_offset,
+          isDst: timezone.is_dst,
+          sunrise: timezone.sunrise,
+          sunset: timezone.sunset
+        }
+      : undefined;
+    // Optional legacy summaries require complete scalar data. Preserve nulls and newer fields in providerData.
+    let parsedProxy = proxySchema.safeParse(mappedProxy);
+    let parsedTimezone = timezoneInfoSchema.safeParse(mappedTimezone);
     let output = {
       ip: result.ip,
-      countryCode: result.country_code || '',
-      countryName: result.country_name || '',
-      regionName: result.region_name || '',
-      cityName: result.city_name || '',
-      latitude: result.latitude || 0,
-      longitude: result.longitude || 0,
-      zipCode: result.zip_code || '',
-      timeZone: result.time_zone || '',
-      asn: result.asn || '',
-      asName: result.as || '',
-      isp: result.isp || undefined,
-      domainName: result.domain || undefined,
-      netSpeed: result.net_speed || undefined,
-      usageType: result.usage_type || undefined,
-      addressType: result.address_type || undefined,
-      district: result.district || undefined,
-      isProxy: result.is_proxy || false,
-      proxy: result.proxy
-        ? {
-            lastSeen: result.proxy.last_seen,
-            proxyType: result.proxy.proxy_type,
-            threat: result.proxy.threat,
-            provider: result.proxy.provider,
-            isVpn: result.proxy.is_vpn,
-            isTor: result.proxy.is_tor,
-            isDataCenter: result.proxy.is_data_center,
-            isPublicProxy: result.proxy.is_public_proxy,
-            isWebProxy: result.proxy.is_web_proxy,
-            isWebCrawler: result.proxy.is_web_crawler,
-            isResidentialProxy: result.proxy.is_residential_proxy,
-            isConsumerPrivacyNetwork: result.proxy.is_consumer_privacy_network,
-            isEnterprisePrivateNetwork: result.proxy.is_enterprise_private_network,
-            isSpammer: result.proxy.is_spammer,
-            isScanner: result.proxy.is_scanner,
-            isBotnet: result.proxy.is_botnet,
-            fraudScore: result.proxy.fraud_score
-          }
-        : undefined,
-      timezoneInfo: result.time_zone_info
-        ? {
-            olson: result.time_zone_info.olson,
-            currentTime: result.time_zone_info.current_time,
-            gmtOffset: result.time_zone_info.gmt_offset,
-            isDst: result.time_zone_info.is_dst,
-            sunrise: result.time_zone_info.sunrise,
-            sunset: result.time_zone_info.sunset
-          }
-        : undefined
+      ...mapGeolocation(result),
+      isp: stringValue(result.isp),
+      domainName: stringValue(result.domain),
+      netSpeed: stringValue(result.net_speed),
+      usageType: stringValue(result.usage_type),
+      addressType: stringValue(result.address_type),
+      district: stringValue(result.district),
+      proxy: parsedProxy.success ? parsedProxy.data : undefined,
+      timezoneInfo: parsedTimezone.success ? parsedTimezone.data : undefined,
+      fraudScore,
+      asInfo: objectValue(result.as_info),
+      continent: objectValue(result.continent),
+      country: objectValue(result.country),
+      region: objectValue(result.region),
+      city: objectValue(result.city),
+      geotargeting: objectValue(result.geotargeting),
+      providerData: result
     };
 
     let locationParts = [output.cityName, output.regionName, output.countryName].filter(

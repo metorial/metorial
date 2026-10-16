@@ -1,6 +1,16 @@
 # Coinranking
 
-Access real-time and historical cryptocurrency market data. Look up coin prices, market caps, trading volumes, supply data, and rankings. Search and filter coins by tags, tiers, and various sorting criteria. Retrieve exchange and decentralized exchange listings, trading pair/market data, and blockchain information. Fetch global crypto market statistics including total market cap and volume. Get trending coins, price history over configurable time periods, OHLC data, and reference currency conversions. Browse available tags and search across coins, exchanges, and markets.
+Access current and historical cryptocurrency prices, coin details, rankings, trending coins, and global market statistics. Search coins, exchanges, and markets. Filter coin lists by symbols, UUIDs, contract addresses, blockchains, tiers, and tags. Discover category and ecosystem tags and available reference currencies, with cursor pagination for coins, tags, and currencies.
+
+## Tools
+
+- Search across coins, exchanges, and markets, optionally selecting suggestion types.
+- List and filter coins, with legacy offset and current cursor pagination.
+- Get coin details, current or timestamped prices, and price history.
+- Get trending coins and global market statistics.
+- Discover reference currencies and category or ecosystem tag slugs.
+
+API access and historical depth depend on your Coinranking subscription. Free plans generally allow up to 100 results per page and history up to one year.
 
 ## License
 

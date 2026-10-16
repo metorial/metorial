@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PiloterrClient } from '../lib/client';
+import { normalizeOutput } from '../lib/response';
 import { spec } from '../spec';
 
 let technologySchema = z.object({
@@ -23,6 +24,17 @@ let technologySchema = z.object({
     .optional()
 });
 
+let detectTechnologyOutputSchema = z.object({
+  raw: z.any().describe('Full provider response'),
+  urls: z.any().optional().describe('Analyzed URLs'),
+  cms: z.string().nullable().optional().describe('Detected CMS (simple mode)'),
+  technologyNames: z.array(z.string()).optional().describe('Names returned in simple mode'),
+  technologies: z
+    .array(technologySchema)
+    .optional()
+    .describe('Detected technologies with details')
+});
+
 export let detectTechnology = SlateTool.create(spec, {
   name: 'Detect Website Technology',
   key: 'detect_technology',
@@ -43,16 +55,7 @@ export let detectTechnology = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      urls: z.any().optional().describe('Analyzed URLs'),
-      cms: z.string().nullable().optional().describe('Detected CMS (simple mode)'),
-      technologies: z
-        .array(technologySchema)
-        .optional()
-        .describe('Detected technologies with details')
-    })
-  )
+  .output(detectTechnologyOutputSchema)
   .handleInvocation(async ctx => {
     let client = new PiloterrClient(ctx.auth.token);
     let result = await client.detectTechnology({
@@ -60,11 +63,17 @@ export let detectTechnology = SlateTool.create(spec, {
       mode: ctx.input.mode
     });
 
-    let techCount = Array.isArray(result.technologies) ? result.technologies.length : 0;
-
     return {
-      output: result,
-      message: `Detected **${techCount} technologies** on **${ctx.input.url}** using ${ctx.input.mode} mode.`
+      output: normalizeOutput(detectTechnologyOutputSchema, {
+        ...result,
+        raw: result,
+        technologyNames:
+          Array.isArray(result.technologies) &&
+          result.technologies.every((item: unknown) => typeof item === 'string')
+            ? result.technologies
+            : undefined
+      }),
+      message: 'Retrieved website technology information.'
     };
   })
   .build();

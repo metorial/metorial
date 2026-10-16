@@ -24,7 +24,18 @@ export let setUserStatus = SlateTool.create(spec, {
         .describe(
           'Status emoji name (e.g., "car", "working_on_it"). Pass empty string to clear'
         ),
-      away: z.boolean().optional().describe('Whether to mark the user as away')
+      emojiCode: z
+        .string()
+        .optional()
+        .describe('Exact emoji code in the selected emoji namespace'),
+      reactionType: z
+        .enum(['unicode_emoji', 'realm_emoji', 'zulip_extra_emoji'])
+        .optional()
+        .describe('Namespace for the status emoji'),
+      away: z
+        .boolean()
+        .optional()
+        .describe('Legacy away setting; on modern servers this disables presence when true')
     })
   )
   .output(
@@ -42,6 +53,8 @@ export let setUserStatus = SlateTool.create(spec, {
     await client.setUserStatus({
       statusText: ctx.input.statusText,
       emoji: ctx.input.emoji,
+      emojiCode: ctx.input.emojiCode,
+      reactionType: ctx.input.reactionType,
       away: ctx.input.away
     });
 

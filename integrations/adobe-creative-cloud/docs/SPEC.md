@@ -1,148 +1,47 @@
-Now I have enough information to write the specification.
+# Adobe Creative Cloud integration
 
-# Slates Specification for Adobe Creative Cloud
-
-## Overview
-
-Adobe Creative Cloud is a suite of desktop and cloud-based creative applications (Photoshop, Illustrator, Lightroom, InDesign, After Effects, etc.) along with cloud services for asset storage, shared libraries, and generative AI capabilities. The Creative Cloud Developer Platform is a collection of APIs and SDKs that let you extend and integrate with Creative Cloud apps and services. The platform exposes several REST APIs including Creative Cloud Libraries, Lightroom, Photoshop, Firefly (generative AI), User Management, and Adobe Stock.
+The integration provides 19 tools across Creative Cloud Libraries, Photoshop, Firefly, Lightroom, Adobe Stock, User Management, and InDesign. Identity lookup and job polling apply across product areas.
 
 ## Authentication
 
-Adobe Creative Cloud APIs use **OAuth 2.0** for authentication, managed through the **Adobe Developer Console** (https://developer.adobe.com/console). There are two credential types:
+Personal and enterprise user OAuth use Adobe IMS authorization-code and refresh-token flows. Offline access enables refresh tokens. The enterprise method retains its organization ID. Server-to-server connections exchange their saved client ID, client secret, and comma-separated scopes for a new access token when refreshing. Access-token expiry comes from the IMS response.
 
-### OAuth User Authentication (Authorization Code Flow)
+API access depends on the Adobe Developer Console project, approved scopes, organization permissions, and product entitlements. Get Current User requires personal or enterprise user OAuth.
 
-Used when acting on behalf of an end user. Adobe services like Creative SDK, Photoshop, Adobe Analytics, etc. use the OAuth 2.0 protocol for authentication and authorization. Using Adobe OAuth 2.0, you can generate access tokens to make API calls from your web server or browser-based apps.
+## Capability map
 
-- **Authorization endpoint:** `https://ims-na1.adobelogin.com/ims/authorize/v2`
-- **Token endpoint:** `https://ims-na1.adobelogin.com/ims/token/v3`
-- **Required credentials:** Client ID and Client Secret from the Adobe Developer Console project, plus a configured Redirect URI.
-- Scopes include: `openid`, `creative_sdk`, `profile`, `address`, `AdobeID`, `email`, `cc_files`, `cc_libraries`. The exact scopes needed depend on the APIs being accessed.
+| API | Tools | Official documentation |
+| --- | --- | --- |
+| IMS identity | `get_current_user` | [User authentication reference](https://developer.adobe.com/developer-console/docs/guides/authentication/UserAuthentication/ims) |
+| Libraries | `list_libraries`, `manage_library`, `list_library_elements`, `get_library`, `get_library_element` | [Libraries reference](https://developer.adobe.com/creative-cloud-libraries/docs/api/) |
+| Photoshop | `remove_background`, `edit_psd` | [Photoshop reference](https://developer.adobe.com/firefly-services/docs/photoshop/api/) |
+| Firefly | `generate_image`, `generative_fill`, `generative_expand` | [Firefly reference](https://developer.adobe.com/firefly-services/docs/firefly-api/api/) |
+| Lightroom | `manage_lightroom_catalog`, `apply_lightroom_edits` | [Content API](https://developer.adobe.com/lightroom/lightroom-api-docs/api/), [image editing guides](https://developer.adobe.com/firefly-services/docs/lightroom/) |
+| Adobe Stock | `search_stock`, `license_stock`, `get_stock_asset` | [Stock reference](https://developer.adobe.com/stock/docs/api/) |
+| User Management | `manage_users` | [User Management reference](https://adobe-apiplatform.github.io/umapi-documentation/en/RefOverview.html) |
+| InDesign | `indesign_data_merge` | [Current InDesign API](https://developer.adobe.com/firefly-services/docs/indesign-apis/) |
+| Job polling | `check_job_status` | [Photoshop job status](https://developer.adobe.com/firefly-services/docs/photoshop/guides/get-job-status/) |
 
-### OAuth Server-to-Server (Client Credentials Flow)
+## Response and file behavior
 
-Used for backend/service-to-service integrations without user interaction. The OAuth Server-to-Server authentication is ideal for backend services needing API access without user interaction. It uses the OAuth 2.0 `client_credentials` grant type to authenticate the client application.
+Library timestamps remain strings and convert Adobe's millisecond timestamps to ISO timestamps. Library cursors can be offsets or next-page links from earlier invocations; the client extracts the offset and continues to call the fixed Libraries API endpoint.
 
-- **Token endpoint:** `https://ims-na1.adobelogin.com/ims/token/v3`
-- **Required credentials:** Client ID and Client Secret from the Adobe Developer Console project.
-- The scope parameter for Firefly Services is: `openid,AdobeID,session,additional_info,read_organizations,firefly_api,ff_apis`. Scopes vary by API.
-- Enterprise customers must be assigned the System Administrator or Developer role in the Adobe Admin Console to access the Adobe Developer Console.
+Stock metadata requests send all requested result columns. Licensing reflects the actual purchase state, including `just_purchased`, and supplies downloadable content using the token query parameter required by Adobe's download endpoint. The ordinary output URL contains no added token.
 
-**Note:** The Service Account (JWT) credentials have been deprecated in favor of the OAuth Server-to-Server credentials. Creating new JWT credentials stopped by May 1, 2024.
+Firefly generated images are downloadable using the URLs Adobe returns. Those URLs remain in their existing output fields. Download generated results promptly; expired generated content cannot be recovered by silently submitting a new generation.
 
-All API calls require including the Client ID as an API key header (typically `x-api-key` or `X-API-Key`) and the access token as a `Bearer` token in the `Authorization` header.
+Asynchronous Photoshop and Lightroom submissions can return only a status URL. A missing status stays absent. Job polling preserves the complete response, including document manifests and errors, and supplies completed Photoshop rendition URLs as downloadable files. It accepts HTTPS Adobe image, Photoshop, and InDesign API hosts and disables redirects on authenticated status requests. Caller-supplied upload destinations are not assumed to be readable downloads.
 
-## Features
+User Management action failures and partial failures raise a provider error even when the HTTP response is 200.
 
-### Creative Cloud Libraries Management
+## Compatibility limits
 
-Libraries are accessible across all of Adobe's tools and offer a way to organize logos, colors, and other assets so they can be easily accessed and re-used. The Libraries API lets you bring Libraries to your products and services.
+Existing tool keys, input fields, value types, enum values, optionalness, defaults, auth choices, and legacy request formats remain available.
 
-- Browse, retrieve, create, and delete libraries and their elements.
-- Enable users to create libraries and add creative elements to their Libraries within your application so that they can start using these creative elements in their favorite Creative Cloud applications.
-- Supported element types include colors, character styles, logos, images, and graphics.
-- Adobe is not currently accepting new integrations for the CC Libraries API. Existing integrations continue to work.
+The existing InDesign `/api/v1/capability/datamerge` request remains unchanged. Adobe's current guide documents `/v3/merge-data` with a different asset/parameter shape; it does not establish support or retirement of this exact legacy route. Its existing submission-status fallback remains a legacy compatibility behavior pending exact endpoint evidence.
 
-### Photoshop API (via Firefly Services)
+The inline Lightroom `presetXmp` request remains unchanged. Adobe's current preset guide describes cloud-hosted preset file references. This integration does not translate inline XMP into an uploaded file.
 
-The Adobe Photoshop API is now integrated into Firefly Services. The API follows REST-like principles, utilizing standard HTTP response codes, verbs, and authentication methods that return JSON-encoded responses.
+The Libraries reference currently states a maximum page size of ten libraries, while the existing tool defaults to fifty. That baseline default is retained pending a compatible pagination expansion and provider verification.
 
-- Edit PSD files programmatically: manipulate layers, apply smart object edits, run actions.
-- Includes APIs for removing backgrounds, smartly cropping images and automatically leveling the horizon in a photo, as well as access to core AI-driven Photoshop features like Generative Fill and Expand.
-- Both Photoshop and Firefly APIs generally require input and output images to be served from cloud storage or pre-signed URLs. These APIs currently support S3, Azure Blob Storage, and Dropbox.
-- Photoshop API operations are asynchronous; results are polled via a status URL.
-
-### Lightroom API
-
-Two separate Lightroom APIs exist:
-
-**Lightroom User Content API:** Lightroom content of a Creative Cloud customer is managed through a set of RESTful APIs. These APIs are available only to entitled partner applications that have authenticated the customer.
-
-- Manage user catalogs, assets (photos/videos), albums, and metadata.
-- Upload images and videos to a user's Lightroom cloud catalog.
-- Retrieve renditions and asset metadata.
-- Apply and read XMP develop settings.
-
-**Lightroom Image Editing API (via Firefly Services):** The Adobe Lightroom API is now integrated into Firefly Services.
-
-- Apply Lightroom presets and auto-adjustments to images programmatically.
-- Requires cloud storage (S3, Azure, Dropbox) for input/output files, similar to the Photoshop API.
-
-### Firefly API (Generative AI)
-
-Firefly Services is a solution for seamless content generation at scale. Firefly Services includes Firefly APIs, Lightroom APIs, Photoshop APIs, and Content Tagging APIs.
-
-- Generate images from text prompts (text-to-image).
-- Generative Fill and Generative Expand for images.
-- Automatically swap text, video, audio, and animations in motion graphics templates with the Dynamic Graphics Render (DGR) API to produce ready-to-publish clips.
-- Translate and Lip-Sync APIs instantly localize video content.
-- Object compositing for placing product shots into realistic scenes.
-- Custom Models for fine-tuning Firefly on brand-specific assets.
-- Content Tagging for automatic labeling of assets.
-- Firefly APIs are synchronous, meaning that after making a request, you will receive the results in the response within a few seconds.
-- The Firefly API is only available on an enterprise plan.
-
-### InDesign API
-
-Import and integrate relevant data to accurately generate product catalogs, in-store marketing, and more with the Adobe InDesign API.
-
-- Merge data into InDesign templates and export to PDF, JPEG, or PNG.
-- Automate document generation workflows.
-
-### User Management API
-
-The User Management API allows clients to manage their users and product entitlements. The User Management API provides programmatic access to the user accounts that are associated with your Adobe organization. You can integrate this API into your organization's administrative applications and processes. You can use the API to create, update, and delete user accounts for your enterprise, and retrieve information about your Adobe users and their access to Adobe products.
-
-- Manage user identities (Adobe ID, Enterprise ID, Federated ID).
-- Assign and remove product profile memberships and administrative roles.
-- Requires System Admin role to configure.
-
-### Adobe Stock API
-
-- Search Adobe Stock for images, videos, vectors, and templates.
-- License and download stock assets.
-- Manage license history and entitlements.
-
-## Events
-
-Adobe Creative Cloud supports events via **Adobe I/O Events**, which delivers notifications through webhooks or a Journaling (pull) API. Adobe I/O Events will call predefined webhooks within seconds of an event triggering, enabling you to build near-real time applications. Events are configured through the Adobe Developer Console by creating an Event Registration.
-
-### Creative Cloud Assets (Files and Directories)
-
-Events for files and directories stored in Creative Cloud Assets:
-
-- **File Created** – A new file was uploaded or added.
-- **File Updated** – An existing file was modified.
-- **File Deleted** – A file was removed.
-- **Directory Created** – A new folder was created.
-- **Directory Updated** – A folder was modified.
-- **Directory Deleted** – A folder was removed.
-
-### Creative Cloud Libraries
-
-I/O Events makes it possible to listen for changes to Creative Cloud Libraries and get a notification when those changes occur. Developers can subscribe to create, delete, and update events for a user's Creative Cloud Libraries.
-
-- **Library Created** – A new library was created.
-- **Library Updated** – A library was modified (e.g., elements added or changed).
-- **Library Deleted** – A library was removed.
-- Currently there is no way to listen for element-level changes only on a Library.
-
-### Cloud Document Events (Photoshop, Illustrator, XD)
-
-Events for cloud documents in specific applications. Each provider supports:
-
-- **Cloud Doc Created** – A new cloud document was created.
-- **Cloud Doc Updated** – A cloud document was modified.
-- **Cloud Doc Deleted** – A cloud document was removed.
-
-Available providers: Adobe Photoshop Cloud Docs, Adobe Illustrator Cloud Docs, Adobe XD Cloud Docs.
-
-### Photoshop API Job Completion Events
-
-Photoshop supports eventing through Adobe's serverless platform, Adobe IO Events. In this model, the client doesn't need to poll the status continuously, as a job completion event will be emitted to IO Events, to which a webhook or IO runtime action can subscribe.
-
-- Subscribe to get notified when an asynchronous Photoshop API job completes.
-
-### Authentication Options for Events
-
-For Asset Events providers, you have the option of selecting which type of authentication to use, either Server-to-Server Authentication (OAuth Server-to-Server) or User Authentication (OAuth). Server-to-server receives all events within the organization, while user-based OAuth receives events scoped to the authenticated user.
+Lightroom content browsing remains page-limited and does not expose continuation URLs. Newer Photoshop v2, Firefly asynchronous/video/custom-model APIs, InDesign v3, library-element writes, and Adobe I/O Events are outside this refresh. Provider behavior, entitlement availability, and actual download delivery require authorized live verification.

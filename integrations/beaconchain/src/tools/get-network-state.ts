@@ -15,6 +15,10 @@ Optionally include network configuration parameters, validator state distributio
 })
   .input(
     z.object({
+      evaluationWindow: z
+        .enum(['24h', '7d', '30d', '90d'])
+        .optional()
+        .describe('Network performance evaluation window. Defaults to 24h.'),
       includeQueues: z
         .boolean()
         .optional()
@@ -74,7 +78,9 @@ Optionally include network configuration parameters, validator state distributio
     }
 
     if (ctx.input.includeNetworkPerformance) {
-      result.networkPerformance = await client.getNetworkPerformanceAggregate();
+      result.networkPerformance = await client.getNetworkPerformanceAggregate(
+        ctx.input.evaluationWindow
+      );
     }
 
     if (ctx.input.includeNetworkConfig) {

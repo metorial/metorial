@@ -1,6 +1,4 @@
-Now I have sufficient information to write the specification. Let me compile it.
-
-# Slates Specification for Postalytics
+# Postalytics Integration Specification
 
 ## Overview
 

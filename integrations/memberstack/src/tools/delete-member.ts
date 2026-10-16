@@ -26,7 +26,11 @@ export let deleteMember = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      memberId: z.string().describe('ID of the deleted member')
+      memberId: z.string().describe('ID of the deleted member'),
+      raw: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider deletion response')
     })
   )
   .handleInvocation(async ctx => {

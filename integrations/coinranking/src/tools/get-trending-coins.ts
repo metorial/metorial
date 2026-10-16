@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoinrankingClient } from '../lib/client';
+import { rawDataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let trendingCoinSchema = z.object({
@@ -12,7 +13,7 @@ let trendingCoinSchema = z.object({
   marketCap: z.string().nullable().describe('Market capitalization'),
   volume24h: z.string().nullable().describe('24-hour trading volume'),
   change: z.string().nullable().describe('Price change percentage'),
-  rank: z.number().nullable().describe('Rank by market cap'),
+  rank: z.number().nullable().describe('Position in the trending ranking'),
   btcPrice: z.string().nullable().describe('Price in Bitcoin')
 });
 
@@ -48,8 +49,14 @@ export let getTrendingCoins = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawData: rawDataSchema
+        .optional()
+        .describe('Original provider data, including additional fields'),
       coins: z.array(trendingCoinSchema).describe('List of trending coins'),
-      totalCoins: z.number().describe('Total number of trending coins available')
+      totalCoins: z
+        .number()
+        .optional()
+        .describe('Total number of trending coins, when supplied by the provider')
     })
   )
   .handleInvocation(async ctx => {
@@ -67,23 +74,24 @@ export let getTrendingCoins = SlateTool.create(spec, {
     });
 
     let data = result.data;
-    let coins = (data.coins || []).map((c: any) => ({
+    let coins = data.coins.map(c => ({
       coinUuid: c.uuid,
       symbol: c.symbol,
       name: c.name,
-      iconUrl: c.iconUrl || null,
-      price: c.price || null,
-      marketCap: c.marketCap || null,
-      volume24h: c['24hVolume'] || null,
-      change: c.change || null,
+      iconUrl: c.iconUrl ?? null,
+      price: c.price ?? null,
+      marketCap: c.marketCap ?? null,
+      volume24h: c['24hVolume'] ?? null,
+      change: c.change ?? null,
       rank: c.rank ?? null,
-      btcPrice: c.btcPrice || null
+      btcPrice: c.btcPrice ?? null
     }));
 
     return {
       output: {
+        rawData: result.data,
         coins,
-        totalCoins: data.stats?.total ?? coins.length
+        totalCoins: data.stats?.total
       },
       message: `Retrieved **${coins.length}** trending coin(s).`
     };

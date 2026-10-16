@@ -19,7 +19,8 @@ let campaignSchema = z.object({
   clicks: z.number().optional().describe('Total clicks'),
   conversions: z.number().optional().describe('Total conversions'),
   ctr: z.number().optional().describe('Click-through rate'),
-  cpc: z.number().optional().describe('Cost per click')
+  cpc: z.number().optional().describe('Cost per click'),
+  raw: z.record(z.string(), z.any()).optional().describe('Original provider resource')
 });
 
 export let listCampaigns = SlateTool.create(spec, {
@@ -66,7 +67,8 @@ export let listCampaigns = SlateTool.create(spec, {
       clicks: c.clicks,
       conversions: c.conversions,
       ctr: c.ctr,
-      cpc: c.cpc
+      cpc: c.cpc,
+      raw: c
     }));
 
     return {

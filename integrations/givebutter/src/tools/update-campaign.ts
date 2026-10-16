@@ -3,6 +3,17 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let updateCampaignOutputSchema = z.object({
+  campaignId: z.number().describe('ID of the updated campaign'),
+  title: z.string().nullable().describe('Updated title'),
+  type: z.string().nullable().describe('Campaign type'),
+  slug: z.string().nullable().describe('URL slug'),
+  url: z.string().nullable().describe('Public URL'),
+  goal: z.number().nullable().describe('Fundraising goal'),
+  status: z.string().nullable().describe('Campaign status'),
+  updatedAt: z.string().nullable().describe('When last updated')
+});
+
 export let updateCampaign = SlateTool.create(spec, {
   name: 'Update Campaign',
   key: 'update_campaign',
@@ -15,6 +26,8 @@ export let updateCampaign = SlateTool.create(spec, {
     z.object({
       campaignId: z.number().describe('ID of the campaign to update'),
       title: z.string().optional().describe('New title'),
+      published: z.boolean().optional().describe('Whether the campaign is published'),
+      public: z.boolean().optional().describe('Whether the campaign is publicly visible'),
       type: z
         .enum(['general', 'collect', 'fundraise', 'event'])
         .optional()
@@ -26,22 +39,13 @@ export let updateCampaign = SlateTool.create(spec, {
       endAt: z.string().optional().describe('New end date (ISO 8601)')
     })
   )
-  .output(
-    z.object({
-      campaignId: z.number().describe('ID of the updated campaign'),
-      title: z.string().nullable().describe('Updated title'),
-      type: z.string().nullable().describe('Campaign type'),
-      slug: z.string().nullable().describe('URL slug'),
-      url: z.string().nullable().describe('Public URL'),
-      goal: z.number().nullable().describe('Fundraising goal'),
-      status: z.string().nullable().describe('Campaign status'),
-      updatedAt: z.string().nullable().describe('When last updated')
-    })
-  )
+  .output(updateCampaignOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let updateData: Record<string, any> = {};
+    if (ctx.input.published !== undefined) updateData.published = ctx.input.published;
+    if (ctx.input.public !== undefined) updateData.public = ctx.input.public;
     if (ctx.input.title !== undefined) updateData.title = ctx.input.title;
     if (ctx.input.type !== undefined) updateData.type = ctx.input.type;
     if (ctx.input.subtitle !== undefined) updateData.subtitle = ctx.input.subtitle;
@@ -53,17 +57,17 @@ export let updateCampaign = SlateTool.create(spec, {
     let c = await client.updateCampaign(ctx.input.campaignId, updateData);
 
     return {
-      output: {
+      output: client.output(updateCampaignOutputSchema, {
         campaignId: c.id,
-        title: c.title ?? null,
-        type: c.type ?? null,
-        slug: c.slug ?? null,
-        url: c.url ?? null,
-        goal: c.goal ?? null,
-        status: c.status ?? null,
-        updatedAt: c.updated_at ?? null
-      },
-      message: `Updated campaign **${c.title ?? c.id}**.`
+        title: c.title,
+        type: c.type,
+        slug: c.slug,
+        url: c.url,
+        goal: c.goal,
+        status: c.status,
+        updatedAt: c.updated_at
+      }),
+      message: client.publicData(`Updated campaign **${c.title ?? c.id}**.`)
     };
   })
   .build();

@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createOrUpdateQuestion,
+  downloadCertificate,
   getExamResults,
   getQuestions,
   listCategories,
@@ -14,6 +15,7 @@ export let provider = Slate.create({
   tools: [
     listGroupsAndLinks,
     getExamResults,
+    downloadCertificate,
     listCategories,
     manageCategory,
     getQuestions,

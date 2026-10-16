@@ -35,7 +35,7 @@ export let listComments = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let comments = await client.getComments(ctx.input.expenseId);
 
-    let mapped = (comments || []).map((c: any) => ({
+    let mapped = comments.map((c: any) => ({
       commentId: c.id,
       content: c.content,
       commentType: c.comment_type,
@@ -110,7 +110,7 @@ export let deleteComment = SlateTool.create(spec, {
     let result = await client.deleteComment(ctx.input.commentId);
 
     return {
-      output: { success: result.success !== false },
+      output: { success: typeof result.comment.deleted_at === 'string' },
       message: `Deleted comment ${ctx.input.commentId}`
     };
   })

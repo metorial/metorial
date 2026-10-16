@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImportClient } from '../lib/client';
+import { importScopeFields, resolveImportConfig } from '../lib/context';
 import { spec } from '../spec';
 
 export let deleteSubscription = SlateTool.create(spec, {
@@ -15,6 +16,7 @@ export let deleteSubscription = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...importScopeFields,
       subscriptionId: z
         .string()
         .describe('The unique identifier of the subscription to delete.')
@@ -27,11 +29,7 @@ export let deleteSubscription = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImportClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      integrationId: ctx.config.integrationId!
-    });
+    let client = new ImportClient(resolveImportConfig(ctx));
 
     let response = await client.deleteSubscription(ctx.input.subscriptionId);
 

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -25,6 +25,9 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.accountId.trim() || !ctx.input.token.trim()) {
+        throw createApiServiceError('A Draftable Account ID and API token are required.');
+      }
       return {
         output: {
           accountId: ctx.input.accountId,

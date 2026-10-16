@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let getReviews = SlateTool.create(spec, {
   name: 'Get Reviews',
   key: 'get_reviews',
   description: `Retrieve customer reviews for a Target product. Returns individual reviews with ratings, text, author info, and verification status, plus a summary with overall rating, rating breakdown, and recommended percentage. Look up by TCIN, DPCI, GTIN/UPC/ISBN, or URL.`,
-  instructions: ['Provide exactly one identifier: tcin, dpci, gtin, or url.'],
+  instructions: ['Provide a product identifier: tcin, dpci, gtin, or url.'],
   tags: {
     readOnly: true
   }
@@ -62,6 +62,13 @@ export let getReviews = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ![ctx.input.tcin, ctx.input.dpci, ctx.input.gtin, ctx.input.url].some(value =>
+        value?.trim()
+      )
+    ) {
+      throw createApiServiceError('Provide a TCIN, DPCI, GTIN, or Target product URL.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let params: Record<string, any> = {};

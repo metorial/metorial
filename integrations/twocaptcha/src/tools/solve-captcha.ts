@@ -13,20 +13,21 @@ let proxySchema = z
   })
   .optional()
   .describe(
-    'Proxy configuration for IP-matching requirements. When provided, the task type automatically switches to the proxy variant.'
+    'Proxy configuration for IP-matching requirements. Selects the proxy task variant where supported; reCAPTCHA V3 does not support proxies.'
   );
 
 export let solveCaptcha = SlateTool.create(spec, {
   name: 'Solve Captcha',
   key: 'solve_captcha',
-  description: `Submit an interactive/token-based captcha for solving and receive a task ID. Supports reCAPTCHA V2, reCAPTCHA V3, hCaptcha, Arkose Labs (FunCaptcha), GeeTest (v3/v4), and Cloudflare Turnstile.
+  description: `Submit an interactive/token-based captcha for solving and receive a task ID. Supports reCAPTCHA V2, reCAPTCHA V3, Arkose Labs (FunCaptcha), GeeTest (v3/v4), and Cloudflare Turnstile, with a legacy hCaptcha compatibility branch.
 The task is processed asynchronously — use **Get Task Result** to poll for the solution.
-Proxy configuration is optional; when provided, the proxy variant of the task type is used automatically.`,
+Proxy configuration is optional for task types that support it. reCAPTCHA V3 does not support proxies.`,
   instructions: [
     'Use the captchaType field to select which captcha type to solve.',
     'After submitting, poll the task result using the returned taskId.',
     'For reCAPTCHA V3, specify pageAction and minScore for best results.',
-    'Provide proxy details when the captcha solution must originate from a specific IP.'
+    'Provide proxy details when the captcha solution must originate from a specific IP. reCAPTCHA V3 does not support proxies; omit proxy for V3 requests.',
+    'Task submissions can incur charges. After a transport failure, check the callback or account before submitting again.'
   ],
   tags: {
     destructive: false,
@@ -68,7 +69,10 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
         .describe(
           'Action parameter for reCAPTCHA V3 (value of the "action" parameter in grecaptcha.execute)'
         ),
-      minScore: z.number().optional().describe('Minimum score for reCAPTCHA V3 (0.1 to 0.9)'),
+      minScore: z
+        .number()
+        .optional()
+        .describe('Minimum score for reCAPTCHA V3: provider documents 0.3, 0.7, or 0.9'),
       isEnterprise: z.boolean().optional().describe('Set to true for reCAPTCHA Enterprise'),
 
       // FunCaptcha specific
@@ -94,6 +98,10 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
         .string()
         .optional()
         .describe('GeeTest API server subdomain'),
+      geetestRiskType: z
+        .string()
+        .optional()
+        .describe('GeeTest riskType parameter from the captcha loading request'),
       geetestVersion: z.number().optional().describe('GeeTest version: 3 or 4 (default: 3)'),
       initParameters: z
         .record(z.string(), z.unknown())
@@ -104,7 +112,7 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
       turnstileAction: z
         .string()
         .optional()
-        .describe('Turnstile action parameter (cData.action value)'),
+        .describe('Turnstile action parameter (turnstile.render action value)'),
       turnstileData: z.string().optional().describe('Turnstile cData value'),
       turnstilePagedata: z.string().optional().describe('Turnstile pagedata value'),
 
@@ -112,7 +120,7 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
       enterprisePayload: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('hCaptcha Enterprise payload data'),
+        .describe('Enterprise payload data for hCaptcha or reCAPTCHA V2 Enterprise'),
 
       // Common
       userAgent: z
@@ -125,9 +133,11 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
         .describe('Cookies to use when solving (format: "name1=value1; name2=value2")'),
       proxy: proxySchema,
       languagePool: z
-        .enum(['en', 'rn'])
+        .enum(['en', 'rn', 'ru'])
         .optional()
-        .describe('Language pool for workers: "en" (English) or "rn" (Russian)'),
+        .describe(
+          'Language pool for workers: "en" (English) or "ru" (Russian; legacy "rn" is also accepted)'
+        ),
       callbackUrl: z
         .string()
         .optional()
@@ -136,7 +146,8 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
   )
   .output(
     z.object({
-      taskId: z.number().describe('ID of the created task, use this to poll for results')
+      taskId: z.number().describe('ID of the created task, use this to poll for results'),
+      raw: z.record(z.string(), z.unknown()).optional().describe('Complete provider response')
     })
   )
   .handleInvocation(async ctx => {
@@ -150,6 +161,8 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
           websiteKey: ctx.input.websiteKey!,
           isInvisible: ctx.input.isInvisible,
           recaptchaDataSValue: ctx.input.recaptchaDataSValue,
+          isEnterprise: ctx.input.isEnterprise,
+          enterprisePayload: ctx.input.enterprisePayload,
           apiDomain: ctx.input.apiDomain,
           userAgent: ctx.input.userAgent,
           cookies: ctx.input.cookies,
@@ -197,6 +210,7 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
           gt: ctx.input.gt!,
           challenge: ctx.input.challenge,
           geetestApiServerSubdomain: ctx.input.geetestApiServerSubdomain,
+          riskType: ctx.input.geetestRiskType,
           version: ctx.input.geetestVersion,
           initParameters: ctx.input.initParameters,
           proxy: ctx.input.proxy
@@ -221,13 +235,10 @@ Proxy configuration is optional; when provided, the proxy variant of the task ty
       languagePool: ctx.input.languagePool
     });
 
-    if (result.errorId !== 0) {
-      throw new Error(`2Captcha error: ${result.errorCode} - ${result.errorDescription}`);
-    }
-
     return {
       output: {
-        taskId: result.taskId!
+        taskId: result.taskId,
+        raw: result
       },
       message: `**${ctx.input.captchaType}** task created with ID **${result.taskId}**. Poll using Get Task Result to retrieve the solution.`
     };

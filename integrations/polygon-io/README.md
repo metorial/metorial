@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Polygon.io
 
-Access real-time, delayed, and historical financial market data across stocks, options, forex, cryptocurrencies, and indices. Retrieve trades, quotes, OHLCV aggregate bars, daily open/close prices, and snapshots. Compute technical indicators including SMA, EMA, MACD, and RSI. Look up reference data such as ticker details, stock financials, dividends, stock splits, market status, and market holidays. Stream real-time market data via WebSocket for stocks, options, forex, crypto, and indices. Search financial news articles with sentiment analysis.
+Query Polygon.io (now Massive) REST market data across stocks, options, forex, crypto, and indices. Retrieve aggregate bars, daily prices, trades, quotes, snapshots, and technical indicators. Search tickers and financial news, inspect company details and legacy financial reports, discover market reference codes, check market status and holidays, and retrieve corporate actions with historical adjustment factors. Data availability and freshness depend on the API subscription.
 
 ## License
 

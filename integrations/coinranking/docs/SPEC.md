@@ -1,74 +1,46 @@
-# Slates Specification for Coinranking
+# Coinranking Specification
 
-## Overview
+## Authentication and configuration
 
-Coinranking is a cryptocurrency data provider that offers real-time and historical data on coins, exchanges, markets, and global crypto statistics. Its API serves as a read-only data source for cryptocurrency prices, market caps, trading volumes, and related market information.
+Coinranking uses an API key sent in the `x-access-token` header over HTTPS to `https://api.coinranking.com/v2`. Obtain a key from the [developer dashboard](https://account.coinranking.com/dashboard). Empty API keys fail with a user-facing validation error. There is no OAuth refresh flow or documented account/profile endpoint in the public market-data API.
 
-## Authentication
+`referenceCurrencyUuid` is optional configuration. Per-tool currency input overrides it; the provider defaults to USD when neither is set. Discover currency UUIDs with `list_reference_currencies`. No setup field requires an opaque account or workspace ID.
 
-The Coinranking API uses API keys to authenticate requests. You can only do a very limited amount of requests without authenticating.
+## Implemented tools
 
-To get an API key:
+| Tool | API endpoint | Notes |
+| --- | --- | --- |
+| `search` | `GET /search-suggestions` | Coin, exchange, and market summaries; optional suggestion-type filters. Original response data also preserves fiat, categories, commodities, indices, stocks, and additional identifiers. |
+| `list_coins` | `GET /coins` | Search, tiers, tags, sorting, symbols, UUIDs, contracts, and blockchains. Offset is preserved; cursor pagination supports later pages. |
+| `get_coin_details` | `GET /coin/:uuid` | Coin metadata, financial data, supply, links, and tags. |
+| `get_coin_price` | `GET /coin/:uuid/price` | Current or nearest historical price; timestamp is epoch seconds. |
+| `get_coin_price_history` | `GET /coin/:uuid/price-history` | Price points, change, and time ranges including `all` when the plan allows it. |
+| `get_trending_coins` | `GET /coins/trending` | User-engagement ranking, tier filters, offset pagination. A total is only returned when the provider supplies it. |
+| `get_global_stats` | `GET /stats` | Counts, market cap, volume, BTC dominance, and best/newest coin highlights. |
+| `list_reference_currencies` | `GET /reference-currencies` | Search, type filters, offset and cursor pagination. Legacy `asset` selects commodities, indices, and stocks. |
+| `list_tags` | `GET /tags` | Discover category/ecosystem slugs and aggregate market statistics, with offset and cursor pagination. |
 
-1. Create a free account at `https://account.coinranking.com/create-developer-account`.
-2. Find your API key on the dashboard at `https://account.coinranking.com/dashboard`.
+Existing structured field types are retained. Every tool also exposes optional original provider data so extra metadata and explicit nulls remain available. Required identifiers, collections, and numeric metrics are validated; malformed responses fail instead of inventing IDs, totals, or timestamps. Optional tag summaries omit unavailable values.
 
-The API key must be passed as an HTTP header on every request:
+## Limits and provider errors
 
-```
-x-access-token: your-api-key
-```
+The free plan generally limits list requests to 100 results and historical time ranges to one year. The provider allows higher list limits up to 5000 on eligible plans. Coin-list offset is capped at 5000; use the returned cursor to continue. Offset and cursor are alternatives. Historical `all` is available only for eligible paid plans.
 
-All API requests must be made over HTTPS.
+Requests use a 30-second timeout. HTTP errors and failure envelopes produce user-facing errors that preserve provider status, error type/code, and validation detail. API key validation is local; successful authentication is established by subsequent provider operations.
 
-**Base URL:** `https://api.coinranking.com/v2`
+## Scope
 
-## Features
+This is a read-only, single-product cryptocurrency data integration. Paid-only exchanges, DEXs, markets, blockchains, bulk downloads, indicators, and historical metric endpoints are not implemented. The provider offers WebSockets for streaming data; no webhooks or triggers are registered.
 
-### Coin Data
+## Official API references
 
-Browse, search, and filter a comprehensive list of cryptocurrencies. It provides the most crucial data of coins in a handy filterable list. Retrieve detailed information about specific coins including price, supply, rank, market metrics, social links, and descriptive metadata. Trending coins are available based on user engagement and popularity. Coins can be filtered by tier (quality level), tags, and sorted by various criteria like market cap or price. A bulk endpoint is available for fetching all coins at once (Pro plan).
-
-### Price Data
-
-Fetch a single price point for a coin, with the option to specify a timestamp for historical prices. Get a series of price points going back in time for various periods. Pro features include OHLCV (Open/High/Low/Close/Volume) data, fiat price conversions, and coin gains and losses tracking.
-
-### Historical Metrics (Pro)
-
-Access historical data for individual coins including market cap history, trading volume history, rank history, and supply history. Global-level historical data is also available for total market cap, trading volume, and Bitcoin dominance.
-
-### Exchanges
-
-Get a list of centralized exchanges for which Coinranking periodically fetches price data. Retrieve specific information about a centralized exchange, such as links to its socials. Fetch coins listed on a specific exchange, including the latest new coin listings. Exchange market listings are also available. All exchange endpoints require a Pro plan.
-
-### Decentralized Exchanges (DEXs)
-
-Browse decentralized exchanges (DEXs) and DEX protocols. View DEX details, coin listings, new coin listings, and market data. All DEX endpoints require a Pro plan.
-
-### Markets (Pro)
-
-Access trading pair/market data across exchanges, including market details such as price and volume for specific trading pairs.
-
-### Blockchains (Pro)
-
-Retrieve information about blockchains, including blockchain details and contract address lookups.
-
-### Global Statistics
-
-Access aggregated crypto market statistics such as total market cap, total 24-hour volume, number of coins, and number of exchanges. Stats can also be retrieved for a custom selection of coins.
-
-### Reference Currencies
-
-List available reference currencies (e.g., USD, EUR, BTC) that can be used to denominate prices across all other endpoints.
-
-### Search & Tags
-
-Search across coins, exchanges, and markets with a unified search suggestions endpoint. Browse and filter coins by tags (categories like DeFi, stablecoins, etc.).
-
-### Real-Time Data via WebSockets (Pro)
-
-Subscribe to real-time cryptocurrency rates, exchange-specific rates, and ticker data including price, volume, and market statistics via WebSocket connections at `wss://api.coinranking.com/v2/real-time/<path>`. DEX real-time data requires an additional add-on available only on the Professional plan.
-
-## Events
-
-The provider does not support webhooks or event subscription mechanisms. Coinranking offers WebSocket connections for real-time streaming data (rates, exchange rates, tickers), but these are continuous data streams rather than discrete event notifications. There are no webhook or callback-based event systems available.
+- [Getting started and authentication](https://coinranking.com/api/documentation)
+- [Coin list](https://coinranking.com/api/documentation/coins/coins)
+- [Coin details](https://coinranking.com/api/documentation/coins/coin-details)
+- [Coin price](https://coinranking.com/api/documentation/coins/coin-price)
+- [Price history](https://coinranking.com/api/documentation/coins/coin-price-history)
+- [Trending coins](https://coinranking.com/api/documentation/coins/trending-coins)
+- [Global statistics](https://coinranking.com/api/documentation/stats/stats)
+- [Reference currencies](https://coinranking.com/api/documentation/reference-currencies)
+- [Search suggestions](https://coinranking.com/api/documentation/search-suggestions)
+- [Tags](https://coinranking.com/api/documentation/tags/tags)

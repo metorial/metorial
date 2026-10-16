@@ -1,16 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { eventSchema, mapEvent } from '../lib/schemas';
 import { spec } from '../spec';
-
-let eventSchema = z.object({
-  eventId: z.string().describe('Unique event identifier'),
-  sportKey: z.string().describe('Sport key'),
-  sportTitle: z.string().describe('Sport display name'),
-  commenceTime: z.string().describe('ISO timestamp of event start time'),
-  homeTeam: z.string().nullable().describe('Home team name'),
-  awayTeam: z.string().nullable().describe('Away team name')
-});
 
 export let getEventsTool = SlateTool.create(spec, {
   name: 'Get Events',
@@ -23,7 +15,11 @@ This is a free endpoint that does not count against the usage quota.`,
 })
   .input(
     z.object({
-      sport: z.string().describe('Sport key (e.g. "americanfootball_nfl")'),
+      includeRotationNumbers: z
+        .boolean()
+        .optional()
+        .describe('Include home and away rotation numbers when available'),
+      sport: z.string().describe('Sport key from list_sports (e.g. "americanfootball_nfl")'),
       eventIds: z.string().optional().describe('Comma-separated event IDs to filter'),
       commenceTimeFrom: z
         .string()
@@ -43,20 +39,14 @@ This is a free endpoint that does not count against the usage quota.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.getEvents({
+      includeRotationNumbers: ctx.input.includeRotationNumbers,
       sport: ctx.input.sport,
       eventIds: ctx.input.eventIds,
       commenceTimeFrom: ctx.input.commenceTimeFrom,
       commenceTimeTo: ctx.input.commenceTimeTo
     });
 
-    let events = data.map(e => ({
-      eventId: e.id,
-      sportKey: e.sport_key,
-      sportTitle: e.sport_title,
-      commenceTime: e.commence_time,
-      homeTeam: e.home_team,
-      awayTeam: e.away_team
-    }));
+    let events = data.map(mapEvent);
 
     return {
       output: { events },

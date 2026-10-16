@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { collection, requiredId } from '../lib/response';
 import { spec } from '../spec';
 
 export let searchCompanies = SlateTool.create(spec, {
@@ -38,8 +39,11 @@ export let searchCompanies = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.query !== undefined && ctx.input.filters !== undefined) {
+      throw createApiServiceError('Provide query or filters, not both.');
+    }
     let data: any;
-    if (ctx.input.filters) {
+    if (ctx.input.filters !== undefined) {
       data = await client.filterCompanies(ctx.input.filters, {
         page: ctx.input.page,
         perPage: ctx.input.perPage
@@ -51,17 +55,17 @@ export let searchCompanies = SlateTool.create(spec, {
       });
     }
 
-    let companies = (data?._embedded?.companies ?? []).map((c: any) => ({
-      companyId: c.id?.toString() ?? '',
-      name: c.name,
-      website: c.website,
-      isHot: c.is_hot
+    let companies = collection(data, 'companies').map((c: any) => ({
+      companyId: requiredId(c.id, 'record'),
+      name: c.name ?? undefined,
+      website: c.website ?? undefined,
+      isHot: c.is_hot ?? undefined
     }));
 
     return {
       output: {
         companies,
-        totalCount: data?.total ?? companies.length,
+        totalCount: data?.total ?? undefined,
         currentPage: data?.page ?? ctx.input.page ?? 1
       },
       message: `Found **${companies.length}** company(ies).`
