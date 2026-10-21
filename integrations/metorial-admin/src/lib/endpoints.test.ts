@@ -277,8 +277,27 @@ describe('Metorial call endpoint validation', () => {
     expect(
       buildMetorialEndpointPath(endpoint, {
         instanceId: 'inst_123',
-        pathParams: { providerId: 'provider/demo' }
+        pathParams: { providerId: 'provider demo' }
       })
-    ).toBe('/dashboard/instances/inst_123/providers/provider%2Fdemo');
+    ).toBe('/dashboard/instances/inst_123/providers/provider%20demo');
+  });
+
+  it('rejects path parameters that would change the request path (security guard: the live API never echoes a traversed path, so live E2E cannot observe it)', () => {
+    let endpoint = resolveMetorialEndpointForCall(docs, {
+      method: 'get',
+      endpointPath: '/dashboard/instances/:instanceId/providers/:providerId'
+    });
+
+    for (let providerId of ['.', '..', 'provider/demo']) {
+      expect(() =>
+        buildMetorialEndpointPath(endpoint, {
+          instanceId: 'inst_123',
+          pathParams: { providerId }
+        })
+      ).toThrow(/Invalid path parameter "providerId"/);
+    }
+    expect(() => buildMetorialEndpointPath(endpoint, { instanceId: '..' })).toThrow(
+      /Invalid path parameter "instanceId"/
+    );
   });
 });

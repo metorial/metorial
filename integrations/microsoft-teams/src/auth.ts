@@ -21,7 +21,7 @@ export let graphAuthMethodKeys = [
 // the standard methods request only scopes Microsoft lets regular users
 // consent to, while "Work Only (Full Access)" adds the admin-consent-gated
 // scopes and therefore shows "Need admin approval" until a Microsoft Entra
-// admin grants tenant-wide consent.
+// admin grants tenant-wide consent through its admin setup flow.
 let baseScopes = [
   {
     title: 'User Profile',
@@ -187,7 +187,8 @@ export let auth = SlateAuth.create()
       tenant: 'organizations',
       scopes: [...baseScopes, ...adminConsentScopes],
       docs,
-      missingRefreshTokenMessage: 'No refresh token available'
+      missingRefreshTokenMessage: 'No refresh token available',
+      adminConsent: true
     }),
     adapters: []
   })

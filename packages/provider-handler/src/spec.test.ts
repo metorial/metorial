@@ -222,4 +222,11 @@ describe('mapAuthMethod', () => {
       expect(mapAuthMethod(slate, method)).not.toHaveProperty('syncTokensAcrossConnections');
     }
   });
+
+  it('omits the adminSetup capability when undeclared so existing spec hashes stay stable', () => {
+    expect(
+      mapAuthMethod(slate, { ...oauthMethod, adminSetup: {} }).capabilities
+    ).toMatchObject({ adminSetup: { enabled: true } });
+    expect(mapAuthMethod(slate, oauthMethod).capabilities).not.toHaveProperty('adminSetup');
+  });
 });

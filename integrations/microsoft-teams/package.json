@@ -9,10 +9,10 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/adapter-chat": "1.0.0-rc.13",
-    "@slates/oauth-microsoft": "1.0.0-rc.12",
+    "@slates/adapter-chat": "1.0.0-rc.15",
+    "@slates/oauth-microsoft": "1.0.0-rc.13",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.27",
+    "slates": "1.0.0-rc.30",
     "zod": "^4.2"
   },
   "devDependencies": {
@@ -21,5 +21,5 @@
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.4.0"
+  "version": "0.4.1"
 }

@@ -3,6 +3,42 @@ import type { SlateAuthDocsReference } from '../docs';
 
 type SlateAuthCallbackConfig = Record<string, any>;
 
+type SlateOauthAuthorizationUrlContext<InputType> = {
+  redirectUri: string;
+  state: string;
+  input: InputType;
+  clientId: string;
+  clientSecret: string;
+  scopes: string[];
+  config?: SlateAuthCallbackConfig;
+};
+
+type SlateOauthAuthorizationUrlResult<InputType> = {
+  url: string;
+  input?: InputType;
+  callbackState?: Record<string, any>;
+};
+
+type SlateOauthCallbackContext<InputType> = {
+  code: string;
+  state: string;
+  redirectUri: string;
+  input: InputType;
+  clientId: string;
+  clientSecret: string;
+  scopes: string[];
+  callbackParams?: Record<string, string>;
+  callbackState: Record<string, any>;
+  config?: SlateAuthCallbackConfig;
+};
+
+type SlateOauthAdminCallbackContext<InputType> = Omit<
+  SlateOauthCallbackContext<InputType>,
+  'code'
+> & {
+  code?: string;
+};
+
 export type SlateAuthWithOauth<
   InputType extends {},
   OutputType extends {
@@ -28,6 +64,18 @@ export type SlateAuthWithOauth<
   // connection of one installation, so a refresh must update all of them.
   syncTokensAcrossConnections?: boolean;
 
+  // Missing hooks fall back to the regular flow (callback output discarded).
+  // Returned instructions are markdown shown to the admin.
+  adminSetup?: {
+    getAuthorizationUrl?: (
+      ctx: SlateOauthAuthorizationUrlContext<InputType>
+    ) => Promise<SlateOauthAuthorizationUrlResult<InputType>>;
+
+    handleCallback?: (
+      ctx: SlateOauthAdminCallbackContext<InputType>
+    ) => Promise<{ instructions?: string }>;
+  };
+
   docs?: SlateAuthDocsReference[];
 
   inputSchema?: z.ZodType<InputType>;
@@ -39,32 +87,11 @@ export type SlateAuthWithOauth<
 
   getDefaultInput?: () => Promise<InputType>;
 
-  getAuthorizationUrl: (ctx: {
-    redirectUri: string;
-    state: string;
-    input: InputType;
-    clientId: string;
-    clientSecret: string;
-    scopes: string[];
-    config?: SlateAuthCallbackConfig;
-  }) => Promise<{
-    url: string;
-    input?: InputType;
-    callbackState?: Record<string, any>;
-  }>;
+  getAuthorizationUrl: (
+    ctx: SlateOauthAuthorizationUrlContext<InputType>
+  ) => Promise<SlateOauthAuthorizationUrlResult<InputType>>;
 
-  handleCallback: (ctx: {
-    code: string;
-    state: string;
-    redirectUri: string;
-    input: InputType;
-    clientId: string;
-    clientSecret: string;
-    scopes: string[];
-    callbackParams?: Record<string, string>;
-    callbackState: Record<string, any>;
-    config?: SlateAuthCallbackConfig;
-  }) => Promise<{
+  handleCallback: (ctx: SlateOauthCallbackContext<InputType>) => Promise<{
     output: OutputType;
     input?: InputType;
     scopes?: string[];

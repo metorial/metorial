@@ -32,7 +32,8 @@ export let slatesAuthenticationMethod = z.object({
     getDefaultInput: z.object({ enabled: z.boolean() }).optional(),
     handleChangedInput: z.object({ enabled: z.boolean() }).optional(),
     handleTokenRefresh: z.object({ enabled: z.boolean() }).optional(),
-    getProfile: z.object({ enabled: z.boolean() }).optional()
+    getProfile: z.object({ enabled: z.boolean() }).optional(),
+    adminSetup: z.object({ enabled: z.boolean() }).optional()
   }),
 
   docs: z.array(

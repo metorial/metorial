@@ -8,9 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates/oauth-microsoft": "1.0.0-rc.6",
+    "@slates/oauth-microsoft": "1.0.0-rc.13",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.17",
+    "slates": "1.0.0-rc.30",
     "zod": "^4.2"
   },
   "devDependencies": {
@@ -19,5 +19,5 @@
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.0"
+  "version": "0.2.1"
 }
