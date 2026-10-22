@@ -12,5 +12,6 @@
     "prepare non-JSON response files for download",
     "inspect authenticated account context",
     "read instance metadata"
-  ]
+  ],
+  "logoUrl": "https://cdn.metorial.com/metorial-bw.svg"
 }
