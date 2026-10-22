@@ -5,18 +5,19 @@
   "scripts": {
     "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
     "test": "vitest run --config vitest.config.ts --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync-contract": "bun scripts/sync-contract.ts"
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
     "@types/node": "^20",
     "zod": "^4.2",
-    "slates": "1.0.0-rc.28"
+    "slates": "1.0.0-rc.30"
   },
   "devDependencies": {
     "@slates/test": "1.0.0-rc.14",
     "typescript": "^5",
     "vitest": "^3.2.4"
   },
-  "version": "0.2.0"
+  "version": "0.3.0"
 }

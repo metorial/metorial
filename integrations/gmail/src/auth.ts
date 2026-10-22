@@ -118,6 +118,21 @@ export let auth = SlateAuth.create()
       };
     },
 
+    adminSetup: {
+      handleCallback: async ctx => ({
+        instructions: [
+          'To let users in your Google Workspace organization connect Gmail, mark this app as trusted in the Google Admin console:',
+          '',
+          '1. Sign in to [admin.google.com](https://admin.google.com) as a super administrator.',
+          '2. Go to **Security** → **Access and data control** → **API controls**.',
+          '3. Under **App access control**, click **Manage third-party app access**.',
+          `4. Click **Configure new app** and search for the OAuth client ID \`${ctx.clientId}\`.`,
+          '5. Select the app, choose who it applies to, and set its access to **Trusted**.',
+          '6. Click **Finish**. The change can take a few minutes to apply.'
+        ].join('\n')
+      })
+    },
+
     handleCallback: async ctx => {
       let response = await googleAxios.post(
         '/token',

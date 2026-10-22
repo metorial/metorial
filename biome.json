@@ -20,7 +20,8 @@
       "!**/dist-*",
       "!**/.turbo",
       "!**/.cache",
-      "!**/prisma/migrations"
+      "!**/prisma/migrations",
+      "!integrations/metorial-admin/src/lib/contract.json"
     ]
   },
   "formatter": {

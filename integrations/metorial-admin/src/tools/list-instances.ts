@@ -41,9 +41,11 @@ export let listInstances = SlateTool.create(spec, {
   name: 'List Instances',
   key: 'list_instances',
   description:
-    'List Metorial instances visible to the authenticated actor. This call uses the organization-level instances endpoint and does not send a metorial-instance-id header.',
+    'DEPRECATED — use `instance_list` instead. List Metorial instances visible to the authenticated actor. This call uses the organization-level instances endpoint and does not send a metorial-instance-id header.',
+  instructions: ['Use instance_list instead; this tool is kept for existing workflows.'],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(z.object({}))

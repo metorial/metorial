@@ -1,7 +1,7 @@
-import { Buffer } from 'node:buffer';
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { resolveMetorialRuntimeConfig } from '../config';
+import { addResponseAttachment } from '../lib/attachments';
 import { MetorialClient } from '../lib/client';
 import {
   buildMetorialEndpointPath,
@@ -122,16 +122,7 @@ export let callEndpoint = SlateTool.create(spec, {
     }
 
     // The dynamic request may use POST or other methods, so reuse the retrieved bytes.
-    await ctx.addAttachment({
-      type: 'content',
-      content: new Response(
-        response.kind === 'text' ? response.text : Buffer.from(response.base64, 'base64'),
-        response.contentType
-          ? { headers: { 'Content-Type': response.contentType } }
-          : undefined
-      ),
-      mimeType: response.contentType
-    });
+    await addResponseAttachment(ctx, response);
 
     return {
       output: {

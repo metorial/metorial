@@ -55,6 +55,12 @@ let generateCodeChallenge = (codeVerifier: string) =>
 let instanceScopes = [
   'organization.instance:read',
   'organization.instance:write',
+  'organization.event:read',
+  'organization.event_destination:read',
+  'organization.event_destination:write',
+  'organization.api_key:read',
+  'organization.outpost:read',
+  'organization.outpost:write',
   'instance.file:read',
   'instance.file:write',
   'instance.file_link:read',
@@ -67,8 +73,11 @@ let instanceScopes = [
   'instance.assistant.conversation:write',
   'instance.skill:read',
   'instance.skill:write',
+  'instance.skill:manage_access',
   'instance.session:read',
   'instance.session:write',
+  'instance.monitor:read',
+  'instance.monitor:write',
   'instance.provider_oauth.connection:read',
   'instance.provider_oauth.connection:write',
   'instance.provider_oauth.session:read',
@@ -82,6 +91,10 @@ let instanceScopes = [
   'instance.provider_oauth.takeIn:write',
   'instance.callback:read',
   'instance.callback:write',
+  'instance.network:read',
+  'instance.network:write',
+  'instance.sandbox:read',
+  'instance.sandbox:write',
   'instance.server.config_vault:read',
   'instance.server.config_vault:write',
   'instance.ssoTenant:read',
@@ -112,6 +125,8 @@ let instanceScopes = [
   'instance.provider.config:write',
   'instance.provider.config_vault:read',
   'instance.provider.config_vault:write',
+  'instance.provider.public_mcp_server:read',
+  'instance.provider.public_mcp_server:write',
   'instance.provider.group:read',
   'instance.provider.group:write',
   'instance.provider.specification:read',
@@ -135,7 +150,9 @@ let instanceScopes = [
   'instance.scm.installation:read',
   'instance.scm.installation:write',
   'instance.scm.repo:read',
-  'instance.scm.repo:write'
+  'instance.scm.repo:write',
+  'instance.chat:read',
+  'instance.chat:write'
 ] as const;
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>

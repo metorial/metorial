@@ -1,6 +1,6 @@
 {
   "name": "@slates/oauth-microsoft",
-  "version": "1.0.0-rc.12",
+  "version": "1.0.0-rc.13",
   "publishConfig": {
     "access": "public"
   },
@@ -31,9 +31,10 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "slates": "1.0.0-rc.25"
+    "slates": "1.0.0-rc.30"
   },
   "devDependencies": {
+    "@lowerdeck/error": "^1.1.0",
     "@types/node": "^20",
     "@slates/tsconfig": "1.0.0-rc.1",
     "typescript": "5.8.2",

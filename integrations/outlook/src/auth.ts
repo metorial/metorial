@@ -43,7 +43,7 @@ let scopes = [
   { title: 'Email', description: 'Read user email address', scope: 'email' }
 ];
 
-let createMicrosoftOauth = (name: string, key: string, tenant: string) =>
+let createMicrosoftOauth = (name: string, key: string, tenant: string, adminConsent = false) =>
   createMicrosoftGraphOauth({
     name,
     key,
@@ -61,7 +61,8 @@ let createMicrosoftOauth = (name: string, key: string, tenant: string) =>
         url: 'https://learn.microsoft.com/en-us/graph/permissions-reference'
       }
     ],
-    normalizeRedirectUri: true
+    normalizeRedirectUri: true,
+    adminConsent
   });
 
 export let auth = SlateAuth.create()
@@ -73,4 +74,4 @@ export let auth = SlateAuth.create()
     })
   )
   .addOauth(createMicrosoftOauth('Work & Personal', 'oauth_common', 'common'))
-  .addOauth(createMicrosoftOauth('Work Only', 'oauth_organizations', 'organizations'));
+  .addOauth(createMicrosoftOauth('Work Only', 'oauth_organizations', 'organizations', true));

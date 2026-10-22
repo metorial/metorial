@@ -1,14 +1,17 @@
 {
   "name": "@metorial/metorial-admin",
-  "description": "Inspect authorized Metorial dashboard instance API endpoints, discover accessible instances, read authenticated account context, and call validated endpoints using OAuth or API key authentication.",
+  "description": "Administer Metorial instances with one tool per admin API operation: providers, sessions, skills, files, sandboxes, Magic MCP, portals, integrations, API keys, and more, plus endpoint discovery and validated dynamic calls using OAuth or API key authentication.",
   "categories": ["developer-tools", "productivity"],
   "skills": [
     "inspect Metorial API endpoints",
+    "manage Metorial skills, sandboxes, and provider deployments",
+    "upload files to a Metorial instance",
     "list accessible Metorial instances",
     "call dashboard instance endpoints",
     "administer Metorial instance resources",
     "prepare non-JSON response files for download",
     "inspect authenticated account context",
     "read instance metadata"
-  ]
+  ],
+  "logoUrl": "https://cdn.metorial.com/metorial-bw.svg"
 }
