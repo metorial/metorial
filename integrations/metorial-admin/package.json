@@ -19,5 +19,5 @@
     "typescript": "^5",
     "vitest": "^3.2.4"
   },
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

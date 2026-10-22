@@ -31,7 +31,7 @@
     {
       "key": "magic-mcp",
       "name": "Magic MCP",
-      "description": "Magic MCP resources."
+      "description": "Magic MCP servers are stable MCP entrypoints backed by a session template. Group servers, combine them behind routed endpoints, and manage the tokens that authorize access to them."
     },
     {
       "key": "skills",
@@ -51,12 +51,12 @@
     {
       "key": "sandbox",
       "name": "Sandboxes",
-      "description": "Sandboxes resources."
+      "description": "Sandboxes are isolated machines that boot from an image and can mount disks. Create and operate machines, run commands on them, build images from a Dockerfile, and manage disks, regions, and machine sizes."
     },
     {
       "key": "chat",
       "name": "Chat",
-      "description": "Chat resources."
+      "description": "Chat links providers such as Slack and Microsoft Teams to your instance. Manage chat connections and chat instances, and read their workspaces and events."
     },
     {
       "key": "callbacks",
@@ -71,12 +71,12 @@
     {
       "key": "network",
       "name": "Network Access",
-      "description": "Network Access resources."
+      "description": "Network access controls how integrations and sandbox machines reach the network. Read integration enclaves and the internet gateway, and manage firewalls, their assignments, and reusable network policies."
     },
     {
       "key": "monitoring",
       "name": "Monitoring",
-      "description": "Monitoring resources."
+      "description": "Monitoring tracks automated checks on your instance. Read monitors and ProtoGuard prompt-injection settings, and review and resolve alerts for detected prompt-injection or schema-change events."
     },
     {
       "key": "portals",
@@ -96,7 +96,7 @@
     {
       "key": "api-keys",
       "name": "API Key",
-      "description": "Read and write API key information"
+      "description": "Read and write API key information. The secret of a newly created API key is shown only once, when it is created."
     },
     {
       "key": "outposts",
@@ -18205,6 +18205,10 @@
           "in": "body",
           "name": "skill_plugin_id"
         },
+        "enable_skill_editing": {
+          "in": "body",
+          "name": "enable_skill_editing"
+        },
         "magic_mcp_servers": {
           "in": "body",
           "name": "magic_mcp_servers"
@@ -18229,6 +18233,10 @@
           },
           "skill_plugin_id": {
             "type": "string"
+          },
+          "enable_skill_editing": {
+            "type": "boolean",
+            "description": "Expose skill editing tools on this endpoint so the connecting consumer can read and edit the skills they have access to. Only connections authenticated with a magic MCP token bound to a single consumer get the tools; connections using a publishable key do not. Requires skills to be enabled for the instance and consumer skill editing to be allowed for the project. The tools disappear if either is turned off later."
           },
           "magic_mcp_servers": {
             "type": "array",
@@ -18749,6 +18757,10 @@
         "metadata": {
           "in": "body",
           "name": "metadata"
+        },
+        "enable_skill_editing": {
+          "in": "body",
+          "name": "enable_skill_editing"
         }
       },
       "inputSchema": {
@@ -18768,6 +18780,10 @@
           "metadata": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "enable_skill_editing": {
+            "type": "boolean",
+            "description": "Expose skill editing tools on this endpoint so the connecting consumer can read and edit the skills they have access to. Only connections authenticated with a magic MCP token bound to a single consumer get the tools; connections using a publishable key do not. Requires skills to be enabled for the instance and consumer skill editing to be allowed for the project. The tools disappear if either is turned off later."
           }
         },
         "required": [
