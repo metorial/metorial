@@ -209,6 +209,72 @@ export type SlatesMessageAuthAuthorizationCallbackHandleResponse = z.infer<
 >;
 
 /**
+ * Get Admin Authorization Url
+ */
+export let slatesMessageAuthAdminAuthorizationUrlGetRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/auth.admin_authorization_url.get'),
+  id: z.string(),
+  params: slatesMessageAuthAuthorizationUrlGetRequest.shape.params
+});
+
+export type SlatesMessageAuthAdminAuthorizationUrlGetRequest = z.infer<
+  typeof slatesMessageAuthAdminAuthorizationUrlGetRequest
+>;
+
+export let slatesMessageAuthAdminAuthorizationUrlGetResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    authorizationUrl: z.string(),
+    input: z.record(z.string(), z.any()).optional(),
+    callbackState: z.record(z.string(), z.any()).optional()
+  })
+});
+
+export type SlatesMessageAuthAdminAuthorizationUrlGetResponse = z.infer<
+  typeof slatesMessageAuthAdminAuthorizationUrlGetResponse
+>;
+
+/**
+ * Handle Admin Callback
+ */
+export let slatesMessageAuthAdminCallbackHandleRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/auth.admin_callback.handle'),
+  id: z.string(),
+  params: z.object({
+    authenticationMethodId: z.string(),
+
+    code: z.string().optional(),
+    state: z.string(),
+    redirectUri: z.string(),
+    input: z.record(z.string(), z.any()),
+    clientId: z.string(),
+    clientSecret: z.string(),
+    scopes: z.array(z.string()),
+    callbackParams: z.record(z.string(), z.string()).optional(),
+    callbackState: z.record(z.string(), z.any()).optional()
+  })
+});
+
+export type SlatesMessageAuthAdminCallbackHandleRequest = z.infer<
+  typeof slatesMessageAuthAdminCallbackHandleRequest
+>;
+
+export let slatesMessageAuthAdminCallbackHandleResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    instructions: z.string().optional()
+  })
+});
+
+export type SlatesMessageAuthAdminCallbackHandleResponse = z.infer<
+  typeof slatesMessageAuthAdminCallbackHandleResponse
+>;
+
+/**
  * Handle Token Refresh
  */
 export let slatesMessageAuthTokenRefreshHandleRequest = z.object({
@@ -314,6 +380,8 @@ export type SlatesAuthRequests =
   | SlatesMessageAuthDefaultInputGetRequest
   | SlatesMessageAuthAuthorizationUrlGetRequest
   | SlatesMessageAuthAuthorizationCallbackHandleRequest
+  | SlatesMessageAuthAdminAuthorizationUrlGetRequest
+  | SlatesMessageAuthAdminCallbackHandleRequest
   | SlatesMessageAuthTokenRefreshHandleRequest
   | SlatesMessageAuthProfileGetRequest
   | SlatesMessageAuthOutputGetRequest;
@@ -325,6 +393,8 @@ export type SlatesAuthResponses =
   | SlatesMessageAuthDefaultInputGetResponse
   | SlatesMessageAuthAuthorizationUrlGetResponse
   | SlatesMessageAuthAuthorizationCallbackHandleResponse
+  | SlatesMessageAuthAdminAuthorizationUrlGetResponse
+  | SlatesMessageAuthAdminCallbackHandleResponse
   | SlatesMessageAuthTokenRefreshHandleResponse
   | SlatesMessageAuthProfileGetResponse
   | SlatesMessageAuthOutputGetResponse;
@@ -339,6 +409,8 @@ export let slatesAuthResponsesByMethod = {
   'slates/auth.authorization_url.get': slatesMessageAuthAuthorizationUrlGetResponse,
   'slates/auth.authorization_callback.handle':
     slatesMessageAuthAuthorizationCallbackHandleResponse,
+  'slates/auth.admin_authorization_url.get': slatesMessageAuthAdminAuthorizationUrlGetResponse,
+  'slates/auth.admin_callback.handle': slatesMessageAuthAdminCallbackHandleResponse,
   'slates/auth.token_refresh.handle': slatesMessageAuthTokenRefreshHandleResponse,
   'slates/auth.profile.get': slatesMessageAuthProfileGetResponse,
   'slates/auth.output.get': slatesMessageAuthOutputGetResponse
@@ -352,6 +424,8 @@ export let slatesAuthRequestsByMethod = {
   'slates/auth.authorization_url.get': slatesMessageAuthAuthorizationUrlGetRequest,
   'slates/auth.authorization_callback.handle':
     slatesMessageAuthAuthorizationCallbackHandleRequest,
+  'slates/auth.admin_authorization_url.get': slatesMessageAuthAdminAuthorizationUrlGetRequest,
+  'slates/auth.admin_callback.handle': slatesMessageAuthAdminCallbackHandleRequest,
   'slates/auth.token_refresh.handle': slatesMessageAuthTokenRefreshHandleRequest,
   'slates/auth.profile.get': slatesMessageAuthProfileGetRequest,
   'slates/auth.output.get': slatesMessageAuthOutputGetRequest

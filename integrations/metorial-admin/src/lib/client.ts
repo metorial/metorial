@@ -1,9 +1,14 @@
 import { Buffer } from 'node:buffer';
 import { type MetorialConfig, normalizeMetorialConfig } from '../config';
-import type { MetorialIntrospectionDocs, MetorialMethod } from './endpoints';
+import {
+  encodeMetorialPathParam,
+  type MetorialIntrospectionDocs,
+  type MetorialMethod
+} from './endpoints';
 import {
   metorialApiError,
   metorialHttpError,
+  metorialServiceError,
   metorialUnsupportedContentTypeError
 } from './errors';
 
@@ -48,7 +53,7 @@ export type MetorialEndpointResponse =
       statusText: string;
       contentType?: string;
       size: number;
-      base64: string;
+      bytes: Buffer;
     };
 
 let appendQueryValue = (params: URLSearchParams, key: string, value: QueryValue) => {
@@ -60,11 +65,23 @@ let appendQueryValue = (params: URLSearchParams, key: string, value: QueryValue)
   }
 
   if (typeof value === 'object') {
-    params.append(key, JSON.stringify(value));
+    for (let [childKey, childValue] of Object.entries(value)) {
+      appendQueryValue(params, `${key}[${childKey}]`, childValue);
+    }
     return;
   }
 
   params.append(key, String(value));
+};
+
+export type MetorialFileUpload = {
+  token: string;
+  instanceId?: string;
+  purpose: string;
+  title?: string;
+  filename: string;
+  contentType: string;
+  bytes: Buffer;
 };
 
 let isJsonContentType = (contentType?: string) =>
@@ -185,7 +202,7 @@ export class MetorialClient {
 
   async getInstance(token: string, instanceId: string) {
     return await this.requestJson<Record<string, unknown>>(
-      `/instances/${encodeURIComponent(instanceId)}`,
+      `/instances/${encodeMetorialPathParam('instanceId', instanceId)}`,
       {
         operation: 'get instance',
         token
@@ -193,11 +210,72 @@ export class MetorialClient {
     );
   }
 
+  async uploadFile(input: MetorialFileUpload) {
+    let options = {
+      method: 'post' as const,
+      token: input.token,
+      instanceId: input.instanceId
+    };
+
+    let upload = await this.requestJson<{
+      id?: unknown;
+      upload?: { url?: unknown; method?: unknown };
+    }>('/files', {
+      ...options,
+      operation: 'request file upload URL',
+      body: {
+        mode: 'get_upload_url',
+        purpose: input.purpose,
+        title: input.title,
+        instance_id: input.instanceId,
+        file_name: input.filename,
+        file_size: input.bytes.byteLength,
+        file_type: input.contentType
+      }
+    });
+
+    if (typeof upload.id !== 'string' || typeof upload.upload?.url !== 'string') {
+      throw metorialServiceError('Metorial API did not return a file upload URL.', {
+        reason: 'metorial_api_error'
+      });
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(upload.upload.url, {
+        method: typeof upload.upload.method === 'string' ? upload.upload.method : 'PUT',
+        headers: { 'Content-Type': input.contentType },
+        body: input.bytes
+      });
+    } catch (error) {
+      throw metorialApiError(error, 'file content upload');
+    }
+    if (!response.ok) {
+      throw metorialHttpError({
+        operation: 'file content upload',
+        status: response.status,
+        statusText: response.statusText,
+        body: await response.text().catch(() => undefined),
+        contentType: response.headers.get('content-type') ?? undefined
+      });
+    }
+
+    return await this.requestJson<Record<string, unknown>>('/files', {
+      ...options,
+      operation: 'complete file upload',
+      body: {
+        mode: 'complete',
+        file_upload_id: upload.id,
+        instance_id: input.instanceId
+      }
+    });
+  }
+
   async callEndpoint(input: {
     method: MetorialMethod;
     path: string;
     token: string;
-    instanceId: string;
+    instanceId?: string;
     query?: Record<string, unknown>;
     body?: unknown;
   }): Promise<MetorialEndpointResponse> {
@@ -267,7 +345,7 @@ export class MetorialClient {
     return {
       ...base,
       kind: 'binary',
-      base64: buffer.toString('base64')
+      bytes: buffer
     };
   }
 }

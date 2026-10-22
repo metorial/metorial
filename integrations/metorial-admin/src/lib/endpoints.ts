@@ -229,6 +229,16 @@ export let resolveMetorialEndpointForCall = (
   throw metorialValidationError(`Unknown Metorial endpoint: ${input.endpointPath}`);
 };
 
+export let encodeMetorialPathParam = (name: string, value: string) => {
+  if (value === '' || value === '.' || value === '..' || value.includes('/')) {
+    throw metorialValidationError(
+      `Invalid path parameter "${name}": ${JSON.stringify(value)} is not a valid resource ID.`
+    );
+  }
+
+  return encodeURIComponent(value);
+};
+
 export let buildMetorialEndpointPath = (
   endpoint: MetorialEndpoint,
   input: { instanceId: string; pathParams?: Record<string, string> }
@@ -248,6 +258,6 @@ export let buildMetorialEndpointPath = (
       );
     }
 
-    return encodeURIComponent(value);
+    return encodeMetorialPathParam(name, value);
   });
 };

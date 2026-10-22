@@ -4,13 +4,21 @@ Metorial Admin exposes a controlled dynamic wrapper around Metorial dashboard in
 
 ## Tools
 
+### Admin tools
+
+One tool per Metorial admin API operation, matching the `metorial-admin` command-line tool: instances, providers and deployments, custom providers, identities, sessions, Magic MCP, skills, files, stores, sandboxes, chat, callbacks, events, network access, monitoring, portals, consumers, integrations, API keys, and outposts. Tool keys follow the command path, such as `skills_files_list` or `sandbox_machines_exec`, and tools are grouped into categories by product area. Instance tools accept an optional `instance_id`; call `instance_list` to discover it.
+
+### Upload File
+
+Upload a base64-encoded file up to 5 MB to an instance and return the created file record.
+
 ### List Endpoints
 
 List callable Metorial dashboard instance API endpoints from runtime introspection. Hidden, deprecated, confidential, and non-instance endpoints are excluded.
 
 ### List Instances
 
-List Metorial instances visible to the authenticated actor without sending a `metorial-instance-id` header.
+Deprecated in favor of `instance_list`. List Metorial instances visible to the authenticated actor without sending a `metorial-instance-id` header.
 
 ### Call Endpoint
 
@@ -22,7 +30,7 @@ Read the credential type and its real organization, project, instance, actor, an
 
 ### Get Instance
 
-Read complete instance metadata by ID or slug discovered with List Instances.
+Deprecated in favor of `instance_get`. Read complete instance metadata by ID or slug discovered with List Instances.
 
 Endpoint discovery optionally includes documented response schemas with `includeResponseSchema`, in addition to the existing query and body schema option.
 

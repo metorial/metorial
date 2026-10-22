@@ -7,6 +7,8 @@ import {
 import {
   createSlatesProviderProtoHandler,
   SLATES_PROTOCOL_VERSION,
+  type SlatesMessageAuthAdminCallbackHandleRequest,
+  type SlatesMessageAuthAuthorizationUrlGetRequest,
   type SlatesParticipant
 } from '@slates/proto';
 import {
@@ -342,6 +344,77 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     ) => {
       let requestTraces = context.getHttpTraces();
       return requestTraces.length > 0 ? { ...result, requestTraces } : result;
+    };
+
+    let buildAuthorizationUrlContext = (
+      params: SlatesMessageAuthAuthorizationUrlGetRequest['params']
+    ) => ({
+      redirectUri: params.redirectUri,
+      state: params.state,
+      input: params.input,
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+      scopes: params.scopes,
+      config: getAuthConfig()
+    });
+
+    let buildCallbackContext = (
+      params: Omit<SlatesMessageAuthAdminCallbackHandleRequest['params'], 'code'>
+    ) => ({
+      state: params.state,
+      redirectUri: params.redirectUri,
+      input: params.input,
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+      scopes: params.scopes,
+      callbackParams: params.callbackParams || {},
+      callbackState: params.callbackState || {},
+      config: getAuthConfig()
+    });
+
+    let getTracedAuthorizationUrl = async (
+      params: SlatesMessageAuthAuthorizationUrlGetRequest['params'],
+      authenticationMethodName: string,
+      trace: {
+        functionName: string;
+        message: string;
+        successMessage: string;
+        metadata?: Record<string, unknown>;
+      },
+      getAuthorizationUrl: (
+        ctx: ReturnType<typeof buildAuthorizationUrlContext>
+      ) => Promise<{ url: string; input?: any; callbackState?: Record<string, any> }>
+    ) => {
+      let context = getEmptyContext();
+      let urlRes = await traceProviderCall(
+        {
+          component: 'auth',
+          functionName: trace.functionName,
+          message: trace.message,
+          successMessage: trace.successMessage,
+          metadata: {
+            authenticationMethodId: params.authenticationMethodId,
+            authenticationMethodName,
+            scopeCount: params.scopes.length,
+            inputKeyCount: getObjectKeyCount(params.input),
+            ...trace.metadata
+          },
+          onSuccess: result => ({
+            returnedInput: !!result.input,
+            hasCallbackState: !!result.callbackState
+          })
+        },
+        () =>
+          runWithContext(context, () =>
+            getAuthorizationUrl(buildAuthorizationUrlContext(params))
+          )
+      );
+
+      return withRequestTraces(context, {
+        authorizationUrl: urlRes.url,
+        input: urlRes.input,
+        callbackState: urlRes.callbackState
+      });
     };
 
     manager.onNotification('slates/hello', async ({ params }) => {
@@ -681,18 +754,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           },
           () =>
             runWithContext(context, () =>
-              authMethod.handleCallback({
-                code: params.code,
-                state: params.state,
-                redirectUri: params.redirectUri,
-                input: params.input,
-                clientId: params.clientId,
-                clientSecret: params.clientSecret,
-                scopes: params.scopes,
-                callbackParams: params.callbackParams || {},
-                callbackState: params.callbackState || {},
-                config: getAuthConfig()
-              })
+              authMethod.handleCallback({ ...buildCallbackContext(params), code: params.code })
             )
         );
 
@@ -715,48 +777,108 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let authMethod = getAuthMethod(slate, params.authenticationMethodId);
 
       if ('getAuthorizationUrl' in authMethod) {
-        let context = getEmptyContext();
-        let urlRes = await traceProviderCall(
+        return getTracedAuthorizationUrl(
+          params,
+          authMethod.name,
           {
-            component: 'auth',
             functionName: 'getAuthorizationUrl',
             message: 'Getting authentication authorization URL',
-            successMessage: 'Authentication authorization URL retrieved',
-            metadata: {
-              authenticationMethodId: params.authenticationMethodId,
-              authenticationMethodName: authMethod.name,
-              scopeCount: params.scopes.length,
-              inputKeyCount: getObjectKeyCount(params.input)
-            },
-            onSuccess: result => ({
-              returnedInput: !!result.input,
-              hasCallbackState: !!result.callbackState
-            })
+            successMessage: 'Authentication authorization URL retrieved'
           },
-          () =>
-            runWithContext(context, () =>
-              authMethod.getAuthorizationUrl({
-                redirectUri: params.redirectUri,
-                state: params.state,
-                input: params.input,
-                clientId: params.clientId,
-                clientSecret: params.clientSecret,
-                scopes: params.scopes,
-                config: getAuthConfig()
-              })
-            )
+          ctx => authMethod.getAuthorizationUrl(ctx)
         );
-
-        return withRequestTraces(context, {
-          authorizationUrl: urlRes.url,
-          input: urlRes.input,
-          callbackState: urlRes.callbackState
-        });
       }
 
       throw new ServiceError(
         preconditionFailedError({
           message: `Authentication method does not support authorization URL retrieval: ${params.authenticationMethodId}`
+        })
+      );
+    });
+
+    manager.onRequest('slates/auth.admin_authorization_url.get', async ({ params }) => {
+      getContextBasic();
+      let authMethod = getAuthMethod(slate, params.authenticationMethodId);
+
+      if (authMethod.type === 'auth.oauth' && authMethod.adminSetup) {
+        let { adminSetup } = authMethod;
+        return getTracedAuthorizationUrl(
+          params,
+          authMethod.name,
+          {
+            functionName: 'adminSetup.getAuthorizationUrl',
+            message: 'Getting admin setup authorization URL',
+            successMessage: 'Admin setup authorization URL retrieved',
+            metadata: { usesDefault: !adminSetup.getAuthorizationUrl }
+          },
+          ctx =>
+            adminSetup.getAuthorizationUrl
+              ? adminSetup.getAuthorizationUrl(ctx)
+              : authMethod.getAuthorizationUrl(ctx)
+        );
+      }
+
+      throw new ServiceError(
+        preconditionFailedError({
+          message: `Authentication method does not support admin setup: ${params.authenticationMethodId}`
+        })
+      );
+    });
+
+    manager.onRequest('slates/auth.admin_callback.handle', async ({ params }) => {
+      getContextBasic();
+      let authMethod = getAuthMethod(slate, params.authenticationMethodId);
+
+      if (authMethod.type === 'auth.oauth' && authMethod.adminSetup) {
+        let { adminSetup } = authMethod;
+        let ctx = { ...buildCallbackContext(params), code: params.code };
+
+        let handleCallback = async (): Promise<{ instructions?: string }> => {
+          if (adminSetup.handleCallback) return adminSetup.handleCallback(ctx);
+
+          let code = ctx.code;
+          if (!code) {
+            throw new ServiceError(
+              badRequestError({
+                message: `Admin setup callback did not include an authorization code: ${params.authenticationMethodId}`
+              })
+            );
+          }
+
+          await authMethod.handleCallback({ ...ctx, code });
+          return {};
+        };
+
+        let context = getEmptyContext();
+        let callbackRes = await traceProviderCall(
+          {
+            component: 'auth',
+            functionName: 'adminSetup.handleCallback',
+            message: 'Handling admin setup callback',
+            successMessage: 'Admin setup callback handled',
+            metadata: {
+              authenticationMethodId: params.authenticationMethodId,
+              authenticationMethodName: authMethod.name,
+              scopeCount: params.scopes.length,
+              hasCode: !!params.code,
+              hasCallbackState: !!params.callbackState,
+              usesDefault: !adminSetup.handleCallback
+            },
+            onSuccess: result => ({
+              returnedInstructions: !!result.instructions
+            })
+          },
+          () => runWithContext(context, handleCallback)
+        );
+
+        return withRequestTraces(context, {
+          instructions: callbackRes.instructions
+        });
+      }
+
+      throw new ServiceError(
+        preconditionFailedError({
+          message: `Authentication method does not support admin setup: ${params.authenticationMethodId}`
         })
       );
     });
