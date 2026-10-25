@@ -1,3 +1,4 @@
+import { createMicrosoftAdminConsent } from '@slates/oauth-microsoft';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { DEFAULT_FABRIC_TENANT_ID } from './config';
@@ -53,6 +54,19 @@ let fabricScopes = [
 ];
 
 let storageScope = 'https://storage.azure.com/.default';
+let FABRIC_API_RESOURCE = 'https://api.fabric.microsoft.com/';
+
+// Fabric and OneLake tokens target two resources, so admin consent covers the app registration's
+// configured permissions instead of a single-resource scope list.
+let adminConsentPermissions = [
+  {
+    api: 'Power BI Service',
+    permissions: fabricScopes
+      .filter(entry => entry.scope.startsWith(FABRIC_API_RESOURCE))
+      .map(entry => entry.scope.slice(FABRIC_API_RESOURCE.length))
+  },
+  { api: 'Azure Storage', permissions: ['user_impersonation'] }
+];
 
 type TokenResponse = {
   access_token?: string;
@@ -225,6 +239,11 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Work Only',
     key: 'oauth_organizations',
+    adminSetup: createMicrosoftAdminConsent({
+      tenant: ctx => resolveTenantId(ctx.config),
+      mode: 'app-registration',
+      requiredPermissions: adminConsentPermissions
+    }),
     docs: [
       {
         type: 'docs.auth.oauth',

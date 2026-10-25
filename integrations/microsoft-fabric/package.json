@@ -9,9 +9,10 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
+    "@slates/oauth-microsoft": "1.0.0-rc.14",
     "@types/node": "^20",
     "zod": "^4.2",
-    "slates": "1.0.0-rc.29"
+    "slates": "1.0.0-rc.31"
   },
   "devDependencies": {
     "@vercel/ncc": "^0.38.4",
@@ -19,5 +20,5 @@
     "vitest": "^3.2.4",
     "@slates/test": "1.0.0-rc.14"
   },
-  "version": "0.2.0"
+  "version": "0.2.1"
 }

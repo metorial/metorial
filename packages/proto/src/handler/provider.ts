@@ -12,6 +12,7 @@ import {
   slatesNotificationsByMethod,
   slatesRequestsByMethod
 } from '../messages';
+import type { SlatesErrorResponse } from '../types';
 
 export class SlatesProviderProtoHandlerManager {
   #implMap = new Map<
@@ -163,9 +164,9 @@ export let createSlatesProviderProtoHandler = (
 let toSlateErrorResponse = (
   error: unknown,
   defaults: Partial<{ code: string; message: string }> = {}
-) => {
+): SlatesErrorResponse => {
   let slateError = getSlateErrorResponse(error);
-  if (slateError) return slateError;
+  if (slateError) return withUpstreamCode(slateError);
 
   let serviceError = getServiceErrorData(error);
   if (serviceError) {
@@ -199,9 +200,7 @@ let isRecord = (value: unknown): value is Record<string, unknown> =>
 let isStructuredValue = (value: unknown): value is Record<string, unknown> | Function =>
   (typeof value === 'object' || typeof value === 'function') && value !== null;
 
-let isSlateErrorPayload = (
-  value: unknown
-): value is { code: string; message: string; kind?: string; [key: string]: unknown } =>
+let isSlateErrorPayload = (value: unknown): value is SlatesErrorResponse =>
   isRecord(value) &&
   typeof value.code === 'string' &&
   typeof value.message === 'string' &&
@@ -271,6 +270,20 @@ let getServiceErrorData = (error: unknown) => {
   }
 
   return null;
+};
+
+let UPSTREAM_CODE_PATTERN = /^[\w.:-]{1,128}$/;
+
+// upstreamCode is copied from untrusted upstream responses to the top level of the
+// error, so anything not code-shaped is dropped.
+let normalizeUpstreamCode = (value: unknown): string | undefined =>
+  typeof value === 'string' && UPSTREAM_CODE_PATTERN.test(value) ? value : undefined;
+
+let withUpstreamCode = (response: SlatesErrorResponse): SlatesErrorResponse => {
+  let { upstreamCode: rawUpstreamCode, ...rest } = response;
+  let upstreamCode =
+    normalizeUpstreamCode(rawUpstreamCode) ?? normalizeUpstreamCode(response.upstream?.code);
+  return upstreamCode ? { ...rest, upstreamCode } : rest;
 };
 
 let mapKind = (code: string) => {
@@ -345,6 +358,7 @@ let mapServiceErrorToSlateErrorResponse = (
   defaults: Partial<{ code: string; message: string }> = {}
 ) => {
   let code = defaults.code ?? mapServiceErrorCode(error.code, error.status);
+  let upstreamCode = normalizeUpstreamCode(error.upstreamCode);
   let extraEntries = Object.entries(error).filter(
     ([key]) =>
       ![
@@ -367,6 +381,7 @@ let mapServiceErrorToSlateErrorResponse = (
     retryable: mapRetryable(code),
     status: error.status,
     ...(mapIssues(error.errors) ? { issues: mapIssues(error.errors) } : {}),
+    ...(upstreamCode ? { upstreamCode } : {}),
     baggage: {
       serviceError: {
         code: error.code,

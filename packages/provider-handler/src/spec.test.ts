@@ -229,4 +229,18 @@ describe('mapAuthMethod', () => {
     ).toMatchObject({ adminSetup: { enabled: true } });
     expect(mapAuthMethod(slate, oauthMethod).capabilities).not.toHaveProperty('adminSetup');
   });
+
+  it('always advertises whether admin setup is required, defaulting to false', () => {
+    expect(
+      mapAuthMethod(slate, { ...oauthMethod, adminSetup: {} }).capabilities.adminSetup
+    ).toEqual({ enabled: true, required: false });
+    expect(
+      mapAuthMethod(slate, { ...oauthMethod, adminSetup: { required: false } }).capabilities
+        .adminSetup
+    ).toEqual({ enabled: true, required: false });
+    expect(
+      mapAuthMethod(slate, { ...oauthMethod, adminSetup: { required: true } }).capabilities
+        .adminSetup
+    ).toEqual({ enabled: true, required: true });
+  });
 });

@@ -44,7 +44,8 @@ let createMicrosoftOauth = (name: string, key: string, tenant: string) =>
         url: 'https://learn.microsoft.com/en-us/graph/permissions-reference'
       }
     ],
-    missingRefreshTokenMessage: 'No refresh token available. Please re-authenticate.'
+    missingRefreshTokenMessage: 'No refresh token available. Please re-authenticate.',
+    adminConsent: tenant === 'organizations'
   });
 
 export let auth = SlateAuth.create()

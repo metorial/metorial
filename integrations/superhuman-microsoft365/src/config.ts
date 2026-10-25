@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Microsoft Entra tenant ID. Use "common" for multi-tenant + personal accounts, "organizations" for work/school only, or a specific tenant ID for single-org apps. Defaults to "common".'
+        'Microsoft Entra tenant ID or verified domain where an administrator grants consent for the "Work Only" sign-in. It does not change the sign-in tenant. Defaults to "organizations".'
       )
   })
 );

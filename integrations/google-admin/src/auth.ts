@@ -1,3 +1,4 @@
+import { createGoogleWorkspaceAdminSetup } from '@slates/oauth-google';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { googleAdminScopes } from './scopes';
@@ -201,6 +202,14 @@ export let auth = SlateAuth.create()
         url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       };
     },
+
+    adminSetup: createGoogleWorkspaceAdminSetup({
+      productName: 'Google Admin',
+      required: true,
+      notes: [
+        'Connect Google Admin with an administrator account that has privileges for the data you want to manage.'
+      ]
+    }),
 
     handleCallback: async ctx => {
       let response = await googleAxios.post(

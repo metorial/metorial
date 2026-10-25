@@ -1,4 +1,5 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
+import { createGoogleWorkspaceAdminSetup } from '@slates/oauth-google';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { getMyProfilePersonFields, googleContactsScopes } from './scopes';
@@ -89,6 +90,8 @@ export let auth = SlateAuth.create()
         url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       };
     },
+
+    adminSetup: createGoogleWorkspaceAdminSetup({ productName: 'Google Contacts' }),
 
     handleCallback: async ctx => {
       let response = await googleAxios.post(

@@ -1,3 +1,4 @@
+import { createGoogleWorkspaceAdminSetup } from '@slates/oauth-google';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { googleSlidesScopes } from './scopes';
@@ -83,6 +84,8 @@ export let auth = SlateAuth.create()
         url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       };
     },
+
+    adminSetup: createGoogleWorkspaceAdminSetup({ productName: 'Google Slides' }),
 
     handleCallback: async ctx => {
       let http = createAxios();

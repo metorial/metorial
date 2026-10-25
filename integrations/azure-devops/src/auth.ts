@@ -56,7 +56,8 @@ let createDevOpsOauth = (name: string, key: string, tenant: string) =>
     scopeMapper: mapAzureDevOpsScopes,
     extraScopes: ['offline_access'],
     onMissingRefreshToken: 'preserve',
-    profile: devOpsProfile
+    profile: devOpsProfile,
+    adminConsent: tenant === 'organizations'
   });
 
 export let auth = SlateAuth.create()

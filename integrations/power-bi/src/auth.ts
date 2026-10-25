@@ -1,5 +1,14 @@
+import {
+  createMicrosoftAdminConsent,
+  microsoftOauthBaseUrl,
+  resolveMicrosoftTenant
+} from '@slates/oauth-microsoft';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+
+// Sign-in stays on `common` so users from any tenant (and existing refresh tokens) keep working;
+// the configured tenant only targets which directory the admin grants consent in.
+let oauthBaseUrl = microsoftOauthBaseUrl('common');
 
 export let auth = SlateAuth.create()
   .output(
@@ -13,6 +22,9 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Microsoft OAuth',
     key: 'microsoft_oauth',
+    adminSetup: createMicrosoftAdminConsent({
+      tenant: ctx => resolveMicrosoftTenant(ctx.config?.tenantId, 'organizations')
+    }),
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -143,15 +155,11 @@ export let auth = SlateAuth.create()
         scope: ctx.scopes.join(' ')
       });
 
-      let tenantId = (ctx.input as any)?.tenantId || 'common';
-      let url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params.toString()}`;
-
-      return { url };
+      return { url: `${oauthBaseUrl}/authorize?${params.toString()}` };
     },
 
     handleCallback: async ctx => {
-      let tenantId = (ctx.input as any)?.tenantId || 'common';
-      let tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+      let tokenUrl = `${oauthBaseUrl}/token`;
 
       let http = createAxios();
       let params = new URLSearchParams({
@@ -186,8 +194,7 @@ export let auth = SlateAuth.create()
         throw new Error('No refresh token available. Re-authenticate to obtain a new token.');
       }
 
-      let tenantId = (ctx.input as any)?.tenantId || 'common';
-      let tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+      let tokenUrl = `${oauthBaseUrl}/token`;
 
       let http = createAxios();
       let params = new URLSearchParams({

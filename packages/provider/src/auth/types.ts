@@ -65,8 +65,11 @@ export type SlateAuthWithOauth<
   syncTokensAcrossConnections?: boolean;
 
   // Missing hooks fall back to the regular flow (callback output discarded).
-  // Returned instructions are markdown shown to the admin.
+  // Returned instructions are markdown shown to the admin. `required` means users
+  // can't connect until an admin has completed setup; otherwise it is optional.
   adminSetup?: {
+    required?: boolean;
+
     getAuthorizationUrl?: (
       ctx: SlateOauthAuthorizationUrlContext<InputType>
     ) => Promise<SlateOauthAuthorizationUrlResult<InputType>>;

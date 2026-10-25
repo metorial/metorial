@@ -363,7 +363,7 @@ const EXPECTED_TOOL_AUTHORIZATION: Record<string, ExpectedToolAuthorization> = {
   'metorial_chat$message.get': { scopes: CONVERSATION_HISTORY_GATE, authMethods: null },
   'metorial_chat$message.list': { scopes: CONVERSATION_HISTORY_GATE, authMethods: null },
   'metorial_chat$message.search': {
-    scopes: [['search:read']],
+    scopes: [['search:read.public']],
     authMethods: USER_AUTH_METHODS
   },
   'metorial_chat$message.sendEphemeral': { scopes: [['chat:write']], authMethods: null },

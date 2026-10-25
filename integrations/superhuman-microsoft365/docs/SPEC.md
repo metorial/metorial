@@ -5,9 +5,9 @@ Workflow-oriented Microsoft 365 mail integration built on **Microsoft Graph**. T
 ## Authentication
 
 - **OAuth 2.0** (Microsoft identity platform), same pattern as the Outlook provider in this repo.
-- **Tenant**: optional `tenantId` on connect; defaults to `common`.
+- **Tenant**: "Work & Personal" signs in through `common` and "Work Only" through `organizations`. The optional `tenantId` config only targets the directory where an administrator grants consent for "Work Only"; it doesn't change the sign-in tenant.
 - **Scopes** (mail-focused): `Mail.Read`, `Mail.ReadWrite`, `Mail.Send`, `User.Read`, `offline_access`, `openid`, `profile`, `email`.
-- **Tokens**: access token, optional refresh token, optional `expiresAt`, optional `tenantId` echoed in stored output.
+- **Tokens**: access token, optional refresh token, optional `expiresAt`.
 
 ## Tools
 

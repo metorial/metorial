@@ -9,9 +9,9 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/adapter-chat": "1.0.0-rc.13",
+    "@slates/adapter-chat": "1.0.0-rc.16",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.27",
+    "slates": "1.0.0-rc.31",
     "zod": "^4.2"
   },
   "devDependencies": {
@@ -19,5 +19,13 @@
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.3.0"
+  "version": "0.3.1",
+  "peerDependencies": {
+    "@slates/oauth-google": "1.0.7"
+  },
+  "peerDependenciesMeta": {
+    "@slates/oauth-google": {
+      "optional": true
+    }
+  }
 }

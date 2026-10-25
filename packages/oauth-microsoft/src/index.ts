@@ -1,8 +1,14 @@
-import { createApiServiceError, createAxios, getApiErrorResponseWithBody } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  getApiErrorResponseWithBody,
+  type SlateAuthWithOauth
+} from 'slates';
 
 export let MICROSOFT_LOGIN_BASE = 'https://login.microsoftonline.com';
 export let MICROSOFT_GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 let MICROSOFT_GRAPH_RESOURCE = 'https://graph.microsoft.com';
+let MICROSOFT_GRAPH_DEFAULT_SCOPE = `${MICROSOFT_GRAPH_RESOURCE}/.default`;
 
 // Microsoft documents this as the Azure DevOps resource ID used when issuing
 // Entra access tokens.
@@ -11,8 +17,15 @@ let AZURE_DEVOPS_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
 let SECONDS_TO_MS = 1000;
 
 let OIDC_SCOPES = new Set(['openid', 'profile', 'email', 'offline_access']);
-let MICROSOFT_TENANT_PATTERN =
-  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})$/i;
+// Microsoft's fixed tenant ID for personal accounts, equivalent to the `consumers` alias.
+let CONSUMERS_TENANT_ID = '9188040d-6c67-4c5b-b112-36a304b66dad';
+let CONSUMER_TENANTS = new Set(['consumers', CONSUMERS_TENANT_ID]);
+let PERSONAL_ACCOUNT_TENANTS = new Set(['common', ...CONSUMER_TENANTS]);
+let MICROSOFT_TENANT_ALIASES = new Set(['common', 'organizations', 'consumers']);
+let MICROSOFT_TENANT_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let MICROSOFT_TENANT_DOMAIN_PATTERN =
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 // AADSTS700016: app not in directory; AADSTS7000229: no service principal.
 let APP_NOT_IN_TENANT_ERROR_CODES = [700016, 7000229];
 let ADMIN_CONSENT_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
@@ -50,6 +63,13 @@ export type MicrosoftGraphOauthOptions = {
   tenant: string;
   scopes: MicrosoftOauthScope[];
   docs?: MicrosoftOauthDocsReference[];
+  /**
+   * Lets `input.tenantId` override a `common` tenant; admin consent also falls back to
+   * `config.tenantId`. An `organizations` tenant only accepts work or school overrides, so
+   * `common` and `consumers` are ignored; any other tenant is never overridden. Overrides
+   * that aren't a tenant ID, verified domain, or tenant alias are ignored for sign-in and
+   * rejected for admin consent.
+   */
   allowTenantInput?: boolean;
   missingRefreshTokenMessage?: string;
   /** Normalize loopback redirect URIs for Microsoft app registration compatibility. */
@@ -62,30 +82,47 @@ export type MicrosoftGraphOauthOptions = {
   onMissingRefreshToken?: 'throw' | 'preserve';
   /** Custom profile endpoint. Defaults to Microsoft Graph `/me`. */
   profile?: MicrosoftGraphProfileOptions;
-  /** Lets a Microsoft Entra admin grant tenant-wide consent before users connect. */
-  adminConsent?: boolean;
+  /**
+   * Lets a Microsoft Entra admin grant tenant-wide consent to the requested scopes. Pass
+   * `{ required: true }` when users can't connect until that consent exists.
+   */
+  adminConsent?: boolean | Pick<MicrosoftAdminConsentBaseOptions, 'required'>;
 };
 
-export type MicrosoftGraphOauthInput = {
+export type MicrosoftRequiredPermission = {
+  /** API name as listed under **API permissions**, e.g. `Microsoft Graph`. */
+  api: string;
+  permissions: string[];
+};
+
+type MicrosoftAdminConsentBaseOptions = {
+  tenant: string | ((ctx: MicrosoftTenantContext) => string);
+  normalizeRedirectUri?: boolean;
+  /** Extra markdown shown to the admin after the required permissions. */
+  instructions?: string;
+  required?: boolean;
+};
+
+export type MicrosoftAdminConsentOptions = MicrosoftAdminConsentBaseOptions &
+  (
+    | {
+        /** Consents to the scopes the method requests (default). */
+        mode?: 'requested-scopes';
+        scopeMapper?: (scopes: string[]) => string[];
+        requiredPermissions?: MicrosoftRequiredPermission[];
+      }
+    | {
+        /**
+         * Grants every API permission configured on the app registration, which is the only
+         * option when the permissions span several resource apps.
+         */
+        mode: 'app-registration';
+        requiredPermissions: MicrosoftRequiredPermission[];
+      }
+  );
+
+type MicrosoftGraphOauthInput = {
   tenantId?: unknown;
-};
-
-export type MicrosoftGraphAuthorizationUrlContext = {
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-  scopes: string[];
-  state: string;
-  input?: MicrosoftGraphOauthInput;
-};
-
-export type MicrosoftGraphCallbackContext = {
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-  scopes: string[];
-  code: string;
-  input?: MicrosoftGraphOauthInput;
 };
 
 export type MicrosoftGraphOauthOutput = {
@@ -94,19 +131,54 @@ export type MicrosoftGraphOauthOutput = {
   expiresAt?: string;
 };
 
-export type MicrosoftGraphTokenRefreshContext = {
-  clientId: string;
-  clientSecret: string;
-  scopes: string[];
+type SlateOauthMethod<InputType extends {}> = SlateAuthWithOauth<
+  InputType,
+  MicrosoftGraphOauthOutput
+>;
+type SlateOauthHookContext<
+  InputType extends {},
+  Hook extends 'getAuthorizationUrl' | 'handleCallback' | 'handleTokenRefresh' | 'getProfile'
+> = Parameters<NonNullable<SlateOauthMethod<InputType>[Hook]>>[0];
+type SlateAdminSetupHooks = NonNullable<SlateOauthMethod<{}>['adminSetup']>;
+
+type MicrosoftAdminConsentAuthorizationUrlContext = Pick<
+  Parameters<NonNullable<SlateAdminSetupHooks['getAuthorizationUrl']>>[0],
+  'clientId' | 'redirectUri' | 'scopes' | 'state' | 'input' | 'config'
+>;
+
+type SlateAdminCallbackContext = Parameters<
+  NonNullable<SlateAdminSetupHooks['handleCallback']>
+>[0];
+
+type MicrosoftAdminConsentCallbackContext = Pick<
+  SlateAdminCallbackContext,
+  'clientId' | 'clientSecret' | 'callbackParams' | 'config'
+> &
+  Partial<Pick<SlateAdminCallbackContext, 'input'>>;
+
+type MicrosoftTenantContext = Pick<MicrosoftAdminConsentAuthorizationUrlContext, 'config'> & {
   input?: MicrosoftGraphOauthInput;
-  output: MicrosoftGraphOauthOutput;
 };
 
-export type MicrosoftGraphProfileContext = {
-  output: {
-    token: string;
-  };
-};
+type MicrosoftGraphAuthorizationUrlContext = Pick<
+  SlateOauthHookContext<MicrosoftGraphOauthInput, 'getAuthorizationUrl'>,
+  'clientId' | 'redirectUri' | 'scopes' | 'state' | 'input'
+>;
+
+type MicrosoftGraphCallbackContext = Pick<
+  SlateOauthHookContext<MicrosoftGraphOauthInput, 'handleCallback'>,
+  'clientId' | 'clientSecret' | 'redirectUri' | 'scopes' | 'code' | 'input'
+>;
+
+type MicrosoftGraphTokenRefreshContext = Pick<
+  SlateOauthHookContext<MicrosoftGraphOauthInput, 'handleTokenRefresh'>,
+  'clientId' | 'clientSecret' | 'scopes' | 'input' | 'output'
+>;
+
+type MicrosoftGraphProfileContext = Pick<
+  SlateOauthHookContext<MicrosoftGraphOauthInput, 'getProfile'>,
+  'output'
+>;
 
 type MicrosoftTokenErrorResponse = {
   error?: string;
@@ -270,16 +342,239 @@ let defaultGraphProfile: MicrosoftGraphProfileOptions = {
   }
 };
 
+let toTenantPathSegment = (tenant: string) => encodeURIComponent(tenant.trim());
+
+export let microsoftOauthBaseUrl = (tenant: string) =>
+  `${MICROSOFT_LOGIN_BASE}/${toTenantPathSegment(tenant)}/oauth2/v2.0`;
+
+let isTenantId = (tenant: string) => MICROSOFT_TENANT_ID_PATTERN.test(tenant);
+
+let isSpecificTenant = (tenant: string) =>
+  isTenantId(tenant) || MICROSOFT_TENANT_DOMAIN_PATTERN.test(tenant);
+
+let isValidTenant = (tenant: string) =>
+  MICROSOFT_TENANT_ALIASES.has(tenant.toLowerCase()) || isSpecificTenant(tenant);
+
+let isConsumerTenant = (tenant: string) => CONSUMER_TENANTS.has(tenant.toLowerCase());
+
+let canOverrideTenant = (methodTenant: string, override: string) => {
+  let normalizedMethodTenant = methodTenant.trim().toLowerCase();
+  if (normalizedMethodTenant === 'common') return true;
+
+  return (
+    normalizedMethodTenant === 'organizations' &&
+    !PERSONAL_ACCOUNT_TENANTS.has(override.toLowerCase())
+  );
+};
+
+let personalAccountAdminConsentError = () =>
+  createApiServiceError(
+    'Microsoft admin consent requires a work or school tenant. Personal Microsoft accounts (the consumers tenant) cannot grant admin consent.'
+  );
+
+let toAdminConsentTenant = (tenant: string) => {
+  let trimmedTenant = tenant.trim();
+  let normalizedTenant = trimmedTenant.toLowerCase();
+
+  if (isConsumerTenant(normalizedTenant)) throw personalAccountAdminConsentError();
+
+  // Admin consent rejects the `common` tenant.
+  if (normalizedTenant === 'common') return 'organizations';
+
+  if (!isValidTenant(trimmedTenant)) {
+    throw createApiServiceError(
+      `Microsoft admin consent needs a tenant ID or a verified domain such as contoso.onmicrosoft.com; ${JSON.stringify(trimmedTenant)} is neither.`
+    );
+  }
+
+  return trimmedTenant;
+};
+
+let assertGrantedTenantMatches = (targetTenant: string, grantedTenant: string) => {
+  if (!isSpecificTenant(targetTenant)) return;
+
+  // Microsoft returns the tenant ID, which can't be matched to a domain target without a directory lookup.
+  if (!isTenantId(targetTenant) && isTenantId(grantedTenant)) return;
+
+  if (targetTenant.toLowerCase() !== grantedTenant.toLowerCase()) {
+    throw createApiServiceError(
+      'Admin consent was granted in a different Microsoft Entra tenant than the one this integration is configured for. Sign in as an administrator of the configured tenant and grant consent again.'
+    );
+  }
+};
+
+let toRedirectUri = (redirectUri: string, shouldNormalize: boolean) =>
+  shouldNormalize ? normalizeMicrosoftRedirectUri(redirectUri) : redirectUri;
+
+let applyScopeMapper = (scopes: string[], scopeMapper?: (scopes: string[]) => string[]) =>
+  scopeMapper ? scopeMapper(scopes) : scopes;
+
+// v2 admin consent only accepts fully qualified scopes, so bare ones get the Graph prefix.
+let toAdminConsentScopeParam = (scopes: string[]) => {
+  let resourceScopes = scopes
+    .filter(scope => !OIDC_SCOPES.has(scope.toLowerCase()))
+    .map(scope => (scope.includes('/') ? scope : `${MICROSOFT_GRAPH_RESOURCE}/${scope}`));
+
+  return (resourceScopes.length ? resourceScopes : [MICROSOFT_GRAPH_DEFAULT_SCOPE]).join(' ');
+};
+
+let renderRequiredPermissions = (requiredPermissions: MicrosoftRequiredPermission[]) =>
+  [
+    'Admin consent was granted. The Microsoft Entra app registration needs these delegated permissions under **API permissions**:',
+    '',
+    ...requiredPermissions.map(
+      ({ api, permissions }) =>
+        `- **${api}**: ${permissions.map(permission => `\`${permission}\``).join(', ')}`
+    ),
+    '',
+    'If any are missing, ask the owner of the app registration to add them, then grant admin consent again.'
+  ].join('\n');
+
 let tokenClientCache = new Map<string, ReturnType<typeof createAxios>>();
-let getCachedTokenClient = (resolvedTenant: string) => {
-  let cached = tokenClientCache.get(resolvedTenant);
+let getCachedTokenClient = (tenant: string) => {
+  let baseURL = microsoftOauthBaseUrl(tenant);
+  let cached = tokenClientCache.get(baseURL);
   if (cached) return cached;
 
-  let client = createAxios({
-    baseURL: `${MICROSOFT_LOGIN_BASE}/${resolvedTenant}/oauth2/v2.0`
-  });
-  tokenClientCache.set(resolvedTenant, client);
+  let client = createAxios({ baseURL });
+  tokenClientCache.set(baseURL, client);
   return client;
+};
+
+// Entra replicates the service principal admin consent creates with a delay, so retry until
+// client credentials stop failing with app-not-in-tenant.
+let verifyMicrosoftAdminConsent = async (ctx: {
+  clientId: string;
+  clientSecret: string;
+  tenant: string;
+}) => {
+  // Each consenting tenant is seen once, so this client is not cached.
+  let tokenClient = createAxios({ baseURL: microsoftOauthBaseUrl(ctx.tenant) });
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await tokenClient.post(
+        '/token',
+        new URLSearchParams({
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          grant_type: 'client_credentials',
+          scope: MICROSOFT_GRAPH_DEFAULT_SCOPE
+        }).toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }
+      );
+      return;
+    } catch (error) {
+      let body = (getApiErrorResponseWithBody(error)?.data ??
+        {}) as MicrosoftTokenErrorResponse;
+      let appNotInTenantCode = APP_NOT_IN_TENANT_ERROR_CODES.find(
+        code =>
+          body.error_codes?.includes(code) ||
+          body.error_description?.includes(`AADSTS${code}:`)
+      );
+
+      if (appNotInTenantCode) {
+        let retryDelay = ADMIN_CONSENT_RETRY_DELAYS_MS[attempt];
+        if (retryDelay !== undefined) {
+          await wait(retryDelay);
+          continue;
+        }
+
+        throw createApiServiceError(
+          'Admin consent could not be verified: the app is not registered in this Microsoft Entra tenant. Ask the admin to grant consent again.',
+          { upstreamCode: `AADSTS${appNotInTenantCode}`, parent: error }
+        );
+      }
+
+      throw createApiServiceError(
+        `Admin consent could not be verified: ${
+          body.error_description ||
+          (error instanceof Error ? error.message : 'token request failed')
+        }`,
+        { upstreamCode: body.error, parent: error }
+      );
+    }
+  }
+};
+
+export let createMicrosoftAdminConsent = (options: MicrosoftAdminConsentOptions) => {
+  let { tenant, normalizeRedirectUri: shouldNormalizeRedirectUri = false } = options;
+  let scopeMapper = options.mode === 'app-registration' ? undefined : options.scopeMapper;
+  let successInstructions = [
+    options.requiredPermissions?.length
+      ? renderRequiredPermissions(options.requiredPermissions)
+      : undefined,
+    options.instructions
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  let getAdminTenant = (ctx: MicrosoftTenantContext) =>
+    toAdminConsentTenant(typeof tenant === 'function' ? tenant(ctx) : tenant);
+
+  return {
+    required: options.required === true,
+
+    getAuthorizationUrl: async (ctx: MicrosoftAdminConsentAuthorizationUrlContext) => {
+      let adminTenant = toTenantPathSegment(getAdminTenant(ctx));
+      let params = new URLSearchParams({
+        client_id: ctx.clientId,
+        redirect_uri: toRedirectUri(ctx.redirectUri, shouldNormalizeRedirectUri),
+        state: ctx.state
+      });
+
+      if (options.mode === 'app-registration') {
+        return {
+          url: `${MICROSOFT_LOGIN_BASE}/${adminTenant}/adminconsent?${params.toString()}`
+        };
+      }
+
+      params.set('scope', toAdminConsentScopeParam(applyScopeMapper(ctx.scopes, scopeMapper)));
+      return {
+        url: `${MICROSOFT_LOGIN_BASE}/${adminTenant}/v2.0/adminconsent?${params.toString()}`
+      };
+    },
+
+    handleCallback: async (
+      ctx: MicrosoftAdminConsentCallbackContext
+    ): Promise<{ instructions?: string }> => {
+      let callbackParams = ctx.callbackParams ?? {};
+
+      if (callbackParams.error) {
+        throw createApiServiceError(
+          callbackParams.error_description ||
+            `Microsoft admin consent failed: ${callbackParams.error}`,
+          { upstreamCode: callbackParams.error }
+        );
+      }
+
+      if (callbackParams.admin_consent?.toLowerCase() !== 'true') {
+        throw createApiServiceError(
+          'Microsoft did not confirm that admin consent was granted.'
+        );
+      }
+
+      let grantedTenant = callbackParams.tenant?.trim() ?? '';
+      if (!isSpecificTenant(grantedTenant)) {
+        throw createApiServiceError(
+          'Admin consent could not be verified: Microsoft returned an invalid tenant.'
+        );
+      }
+      if (isConsumerTenant(grantedTenant)) throw personalAccountAdminConsentError();
+
+      assertGrantedTenantMatches(getAdminTenant(ctx), grantedTenant);
+
+      await verifyMicrosoftAdminConsent({
+        clientId: ctx.clientId,
+        clientSecret: ctx.clientSecret,
+        tenant: grantedTenant
+      });
+
+      return successInstructions ? { instructions: successInstructions } : {};
+    }
+  };
 };
 
 export let createMicrosoftGraphOauth = ({
@@ -299,139 +594,33 @@ export let createMicrosoftGraphOauth = ({
 }: MicrosoftGraphOauthOptions) => {
   let profileAxios = createAxios({ baseURL: profile.baseURL });
 
-  let getTenant = (ctx: { input?: MicrosoftGraphOauthInput }) =>
-    allowTenantInput ? resolveMicrosoftTenant(ctx.input?.tenantId, tenant) : tenant;
+  let getTenantOverride = (candidate: unknown) => {
+    if (!allowTenantInput) return undefined;
+
+    let override = resolveMicrosoftTenant(candidate, '');
+    return override && canOverrideTenant(tenant, override) ? override : undefined;
+  };
+
+  // Sign-in and refresh keep the tenant users connected through; only admin consent is
+  // targeted at the configured tenant.
+  let getTenant = (ctx: { input?: MicrosoftGraphOauthInput }) => {
+    let override = getTenantOverride(ctx.input?.tenantId);
+    return override && isValidTenant(override) ? override : tenant;
+  };
+  let getAdminConsentTenant = (ctx: MicrosoftTenantContext) =>
+    getTenantOverride(ctx.input?.tenantId) ??
+    getTenantOverride(ctx.config?.tenantId) ??
+    tenant;
 
   let getRedirectUri = (redirectUri: string) =>
-    shouldNormalizeRedirectUri ? normalizeMicrosoftRedirectUri(redirectUri) : redirectUri;
+    toRedirectUri(redirectUri, shouldNormalizeRedirectUri);
 
   let mapScopes = (rawScopes: string[]) => {
-    let mapped = scopeMapper ? scopeMapper(rawScopes) : rawScopes;
+    let mapped = applyScopeMapper(rawScopes, scopeMapper);
     return extraScopes ? [...mapped, ...extraScopes] : mapped;
   };
 
   let buildScopeParam = (rawScopes: string[]) => mapScopes(rawScopes).join(' ');
-
-  // v2 admin consent only accepts fully qualified scopes, so bare ones get the Graph prefix.
-  let buildAdminConsentScopeParam = (rawScopes: string[]) => {
-    let resourceScopes = mapScopes(rawScopes)
-      .filter(scope => !OIDC_SCOPES.has(scope.toLowerCase()))
-      .map(scope => (scope.includes('/') ? scope : `${MICROSOFT_GRAPH_RESOURCE}/${scope}`));
-
-    return (
-      resourceScopes.length ? resourceScopes : [`${MICROSOFT_GRAPH_RESOURCE}/.default`]
-    ).join(' ');
-  };
-
-  // Entra replicates the service principal admin consent creates with a delay, so retry until
-  // client credentials stop failing with app-not-in-tenant.
-  let verifyAdminConsent = async (ctx: {
-    clientId: string;
-    clientSecret: string;
-    tenant?: string;
-  }) => {
-    let consentTenant = ctx.tenant?.trim() ?? '';
-    if (!MICROSOFT_TENANT_PATTERN.test(consentTenant)) {
-      throw createApiServiceError(
-        'Admin consent could not be verified: Microsoft returned an invalid tenant.'
-      );
-    }
-
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await getCachedTokenClient(consentTenant).post(
-          '/token',
-          new URLSearchParams({
-            client_id: ctx.clientId,
-            client_secret: ctx.clientSecret,
-            grant_type: 'client_credentials',
-            scope: `${MICROSOFT_GRAPH_RESOURCE}/.default`
-          }).toString(),
-          {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-          }
-        );
-        return;
-      } catch (error) {
-        let body = (getApiErrorResponseWithBody(error)?.data ??
-          {}) as MicrosoftTokenErrorResponse;
-        let appNotInTenantCode = APP_NOT_IN_TENANT_ERROR_CODES.find(
-          code =>
-            body.error_codes?.includes(code) ||
-            body.error_description?.includes(`AADSTS${code}:`)
-        );
-
-        if (appNotInTenantCode) {
-          let retryDelay = ADMIN_CONSENT_RETRY_DELAYS_MS[attempt];
-          if (retryDelay !== undefined) {
-            await wait(retryDelay);
-            continue;
-          }
-
-          throw createApiServiceError(
-            'Admin consent could not be verified: the app is not registered in this Microsoft Entra tenant. Ask the admin to grant consent again.',
-            { upstreamCode: `AADSTS${appNotInTenantCode}`, parent: error }
-          );
-        }
-
-        throw createApiServiceError(
-          `Admin consent could not be verified: ${
-            body.error_description ||
-            (error instanceof Error ? error.message : 'token request failed')
-          }`,
-          { upstreamCode: body.error, parent: error }
-        );
-      }
-    }
-  };
-
-  let adminSetup = {
-    getAuthorizationUrl: async (ctx: MicrosoftGraphAuthorizationUrlContext) => {
-      let resolvedTenant = getTenant(ctx);
-      // Admin consent rejects the `common` tenant.
-      let adminTenant = resolvedTenant === 'common' ? 'organizations' : resolvedTenant;
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        redirect_uri: getRedirectUri(ctx.redirectUri),
-        state: ctx.state,
-        scope: buildAdminConsentScopeParam(ctx.scopes)
-      });
-
-      return {
-        url: `${MICROSOFT_LOGIN_BASE}/${adminTenant}/v2.0/adminconsent?${params.toString()}`
-      };
-    },
-
-    handleCallback: async (ctx: {
-      clientId: string;
-      clientSecret: string;
-      callbackParams?: Record<string, string>;
-    }) => {
-      let callbackParams = ctx.callbackParams ?? {};
-
-      if (callbackParams.error) {
-        throw createApiServiceError(
-          callbackParams.error_description ||
-            `Microsoft admin consent failed: ${callbackParams.error}`,
-          { upstreamCode: callbackParams.error }
-        );
-      }
-
-      if (callbackParams.admin_consent?.toLowerCase() !== 'true') {
-        throw createApiServiceError(
-          'Microsoft did not confirm that admin consent was granted.'
-        );
-      }
-
-      await verifyAdminConsent({
-        clientId: ctx.clientId,
-        clientSecret: ctx.clientSecret,
-        tenant: callbackParams.tenant
-      });
-
-      return {};
-    }
-  };
 
   return {
     type: 'auth.oauth' as const,
@@ -439,10 +628,18 @@ export let createMicrosoftGraphOauth = ({
     key,
     scopes,
     docs,
-    ...(adminConsent ? { adminSetup } : {}),
+    ...(adminConsent
+      ? {
+          adminSetup: createMicrosoftAdminConsent({
+            tenant: getAdminConsentTenant,
+            scopeMapper: mapScopes,
+            normalizeRedirectUri: shouldNormalizeRedirectUri,
+            required: typeof adminConsent === 'object' ? adminConsent.required : undefined
+          })
+        }
+      : {}),
 
     getAuthorizationUrl: async (ctx: MicrosoftGraphAuthorizationUrlContext) => {
-      let resolvedTenant = getTenant(ctx);
       let params = new URLSearchParams({
         client_id: ctx.clientId,
         response_type: 'code',
@@ -453,7 +650,7 @@ export let createMicrosoftGraphOauth = ({
       });
 
       return {
-        url: `${MICROSOFT_LOGIN_BASE}/${resolvedTenant}/oauth2/v2.0/authorize?${params.toString()}`
+        url: `${microsoftOauthBaseUrl(getTenant(ctx))}/authorize?${params.toString()}`
       };
     },
 
