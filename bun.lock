@@ -8463,7 +8463,7 @@
     },
     "integrations/metorial-admin": {
       "name": "@slates-integrations/metorial-admin",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
