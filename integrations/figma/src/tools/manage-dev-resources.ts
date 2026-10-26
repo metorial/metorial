@@ -49,7 +49,7 @@ export let getDevResources = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     let result = await client.getDevResources(ctx.input.fileKey, {
       nodeId: ctx.input.nodeId
     });
@@ -101,7 +101,7 @@ export let createDevResource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     let result = await client.createDevResources(ctx.input.resources);
 
     let created = result.links_created || result.dev_resources || [];
@@ -141,7 +141,7 @@ export let deleteDevResource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     await client.deleteDevResource(ctx.input.fileKey, ctx.input.devResourceId);
 
     return {

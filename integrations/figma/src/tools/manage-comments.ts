@@ -40,7 +40,7 @@ export let listComments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     let result = await client.getComments(ctx.input.fileKey);
 
     let comments = (result.comments || []).map((c: any) => ({
@@ -102,7 +102,7 @@ export let postComment = SlateTool.create(spec, {
   )
   .output(commentSchema)
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
 
     let clientMeta: any;
     if (ctx.input.nodeId && ctx.input.nodeOffset) {
@@ -164,7 +164,7 @@ export let deleteComment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     await client.deleteComment(ctx.input.fileKey, ctx.input.commentId);
 
     return {

@@ -9,6 +9,7 @@ export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      authType: z.enum(['oauth', 'personal_access_token']).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -153,6 +154,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
+          authType: 'oauth',
           refreshToken: data.refresh_token,
           expiresAt
         }
@@ -186,6 +188,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
+          authType: 'oauth' as const,
           refreshToken: data.refresh_token ?? ctx.output.refreshToken,
           expiresAt
         }
@@ -223,7 +226,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          authType: 'personal_access_token'
         }
       };
     },

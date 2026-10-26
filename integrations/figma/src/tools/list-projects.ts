@@ -30,7 +30,7 @@ export let listTeamProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     let result = await client.getTeamProjects(ctx.input.teamId);
 
     let projects = (result.projects || []).map((p: any) => ({
@@ -78,7 +78,7 @@ export let listProjectFiles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     let result = await client.getProjectFiles(ctx.input.projectId, {
       branchData: ctx.input.branchData
     });
