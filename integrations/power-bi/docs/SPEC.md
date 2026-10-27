@@ -12,12 +12,15 @@ Power BI uses **OAuth 2.0** via Microsoft Entra ID (formerly Azure Active Direct
 
 - A Microsoft Entra ID (Azure AD) app registration
 - A Client ID and Client Secret from the registered app
-- A Tenant ID for your Azure AD directory
+- A Tenant ID for your Azure AD directory, used only to target the directory where an administrator grants consent
 
 **OAuth 2.0 Endpoints (Microsoft Identity Platform v2.0):**
 
-- Authorization URL: `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/authorize`
-- Token URL: `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token`
+Sign-in always goes through the `common` tenant so users from any directory can connect.
+
+- Authorization URL: `https://login.microsoftonline.com/common/oauth2/v2.0/authorize`
+- Token URL: `https://login.microsoftonline.com/common/oauth2/v2.0/token`
+- Admin consent URL: `https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent`
 
 **Scope:** Use `https://analysis.windows.net/powerbi/api/.default` as the scope value. Each API has the list of required scopes, so it depends on which API you are using.
 

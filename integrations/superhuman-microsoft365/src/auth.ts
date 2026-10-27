@@ -75,6 +75,7 @@ export let auth = SlateAuth.create()
           url: 'https://learn.microsoft.com/en-us/graph/permissions-reference'
         }
       ],
-      allowTenantInput: true
+      allowTenantInput: true,
+      adminConsent: true
     })
   );

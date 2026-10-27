@@ -28,6 +28,7 @@ const method = (key: string, name: string, scope: string, description: string) =
     key,
     name,
     scopes: [{ title: name, scope, description }],
+    adminSetup: { productName: 'Gmail' },
     dependencies: {
       requestToken: async request => {
         const fields = new URLSearchParams({

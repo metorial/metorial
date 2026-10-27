@@ -1,3 +1,4 @@
+import { createGoogleWorkspaceAdminSetup } from '@slates/oauth-google';
 import {
   createApiServiceError,
   createAxios,
@@ -293,6 +294,8 @@ export let auth = SlateAuth.create()
         url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       };
     },
+
+    adminSetup: createGoogleWorkspaceAdminSetup({ productName: 'Google Chat' }),
 
     handleCallback: async ctx => {
       try {

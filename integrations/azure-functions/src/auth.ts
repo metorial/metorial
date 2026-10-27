@@ -1,3 +1,4 @@
+import { createMicrosoftAdminConsent } from '@slates/oauth-microsoft';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 
@@ -14,12 +15,27 @@ let scopes = [
   }
 ];
 
+let adminConsentPermissions = [
+  { api: 'Azure Service Management', permissions: ['user_impersonation'] }
+];
+let adminConsentRbacNote =
+  'Users also need Azure RBAC roles, such as Website Contributor, on the subscriptions or function apps they manage.';
+
 function createMicrosoftOauth(name: string, key: string, tenant: string) {
   return {
     type: 'auth.oauth' as const,
     name,
     key,
     scopes,
+    ...(tenant === 'organizations'
+      ? {
+          adminSetup: createMicrosoftAdminConsent({
+            tenant,
+            requiredPermissions: adminConsentPermissions,
+            instructions: adminConsentRbacNote
+          })
+        }
+      : {}),
 
     getAuthorizationUrl: async (ctx: any) => {
       let params = new URLSearchParams({

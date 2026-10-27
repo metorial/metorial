@@ -389,6 +389,13 @@ export let sanitizeForBaggage = (
   }
 };
 
+let UPSTREAM_CODE_PATTERN = /^[\w.:-]{1,128}$/;
+
+// upstreamCode is copied from untrusted upstream responses to the top level of the
+// error, outside the baggage sanitizer, so anything not code-shaped is dropped.
+export let normalizeUpstreamCode = (value: unknown): string | undefined =>
+  typeof value === 'string' && UPSTREAM_CODE_PATTERN.test(value) ? value : undefined;
+
 export let normalizeSlateErrorInput = (input: SlateErrorInput): SlateErrorResponse => {
   let code = input.code || DEFAULT_CODE;
   return {
@@ -405,6 +412,8 @@ export let normalizeSlateErrorInput = (input: SlateErrorInput): SlateErrorRespon
       ...input.upstream,
       status: input.upstream?.status ?? input.status
     }) as SlateErrorUpstreamInfo | undefined,
+    upstreamCode:
+      normalizeUpstreamCode(input.upstreamCode) ?? normalizeUpstreamCode(input.upstream?.code),
     baggage: cleanRecord(input.baggage),
     requestTraces: input.requestTraces
   };

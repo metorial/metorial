@@ -45,6 +45,8 @@ export interface SlateErrorResponse {
   issues?: SlateErrorIssue[];
   provider?: SlateErrorProviderInfo;
   upstream?: SlateErrorUpstreamInfo;
+  // The upstream API's own error code, next to the normalized protocol `code`.
+  upstreamCode?: string;
   baggage?: Record<string, unknown>;
   requestTraces?: SlateHttpTrace[];
 }

@@ -17,6 +17,7 @@ import {
 } from '@lowerdeck/error';
 import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { describe, expect, it } from 'vitest';
+import { createApiServiceError } from './api';
 import { SlateError } from './base';
 
 let createConfig = (overrides: Partial<InternalAxiosRequestConfig> = {}) =>
@@ -174,5 +175,81 @@ describe('SlateError', () => {
         status: serviceError.data.status
       });
     }
+  });
+
+  it('exposes the upstream API error code as a top-level upstreamCode', () => {
+    expect(
+      new SlateError({ code: 'upstream.error', message: 'x', upstream: { code: 'E42' } }).data
+        .upstreamCode
+    ).toBe('E42');
+    expect(
+      new SlateError({
+        code: 'upstream.error',
+        message: 'x',
+        upstream: { code: 'nested' },
+        upstreamCode: 'explicit'
+      }).data.upstreamCode
+    ).toBe('explicit');
+    expect(
+      SlateError.fromServiceError(
+        createApiServiceError('x', { upstreamCode: 'card_declined' })
+      ).data.upstreamCode
+    ).toBe('card_declined');
+    expect(new SlateError({ code: 'upstream.error', message: 'x' }).data.upstreamCode).toBe(
+      undefined
+    );
+  });
+
+  it('accepts only code-shaped upstreamCode values', () => {
+    for (let code of [
+      'AADSTS700016',
+      'invalid_grant',
+      'RATE_LIMITED',
+      'request.bad',
+      'a:b-c'
+    ]) {
+      expect(
+        new SlateError({ code: 'upstream.error', message: 'x', upstreamCode: code }).data
+          .upstreamCode
+      ).toBe(code);
+    }
+
+    for (let code of ['', 'x'.repeat(129), 'has space', 'token=abc&x', 'line\nbreak', '`x`']) {
+      expect(
+        new SlateError({ code: 'upstream.error', message: 'x', upstreamCode: code }).data
+          .upstreamCode
+      ).toBe(undefined);
+      expect(
+        SlateError.fromServiceError(createApiServiceError('x', { upstreamCode: code })).data
+          .upstreamCode
+      ).toBe(undefined);
+    }
+
+    expect(
+      SlateError.fromServiceError(
+        createApiServiceError('x', { upstreamCode: { nested: true } as unknown as string })
+      ).data.upstreamCode
+    ).toBe(undefined);
+    expect(
+      new SlateError({ code: 'upstream.error', message: 'x', upstreamCode: 'x'.repeat(128) })
+        .data.upstreamCode
+    ).toBe('x'.repeat(128));
+    expect(
+      new SlateError({
+        code: 'upstream.error',
+        message: 'x',
+        upstreamCode: 'bad value',
+        upstream: { code: 'fallback_code' }
+      }).data.upstreamCode
+    ).toBe('fallback_code');
+  });
+
+  it('also keeps upstreamCode in service error baggage for older hubs', () => {
+    let error = SlateError.fromServiceError(
+      createApiServiceError('x', { upstreamCode: 'card_declined' })
+    );
+    expect(error.data.baggage?.serviceErrorData).toMatchObject({
+      upstreamCode: 'card_declined'
+    });
   });
 });

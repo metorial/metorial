@@ -7,6 +7,7 @@ import {
   isRecord,
   normalizeKind,
   normalizeRetryable,
+  normalizeUpstreamCode,
   sanitizeForBaggage
 } from './utils';
 
@@ -162,6 +163,8 @@ export let mapServiceErrorToSlateErrorInput = (
     issues: defaults.issues ?? normalizeServiceErrorIssues(data.errors),
     provider: defaults.provider,
     upstream: defaults.upstream,
+    upstreamCode:
+      normalizeUpstreamCode(defaults.upstreamCode) ?? normalizeUpstreamCode(data.upstreamCode),
     baggage: cleanRecord({
       ...(defaults.baggage ?? {}),
       ...getServiceErrorBaggage(data)

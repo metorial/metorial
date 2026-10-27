@@ -9,14 +9,21 @@
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.25",
-    "zod": "^4.2",
-    "@slates/oauth-google": "1.0.6"
+    "slates": "1.0.0-rc.31",
+    "zod": "^4.2"
   },
   "devDependencies": {
     "typescript": "^5",
     "@slates/test": "1.0.0-rc.23",
     "vitest": "^3.2.4"
   },
-  "version": "0.3.1"
+  "version": "0.3.2",
+  "peerDependencies": {
+    "@slates/oauth-google": "1.0.7"
+  },
+  "peerDependenciesMeta": {
+    "@slates/oauth-google": {
+      "optional": true
+    }
+  }
 }

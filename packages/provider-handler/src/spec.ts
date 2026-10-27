@@ -67,7 +67,9 @@ export let mapAuthMethod = <ConfigType extends {}, AuthType extends {}>(
       enabled: !!m.onInputChanged
     },
     getProfile: { enabled: !!m.getProfile },
-    ...('adminSetup' in m && m.adminSetup ? { adminSetup: { enabled: true } } : {})
+    ...('adminSetup' in m && m.adminSetup
+      ? { adminSetup: { enabled: true, required: m.adminSetup.required === true } }
+      : {})
   },
 
   docs: m.docs ?? []

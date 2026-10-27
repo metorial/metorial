@@ -19,9 +19,10 @@ export let graphAuthMethodKeys = [
 // Every scope declared on an auth method is requested in production, so
 // scope tiers are separate auth methods:
 // the standard methods request only scopes Microsoft lets regular users
-// consent to, while "Work Only (Full Access)" adds the admin-consent-gated
-// scopes and therefore shows "Need admin approval" until a Microsoft Entra
-// admin grants tenant-wide consent through its admin setup flow.
+// consent to, and "Work Only" offers optional admin setup for tenants that
+// block user consent. "Work Only (Full Access)" adds the admin-consent-gated
+// scopes, so users can't connect until a Microsoft Entra admin grants
+// tenant-wide consent through its required admin setup flow.
 let baseScopes = [
   {
     title: 'User Profile',
@@ -176,7 +177,8 @@ export let auth = SlateAuth.create()
       tenant: 'organizations',
       scopes: baseScopes,
       docs,
-      missingRefreshTokenMessage: 'No refresh token available'
+      missingRefreshTokenMessage: 'No refresh token available',
+      adminConsent: true
     }),
     adapters: []
   })
@@ -188,7 +190,7 @@ export let auth = SlateAuth.create()
       scopes: [...baseScopes, ...adminConsentScopes],
       docs,
       missingRefreshTokenMessage: 'No refresh token available',
-      adminConsent: true
+      adminConsent: { required: true }
     }),
     adapters: []
   })

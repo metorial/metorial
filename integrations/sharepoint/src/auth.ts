@@ -1,4 +1,5 @@
 import {
+  createMicrosoftAdminConsent,
   MICROSOFT_GRAPH_BASE,
   MICROSOFT_LOGIN_BASE,
   normalizeMicrosoftRedirectUri
@@ -80,6 +81,13 @@ let scopes = [
       'Maintain access to data you have given it access to (enables refresh tokens)',
     scope: 'offline_access'
   }
+];
+
+// Graph and SharePoint REST tokens target two resource apps, so admin consent covers the app
+// registration's configured permissions instead of a single-resource scope list.
+let adminConsentPermissions = [
+  { api: 'Microsoft Graph', permissions: scopes.map(entry => entry.scope) },
+  { api: 'SharePoint', permissions: ['AllSites.Manage'] }
 ];
 
 let serviceError = (message: string, reason = 'sharepoint_auth_error') =>
@@ -340,14 +348,14 @@ let requireSharePointRestAuth = (output: SharePointAuthOutput) => {
     !Number.isFinite(expiresAt)
   ) {
     throw serviceError(
-      'SharePoint REST authorization is incomplete. Grant the Office 365 SharePoint Online delegated AllSites.Manage permission, then reconnect SharePoint.',
+      'SharePoint REST authorization is incomplete. Grant the SharePoint delegated AllSites.Manage permission, then reconnect SharePoint.',
       'sharepoint_rest_auth_incomplete'
     );
   }
 
   if (expiresAt <= Date.now()) {
     throw serviceError(
-      'SharePoint REST authorization has expired. Refresh or reconnect SharePoint after granting the Office 365 SharePoint Online delegated AllSites.Manage permission.',
+      'SharePoint REST authorization has expired. Refresh or reconnect SharePoint after granting the SharePoint delegated AllSites.Manage permission.',
       'sharepoint_rest_token_expired'
     );
   }
@@ -389,6 +397,16 @@ let createMicrosoftOauth = (name: string, key: string, tenant: string) => ({
   name,
   key,
   scopes,
+  ...(tenant === 'organizations'
+    ? {
+        adminSetup: createMicrosoftAdminConsent({
+          tenant,
+          mode: 'app-registration',
+          requiredPermissions: adminConsentPermissions,
+          normalizeRedirectUri: true
+        })
+      }
+    : {}),
   docs: [
     {
       type: 'docs.auth.oauth' as const,

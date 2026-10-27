@@ -1,6 +1,7 @@
 import { normalizeRetailServerBaseUrl } from '@slates/dynamics-commerce-recipes';
 import { normalizeFinOpsBaseUrl } from '@slates/dynamics-finops-recipes';
 import { normalizeDataverseInstanceUrl } from '@slates/microsoft-dataverse-recipes';
+import { createMicrosoftAdminConsent } from '@slates/oauth-microsoft';
 import {
   buildApiServiceError,
   createApiServiceError,
@@ -529,10 +530,28 @@ let getProfile = async (output: DynamicsAuthOutput) => ({
   }
 });
 
+// Dataverse, Finance and Operations, and Business Central tokens target separate resource apps,
+// so admin consent covers the app registration's configured permissions instead of a
+// single-resource scope list.
+let adminConsentPermissions = [
+  { api: 'Dynamics CRM', permissions: ['user_impersonation'] },
+  { api: 'Dynamics ERP', permissions: ['user_impersonation'] },
+  { api: 'Dynamics 365 Business Central', permissions: ['Financials.ReadWrite.All'] }
+];
+
 let createMicrosoftOauth = (name: string, key: string, tenant: string) => ({
   type: 'auth.oauth' as const,
   name,
   key,
+  ...(tenant === 'organizations'
+    ? {
+        adminSetup: createMicrosoftAdminConsent({
+          tenant,
+          mode: 'app-registration',
+          requiredPermissions: adminConsentPermissions
+        })
+      }
+    : {}),
   inputSchema: microsoftOauthInputSchema,
   docs: [
     {

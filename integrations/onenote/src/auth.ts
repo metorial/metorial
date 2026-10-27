@@ -39,7 +39,8 @@ let createMicrosoftOauth = (name: string, key: string, tenant: string) =>
       }
     ],
     missingRefreshTokenMessage:
-      'No refresh token available. Re-authenticate with the offline_access scope.'
+      'No refresh token available. Re-authenticate with the offline_access scope.',
+    adminConsent: tenant === 'organizations'
   });
 
 export let auth = SlateAuth.create()

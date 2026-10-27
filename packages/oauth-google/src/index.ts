@@ -5,10 +5,18 @@ import {
   normalizeOAuthTokenResponse
 } from 'slates';
 import { z } from 'zod';
+import {
+  createGoogleWorkspaceAdminSetup,
+  type GoogleWorkspaceAdminSetupOptions
+} from './adminSetup';
+import {
+  GOOGLE_OAUTH_AUTHORIZATION_URL,
+  GOOGLE_OAUTH_TOKEN_BASE_URL,
+  GOOGLE_USERINFO_BASE_URL
+} from './constants';
 
-export let GOOGLE_OAUTH_AUTHORIZATION_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-export let GOOGLE_OAUTH_TOKEN_BASE_URL = 'https://oauth2.googleapis.com';
-export let GOOGLE_USERINFO_BASE_URL = 'https://www.googleapis.com';
+export * from './adminSetup';
+export * from './constants';
 
 export let googleOAuthOutputSchema = z.object({
   token: z.string(),
@@ -60,6 +68,7 @@ export type GoogleOAuthOptions<InputType extends {} = {}, AdditionalOutput exten
   docs?: GoogleOAuthDocsReference[];
   dependencies?: Partial<GoogleOAuthDependencies>;
   additionalInput?: GoogleOAuthAdditionalInput<InputType, AdditionalOutput>;
+  adminSetup?: GoogleWorkspaceAdminSetupOptions;
 };
 
 export type GoogleAuthorizationUrlContext<InputType extends {} = {}> = {
@@ -223,7 +232,8 @@ export let createGoogleOAuth = <InputType extends {} = {}, AdditionalOutput exte
   key = 'oauth',
   docs = defaultDocs,
   dependencies: dependencyOverrides,
-  additionalInput
+  additionalInput,
+  adminSetup
 }: GoogleOAuthOptions<InputType, AdditionalOutput>) => {
   assertValidScopeDescriptors(scopes);
   let dependencies = { ...defaultDependencies, ...dependencyOverrides };
@@ -235,6 +245,7 @@ export let createGoogleOAuth = <InputType extends {} = {}, AdditionalOutput exte
     scopes: scopes.map(scope => ({ ...scope })),
     docs,
     ...(additionalInput ? { inputSchema: additionalInput.schema } : {}),
+    ...(adminSetup ? { adminSetup: createGoogleWorkspaceAdminSetup(adminSetup) } : {}),
 
     getAuthorizationUrl: async (ctx: GoogleAuthorizationUrlContext<InputType>) => {
       let params = new URLSearchParams({

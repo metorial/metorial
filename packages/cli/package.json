@@ -26,7 +26,7 @@
   "dependencies": {
     "@inquirer/prompts": "^7.4.0",
     "@slates/client": "1.0.0-rc.27",
-    "@slates/oauth-microsoft": "1.0.0-rc.13",
+    "@slates/oauth-microsoft": "1.0.0-rc.14",
     "@slates/profiles": "1.0.0-rc.25",
     "sade": "^1.8.1"
   },

@@ -6,7 +6,7 @@ export let config = SlateConfig.create(
     tenantId: z
       .string()
       .describe(
-        'Azure AD (Microsoft Entra ID) Tenant ID. Found in Azure portal under App registrations.'
+        'Microsoft Entra tenant ID or verified domain where an administrator grants consent. Users still sign in through "common". Found in the Azure portal under App registrations.'
       )
   })
 );
