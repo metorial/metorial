@@ -42,7 +42,7 @@ export let getStyles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
 
     if (ctx.input.styleKey) {
       let result = await client.getStyle(ctx.input.styleKey);

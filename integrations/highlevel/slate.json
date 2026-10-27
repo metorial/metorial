@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/highlevel",
+  "description": "Manage contacts, conversations, opportunities, blogs, email templates, and social posts in one HighLevel sub-account. Discover calendars and custom fields, read appointment notes, and inspect orders and transactions.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "search and manage contacts and tags",
+    "discover calendars and read appointment notes",
+    "search conversations and send messages",
+    "inspect pipelines and update opportunities",
+    "read payment orders and transactions",
+    "create and update blog posts",
+    "create and import email templates",
+    "manage social posts and inspect social statistics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/highlevel.png",
+  "version": "0.1.1"
+}

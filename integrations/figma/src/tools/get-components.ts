@@ -56,7 +56,7 @@ export let getComponents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
 
     if (ctx.input.componentKey) {
       let result = await client.getComponent(ctx.input.componentKey);

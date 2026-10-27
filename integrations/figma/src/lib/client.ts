@@ -3,13 +3,17 @@ import { createAxios } from 'slates';
 export class FigmaClient {
   private api: ReturnType<typeof createAxios>;
 
-  constructor(token: string) {
+  constructor(token: string, authType?: 'oauth' | 'personal_access_token') {
+    // Connections saved before authType was recorded still carry Figma's token prefix.
+    let isPersonalAccessToken = authType
+      ? authType === 'personal_access_token'
+      : token.startsWith('figd_');
+
     this.api = createAxios({
       baseURL: 'https://api.figma.com',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'X-Figma-Token': token
-      }
+      headers: isPersonalAccessToken
+        ? { 'X-Figma-Token': token }
+        : { Authorization: `Bearer ${token}` }
     });
   }
 

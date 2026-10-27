@@ -53,7 +53,7 @@ export let getFileVersions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
 
     let result = await client.getFileVersions(ctx.input.fileKey, {
       pageSize: ctx.input.pageSize,

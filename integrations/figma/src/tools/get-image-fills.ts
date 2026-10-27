@@ -25,7 +25,7 @@ export let getImageFills = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     let result = await client.getImageFills(ctx.input.fileKey);
 
     let images = result.meta?.images || {};

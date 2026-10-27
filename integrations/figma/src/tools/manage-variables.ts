@@ -31,7 +31,7 @@ export let getVariables = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
 
     let result = ctx.input.publishedOnly
       ? await client.getPublishedVariables(ctx.input.fileKey)
@@ -81,7 +81,7 @@ export let updateVariables = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
 
     let result = await client.postVariables(ctx.input.fileKey, {
       variableCollections: ctx.input.variableCollections,

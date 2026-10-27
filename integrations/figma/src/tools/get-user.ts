@@ -21,7 +21,7 @@ export let getUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FigmaClient(ctx.auth.token);
+    let client = new FigmaClient(ctx.auth.token, ctx.auth.authType);
     let user = await client.getMe();
 
     return {

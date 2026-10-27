@@ -6667,6 +6667,21 @@
         "typescript": "^5",
       },
     },
+    "integrations/highlevel": {
+      "name": "@slates-integrations/highlevel",
+      "version": "0.1.1",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.30",
+        "zod": "^4.2.1",
+      },
+      "devDependencies": {
+        "@slates/test": "1.0.0-rc.26",
+        "typescript": "^5",
+        "vitest": "^3.1.2",
+      },
+    },
     "integrations/hightouch": {
       "name": "@slates-integrations/hightouch",
       "version": "0.3.1",
@@ -17173,6 +17188,8 @@
     "@slates-integrations/heyzine": ["@slates-integrations/heyzine@workspace:integrations/heyzine"],
 
     "@slates-integrations/highergov": ["@slates-integrations/highergov@workspace:integrations/highergov"],
+
+    "@slates-integrations/highlevel": ["@slates-integrations/highlevel@workspace:integrations/highlevel"],
 
     "@slates-integrations/hightouch": ["@slates-integrations/hightouch@workspace:integrations/hightouch"],
 
