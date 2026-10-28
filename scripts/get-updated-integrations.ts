@@ -1,245 +1,160 @@
 #!/usr/bin/env bun
 
-import { readdir, readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { $ } from 'bun';
+import { parseArgs } from 'node:util';
+import { type IntegrationPackage, listIntegrationPackages } from './lib/integration-packages';
+import { classifyLookup, getRegistryTarget, lookupVersions } from './lib/slate-registry';
 
-type IntegrationPackage = {
-  directory: string;
-  name: string;
-  version: string;
+type MatrixEntry = {
+  label: string;
+  directories: string;
 };
 
-type MatrixEntry = IntegrationPackage;
-
-type MatrixOutput = {
-  include: MatrixEntry[];
-};
-
-type CliOptions = {
-  filters: string[];
-};
-
-const INTEGRATION_ROOTS = [
-  path.resolve(import.meta.dir, '..', 'integrations'),
-  path.resolve(import.meta.dir, '..', 'test-integrations')
-] as const;
-const REGISTRY_RETRY_ATTEMPTS = 5;
-const REGISTRY_RETRY_BASE_DELAY_MS = 2_000;
+// GitHub rejects a matrix with more than 256 jobs.
+const MAX_MATRIX_JOBS = 256;
 const HELP_TEXT = `
 Usage:
   bun scripts/get-updated-integrations.ts [--filter <pattern>]
 
+Prints {"matrix": {"include": [...]}, "blocked": [...]}: a GitHub Actions matrix of
+at most ${MAX_MATRIX_JOBS} jobs for integration versions missing from the Slates
+registry (SLATES_REGISTRY_URL, SLATES_REGISTRY_TOKEN), and the integrations that
+cannot be published, for example because their scope is missing.
+
 Options:
-  --filter <pattern>   Filter package names with exact values or "*" wildcards.
-                       Repeat the flag or provide a comma-separated list.
+  --filter <pattern>   Filter by package name, slate.json name, or directory name
+                       with exact values or "*" wildcards. Repeat the flag or
+                       provide a comma-separated list.
 
 Examples:
   bun scripts/get-updated-integrations.ts
   bun scripts/get-updated-integrations.ts --filter @slates-integrations/google-*
-  bun scripts/get-updated-integrations.ts --filter @slates-integrations/google-*,@slates-integrations/npm
+  bun scripts/get-updated-integrations.ts --filter slack,@github/github
 `.trim();
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const integrations = await getIntegrationPackages();
-  const matchingIntegrations = integrations.filter(integration =>
-    matchesAnyFilter(integration.name, options.filters)
+  const { values } = parseArgs({
+    options: {
+      filter: { type: 'string', multiple: true },
+      help: { type: 'boolean', short: 'h' }
+    },
+    strict: true
+  });
+  if (values.help) {
+    console.log(HELP_TEXT);
+    return;
+  }
+
+  const filters = (values.filter ?? []).flatMap(value =>
+    value
+      .split(',')
+      .map(part => part.trim())
+      .filter(Boolean)
+  );
+  const target = getRegistryTarget();
+  const integrations = (await listIntegrationPackages()).filter(integration =>
+    matchesAnyFilter(
+      [integration.name, integration.slateName, integration.directory.split('/')[1]!],
+      filters
+    )
+  );
+
+  if (filters.length > 0 && integrations.length === 0) {
+    throw new Error(`No integration matches --filter ${filters.join(',')}.`);
+  }
+  assertUniqueSlateNames(integrations);
+
+  console.error(
+    `Checking ${integrations.length} integration package${integrations.length === 1 ? '' : 's'}...`
+  );
+
+  const unpublished: IntegrationPackage[] = [];
+  const blocked: string[] = [];
+  const results = await lookupVersions(
+    target,
+    integrations.map(integration => ({
+      identifier: integration.slateName,
+      version: integration.version
+    }))
+  );
+
+  results.forEach((result, index) => {
+    const integration = integrations[index]!;
+    const spec = `${integration.slateName}@${integration.version} (${integration.directory})`;
+    const outcome = classifyLookup(result.status);
+
+    if (outcome.kind === 'missing') {
+      console.error(`Needs publish: ${spec}`);
+      unpublished.push(integration);
+    } else if (outcome.kind === 'skip') {
+      console.error(`::warning::Skipping ${spec}: ${outcome.reason}.`);
+    } else if (outcome.kind === 'blocked') {
+      console.error(`::error::Cannot publish ${spec}: ${outcome.reason}.`);
+      blocked.push(`${spec}: ${outcome.reason}`);
+    }
+  });
+
+  const include = toMatrixEntries(
+    unpublished.sort((left, right) => left.name.localeCompare(right.name))
   );
 
   console.error(
-    `Checking ${matchingIntegrations.length} integration package${matchingIntegrations.length === 1 ? '' : 's'} on npm...`
+    `Found ${unpublished.length} unpublished integration version${unpublished.length === 1 ? '' : 's'} in ${include.length} job${include.length === 1 ? '' : 's'}; ${blocked.length} blocked.`
   );
 
-  const unpublishedIntegrations = await filterUnpublishedIntegrations(
-    matchingIntegrations,
-    20
-  );
-  const output: MatrixOutput = {
-    include: unpublishedIntegrations.sort((left, right) => left.name.localeCompare(right.name))
-  };
-
-  console.error(
-    `Found ${output.include.length} unpublished integration version${output.include.length === 1 ? '' : 's'}.`
-  );
-
-  process.stdout.write(`${JSON.stringify(output)}\n`);
+  process.stdout.write(`${JSON.stringify({ matrix: { include }, blocked })}\n`);
 }
 
-function parseArgs(args: string[]): CliOptions {
-  const filters: string[] = [];
-
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-
-    if (argument === '--help' || argument === '-h') {
-      console.log(HELP_TEXT);
-      process.exit(0);
-    }
-
-    if (argument === '--filter') {
-      const value = args[index + 1];
-
-      if (!value) {
-        throw new Error('Missing value for --filter.');
-      }
-
-      filters.push(...splitFilters(value));
-      index += 1;
-      continue;
-    }
-
-    if (argument.startsWith('--filter=')) {
-      filters.push(...splitFilters(argument.slice('--filter='.length)));
-      continue;
-    }
-
-    throw new Error(`Unknown argument: ${argument}`);
+function assertUniqueSlateNames(integrations: IntegrationPackage[]) {
+  const directoriesByName = new Map<string, string[]>();
+  for (const integration of integrations) {
+    directoriesByName.set(integration.slateName, [
+      ...(directoriesByName.get(integration.slateName) ?? []),
+      integration.directory
+    ]);
   }
 
-  return {
-    filters: filters.filter(Boolean)
-  };
+  const duplicates = [...directoriesByName].filter(
+    ([, directories]) => directories.length > 1
+  );
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Several directories share a slate.json name:\n${duplicates.map(([name, directories]) => `  ${name}: ${directories.join(', ')}`).join('\n')}`
+    );
+  }
 }
 
-function splitFilters(value: string): string[] {
-  return value
-    .split(',')
-    .map(part => part.trim())
-    .filter(Boolean);
-}
+function toMatrixEntries(integrations: IntegrationPackage[]): MatrixEntry[] {
+  const batchSize = Math.ceil(integrations.length / MAX_MATRIX_JOBS);
+  const entries: MatrixEntry[] = [];
 
-async function getIntegrationPackages(): Promise<IntegrationPackage[]> {
-  const packages: IntegrationPackage[] = [];
-
-  for (const root of INTEGRATION_ROOTS) {
-    const directoryEntries = await readdir(root, { withFileTypes: true });
-    const rootSegment = path.basename(root);
-
-    for (const entry of directoryEntries.filter(e => e.isDirectory())) {
-      const packageJsonPath = path.join(root, entry.name, 'package.json');
-      const packageJsonRaw = await readFile(packageJsonPath, 'utf8');
-      const packageJson = JSON.parse(packageJsonRaw) as {
-        name?: string;
-        private?: boolean;
-        version?: string;
-      };
-
-      if (packageJson.private) {
-        continue;
-      }
-
-      if (!packageJson.name || !packageJson.version) {
-        throw new Error(`Missing name or version in ${packageJsonPath}.`);
-      }
-
-      packages.push({
-        directory: path.posix.join(rootSegment, entry.name),
-        name: packageJson.name,
-        version: packageJson.version
-      });
-    }
+  for (let index = 0; index < integrations.length; index += batchSize) {
+    const batch = integrations.slice(index, index + batchSize);
+    entries.push({
+      label:
+        batch.length === 1
+          ? `${batch[0]!.slateName}@${batch[0]!.version}`
+          : `${batch[0]!.slateName} and ${batch.length - 1} more`,
+      directories: batch.map(integration => integration.directory).join(' ')
+    });
   }
 
-  return packages;
+  return entries;
 }
 
-function matchesAnyFilter(packageName: string, filters: string[]): boolean {
+function matchesAnyFilter(names: string[], filters: string[]): boolean {
   if (filters.length === 0) {
     return true;
   }
 
-  return filters.some(filter => wildcardToRegExp(filter).test(packageName));
+  return filters.some(filter => {
+    const pattern = wildcardToRegExp(filter);
+    return names.some(name => pattern.test(name));
+  });
 }
 
 function wildcardToRegExp(pattern: string): RegExp {
   const escapedPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
   return new RegExp(`^${escapedPattern}$`);
-}
-
-async function filterUnpublishedIntegrations(
-  integrations: IntegrationPackage[],
-  concurrency: number
-): Promise<IntegrationPackage[]> {
-  const unpublished: IntegrationPackage[] = [];
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < integrations.length) {
-      const integration = integrations[cursor];
-      cursor += 1;
-
-      const isPublished = await hasPublishedVersion(integration);
-
-      if (!isPublished) {
-        unpublished.push(integration);
-      }
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, integrations.length) }, () => worker())
-  );
-
-  return unpublished;
-}
-
-async function hasPublishedVersion(integration: IntegrationPackage): Promise<boolean> {
-  const spec = `${integration.name}@${integration.version}`;
-  const result = await npmViewWithRetries(spec);
-
-  if (result.exitCode === 0) {
-    console.error(`Published already: ${spec}`);
-    return true;
-  }
-
-  const stderr = new TextDecoder().decode(result.stderr).trim();
-
-  if (stderr.includes('E404') || stderr.includes('404 Not Found')) {
-    console.error(`Needs publish: ${spec}`);
-    return false;
-  }
-
-  throw new Error(
-    `Failed to query npm for ${spec}: ${stderr || `exit code ${result.exitCode}`}`
-  );
-}
-
-async function npmViewWithRetries(spec: string) {
-  for (let attempt = 1; attempt <= REGISTRY_RETRY_ATTEMPTS; attempt += 1) {
-    const result = await $`npm view ${spec} version --json --loglevel=error`.quiet().nothrow();
-    const stderr = new TextDecoder().decode(result.stderr).trim();
-
-    if (!isRateLimitError(stderr)) {
-      return result;
-    }
-
-    if (attempt === REGISTRY_RETRY_ATTEMPTS) {
-      return result;
-    }
-
-    const delayMs = getRetryDelayMs(attempt);
-    console.error(
-      `npm rate limit while checking ${spec}. Retrying in ${delayMs}ms (${attempt}/${REGISTRY_RETRY_ATTEMPTS})...`
-    );
-    await sleep(delayMs);
-  }
-
-  throw new Error(`Retry loop exited unexpectedly for ${spec}.`);
-}
-
-function isRateLimitError(stderr: string): boolean {
-  return stderr.includes('E429') || stderr.includes('429 Too Many Requests');
-}
-
-function getRetryDelayMs(attempt: number): number {
-  return REGISTRY_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
-}
-
-function sleep(delayMs: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, delayMs);
-  });
 }
 
 async function mainWithErrorHandling() {

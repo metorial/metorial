@@ -1,13 +1,10 @@
 #!/usr/bin/env bun
 
-import { access, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { access, copyFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { $ } from 'bun';
-import {
-  type PackageJson,
-  preparePackageJsonForPublish
-} from './lib/prepare-package-for-publish';
+import type { PackageJson } from './lib/prepare-package-for-publish';
+import { createSlateBundle } from './lib/slate-bundle';
 
 type ResolvedIntegration = {
   directory: string;
@@ -43,61 +40,22 @@ async function main() {
 
   const integration = await resolveIntegration(slateIdentifier);
   const packageDirectory = path.join(ROOT_DIRECTORY, integration.directory);
-  const packageJsonPath = path.join(packageDirectory, 'package.json');
-  const originalPackageJson = await readFile(packageJsonPath, 'utf8');
   const zipPath = path.join(OUT_DIRECTORY, `${integration.folderName}.zip`);
 
   console.error(`Packaging ${integration.packageName} from ${integration.directory}...`);
 
+  await $`bun install`.cwd(ROOT_DIRECTORY).quiet();
+  await $`bunx turbo run build --filter=${integration.packageName}`.cwd(ROOT_DIRECTORY);
+
+  const bundle = await createSlateBundle(packageDirectory);
   try {
-    await $`bun install`.cwd(ROOT_DIRECTORY).quiet();
-    await $`bunx turbo run build --filter=${integration.packageName}`.cwd(ROOT_DIRECTORY);
-
-    const packageJson = JSON.parse(originalPackageJson) as PackageJson;
-    const publishPackageJson = await preparePackageJsonForPublish(
-      packageDirectory,
-      packageJson
-    );
-
-    await writeFile(
-      packageJsonPath,
-      `${JSON.stringify(publishPackageJson, null, 2)}\n`,
-      'utf8'
-    );
-
-    const packResult = await $`npm pack --ignore-scripts`
-      .cwd(packageDirectory)
-      .quiet()
-      .nothrow();
-    if (packResult.exitCode !== 0) {
-      throw new Error(
-        `npm pack failed: ${new TextDecoder().decode(packResult.stderr).trim() || 'unknown error'}`
-      );
-    }
-
-    const packOutput = new TextDecoder().decode(packResult.stdout).trim();
-    const tarballName = packOutput.split('\n').at(-1)?.trim();
-    if (!tarballName) {
-      throw new Error('npm pack did not return a tarball filename.');
-    }
-
-    const tarballPath = path.join(packageDirectory, tarballName);
-    const extractDirectory = await mkdtemp(path.join(tmpdir(), 'package-local-'));
-
-    try {
-      await $`tar -xzf ${tarballPath} -C ${extractDirectory}`.quiet();
-      await $`mkdir -p ${OUT_DIRECTORY}`.quiet();
-      await $`rm -f ${zipPath}`.quiet();
-      await $`zip -qr ${zipPath} .`.cwd(path.join(extractDirectory, 'package')).quiet();
-    } finally {
-      await rm(extractDirectory, { force: true, recursive: true });
-      await rm(tarballPath, { force: true });
-    }
-
-    console.error(`Wrote ${path.relative(ROOT_DIRECTORY, zipPath)}`);
+    await mkdir(OUT_DIRECTORY, { recursive: true });
+    await copyFile(bundle.zipPath, zipPath);
   } finally {
-    await writeFile(packageJsonPath, originalPackageJson, 'utf8');
+    await bundle.cleanup();
   }
+
+  console.error(`Wrote ${path.relative(ROOT_DIRECTORY, zipPath)}`);
 }
 
 async function resolveIntegration(slateIdentifier: string): Promise<ResolvedIntegration> {
