@@ -211,8 +211,13 @@ export async function readStoredSlateBundle(
     return null;
   }
 
-  const manifest = JSON.parse(manifestRaw) as Partial<StoredSlateBundle>;
-  if (!manifest.slateName || !manifest.version || !manifest.contentChecksum) {
+  let manifest: Partial<StoredSlateBundle> | null;
+  try {
+    manifest = JSON.parse(manifestRaw);
+  } catch {
+    manifest = null;
+  }
+  if (!manifest?.slateName || !manifest.version || !manifest.contentChecksum) {
     throw new Error(`Invalid bundle manifest for ${directory}.`);
   }
 

@@ -22,6 +22,8 @@ export type VersionLookupResult = {
 const LOOKUP_BATCH_SIZE = 500;
 const RETRY_ATTEMPTS = 5;
 const RETRY_BASE_DELAY_MS = 2_000;
+const LOOKUP_TIMEOUT_MS = 60_000;
+const UPLOAD_TIMEOUT_MS = 5 * 60_000;
 const LOOPBACK_HOSTNAME = /^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/;
 
 export function classifyLookup(
@@ -86,20 +88,33 @@ export async function lookupVersions(
 
   for (let index = 0; index < items.length; index += LOOKUP_BATCH_SIZE) {
     const batch = items.slice(index, index + LOOKUP_BATCH_SIZE);
-    const response = await requestWithRetries(target, '/slates/version-lookup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: batch })
-    });
+    const response = await requestWithRetries(
+      target,
+      '/slates/version-lookup',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: batch })
+      },
+      LOOKUP_TIMEOUT_MS
+    );
     const body = (await response.json()) as { items?: VersionLookupResult[] };
 
     const batchResults = body.items ?? [];
-    if (
-      batchResults.length !== batch.length ||
-      batchResults.some((result, i) => result.identifier !== batch[i]?.identifier)
-    ) {
+    if (batchResults.length !== batch.length) {
       throw new Error(
         `Registry returned ${batchResults.length} lookup results for ${batch.length} items.`
+      );
+    }
+    const mismatch = batch.findIndex(
+      (item, i) =>
+        batchResults[i]?.identifier !== item.identifier ||
+        batchResults[i]?.version !== item.version
+    );
+    if (mismatch !== -1) {
+      const result = batchResults[mismatch]!;
+      throw new Error(
+        `Registry lookup result ${index + mismatch} is for ${result.identifier}@${result.version}, expected ${batch[mismatch]!.identifier}@${batch[mismatch]!.version}.`
       );
     }
     results.push(...batchResults);
@@ -124,11 +139,16 @@ export async function uploadVersion(
 
   const query = d.defaultAccess ? `?default_access=${d.defaultAccess}` : '';
   const pathname = `/slates/${encodeURIComponent(scope)}/${encodeURIComponent(slate)}/versions/${encodeURIComponent(d.version)}${query}`;
-  const response = await requestWithRetries(target, pathname, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/zip' },
-    body: d.zip
-  });
+  const response = await requestWithRetries(
+    target,
+    pathname,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/zip' },
+      body: d.zip
+    },
+    UPLOAD_TIMEOUT_MS
+  );
 
   return (await response.json()) as { id: string; version: string };
 }
@@ -136,7 +156,8 @@ export async function uploadVersion(
 async function requestWithRetries(
   target: RegistryTarget,
   pathname: string,
-  init: RequestInit
+  init: RequestInit,
+  timeoutMs: number
 ) {
   const url = `${target.url}${pathname}`;
 
@@ -148,6 +169,7 @@ async function requestWithRetries(
       response = await fetch(url, {
         ...init,
         redirect: 'error',
+        signal: AbortSignal.timeout(timeoutMs),
         headers: { ...init.headers, Authorization: `Bearer ${target.token}` }
       });
     } catch (error) {

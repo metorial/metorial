@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
-import { access, copyFile, mkdir, readdir, readFile } from 'node:fs/promises';
+import { copyFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { $ } from 'bun';
-import type { PackageJson } from './lib/prepare-package-for-publish';
+import { listIntegrationPackages } from './lib/integration-packages';
 import { createSlateBundle } from './lib/slate-bundle';
 
 type ResolvedIntegration = {
@@ -14,7 +14,6 @@ type ResolvedIntegration = {
 };
 
 const ROOT_DIRECTORY = path.resolve(import.meta.dir, '..');
-const INTEGRATION_ROOTS = ['integrations', 'test-integrations'] as const;
 const OUT_DIRECTORY = path.join(ROOT_DIRECTORY, 'out');
 const HELP_TEXT = `
 Usage:
@@ -102,54 +101,12 @@ async function resolveIntegration(slateIdentifier: string): Promise<ResolvedInte
 }
 
 async function listIntegrations(): Promise<ResolvedIntegration[]> {
-  const integrations: ResolvedIntegration[] = [];
-
-  for (const root of INTEGRATION_ROOTS) {
-    const rootDirectory = path.join(ROOT_DIRECTORY, root);
-    const entries = await readdir(rootDirectory, { withFileTypes: true }).catch(() => []);
-
-    for (const entry of entries.filter(item => item.isDirectory())) {
-      const directory = path.posix.join(root, entry.name);
-      const packageDirectory = path.join(ROOT_DIRECTORY, directory);
-      const packageJsonPath = path.join(packageDirectory, 'package.json');
-
-      if (!(await pathExists(packageJsonPath))) {
-        continue;
-      }
-
-      const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8')) as PackageJson;
-      if (!packageJson.name) {
-        throw new Error(`Missing name in ${packageJsonPath}.`);
-      }
-
-      const slateJsonPath = path.join(packageDirectory, 'slate.json');
-      let slateName: string | undefined;
-      if (await pathExists(slateJsonPath)) {
-        const slateJson = JSON.parse(await readFile(slateJsonPath, 'utf8')) as {
-          name?: string;
-        };
-        slateName = slateJson.name;
-      }
-
-      integrations.push({
-        directory,
-        folderName: entry.name,
-        packageName: packageJson.name,
-        slateName: slateName ?? packageJson.name
-      });
-    }
-  }
-
-  return integrations;
-}
-
-async function pathExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
+  return (await listIntegrationPackages()).map(integration => ({
+    directory: integration.directory,
+    folderName: path.basename(integration.directory),
+    packageName: integration.name,
+    slateName: integration.slateName
+  }));
 }
 
 async function mainWithErrorHandling() {

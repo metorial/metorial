@@ -11,6 +11,8 @@ type MatrixEntry = {
 
 // GitHub rejects a matrix with more than 256 jobs.
 const MAX_MATRIX_JOBS = 256;
+// Each job runs a full `bun install`, so small batches still share one.
+const MIN_BATCH_SIZE = 10;
 const HELP_TEXT = `
 Usage:
   bun scripts/get-updated-integrations.ts [--filter <pattern>]
@@ -124,7 +126,7 @@ function assertUniqueSlateNames(integrations: IntegrationPackage[]) {
 }
 
 function toMatrixEntries(integrations: IntegrationPackage[]): MatrixEntry[] {
-  const batchSize = Math.ceil(integrations.length / MAX_MATRIX_JOBS);
+  const batchSize = Math.max(MIN_BATCH_SIZE, Math.ceil(integrations.length / MAX_MATRIX_JOBS));
   const entries: MatrixEntry[] = [];
 
   for (let index = 0; index < integrations.length; index += batchSize) {

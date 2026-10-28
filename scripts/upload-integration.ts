@@ -17,18 +17,12 @@ const HELP_TEXT = `
 Usage:
   bun scripts/upload-integration.ts --bundle-dir <dir> --expected-matrix-env <name> [--concurrency <n>]
 
-Uploads the bundles that scripts/bundle-integration.ts wrote for every directory in
-the detection matrix (read from the environment variable <name>) to the Slates
-registry (SLATES_REGISTRY_URL, SLATES_REGISTRY_TOKEN), skipping versions it already
-has. New slates are created public; existing slates keep their access. A failed integration does not stop the others; the command exits
-non-zero if any failed.
+Uploads the bundles that scripts/bundle-integration.ts wrote for every unpublished
+directory in the detection matrix (read from the environment variable <name>) to the
+Slates registry (SLATES_REGISTRY_URL, SLATES_REGISTRY_TOKEN). New slates are created
+public; existing slates keep their access. A failed integration does not stop the
+others; the command exits non-zero if any failed.
 `.trim();
-
-type UploadItem = {
-  integration: IntegrationPackage;
-  contentChecksum: string;
-  zipPath: string;
-};
 
 async function main() {
   const { values } = parseArgs({
@@ -56,33 +50,51 @@ async function main() {
   }
 
   const failures: string[] = [];
-  const items = await resolveUploadItems(
-    path.resolve(bundleDirectory),
-    readMatrixDirectories(matrixVariable),
-    failures
+  const fail = (directory: string, message: string) => {
+    console.error(`::error::${directory}: ${message}`);
+    failures.push(`${directory}: ${message}`);
+  };
+
+  const integrationsByDirectory = new Map(
+    (await listIntegrationPackages()).map(integration => [integration.directory, integration])
   );
+  const integrations: IntegrationPackage[] = [];
+  for (const directory of readMatrixDirectories(matrixVariable)) {
+    const integration = integrationsByDirectory.get(directory);
+    if (integration) {
+      integrations.push(integration);
+    } else {
+      fail(directory, 'not a publishable integration in this checkout');
+    }
+  }
+
   const target = getRegistryTarget();
+  const resolvedBundleDirectory = path.resolve(bundleDirectory);
   const lookups = await lookupVersions(
     target,
-    items.map(item => ({
-      identifier: item.integration.slateName,
-      version: item.integration.version
+    integrations.map(integration => ({
+      identifier: integration.slateName,
+      version: integration.version
     }))
   );
 
   let cursor = 0;
   const worker = async () => {
-    while (cursor < items.length) {
+    while (cursor < integrations.length) {
       const index = cursor;
       cursor += 1;
-      const item = items[index]!;
+      const integration = integrations[index]!;
       const lookup = lookups[index]!;
-      const spec = `${item.integration.slateName}@${item.integration.version}`;
+      const spec = `${integration.slateName}@${integration.version}`;
 
       try {
         const outcome = classifyLookup(lookup.status);
         if (outcome.kind === 'published') {
-          if (lookup.checksum && lookup.checksum !== item.contentChecksum) {
+          const bundle = await readStoredSlateBundle(
+            resolvedBundleDirectory,
+            integration.directory
+          ).catch(() => null);
+          if (bundle && lookup.checksum && lookup.checksum !== bundle.contentChecksum) {
             console.error(
               `::warning::${spec} is already published with different contents. Bump the version in package.json to publish the change.`
             );
@@ -93,23 +105,22 @@ async function main() {
         } else if (outcome.kind === 'blocked') {
           throw new Error(`cannot publish: ${outcome.reason}.`);
         } else {
+          const zipPath = await resolveBundleZip(resolvedBundleDirectory, integration);
           const version = await uploadVersion(target, {
-            slateName: item.integration.slateName,
-            version: item.integration.version,
-            zip: new Uint8Array(await readFile(item.zipPath)),
+            slateName: integration.slateName,
+            version: integration.version,
+            zip: new Uint8Array(await readFile(zipPath)),
             defaultAccess: 'public'
           });
           console.error(`${spec}: published (${version.id}).`);
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`::error::${item.integration.directory}: ${message}`);
-        failures.push(`${item.integration.directory}: ${message}`);
+        fail(integration.directory, error instanceof Error ? error.message : String(error));
       }
     }
   };
   await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
+    Array.from({ length: Math.min(concurrency, integrations.length) }, () => worker())
   );
 
   if (failures.length > 0) {
@@ -118,7 +129,9 @@ async function main() {
     );
   }
 
-  console.error(`Processed ${items.length} integration${items.length === 1 ? '' : 's'}.`);
+  console.error(
+    `Processed ${integrations.length} integration${integrations.length === 1 ? '' : 's'}.`
+  );
 }
 
 function readMatrixDirectories(variable: string): string[] {
@@ -138,41 +151,17 @@ function readMatrixDirectories(variable: string): string[] {
 }
 
 // Bundles come from untrusted build jobs: trust only their zip, for what the checkout expects.
-async function resolveUploadItems(
-  bundleDirectory: string,
-  directories: string[],
-  failures: string[]
-): Promise<UploadItem[]> {
-  const integrationsByDirectory = new Map(
-    (await listIntegrationPackages()).map(integration => [integration.directory, integration])
-  );
-  const items: UploadItem[] = [];
-
-  for (const directory of directories) {
-    const integration = integrationsByDirectory.get(directory);
-    const bundle = integration && (await readStoredSlateBundle(bundleDirectory, directory));
-    const problem = !integration
-      ? 'not a publishable integration in this checkout'
-      : !bundle
-        ? 'no bundle was built (see the build job)'
-        : bundle.slateName !== integration.slateName || bundle.version !== integration.version
-          ? `bundle is for ${bundle.slateName}@${bundle.version}, but the checkout has ${integration.slateName}@${integration.version}`
-          : null;
-
-    if (problem || !integration || !bundle) {
-      console.error(`::error::${directory}: ${problem}`);
-      failures.push(`${directory}: ${problem}`);
-      continue;
-    }
-
-    items.push({
-      integration,
-      contentChecksum: bundle.contentChecksum,
-      zipPath: bundle.zipPath
-    });
+async function resolveBundleZip(bundleDirectory: string, integration: IntegrationPackage) {
+  const bundle = await readStoredSlateBundle(bundleDirectory, integration.directory);
+  if (!bundle) {
+    throw new Error('no bundle was built (see the build job)');
   }
-
-  return items;
+  if (bundle.slateName !== integration.slateName || bundle.version !== integration.version) {
+    throw new Error(
+      `bundle is for ${bundle.slateName}@${bundle.version}, but the checkout has ${integration.slateName}@${integration.version}`
+    );
+  }
+  return bundle.zipPath;
 }
 
 async function mainWithErrorHandling() {
