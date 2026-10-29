@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { type MetorialConfig, normalizeMetorialConfig } from '../config';
+import { DEFAULT_API_VERSION, getMetorialApiUrl } from '../config';
 import {
   encodeMetorialPathParam,
   type MetorialIntrospectionDocs,
@@ -99,10 +99,12 @@ export class MetorialClient {
   private readonly apiUrl: string;
   private readonly apiVersion: string;
 
-  constructor(config: Partial<MetorialConfig> & Record<string, unknown>) {
-    let normalized = normalizeMetorialConfig(config);
-    this.apiUrl = normalized.apiUrl;
-    this.apiVersion = normalized.apiVersion;
+  constructor({
+    apiUrl = getMetorialApiUrl(),
+    apiVersion = DEFAULT_API_VERSION
+  }: { apiUrl?: string; apiVersion?: string } = {}) {
+    this.apiUrl = apiUrl;
+    this.apiVersion = apiVersion;
   }
 
   private buildUrl(path: string, query?: Record<string, QueryValue>) {

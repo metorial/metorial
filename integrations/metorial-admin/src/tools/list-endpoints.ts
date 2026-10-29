@@ -1,6 +1,5 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { resolveMetorialRuntimeConfig } from '../config';
 import { MetorialClient } from '../lib/client';
 import { listMetorialEndpoints, METORIAL_METHODS } from '../lib/endpoints';
 import { spec } from '../spec';
@@ -55,7 +54,7 @@ export let listEndpoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetorialClient(resolveMetorialRuntimeConfig(ctx.config, ctx.auth));
+    let client = new MetorialClient();
     let docs = await client.introspectEndpoints();
     let result = listMetorialEndpoints(docs, {
       search: ctx.input.search,

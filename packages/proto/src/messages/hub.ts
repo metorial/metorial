@@ -36,13 +36,39 @@ export type SlatesMessageHubLiveInvocationSetNotification = z.infer<
   typeof slatesMessageHubLiveInvocationSetNotification
 >;
 
+export let slatesRuntimeInfo = z.object({
+  metorial: z
+    .object({
+      apiUrl: z.string().url().max(2048),
+      region: z.string().max(64).nullish(),
+      environment: z.string().max(64).nullish()
+    })
+    .optional()
+});
+
+export type SlatesRuntimeInfo = z.infer<typeof slatesRuntimeInfo>;
+
+export let slatesMessageHubRuntimeInfoSetNotification = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/hub.runtime_info.set'),
+  params: z.object({
+    runtimeInfo: slatesRuntimeInfo
+  })
+});
+
+export type SlatesMessageHubRuntimeInfoSetNotification = z.infer<
+  typeof slatesMessageHubRuntimeInfoSetNotification
+>;
+
 export type SlatesHubNotifications =
   | SlatesMessageHubCapabilitiesSetNotification
-  | SlatesMessageHubLiveInvocationSetNotification;
+  | SlatesMessageHubLiveInvocationSetNotification
+  | SlatesMessageHubRuntimeInfoSetNotification;
 
 export let slatesHubNotificationsByMethod = {
   'slates/hub.capabilities.set': slatesMessageHubCapabilitiesSetNotification,
-  'slates/hub.live_invocation.set': slatesMessageHubLiveInvocationSetNotification
+  'slates/hub.live_invocation.set': slatesMessageHubLiveInvocationSetNotification,
+  'slates/hub.runtime_info.set': slatesMessageHubRuntimeInfoSetNotification
 };
 
 export let slatesMessageProviderCapabilitiesGetRequest = z.object({
@@ -64,7 +90,8 @@ export let slatesMessageProviderCapabilitiesGetResponse = z.object({
       hub: z
         .object({
           capabilitiesNotification: z.boolean().optional(),
-          liveInvocation: z.boolean().optional()
+          liveInvocation: z.boolean().optional(),
+          runtimeInfo: z.boolean().optional()
         })
         .optional(),
       provider: z

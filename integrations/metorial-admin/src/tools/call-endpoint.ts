@@ -1,6 +1,5 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { resolveMetorialRuntimeConfig } from '../config';
 import { addResponseAttachment } from '../lib/attachments';
 import { MetorialClient } from '../lib/client';
 import {
@@ -72,8 +71,7 @@ export let callEndpoint = SlateTool.create(spec, {
       throw metorialValidationError('GET Metorial endpoint calls cannot include a body.');
     }
 
-    let config = resolveMetorialRuntimeConfig(ctx.config, ctx.auth);
-    let client = new MetorialClient(config);
+    let client = new MetorialClient();
     let docs = await client.introspectEndpoints();
     let endpoint = resolveMetorialEndpointForCall(docs, {
       method: ctx.input.method,

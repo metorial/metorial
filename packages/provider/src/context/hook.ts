@@ -30,3 +30,5 @@ export let getCurrentContext = <
   }
   return context as SlateContext<ConfigType, AuthType, InputType>;
 };
+
+export let getRuntimeInfo = () => asyncLocalStorage.getStore()?.runtimeInfo ?? null;

@@ -1182,4 +1182,47 @@ describe('@slates/client local transport', () => {
       message: 'Session context has not been initialized'
     });
   });
+
+  it('sends hub runtime info only when it is set', async () => {
+    let spec = SlateSpecification.create({
+      key: 'runtime-info-slate',
+      name: 'Runtime Info Slate',
+      config: SlateConfig.create(z.object({})),
+      auth: SlateAuth.create().output(z.object({}))
+    });
+    let tool = SlatePublicTool.create(spec, {
+      key: 'runtime_info',
+      name: 'Runtime Info'
+    })
+      .input(z.object({}))
+      .output(z.object({ apiUrl: z.string().nullable() }))
+      .handleInvocation(async ctx => ({
+        output: { apiUrl: ctx.runtimeInfo?.metorial?.apiUrl ?? null },
+        message: 'done'
+      }))
+      .build();
+
+    let localTransport = createLocalSlateTransport({
+      slate: Slate.create({ spec, triggers: [], tools: [tool] })
+    });
+    let sentMethods: string[][] = [];
+    let client = createSlatesClient({
+      transport: {
+        async send(messages) {
+          sentMethods.push(messages.map(message => message.method));
+          return localTransport.send(messages);
+        }
+      }
+    });
+
+    let withoutRuntimeInfo = await client.invokeTool('runtime_info', {});
+    expect(withoutRuntimeInfo.output).toEqual({ apiUrl: null });
+    expect(sentMethods.at(-1)).not.toContain('slates/hub.runtime_info.set');
+
+    client.setRuntimeInfo({ metorial: { apiUrl: 'https://api-eu1.metorial.test' } });
+
+    let withRuntimeInfo = await client.invokeTool('runtime_info', {});
+    expect(withRuntimeInfo.output).toEqual({ apiUrl: 'https://api-eu1.metorial.test' });
+    expect(sentMethods.at(-1)).toContain('slates/hub.runtime_info.set');
+  });
 });
