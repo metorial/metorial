@@ -9303,7 +9303,7 @@
     },
     "integrations/notion": {
       "name": "@slates-integrations/notion",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -15296,7 +15296,7 @@
     },
     "packages/cli": {
       "name": "@slates/cli",
-      "version": "1.0.10",
+      "version": "1.0.11",
       "bin": "./src/cli.ts",
       "dependencies": {
         "@inquirer/prompts": "^7.4.0",
