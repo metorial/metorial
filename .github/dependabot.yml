@@ -1,8 +1,6 @@
 version: 2
 
 updates:
-  # One bun workspace: covers every integration, package, and adapter via the
-  # root bun.lock. PRs edit each affected integrations/*/package.json.
   - package-ecosystem: bun
     directory: /
     schedule:
@@ -10,16 +8,13 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
-    # Caret ranges absorb minor/patch, so those only touch bun.lock.
     versioning-strategy: increase-if-necessary
     commit-message:
       prefix: deps
     ignore:
-      # Internal packages; versions move via `bun run packages:sync-versions`.
       - dependency-name: slates
       - dependency-name: "@slates/*"
       - dependency-name: "@slates-integrations/*"
-      # Matches the Node 20 runtime.
       - dependency-name: "@types/node"
         update-types:
           - version-update:semver-major
