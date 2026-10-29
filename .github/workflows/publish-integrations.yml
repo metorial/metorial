@@ -1,71 +1,81 @@
 name: Publish integrations
 
+# Publishing is manual: run this workflow from the Actions tab or with
+# `bun run publish` in integrations-enterprise.
 on:
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - 'integrations/**/package.json'
-  #     - 'test-integrations/**/package.json'
-  #     - 'scripts/get-updated-integrations.ts'
-  #     - '.github/workflows/publish-integrations.yml'
   workflow_dispatch:
     inputs:
       filter:
-        description: 'Optional package filter, for example "@slates-integrations/google-*"'
+        description: 'Optional filter by package, slate.json, or directory name, for example "@slates-integrations/google-*". Empty publishes every unpublished version.'
         required: false
         type: string
+
+concurrency:
+  group: publish-integrations
+  cancel-in-progress: false
+
+# Only the token jobs (detect, upload) use the slates-registry environment; they install nothing.
 
 jobs:
   detect-unpublished-integrations:
     name: Detect unpublished integrations
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: slates-registry
+    permissions:
+      contents: read
     outputs:
       matrix: ${{ steps.discover.outputs.matrix }}
       count: ${{ steps.discover.outputs.count }}
+      blocked: ${{ steps.discover.outputs.blocked }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+      - name: Require main
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Publishing runs only from main, not ${GITHUB_REF}."
+          exit 1
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          node-version: 20
+          persist-credentials: false
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.0
-
-      - name: Install dependencies
-        run: bun install
+          no-cache: true
 
       - name: Discover unpublished integration versions
         id: discover
         shell: bash
         env:
           FILTER: ${{ github.event.inputs.filter || '' }}
+          SLATES_REGISTRY_URL: ${{ vars.SLATES_REGISTRY_URL }}
+          SLATES_REGISTRY_TOKEN: ${{ secrets.SLATES_REGISTRY_TOKEN }}
         run: |
-          cmd=(bun scripts/get-updated-integrations.ts)
+          cmd=(bun --no-install scripts/get-updated-integrations.ts)
           if [[ -n "$FILTER" ]]; then
             cmd+=(--filter "$FILTER")
           fi
 
-          matrix="$("${cmd[@]}")"
-          count="$(printf '%s' "$matrix" | bun -e 'const input = await Bun.stdin.text(); const data = JSON.parse(input); console.log(data.include.length);')"
+          "${cmd[@]}" > "$RUNNER_TEMP/detect.json"
+          bun --no-install -e '
+            const result = JSON.parse(await Bun.file(process.argv[1]).text());
+            const lines = [
+              `matrix=${JSON.stringify(result.matrix)}`,
+              `count=${result.matrix.include.length}`,
+              `blocked=${JSON.stringify(result.blocked)}`
+            ];
+            (await import("node:fs")).appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
+          ' "$RUNNER_TEMP/detect.json"
 
-          {
-            echo 'matrix<<EOF'
-            echo "$matrix"
-            echo 'EOF'
-            echo "count=$count"
-          } >> "$GITHUB_OUTPUT"
-
-  publish-integration:
-    name: Publish ${{ matrix.name }}
+  build-integrations:
+    name: Build ${{ matrix.label }}
     needs: detect-unpublished-integrations
     if: ${{ needs.detect-unpublished-integrations.outputs.count != '0' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     strategy:
@@ -74,58 +84,94 @@ jobs:
       matrix: ${{ fromJSON(needs.detect-unpublished-integrations.outputs.matrix) }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 20
-          registry-url: https://registry.npmjs.org
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.0
 
       - name: Install dependencies
         run: bun install
 
-      - name: Build integration package
-        run: bunx turbo run build --filter="${{ matrix.name }}"
-
-      - name: Prepare integration package for publish
-        run: bun scripts/prepare-package-for-publish.ts --directory "${{ matrix.directory }}"
-
-      - name: Publish integration to npm
-        working-directory: ${{ matrix.directory }}
-        shell: bash
+      - name: Build integration packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIRECTORIES: ${{ matrix.directories }}
         run: |
-          max_attempts=5
-          base_delay_seconds=2
-
-          for attempt in $(seq 1 "$max_attempts"); do
-            log_file="$(mktemp)"
-
-            if npm publish --access public > >(tee "$log_file") 2> >(tee -a "$log_file" >&2); then
-              rm -f "$log_file"
-              exit 0
-            fi
-
-            if ! grep -Eq 'E429|429 Too Many Requests' "$log_file"; then
-              rm -f "$log_file"
-              exit 1
-            fi
-
-            if [[ "$attempt" -eq "$max_attempts" ]]; then
-              echo "npm publish hit the rate limit too many times." >&2
-              rm -f "$log_file"
-              exit 1
-            fi
-
-            delay_seconds=$((base_delay_seconds * (2 ** (attempt - 1))))
-            echo "npm publish rate limited. Retrying in ${delay_seconds}s (${attempt}/${max_attempts})..." >&2
-            rm -f "$log_file"
-            sleep "$delay_seconds"
+          filters=()
+          for directory in $DIRECTORIES; do
+            filters+=("--filter=./$directory")
           done
+          bunx turbo run build --continue "${filters[@]}"
+
+      - name: Bundle integrations
+        if: ${{ !cancelled() }}
+        env:
+          DIRECTORIES: ${{ matrix.directories }}
+        run: bun scripts/bundle-integration.ts --out "$RUNNER_TEMP/slate-bundles" $DIRECTORIES
+
+      - name: Store bundles
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: slate-bundles-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/slate-bundles
+          if-no-files-found: ignore
+          retention-days: 1
+          overwrite: true
+
+  upload-integrations:
+    name: Upload integrations to the registry
+    needs: [detect-unpublished-integrations, build-integrations]
+    if: ${{ !cancelled() && needs.detect-unpublished-integrations.result == 'success' && needs.detect-unpublished-integrations.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: slates-registry
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.0
+          no-cache: true
+
+      - name: Download bundles
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: slate-bundles-*
+          path: ${{ runner.temp }}/slate-bundles
+          merge-multiple: true
+
+      - name: Upload bundles to the registry
+        env:
+          SLATES_REGISTRY_URL: ${{ vars.SLATES_REGISTRY_URL }}
+          SLATES_REGISTRY_TOKEN: ${{ secrets.SLATES_REGISTRY_TOKEN }}
+          PUBLISH_MATRIX: ${{ needs.detect-unpublished-integrations.outputs.matrix }}
+        run: bun --no-install scripts/upload-integration.ts --bundle-dir "$RUNNER_TEMP/slate-bundles" --expected-matrix-env PUBLISH_MATRIX
+
+  report-blocked-integrations:
+    name: Report blocked integrations
+    needs: detect-unpublished-integrations
+    if: ${{ needs.detect-unpublished-integrations.outputs.blocked != '' && needs.detect-unpublished-integrations.outputs.blocked != '[]' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Fail on blocked integrations
+        env:
+          BLOCKED: ${{ needs.detect-unpublished-integrations.outputs.blocked }}
+        run: |
+          echo "::error::Some integrations cannot be published: $BLOCKED"
+          exit 1
