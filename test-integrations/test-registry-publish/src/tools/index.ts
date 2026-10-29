@@ -1,0 +1,1 @@
+export { echo } from './echo';

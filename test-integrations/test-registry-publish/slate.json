@@ -1,0 +1,6 @@
+{
+  "name": "@__test__/registry-publish",
+  "description": "Internal test slate for checking that integrations publish to the Slates registry. Echoes back the text it receives.",
+  "categories": ["utilities"],
+  "skills": ["echo text back", "run registry publish smoke tests"]
+}

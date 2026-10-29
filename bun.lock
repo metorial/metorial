@@ -15624,7 +15624,7 @@
     },
     "test-integrations/test-no-auth": {
       "name": "@slates-integrations/test-no-auth",
-      "version": "0.1.0-rc.14",
+      "version": "0.1.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.23",
@@ -15651,6 +15651,19 @@
     "test-integrations/test-public-apis": {
       "name": "@slates-integrations/test-public-apis",
       "version": "0.1.0-rc.13",
+      "dependencies": {
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.23",
+        "zod": "^4.2",
+      },
+      "devDependencies": {
+        "typescript": "^5",
+        "vitest": "^3.1.2",
+      },
+    },
+    "test-integrations/test-registry-publish": {
+      "name": "@slates-integrations/test-registry-publish",
+      "version": "0.1.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.23",
@@ -18232,6 +18245,8 @@
     "@slates-integrations/test-oauth": ["@slates-integrations/test-oauth@workspace:test-integrations/test-oauth"],
 
     "@slates-integrations/test-public-apis": ["@slates-integrations/test-public-apis@workspace:test-integrations/test-public-apis"],
+
+    "@slates-integrations/test-registry-publish": ["@slates-integrations/test-registry-publish@workspace:test-integrations/test-registry-publish"],
 
     "@slates-integrations/test-triggers": ["@slates-integrations/test-triggers@workspace:test-integrations/test-triggers"],
 
@@ -22489,6 +22504,8 @@
 
     "@slates-integrations/test-public-apis/slates": ["slates@1.0.0-rc.23", "", { "dependencies": { "@slates/provider": "1.0.0-rc.24" } }, "sha512-O2sq5D8OEurOgIsUTLeP0lOQf3yD6aEvyvri9fXzrMp7vMUVwwREplNJ8pguud3q/4OAlh/U7EKQCuzxyOZr7Q=="],
 
+    "@slates-integrations/test-registry-publish/slates": ["slates@1.0.0-rc.23", "", { "dependencies": { "@slates/provider": "1.0.0-rc.24" } }, "sha512-O2sq5D8OEurOgIsUTLeP0lOQf3yD6aEvyvri9fXzrMp7vMUVwwREplNJ8pguud3q/4OAlh/U7EKQCuzxyOZr7Q=="],
+
     "@slates-integrations/test-triggers/@slates/test": ["@slates/test@1.0.0-rc.21", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.24", "@slates/profiles": "1.0.0-rc.22" } }, "sha512-S6W9ccO1wEtLAGm6TTr83nGvT/dz1ROT4pSJHDPilDEm/LGy8loXMvbvRRohK/60R62qP42xVS/7aoriHNFwNQ=="],
 
     "@slates-integrations/test-triggers/slates": ["slates@1.0.0-rc.23", "", { "dependencies": { "@slates/provider": "1.0.0-rc.24" } }, "sha512-O2sq5D8OEurOgIsUTLeP0lOQf3yD6aEvyvri9fXzrMp7vMUVwwREplNJ8pguud3q/4OAlh/U7EKQCuzxyOZr7Q=="],
@@ -25688,6 +25705,8 @@
     "@slates-integrations/test-oauth/slates/@slates/provider": ["@slates/provider@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-R3IWFdvCvuPuzpRtszzA5as/fbc+si3O6sop92M7njh7Iy0HNyZUfzV8f6YWICed7rU5nNbMAPcSBHapJT0aVA=="],
 
     "@slates-integrations/test-public-apis/slates/@slates/provider": ["@slates/provider@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-R3IWFdvCvuPuzpRtszzA5as/fbc+si3O6sop92M7njh7Iy0HNyZUfzV8f6YWICed7rU5nNbMAPcSBHapJT0aVA=="],
+
+    "@slates-integrations/test-registry-publish/slates/@slates/provider": ["@slates/provider@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-R3IWFdvCvuPuzpRtszzA5as/fbc+si3O6sop92M7njh7Iy0HNyZUfzV8f6YWICed7rU5nNbMAPcSBHapJT0aVA=="],
 
     "@slates-integrations/test-triggers/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.24", "", { "dependencies": { "@slates/proto": "1.0.0-rc.20", "@slates/provider": "1.0.0-rc.24", "@slates/provider-handler": "1.0.0-rc.34" } }, "sha512-ObxQTWaWitXxMlZqsEvCe3ss4DTm2TEkF/nwtfnWk+RdHvJnMDAtMZo5H5aX7f8KdpMnR90awdzC4dIstBnqUA=="],
 
