@@ -12358,6 +12358,21 @@
         "typescript": "^5",
       },
     },
+    "integrations/sixtyfour": {
+      "name": "@slates-integrations/sixtyfour",
+      "version": "0.1.0",
+      "dependencies": {
+        "@lowerdeck/error": "^1.0.5",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.31",
+        "zod": "^4.2",
+      },
+      "devDependencies": {
+        "@slates/test": "1.0.0-rc.26",
+        "typescript": "^5",
+        "vitest": "^3.2.4",
+      },
+    },
     "integrations/sketch": {
       "name": "@slates-integrations/sketch",
       "version": "0.3.0",
@@ -18071,6 +18086,8 @@
     "@slates-integrations/simplesat": ["@slates-integrations/simplesat@workspace:integrations/simplesat"],
 
     "@slates-integrations/sitespeakai": ["@slates-integrations/sitespeakai@workspace:integrations/sitespeakai"],
+
+    "@slates-integrations/sixtyfour": ["@slates-integrations/sixtyfour@workspace:integrations/sixtyfour"],
 
     "@slates-integrations/sketch": ["@slates-integrations/sketch@workspace:integrations/sketch"],
 

@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/sixtyfour",
+  "description": "Search and research people and companies, find contact details, run bulk enrichment, and inspect Atlas investigations.",
+  "categories": ["data-enrichment", "search"],
+  "skills": [
+    "search people and companies",
+    "research people and companies",
+    "find emails and phone numbers",
+    "reverse contact lookups",
+    "bulk enrichment",
+    "inspect Atlas investigations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sixtyfour.png"
+}
