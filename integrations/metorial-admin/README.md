@@ -36,7 +36,7 @@ Endpoint discovery optionally includes documented response schemas with `include
 
 ## Connection settings
 
-Set a custom API base URL in the chosen authentication method. The default is `https://api.metorial.com`. The API version remains configurable, and existing saved API URL settings continue to work.
+Connect with Metorial OAuth or a Metorial API key; no other settings are needed. Calls always go to the API of the Metorial environment and region running the integration, using the API version this integration was built against.
 
 ## License
 

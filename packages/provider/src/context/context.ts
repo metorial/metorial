@@ -12,6 +12,20 @@ import { PQueue } from './pQueue';
 
 export type { SlateLiveInvocationInfo };
 
+export interface SlateRuntimeInfo {
+  metorial?: {
+    apiUrl: string;
+    region?: string | null;
+    environment?: string | null;
+  };
+}
+
+let freezeRuntimeInfo = (runtimeInfo: SlateRuntimeInfo): Readonly<SlateRuntimeInfo> =>
+  Object.freeze({
+    ...runtimeInfo,
+    ...(runtimeInfo.metorial ? { metorial: Object.freeze({ ...runtimeInfo.metorial }) } : {})
+  });
+
 export type SlateAddAttachmentContent =
   | Buffer
   | Uint8Array
@@ -80,6 +94,7 @@ export class SlatePublicContext<InputType extends {}> {
   #httpTraces: SlateHttpTrace[] = [];
 
   #liveInvocation: SlateLiveInvocationInfo | null;
+  #runtimeInfo: Readonly<SlateRuntimeInfo> | null;
   #attachmentsDisabled = false;
   #attachments: SlateAttachment[] = [];
   #pendingUploads: Promise<void>[] = [];
@@ -96,10 +111,16 @@ export class SlatePublicContext<InputType extends {}> {
     input: InputType,
     private readonly spec: SlateSpecification<any, any>,
     private readonly logger: SlateLogger,
-    liveInvocation: SlateLiveInvocationInfo | null = null
+    liveInvocation: SlateLiveInvocationInfo | null = null,
+    runtimeInfo: SlateRuntimeInfo | null = null
   ) {
     this.#input = input;
     this.#liveInvocation = liveInvocation;
+    this.#runtimeInfo = runtimeInfo && freezeRuntimeInfo(runtimeInfo);
+  }
+
+  get runtimeInfo() {
+    return this.#runtimeInfo;
   }
 
   get specification() {
@@ -294,9 +315,10 @@ export class SlateContext<
     auth: AuthType,
     spec: SlateSpecification<ConfigType, AuthType>,
     logger: SlateLogger,
-    liveInvocation: SlateLiveInvocationInfo | null = null
+    liveInvocation: SlateLiveInvocationInfo | null = null,
+    runtimeInfo: SlateRuntimeInfo | null = null
   ) {
-    super(input, spec, logger, liveInvocation);
+    super(input, spec, logger, liveInvocation, runtimeInfo);
     this.#config = config;
     this.#auth = auth;
   }

@@ -9,7 +9,8 @@ import {
   SLATES_PROTOCOL_VERSION,
   type SlatesMessageAuthAdminCallbackHandleRequest,
   type SlatesMessageAuthAuthorizationUrlGetRequest,
-  type SlatesParticipant
+  type SlatesParticipant,
+  type SlatesRuntimeInfo
 } from '@slates/proto';
 import {
   AuthConfigSecretRedactor,
@@ -22,6 +23,7 @@ import {
   SlateLogger,
   type SlateLogListener,
   SlatePublicContext,
+  type SlateRuntimeInfo,
   uploadAttachmentDirect
 } from '@slates/provider';
 import { PQueue } from './pQueue';
@@ -189,6 +191,14 @@ let resolveTraceMessage = <ResultType>(
   result: ResultType
 ) => (typeof message === 'function' ? message(result) : message);
 
+// Build fails if SlateRuntimeInfo drifts from the proto schema.
+true satisfies [SlateRuntimeInfo, SlatesRuntimeInfo] extends [
+  SlatesRuntimeInfo,
+  SlateRuntimeInfo
+]
+  ? true
+  : false;
+
 export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   listeners: SlateLogListener[]
@@ -209,6 +219,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     let liveInvocation = new State<Pick<SlateLiveInvocationInfo, 'token' | 'baseUrl'> | null>(
       null
     );
+    let runtimeInfo = new State<SlateRuntimeInfo | null>(null);
 
     let getLiveInvocation = (): SlateLiveInvocationInfo | null => {
       let directUpload = hubCapabilities.get()?.attachments?.directUpload;
@@ -335,9 +346,24 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
     let getAuthConfig = (): Record<string, any> => config.get()?.value ?? {};
 
-    let getEmptyContext = () => new SlateContext({}, {}, {}, slate.spec as any, logger);
-    let getAuthContext = () =>
-      new SlateContext(getAuthConfig(), {}, {}, slate.spec as any, logger);
+    let createContext = <ConfigType extends {}, InputType extends {}, AuthType extends {}>(
+      config: ConfigType,
+      input: InputType,
+      auth: AuthType,
+      liveInvocationInfo: SlateLiveInvocationInfo | null = null
+    ) =>
+      new SlateContext(
+        config,
+        input,
+        auth,
+        slate.spec as any,
+        logger,
+        liveInvocationInfo,
+        runtimeInfo.get()
+      );
+
+    let getEmptyContext = () => createContext({}, {}, {});
+    let getAuthContext = () => createContext(getAuthConfig(), {}, {});
     let withRequestTraces = <Result extends Record<string, any>>(
       context: SlatePublicContext<any>,
       result: Result
@@ -481,11 +507,16 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       });
     });
 
+    manager.onNotification('slates/hub.runtime_info.set', async ({ params }) => {
+      runtimeInfo.set(params.runtimeInfo);
+    });
+
     manager.onRequest('slates/provider.capabilities.get', async () => ({
       capabilities: {
         hub: {
           capabilitiesNotification: true,
-          liveInvocation: true
+          liveInvocation: true,
+          runtimeInfo: true
         },
         provider: {
           triggerGroups:
@@ -1131,20 +1162,19 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       if (action.isPublic) {
         getContextBasic();
-        return invoke(new SlatePublicContext(input, slate.spec, logger, getLiveInvocation()));
+        return invoke(
+          new SlatePublicContext(
+            input,
+            slate.spec,
+            logger,
+            getLiveInvocation(),
+            runtimeInfo.get()
+          )
+        );
       }
 
       let ctx = getContextFull();
-      return invoke(
-        new SlateContext(
-          ctx.config,
-          input,
-          ctx.auth?.output!,
-          slate.spec,
-          logger,
-          getLiveInvocation()
-        )
-      );
+      return invoke(createContext(ctx.config, input, ctx.auth?.output!, getLiveInvocation()));
     });
 
     manager.onRequest('slates/action.trigger.map_event', async ({ params }) => {
@@ -1158,7 +1188,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         `Invalid event for trigger ID: ${params.actionId}`
       );
 
-      let context = new SlateContext(ctx.config, input, ctx.auth?.output!, slate.spec, logger);
+      let context = createContext(ctx.config, input, ctx.auth?.output!);
       let res = await traceProviderCall(
         {
           component: 'action',
@@ -1246,12 +1276,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let group = getTriggerGroup(slate, params.triggerGroupId);
       let autoRegistration = getWebhookAutoRegistration(group);
 
-      let context = new SlateContext(
+      let context = createContext(
         ctx.config,
         { pageToken: params.pageToken ?? null },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
+        ctx.auth?.output!
       );
       let res = await traceProviderCall(
         {
@@ -1285,16 +1313,14 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let group = getTriggerGroup(slate, params.triggerGroupId);
       let autoRegistration = getWebhookAutoRegistration(group);
 
-      let context = new SlateContext(
+      let context = createContext(
         ctx.config,
         {
           webhookTargetIdentifier: params.webhookTargetIdentifier,
           webhookTargetPayload: params.webhookTargetPayload,
           webhookUrl: params.webhookUrl
         },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
+        ctx.auth?.output!
       );
       let res = await traceProviderCall(
         {
@@ -1323,15 +1349,13 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let group = getTriggerGroup(slate, params.triggerGroupId);
       let autoRegistration = getWebhookAutoRegistration(group);
 
-      let context = new SlateContext(
+      let context = createContext(
         ctx.config,
         {
           webhookRegistrationIdentifier: params.webhookRegistrationIdentifier,
           webhookRegistrationPayload: params.webhookRegistrationPayload
         },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
+        ctx.auth?.output!
       );
       await traceProviderCall(
         {
@@ -1357,13 +1381,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let group = getTriggerGroup(slate, params.triggerGroupId);
       let manualRegistration = getWebhookManualRegistration(group);
 
-      let context = new SlateContext(
-        {},
-        { webhookUrl: params.webhookUrl },
-        {},
-        slate.spec as any,
-        logger
-      );
+      let context = createContext({}, { webhookUrl: params.webhookUrl }, {});
       let res = await traceProviderCall(
         {
           component: 'action',
@@ -1398,16 +1416,14 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         );
       }
 
-      let context = new SlateContext(
+      let context = createContext(
         {},
         {
           webhookUrl: params.webhookUrl,
           partialWebhookRegistrationPayload: params.partialWebhookRegistrationPayload,
           userWebhookRegistrationPayload: params.userWebhookRegistrationPayload
         },
-        {},
-        slate.spec as any,
-        logger
+        {}
       );
       let res = await traceProviderCall(
         {
@@ -1447,15 +1463,13 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           : null
       });
 
-      let context = new SlateContext(
+      let context = createContext(
         {},
         {
           request: req,
           webhookRegistrationPayload: params.webhookRegistrationPayload
         },
-        {},
-        slate.spec as any,
-        logger
+        {}
       );
       let res = await traceProviderCall(
         {
@@ -1511,7 +1525,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let ctx = getContextFull();
       let group = getTriggerGroup(slate, params.triggerGroupId);
 
-      let context = new SlateContext(ctx.config, {}, ctx.auth?.output!, slate.spec, logger);
+      let context = createContext(ctx.config, {}, ctx.auth?.output!);
       let matchers = await traceProviderCall(
         {
           component: 'action',
@@ -1545,13 +1559,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         );
       }
 
-      let context = new SlateContext(
-        ctx.config,
-        { state: params.state },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
-      );
+      let context = createContext(ctx.config, { state: params.state }, ctx.auth?.output!);
       let res = await traceProviderCall(
         {
           component: 'action',
@@ -1599,13 +1607,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let ctx = getContextFull();
       let { group, gateway } = getGatewayTriggerGroup(params.triggerGroupId);
 
-      let context = new SlateContext(
-        ctx.config,
-        { state: params.state },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
-      );
+      let context = createContext(ctx.config, { state: params.state }, ctx.auth?.output!);
       let res = await traceProviderCall(
         {
           component: 'action',
@@ -1630,12 +1632,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let ctx = getContextFull();
       let { group, gateway } = getGatewayTriggerGroup(params.triggerGroupId);
 
-      let context = new SlateContext(
+      let context = createContext(
         ctx.config,
         { state: params.state, frames: params.frames, closed: params.closed ?? null },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
+        ctx.auth?.output!
       );
       let res = await traceProviderCall(
         {

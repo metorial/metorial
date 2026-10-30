@@ -1,7 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { resolveMetorialRuntimeConfig } from '../config';
 import { MetorialClient } from '../lib/client';
 import { INSTANCE_ID_DESCRIPTION } from '../lib/contractTools';
 import { metorialValidationError } from '../lib/errors';
@@ -81,7 +80,7 @@ export let filesUpload = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let { bytes, contentType } = decodeFile(ctx.input.fileBase64);
-    let client = new MetorialClient(resolveMetorialRuntimeConfig(ctx.config, ctx.auth));
+    let client = new MetorialClient();
     let file = await client.uploadFile({
       token: ctx.auth.token,
       instanceId: ctx.input.instance_id,

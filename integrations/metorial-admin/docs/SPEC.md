@@ -6,7 +6,7 @@ The `metorial-admin` integration uses Metorial OAuth or API key authentication t
 
 ## Config
 
-- `apiVersion`: Metorial API version. Defaults to `mt_2026_01_01_magnetar`.
+The integration has no settings. The API host (`apiUrl` below) is the API of the Metorial environment and region running the integration, falling back to `https://api.metorial.com` when the environment provides none. It must use https except in local development. The API version is fixed to `DEFAULT_API_VERSION` in `src/config.ts` (`mt_2026_01_01_magnetar`). Settings saved by earlier versions (`apiUrl`, `apiVersion`) are ignored.
 
 ## Auth
 
@@ -15,7 +15,7 @@ The integration supports two auth methods:
 - `api_key`: token auth that accepts a Metorial API key and returns it as the shared bearer `token` output.
 - `oauth`: OAuth auth for interactive Metorial authorization.
 
-The `api_key` method accepts optional `apiUrl` input to select a custom API host for authenticated tool calls. It defaults to `https://api.metorial.com`; legacy saved `apiUrl` config remains a fallback when auth output has no URL. Auth output takes precedence over stored config.
+The `api_key` method accepts only `apiKey`.
 
 For `oauth`:
 
@@ -24,7 +24,7 @@ For `oauth`:
 - Refresh URL: `${apiUrl}/oauth/token`
 - Profile URL: `${apiUrl}/oauth/userinfo`
 
-Auth input may include `apiUrl` to select the API host for the OAuth flow. The resolved URL is stored in auth output and used for token refresh, profile lookup, and authenticated tool calls. Auth output also includes the access token, optional refresh token, optional expiration, user identity fields, and organization identity fields when returned by Metorial.
+OAuth takes no auth input. Auth output includes the access token, optional refresh token, optional expiration, user identity fields, and organization identity fields when returned by Metorial.
 
 ## Tools
 

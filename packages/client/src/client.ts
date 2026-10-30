@@ -59,7 +59,8 @@ export class SlatesProtocolClient {
       config: opts.state?.config ?? null,
       auth: opts.state?.auth ?? null,
       session: opts.state?.session ?? null,
-      capabilities: opts.state?.capabilities ?? null
+      capabilities: opts.state?.capabilities ?? null,
+      runtimeInfo: opts.state?.runtimeInfo ?? null
     };
   }
 
@@ -93,6 +94,11 @@ export class SlatesProtocolClient {
     return this;
   }
 
+  setRuntimeInfo(runtimeInfo: SlatesClientState['runtimeInfo']) {
+    this.state.runtimeInfo = runtimeInfo;
+    return this;
+  }
+
   ensureSession() {
     if (!this.state.session) {
       this.state.session = {
@@ -122,6 +128,15 @@ export class SlatesProtocolClient {
               jsonrpc: '2.0' as const,
               method: 'slates/hub.capabilities.set' as const,
               params: { capabilities: this.state.capabilities }
+            }
+          ]
+        : []),
+      ...(this.state.runtimeInfo
+        ? [
+            {
+              jsonrpc: '2.0' as const,
+              method: 'slates/hub.runtime_info.set' as const,
+              params: { runtimeInfo: this.state.runtimeInfo }
             }
           ]
         : []),

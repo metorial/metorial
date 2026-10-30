@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createAxios, getOAuthExpiresAtFromExpiresIn, SlateAuth } from 'slates';
 import { z } from 'zod';
-import { type MetorialConfig, normalizeApiUrl, normalizeMetorialConfig } from './config';
+import { getMetorialApiUrl } from './config';
 import { metorialOAuthError, metorialValidationError } from './lib/errors';
 
 type TokenResponse = {
@@ -24,7 +24,6 @@ type AuthOutput = {
   token: string;
   refreshToken?: string;
   expiresAt?: string;
-  apiUrl?: string;
   userId?: string;
   userName?: string;
   userEmail?: string;
@@ -32,18 +31,13 @@ type AuthOutput = {
   organizationName?: string;
 };
 
-type AuthContextBase = {
-  input?: unknown;
-  config?: unknown;
-};
-
-type RefreshContext = AuthContextBase & {
+type RefreshContext = {
   output: AuthOutput;
   clientId: string;
   clientSecret: string;
 };
 
-type ProfileContext = AuthContextBase & {
+type ProfileContext = {
   output: AuthOutput;
 };
 
@@ -160,12 +154,6 @@ let isRecord = (value: unknown): value is Record<string, unknown> =>
 
 let readString = (value: unknown) => (typeof value === 'string' ? value : undefined);
 
-let resolveAuthConfig = (ctx: { config?: unknown; input?: unknown }) =>
-  normalizeMetorialConfig({
-    ...(isRecord(ctx.config) ? ctx.config : {}),
-    ...(isRecord(ctx.input) ? ctx.input : {})
-  });
-
 let parseScopes = (scope: unknown) => {
   if (typeof scope === 'string') return scope.split(/\s+/).filter(Boolean);
   if (Array.isArray(scope))
@@ -186,12 +174,8 @@ let expiresAtFromSeconds = (expiresIn: unknown) => {
     : undefined;
 };
 
-let exchangeToken = async (
-  config: MetorialConfig,
-  operation: string,
-  params: URLSearchParams
-) => {
-  let api = createAxios({ baseURL: config.apiUrl });
+let exchangeToken = async (apiUrl: string, operation: string, params: URLSearchParams) => {
+  let api = createAxios({ baseURL: apiUrl });
 
   try {
     let response = await api.post('/oauth/token', params.toString(), {
@@ -206,8 +190,8 @@ let exchangeToken = async (
   }
 };
 
-let fetchProfile = async (config: MetorialConfig, token: string) => {
-  let api = createAxios({ baseURL: config.apiUrl });
+let fetchProfile = async (apiUrl: string, token: string) => {
+  let api = createAxios({ baseURL: apiUrl });
 
   try {
     let response = await api.get('/oauth/userinfo', {
@@ -238,7 +222,6 @@ let buildOutput = (
     token,
     refreshToken: readString(data.refresh_token) ?? fallback.refreshToken,
     expiresAt: expiresAtFromSeconds(data.expires_in) ?? fallback.expiresAt,
-    apiUrl: fallback.apiUrl,
     userId: readString(user.id) ?? readString(profile?.sub) ?? fallback.userId,
     userName:
       readString(user.name) ??
@@ -264,7 +247,6 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      apiUrl: z.string().optional(),
       userId: z.string().optional(),
       userName: z.string().optional(),
       userEmail: z.string().optional(),
@@ -298,18 +280,7 @@ export let auth = SlateAuth.create()
         scope
       }))
     ],
-    inputSchema: z.object({
-      apiUrl: z
-        .string()
-        .optional()
-        .describe(
-          'Optional Metorial API base URL for OAuth. Defaults to https://api.metorial.com; existing saved API URL settings remain supported.'
-        )
-    }),
-
-    getAuthorizationUrl: async rawCtx => {
-      let ctx = rawCtx as typeof rawCtx & { config?: unknown };
-      let config = resolveAuthConfig(ctx);
+    getAuthorizationUrl: async ctx => {
       let codeVerifier = generateCodeVerifier();
       let params = new URLSearchParams({
         response_type: 'code',
@@ -322,17 +293,13 @@ export let auth = SlateAuth.create()
       });
 
       return {
-        url: `${config.apiUrl}/oauth/authorize?${params.toString()}`,
-        callbackState: { codeVerifier, apiUrl: config.apiUrl }
+        url: `${getMetorialApiUrl()}/oauth/authorize?${params.toString()}`,
+        callbackState: { codeVerifier }
       };
     },
 
-    handleCallback: async rawCtx => {
-      let ctx = rawCtx as typeof rawCtx & { config?: unknown };
-      let config = resolveAuthConfig({
-        config: ctx.config,
-        input: ctx.callbackState
-      });
+    handleCallback: async ctx => {
+      let apiUrl = getMetorialApiUrl();
       let codeVerifier = readString(ctx.callbackState.codeVerifier);
       if (!codeVerifier) {
         throw metorialValidationError(
@@ -341,7 +308,7 @@ export let auth = SlateAuth.create()
       }
 
       let data = await exchangeToken(
-        config,
+        apiUrl,
         'authorization code exchange',
         new URLSearchParams({
           grant_type: 'authorization_code',
@@ -359,26 +326,22 @@ export let auth = SlateAuth.create()
         );
       }
 
-      let profile = await fetchProfile(config, token);
+      let profile = await fetchProfile(apiUrl, token);
 
       return {
-        output: buildOutput(data, profile, { apiUrl: config.apiUrl }),
+        output: buildOutput(data, profile),
         scopes: parseScopes(data.scope)
       };
     },
 
-    handleTokenRefresh: async (rawCtx: RefreshContext) => {
-      let ctx = rawCtx as typeof rawCtx & { config?: unknown };
-      let config = resolveAuthConfig({
-        config: ctx.config,
-        input: ctx.output
-      });
+    handleTokenRefresh: async (ctx: RefreshContext) => {
+      let apiUrl = getMetorialApiUrl();
       if (!ctx.output.refreshToken) {
         throw metorialValidationError('No Metorial refresh token is available.');
       }
 
       let data = await exchangeToken(
-        config,
+        apiUrl,
         'token refresh',
         new URLSearchParams({
           grant_type: 'refresh_token',
@@ -394,20 +357,15 @@ export let auth = SlateAuth.create()
         );
       }
 
-      let profile = await fetchProfile(config, token);
+      let profile = await fetchProfile(apiUrl, token);
 
       return {
         output: buildOutput(data, profile, ctx.output)
       };
     },
 
-    getProfile: async (rawCtx: ProfileContext) => {
-      let ctx = rawCtx as typeof rawCtx & { config?: unknown };
-      let config = resolveAuthConfig({
-        config: ctx.config,
-        input: ctx.output
-      });
-      let profile = await fetchProfile(config, ctx.output.token);
+    getProfile: async (ctx: ProfileContext) => {
+      let profile = await fetchProfile(getMetorialApiUrl(), ctx.output.token);
 
       return {
         profile: {
@@ -429,19 +387,11 @@ export let auth = SlateAuth.create()
         .string()
         .trim()
         .min(1)
-        .describe('Metorial API key to use as a bearer token for admin API calls.'),
-      apiUrl: z
-        .string()
-        .trim()
-        .optional()
-        .describe(
-          'Optional Metorial API base URL for API key auth. Defaults to https://api.metorial.com; existing saved API URL settings remain supported.'
-        )
+        .describe('Metorial API key to use as a bearer token for admin API calls.')
     }),
     getOutput: async ctx => ({
       output: {
-        token: ctx.input.apiKey,
-        ...(ctx.input.apiUrl ? { apiUrl: normalizeApiUrl(ctx.input.apiUrl) } : {})
+        token: ctx.input.apiKey
       }
     })
   });

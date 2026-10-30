@@ -12,12 +12,12 @@
     "@lowerdeck/error": "^1.1.0",
     "@types/node": "^20",
     "zod": "^4.2",
-    "slates": "1.0.0-rc.30"
+    "slates": "1.0.0-rc.32"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.14",
+    "@slates/test": "1.0.0-rc.27",
     "typescript": "^5",
     "vitest": "^3.2.4"
   },
-  "version": "0.3.1"
+  "version": "0.4.0"
 }

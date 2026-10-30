@@ -4,7 +4,8 @@ import type {
   SlatesParticipant,
   SlatesProtocolVersion,
   SlatesRequests,
-  SlatesResponses
+  SlatesResponses,
+  SlatesRuntimeInfo
 } from '@slates/proto';
 
 export type SlatesJsonObject = Record<string, any>;
@@ -27,6 +28,7 @@ export interface SlatesClientState {
     state: SlatesJsonObject;
   } | null;
   capabilities: SlatesHubCapabilities | null;
+  runtimeInfo: SlatesRuntimeInfo | null;
 }
 
 export interface SlatesMessageTransport {

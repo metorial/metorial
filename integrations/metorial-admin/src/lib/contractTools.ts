@@ -1,6 +1,5 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { resolveMetorialRuntimeConfig } from '../config';
 import { spec } from '../spec';
 import { addResponseAttachment } from './attachments';
 import { MetorialClient } from './client';
@@ -99,10 +98,7 @@ let generatedTool = (tool: ContractTool) =>
     )
     .handleInvocation(async ctx => {
       let input = ctx.input as Record<string, unknown>;
-      let client = new MetorialClient({
-        ...resolveMetorialRuntimeConfig(ctx.config, ctx.auth),
-        apiVersion: contract.generatedFrom.apiVersion
-      });
+      let client = new MetorialClient();
       let request = buildRequest(tool, input);
       let response = await client.callEndpoint({
         method: tool.method.toLowerCase() as MetorialMethod,

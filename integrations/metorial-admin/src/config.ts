@@ -1,69 +1,30 @@
-import { SlateConfig } from 'slates';
+import { getRuntimeInfo, SlateConfig } from 'slates';
 import { z } from 'zod';
 import { metorialValidationError } from './lib/errors';
 
 export let DEFAULT_API_URL = 'https://api.metorial.com';
 export let DEFAULT_API_VERSION = 'mt_2026_01_01_magnetar';
 
-export type MetorialConfig = {
-  apiUrl: string;
-  apiVersion: string;
-};
+let LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+export let getMetorialApiUrl = () => {
+  let metorial = getRuntimeInfo()?.metorial;
+  let raw = metorial?.apiUrl ?? DEFAULT_API_URL;
 
-export let normalizeApiUrl = (apiUrl?: string | null) => {
-  let raw = apiUrl?.trim() || DEFAULT_API_URL;
-
+  let url: URL;
   try {
-    let url = new URL(raw);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-      throw metorialValidationError('Metorial apiUrl must use http or https.');
-    }
-
-    return url.toString().replace(/\/+$/, '');
-  } catch (error) {
-    if (error instanceof Error && error.name !== 'TypeError') throw error;
-    throw metorialValidationError(`Invalid Metorial apiUrl: ${apiUrl ?? raw}`);
+    url = new URL(raw.trim());
+  } catch {
+    throw metorialValidationError(`Invalid Metorial API URL: ${raw}`);
   }
+
+  let allowsHttp =
+    metorial?.environment === 'development' || LOCAL_HOSTNAMES.has(url.hostname);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && allowsHttp)) {
+    throw metorialValidationError('Metorial API URL must use https.');
+  }
+
+  return url.toString().replace(/\/+$/, '');
 };
 
-export let normalizeMetorialConfig = (
-  value: Partial<MetorialConfig> & Record<string, unknown> = {}
-): MetorialConfig => ({
-  apiUrl: normalizeApiUrl(typeof value.apiUrl === 'string' ? value.apiUrl : undefined),
-  apiVersion:
-    typeof value.apiVersion === 'string' && value.apiVersion.trim()
-      ? value.apiVersion.trim()
-      : DEFAULT_API_VERSION
-});
-
-export let resolveMetorialRuntimeConfig = (config?: unknown, auth?: { apiUrl?: string }) =>
-  normalizeMetorialConfig({
-    ...(isRecord(config) ? config : {}),
-    ...(auth?.apiUrl ? { apiUrl: auth.apiUrl } : {})
-  });
-
-// Unknown stored fields retain the legacy apiUrl fallback for existing connections.
-export let metorialConfigSchema = z
-  .object({
-    apiVersion: z
-      .string()
-      .optional()
-      .default(DEFAULT_API_VERSION)
-      .describe('Metorial API version used for introspection and authenticated API calls.')
-  })
-  .passthrough();
-
-export let config = SlateConfig.create(metorialConfigSchema)
-  .getDefaultConfig(() => ({ apiVersion: DEFAULT_API_VERSION }))
-  .onConfigChanged(({ newConfig }) => ({
-    config: {
-      ...newConfig,
-      ...(typeof newConfig.apiUrl === 'string'
-        ? { apiUrl: normalizeApiUrl(newConfig.apiUrl) }
-        : {}),
-      apiVersion: normalizeMetorialConfig(newConfig).apiVersion
-    }
-  }));
+export let config = SlateConfig.create(z.object({}));

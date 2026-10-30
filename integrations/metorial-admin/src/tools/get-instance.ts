@@ -1,6 +1,5 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { resolveMetorialRuntimeConfig } from '../config';
 import { MetorialClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -25,7 +24,7 @@ export let getInstance = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetorialClient(resolveMetorialRuntimeConfig(ctx.config, ctx.auth));
+    let client = new MetorialClient();
     let instance = await client.getInstance(ctx.auth.token, ctx.input.instanceId);
     return {
       output: { instance },

@@ -1,6 +1,5 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { resolveMetorialRuntimeConfig } from '../config';
 import { MetorialClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -22,7 +21,7 @@ export let getAccountContext = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetorialClient(resolveMetorialRuntimeConfig(ctx.config, ctx.auth));
+    let client = new MetorialClient();
     let context = await client.getTokenContext(ctx.auth.token);
     return {
       output: { context },
