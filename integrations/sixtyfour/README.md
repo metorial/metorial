@@ -10,10 +10,10 @@ Research, contact discovery, searches and bulk jobs consume organization credits
 
 ## Tools
 
-The integration follows the 31 intelligence tools documented by the [official MCP server](https://docs.sixtyfour.ai/developer-tools/mcp-setup):
+The integration follows the intelligence tools documented by the [official MCP server](https://docs.sixtyfour.ai/developer-tools/mcp-setup):
 
 - Organization credit balance.
-- Company and people search: discover fields, explore field values, search, paginate and retrieve result details.
+- Company and people search: discover fields, explore field values, search and paginate. Search results include the complete provider record.
 - Similar-people search: start, poll and retrieve ranked results.
 - People/company intelligence, email/phone discovery, reverse email/phone lookup, LinkedIn enrichment and shared job status.
 - Bulk people/company intelligence, with downloadable results.
@@ -26,7 +26,7 @@ Submit asynchronous jobs once, retain the returned `task_id`, and poll the match
 
 The provider publishes tool names and workflows but requires authentication to expose exact MCP schemas. This implementation follows those documented workflows using the public REST schemas; exact schema parity has not been verified.
 
-- Search detail handles are API-key-bound snapshots that expire after 20 minutes. They work with this integration only. Rotating the API key requires a new search.
+- Search pages return complete records directly, so separate company and person detail tools are not provided. Use `page_size` to bound response size.
 - `count_only: true` is rejected before making a request because the public REST contract does not support it.
 - Similar-people CSV input is converted to LinkedIn URL seeds locally.
 - Atlas workspace files and bulk results are provided as downloadable files. Atlas files are complete downloads rather than inline text chunks.

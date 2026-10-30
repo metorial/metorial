@@ -24,7 +24,6 @@ All public keys retain the official `sixtyfour_` prefix.
 | company_explore_field_values, people_explore_field_values | POST /search/filter-field-values |
 | company_search, people_search | POST /search/query |
 | company_next_page, people_next_page | POST /search/query with cursor |
-| company_get_company_details, people_get_person_details | Expand the returned, authenticated search snapshot locally |
 | find_similar_start | POST /search/lookalike |
 | find_similar_status | GET /search/lookalike/{task_id} |
 | find_similar_results | POST /search/query with search_id or cursor |
@@ -50,9 +49,9 @@ All public keys retain the official `sixtyfour_` prefix.
 
 See the README for explicit MCP-to-REST adaptations. Exact hosted input schemas are not public; unauthenticated tools/list returns 401 and the official plugin repository does not contain server implementation. Tools preserve documented names and workflows, using REST parameter names where no MCP parameter contract is published.
 
-Search cursors are opaque provider values. Result handles encrypt the full returned record with AES-256-GCM under a credential-derived key, include a mode and 20-minute expiry, and cap plaintext size at 512 KiB. Detail tools retrieve the original snapshot, not refreshed provider data. Similar-people seeds accept 1–1,000 LinkedIn URLs or bounded CSV text. Similarity scores are normalized from the API's 0–1 scale to 0–100.
+Search cursors are opaque provider values. Each search result carries a summary and the complete provider record; the MCP detail tools are omitted because the REST API already returns full records. Similar-people seeds accept 1–1,000 LinkedIn URLs or bounded CSV text. Similarity scores are normalized from the API's 0–1 scale to 0–100.
 
-Research tools return job IDs immediately. Starts are not automatically retried. Status tools retain terminal state, results and credit charges. Bulk outputs expose file metadata and renewable downloads. Atlas file URLs stay on the fixed provider origin and use validated relative paths. API failures preserve HTTP status without exposing request headers or raw credential-bearing error objects.
+Research tools return job IDs immediately. Starts are not automatically retried. Status tools retain terminal state, results and credit charges. Bulk outputs expose file metadata and renewable downloads. Atlas file URLs stay on the fixed provider origin and use validated relative paths. API failures preserve HTTP status and the provider's error detail without exposing request headers or raw credential-bearing error objects.
 
 No triggers or recurring monitor/schedule management are included: these are outside the documented intelligence MCP tool list. Provider webhooks can be added separately if required.
 
@@ -60,4 +59,4 @@ No triggers or recurring monitor/schedule management are included: these are out
 
 Private live scenarios cover the public tools; billable, age-verification and Atlas cases use explicit fixture controls. A live run needs a configured API-key profile and sufficient credits; Atlas additionally needs entitlement. Static schema checks do not establish live API acceptance or exact hosted MCP parity.
 
-Deterministic local snapshot tampering, cross-key isolation, expiry, and CSV encoding edge cases have contract tests because they cannot be reliably exercised through a provider round-trip. Provider tool behavior remains covered by the private live suite.
+CSV encoding edge cases have contract tests because they cannot be reliably exercised through a provider round-trip. Provider tool behavior remains covered by the private live suite.

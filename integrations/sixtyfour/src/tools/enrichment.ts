@@ -200,11 +200,7 @@ const reverseEmailStart = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      emails: z
-        .array(z.string().email())
-        .min(1)
-        .max(100)
-        .describe('Email addresses to resolve.')
+      emails: z.array(z.email()).min(1).max(100).describe('Email addresses to resolve.')
     })
   )
   .output(startOutput)
@@ -290,7 +286,7 @@ const enrichLinkedin = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      linkedin_url: z.string().url().describe('Full LinkedIn person or company URL.'),
+      linkedin_url: z.url().describe('Full LinkedIn person or company URL.'),
       struct: struct
         .optional()
         .describe(
@@ -317,11 +313,12 @@ const enrichLinkedin = SlateTool.create(spec, {
         struct: ctx.input.struct
       })
     );
+    const { structured_data: _, ...rest } = result;
     return {
       output: {
         linkedin_url: ctx.input.linkedin_url,
         structured_data: result.structured_data,
-        result
+        result: rest
       },
       message: 'LinkedIn enrichment completed.'
     };

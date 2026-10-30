@@ -3,9 +3,7 @@ import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
-  createResultHandle,
   linkedinSeedsFromCsv,
-  readResultHandle,
   readSearchResponse,
   type SearchMode,
   searchRecord,
@@ -36,16 +34,15 @@ const pageSchema = z.object({
   unmet_constraints: z.array(z.string()).nullish()
 });
 const resultSchema = summarySchema.extend({
-  result_handle: z.string(),
+  record: searchRecord.describe('Complete record returned by Sixtyfour.'),
   similarity_score: z.number().optional(),
   rank: z.number().optional(),
   matched_signals: z.array(searchRecord).optional()
 });
 const pageOutput = pageSchema.omit({ results: true }).extend({
-  results: z.array(resultSchema),
-  result_handle_expires_in_seconds: z.number()
+  results: z.array(resultSchema)
 });
-const formatPage = (token: string, mode: SearchMode, response: unknown) => {
+const formatPage = (response: unknown) => {
   const page = readSearchResponse(pageSchema, response);
   if (page.has_more && !page.next_cursor)
     throw createApiServiceError(
@@ -53,10 +50,9 @@ const formatPage = (token: string, mode: SearchMode, response: unknown) => {
     );
   return {
     ...page,
-    result_handle_expires_in_seconds: 1200,
     results: page.results.map(record => ({
       ...searchSummary(record),
-      result_handle: createResultHandle(token, mode, record),
+      record,
       similarity_score:
         typeof record.lookalike_score === 'number' ? record.lookalike_score * 100 : undefined,
       rank: typeof record.lookalike_rank === 'number' ? record.lookalike_rank : undefined,
@@ -199,7 +195,7 @@ const createSearchTool = (mode: SearchMode) =>
   SlateTool.create(spec, {
     key: `sixtyfour_${mode}_search`,
     name: mode === 'company' ? 'Search Companies' : 'Search People',
-    description: `Search ${mode === 'company' ? 'companies' : 'people'} using MongoDB-style filters. Returns summaries and result_handle values for the corresponding details tool.`,
+    description: `Search ${mode === 'company' ? 'companies' : 'people'} using MongoDB-style filters. Returns a summary and the complete record for each match.`,
     instructions: [
       `Discover field names with sixtyfour_${mode}_get_searchable_fields and valid values with sixtyfour_${mode}_explore_field_values.`
     ],
@@ -223,6 +219,10 @@ const createSearchTool = (mode: SearchMode) =>
     )
     .output(pageOutput)
     .handleInvocation(async ctx => {
+      if (!Object.keys(ctx.input.query).length)
+        throw createApiServiceError(
+          `Provide at least one filter in query. Discover fields with sixtyfour_${mode}_get_searchable_fields.`
+        );
       if (ctx.input.count_only)
         throw createApiServiceError(
           'Count-only search is unavailable through the public Sixtyfour REST API. Omit count_only or set it to false to retrieve a billable page; total_available is returned when the provider knows the exact count.'
@@ -237,7 +237,7 @@ const createSearchTool = (mode: SearchMode) =>
           output_shape: 'raw'
         })
       );
-      const output = formatPage(ctx.auth.token, mode, response);
+      const output = formatPage(response);
       return {
         output,
         message: `Returned ${output.results.length} ${mode === 'company' ? 'companies' : 'people'}.${output.has_more ? ' More results are available.' : ''}`
@@ -259,42 +259,10 @@ const createNextPageTool = (mode: SearchMode) =>
       const response = await new Client(ctx.auth).post('/search/query', {
         cursor: ctx.input.cursor
       });
-      const output = formatPage(ctx.auth.token, mode, response);
+      const output = formatPage(response);
       return {
         output,
         message: `Returned ${output.results.length} search results.${output.has_more ? ' More results are available.' : ''}`
-      };
-    })
-    .build();
-
-const createDetailsTool = (mode: SearchMode) =>
-  SlateTool.create(spec, {
-    key:
-      mode === 'company'
-        ? 'sixtyfour_company_get_company_details'
-        : 'sixtyfour_people_get_person_details',
-    name: mode === 'company' ? 'Get Company Details' : 'Get Person Details',
-    description: `Expand a result_handle from the matching search into the complete ${mode} record captured on that page.`,
-    constraints: [
-      'Result handles expire after 20 minutes and can only be opened with the API key that created them. Details reflect the original search snapshot.'
-    ],
-    tags: { readOnly: true }
-  })
-    .input(
-      z.object({
-        result_handle: z
-          .string()
-          .min(1)
-          .max(700_000)
-          .describe('result_handle returned by the matching company or people search tool.')
-      })
-    )
-    .output(summarySchema.extend({ record: searchRecord }))
-    .handleInvocation(async ctx => {
-      const record = readResultHandle(ctx.auth.token, mode, ctx.input.result_handle);
-      return {
-        output: { ...searchSummary(record), record },
-        message: 'Retrieved the full search-result record.'
       };
     })
     .build();
@@ -322,12 +290,13 @@ export const findSimilarStart = SlateTool.create(spec, {
     'Find people similar to 1–1,000 seed LinkedIn profiles. Returns task_id and search_id for status and results.',
   constraints: [
     'Starts a billable search. If submission times out, check a known task_id before retrying; the search may already exist.'
-  ]
+  ],
+  tags: { readOnly: false }
 })
   .input(
     z.object({
       linkedin_urls: z
-        .array(z.string().url().max(500))
+        .array(z.url().max(500))
         .min(1)
         .max(1000)
         .optional()
@@ -484,7 +453,7 @@ export const findSimilarResults = SlateTool.create(spec, {
           max_results: ctx.input.max_results
         });
     const response = await new Client(ctx.auth).post('/search/query', body);
-    const output = formatPage(ctx.auth.token, 'people', response);
+    const output = formatPage(response);
     return {
       output,
       message: `Returned ${output.results.length} similar people.${output.has_more ? ' More results are available.' : ''}`
@@ -497,12 +466,10 @@ export const searchTools = [
   createFieldValuesTool('company'),
   createSearchTool('company'),
   createNextPageTool('company'),
-  createDetailsTool('company'),
   createFieldsTool('people'),
   createFieldValuesTool('people'),
   createSearchTool('people'),
   createNextPageTool('people'),
-  createDetailsTool('people'),
   findSimilarStart,
   findSimilarStatus,
   findSimilarResults

@@ -24,7 +24,7 @@ const investigationReference = z.object({
 const summarySchema = z.object({
   id: z.string(),
   name: z.string(),
-  status: z.enum(['created', 'running', 'stalled', 'completed', 'failed']),
+  status: z.string(),
   visibility: z.string(),
   lead_info: recordSchema,
   created_at: z.string(),

@@ -1,63 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { createApiServiceError } from 'slates';
 import { z } from 'zod';
 
 export const searchRecord = z.record(z.string(), z.unknown());
 export type SearchRecord = z.infer<typeof searchRecord>;
 export type SearchMode = 'company' | 'people';
-const maxHandleBytes = 512 * 1024;
-const snapshotSchema = z.object({
-  mode: z.enum(['company', 'people']),
-  expires: z.number().int(),
-  record: searchRecord
-});
-const keyFor = (token: string) =>
-  createHash('sha256').update('sixtyfour-search-snapshot-v1\0').update(token).digest();
-
-// The REST API returns full records, whereas the hosted MCP retains records behind
-// session handles. Key-bound snapshots preserve that workflow across stateless calls.
-export const createResultHandle = (token: string, mode: SearchMode, record: SearchRecord) => {
-  const body = Buffer.from(
-    JSON.stringify({ mode, expires: Date.now() + 20 * 60_000, record })
-  );
-  if (body.length > maxHandleBytes)
-    throw createApiServiceError(
-      'The search record is too large to return a detail handle. Narrow the search.'
-    );
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', keyFor(token), iv);
-  const encrypted = Buffer.concat([cipher.update(body), cipher.final()]);
-  return `s64v1.${Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url')}`;
-};
-
-export const readResultHandle = (
-  token: string,
-  mode: SearchMode,
-  handle: string
-): SearchRecord => {
-  const invalid = () =>
-    createApiServiceError(
-      'This result handle is invalid, expired, or belongs to another API key or search type. Run the matching search again and use its result_handle.'
-    );
-  if (
-    !/^s64v1\.[A-Za-z0-9_-]+$/.test(handle) ||
-    handle.length > ((maxHandleBytes + 28) * 4) / 3 + 10
-  )
-    throw invalid();
-  try {
-    const payload = Buffer.from(handle.slice(6), 'base64url');
-    if (payload.length < 29 || payload.length > maxHandleBytes + 28) throw invalid();
-    const decipher = createDecipheriv('aes-256-gcm', keyFor(token), payload.subarray(0, 12));
-    decipher.setAuthTag(payload.subarray(12, 28));
-    const plain = Buffer.concat([decipher.update(payload.subarray(28)), decipher.final()]);
-    const parsed = snapshotSchema.safeParse(JSON.parse(plain.toString('utf8')));
-    if (!parsed.success || parsed.data.mode !== mode || parsed.data.expires <= Date.now())
-      throw invalid();
-    return parsed.data.record;
-  } catch {
-    throw invalid();
-  }
-};
 
 export const readSearchResponse = <T>(schema: z.ZodType<T>, value: unknown): T => {
   const parsed = schema.safeParse(value);
@@ -74,9 +20,18 @@ export const searchSummary = (record: SearchRecord) => {
   const text = (...values: unknown[]) =>
     values.find((v): v is string => typeof v === 'string' && v.length > 0);
   return {
-    id: text(record.source_id, row.publicId, row.id, row.companyId),
+    id: text(record.source_id, row.publicId, row.id, row.companyId, row.company_id),
     name: text(row.fullName, row.name, row.company_name, record.name),
-    linkedin_url: text(row.linkedinUrl, row.linkedin_url, record.linkedin_url),
+    linkedin_url: text(
+      row.linkedinUrl,
+      row.linkedin_url,
+      record.linkedin_url,
+      typeof row.fullName === 'string' &&
+        typeof row.publicId === 'string' &&
+        /^[\w%-]+$/.test(row.publicId)
+        ? `https://www.linkedin.com/in/${row.publicId}`
+        : undefined
+    ),
     website: text(row.website, row.domain, record.website),
     headline: text(row.headline, row.description)
   };
