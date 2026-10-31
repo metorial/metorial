@@ -630,6 +630,10 @@
           "in": "query",
           "name": "provider_id"
         },
+        "search": {
+          "in": "query",
+          "name": "search"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -689,6 +693,10 @@
               }
             ],
             "description": "Filter by provider ID(s)"
+          },
+          "search": {
+            "type": "string",
+            "description": "Match a provider version by its exact ID"
           },
           "created_at": {
             "type": "object",
@@ -802,6 +810,10 @@
           "in": "query",
           "name": "provider_config_id"
         },
+        "search": {
+          "in": "query",
+          "name": "search"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -903,6 +915,10 @@
               }
             ],
             "description": "Filter by provider config ID(s)"
+          },
+          "search": {
+            "type": "string",
+            "description": "Match a provider specification by its exact ID"
           },
           "created_at": {
             "type": "object",
@@ -2326,6 +2342,10 @@
                   "provider_config_vault_id": {
                     "type": "string",
                     "description": "Provider config vault ID"
+                  },
+                  "provider_id": {
+                    "type": "string",
+                    "description": "Explicitly specify provider ID to associate with this auth config"
                   }
                 },
                 "required": [
@@ -3096,6 +3116,10 @@
           "in": "query",
           "name": "order"
         },
+        "ownership": {
+          "in": "query",
+          "name": "ownership"
+        },
         "status": {
           "in": "query",
           "name": "status"
@@ -3179,6 +3203,15 @@
               "asc",
               "desc"
             ]
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "usable",
+              "all"
+            ],
+            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'shared' when ownership is enforced for the project and 'all' otherwise."
           },
           "status": {
             "anyOf": [
@@ -4116,6 +4149,10 @@
           "in": "query",
           "name": "order"
         },
+        "ownership": {
+          "in": "query",
+          "name": "ownership"
+        },
         "status": {
           "in": "query",
           "name": "status"
@@ -4203,6 +4240,15 @@
               "asc",
               "desc"
             ]
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "usable",
+              "all"
+            ],
+            "description": "Which resources to return under the resource ownership rules: shared (resources without an owner), usable (shared resources plus owned resources the caller may use), or all (everything the caller can see). Defaults to shared when ownership is enforced for the project, and all otherwise."
           },
           "status": {
             "anyOf": [
@@ -5298,6 +5344,10 @@
           "in": "query",
           "name": "status"
         },
+        "type": {
+          "in": "query",
+          "name": "type"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -5441,6 +5491,32 @@
               }
             ],
             "description": "Filter by session status (archived, failed, completed, expired, pending)"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auth_only",
+                  "config_only",
+                  "auth_and_config",
+                  "admin"
+                ]
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "auth_only",
+                    "config_only",
+                    "auth_and_config",
+                    "admin"
+                  ]
+                }
+              }
+            ],
+            "description": "Filter by session type (auth_only, config_only, auth_and_config, admin), matching either the requested or the resolved type"
           },
           "created_at": {
             "type": "object",
@@ -8100,6 +8176,10 @@
           "in": "query",
           "name": "agent_id"
         },
+        "consumer_profile_id": {
+          "in": "query",
+          "name": "consumer_profile_id"
+        },
         "consumer_id": {
           "in": "query",
           "name": "consumer_id"
@@ -8191,6 +8271,20 @@
               }
             ],
             "description": "Filter by linked agent ID or IDs."
+          },
+          "consumer_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Filter by linked consumer profile ID or IDs."
           },
           "consumer_id": {
             "anyOf": [
@@ -8461,6 +8555,10 @@
           "in": "query",
           "name": "actor_id"
         },
+        "consumer_profile_id": {
+          "in": "query",
+          "name": "consumer_profile_id"
+        },
         "identity_id": {
           "in": "query",
           "name": "identity_id"
@@ -8578,6 +8676,20 @@
               }
             ],
             "description": "Filter by owner actor ID or IDs."
+          },
+          "consumer_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Filter by the consumer profile that owns the credentials."
           },
           "identity_id": {
             "anyOf": [
@@ -10672,6 +10784,10 @@
         "updated_at": {
           "in": "query",
           "name": "updated_at"
+        },
+        "search": {
+          "in": "query",
+          "name": "search"
         }
       },
       "inputSchema": {
@@ -10900,6 +11016,10 @@
               }
             },
             "description": "Filter session last update time by date range"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search by session ID, or by the name of a related provider, auth method, deployment, config, auth config, agent, actor, identity, or consumer"
           }
         }
       }
@@ -11029,6 +11149,10 @@
         "hierarchy": {
           "in": "query",
           "name": "hierarchy"
+        },
+        "status": {
+          "in": "query",
+          "name": "status"
         },
         "id": {
           "in": "query",
@@ -11163,6 +11287,30 @@
               }
             ],
             "description": "Filter by message hierarchy"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "waiting_for_response",
+                  "succeeded",
+                  "failed"
+                ]
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "waiting_for_response",
+                    "succeeded",
+                    "failed"
+                  ]
+                }
+              }
+            ],
+            "description": "Filter by message status(es)"
           },
           "id": {
             "anyOf": [
@@ -11708,6 +11856,10 @@
           "in": "query",
           "name": "actor_id"
         },
+        "consumer_profile_id": {
+          "in": "query",
+          "name": "consumer_profile_id"
+        },
         "consumer_id": {
           "in": "query",
           "name": "consumer_id"
@@ -11849,6 +12001,20 @@
               }
             ],
             "description": "Filter by connected identity actor ID(s)"
+          },
+          "consumer_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Filter by the selected consumer profile ID or IDs."
           },
           "consumer_id": {
             "anyOf": [
@@ -13369,6 +13535,10 @@
         "updated_at": {
           "in": "query",
           "name": "updated_at"
+        },
+        "search": {
+          "in": "query",
+          "name": "search"
         }
       },
       "inputSchema": {
@@ -13557,6 +13727,10 @@
               }
             },
             "description": "Filter session error last update time by date range"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search by session error ID or error code, or by the name of a related provider, deployment, or auth config"
           }
         }
       }
@@ -13637,6 +13811,10 @@
         "provider_id": {
           "in": "query",
           "name": "provider_id"
+        },
+        "search": {
+          "in": "query",
+          "name": "search"
         }
       },
       "inputSchema": {
@@ -13727,6 +13905,10 @@
               }
             ],
             "description": "Filter by provider ID(s)"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search by error group ID or error code, or by the name of a related provider"
           }
         }
       }
@@ -13886,6 +14068,10 @@
           "in": "query",
           "name": "actor_id"
         },
+        "consumer_profile_id": {
+          "in": "query",
+          "name": "consumer_profile_id"
+        },
         "consumer_id": {
           "in": "query",
           "name": "consumer_id"
@@ -13902,6 +14088,10 @@
           "in": "query",
           "name": "tool_id"
         },
+        "status": {
+          "in": "query",
+          "name": "status"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -13909,6 +14099,10 @@
         "updated_at": {
           "in": "query",
           "name": "updated_at"
+        },
+        "search": {
+          "in": "query",
+          "name": "search"
         }
       },
       "inputSchema": {
@@ -14060,6 +14254,20 @@
             ],
             "description": "Filter by identity actor ID(s)"
           },
+          "consumer_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Filter by the selected consumer profile ID or IDs."
+          },
           "consumer_id": {
             "anyOf": [
               {
@@ -14116,6 +14324,30 @@
             ],
             "description": "Filter by tool ID(s)"
           },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "waiting_for_response",
+                  "succeeded",
+                  "failed"
+                ]
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "waiting_for_response",
+                    "succeeded",
+                    "failed"
+                  ]
+                }
+              }
+            ],
+            "description": "Filter by tool call status(es)"
+          },
           "created_at": {
             "type": "object",
             "properties": {
@@ -14143,6 +14375,10 @@
               }
             },
             "description": "Filter tool call last update time by date range"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search by tool call ID or tool key, or by the name of a related tool, provider, deployment, config, auth config, agent, actor, identity, or consumer"
           }
         }
       }
@@ -14859,6 +15095,10 @@
           "in": "query",
           "name": "order"
         },
+        "ownership": {
+          "in": "query",
+          "name": "ownership"
+        },
         "status": {
           "in": "query",
           "name": "status"
@@ -14922,6 +15162,15 @@
               "asc",
               "desc"
             ]
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "usable",
+              "all"
+            ],
+            "description": "Which resources to return under the resource ownership rules: shared (resources without an owner), usable (shared resources plus resources the caller can use), or all. Defaults to shared when ownership is enforced for the project and to all otherwise."
           },
           "status": {
             "anyOf": [
@@ -16224,6 +16473,10 @@
           "in": "query",
           "name": "order"
         },
+        "ownership": {
+          "in": "query",
+          "name": "ownership"
+        },
         "status": {
           "in": "query",
           "name": "status"
@@ -16291,6 +16544,15 @@
               "asc",
               "desc"
             ]
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "usable",
+              "all"
+            ],
+            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'shared' when ownership is enforced for the project and 'all' otherwise."
           },
           "status": {
             "anyOf": [
@@ -17618,7 +17880,7 @@
     {
       "key": "magic_mcp_groups_delete",
       "name": "Delete magic MCP group",
-      "description": "Deletes a magic MCP group.",
+      "description": "Deletes a magic MCP group. Fails while the group is the only group of an active magic MCP token, so that deleting a group never widens what a token can access.",
       "category": "magic-mcp",
       "method": "DELETE",
       "path": "/magic-mcp-groups/:magicMcpGroupId",
@@ -17713,6 +17975,10 @@
         "search": {
           "in": "query",
           "name": "search"
+        },
+        "id": {
+          "in": "query",
+          "name": "id"
         }
       },
       "inputSchema": {
@@ -17763,6 +18029,19 @@
           },
           "search": {
             "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           }
         }
       }
@@ -18612,6 +18891,10 @@
           "in": "query",
           "name": "order"
         },
+        "ownership": {
+          "in": "query",
+          "name": "ownership"
+        },
         "status": {
           "in": "query",
           "name": "status"
@@ -18647,6 +18930,15 @@
               "asc",
               "desc"
             ]
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "usable",
+              "all"
+            ],
+            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'shared' when ownership is enforced for the project and 'all' otherwise."
           },
           "status": {
             "anyOf": [
@@ -30307,6 +30599,10 @@
           "in": "query",
           "name": "status"
         },
+        "search": {
+          "in": "query",
+          "name": "search"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -30432,6 +30728,10 @@
               }
             ],
             "description": "Filter by callback instance lifecycle status"
+          },
+          "search": {
+            "type": "string",
+            "description": "Match a callback instance by its exact ID"
           },
           "created_at": {
             "type": "object",
@@ -35448,7 +35748,17 @@
             ]
           },
           "id": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           }
         }
       }
@@ -37619,6 +37929,10 @@
           "in": "query",
           "name": "order"
         },
+        "ownership": {
+          "in": "query",
+          "name": "ownership"
+        },
         "search": {
           "in": "query",
           "name": "search"
@@ -37702,6 +38016,15 @@
               "asc",
               "desc"
             ]
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "usable",
+              "all"
+            ],
+            "description": "Which resources to return under the resource ownership rules: shared (not owned by someone else), usable (shared plus ones the caller may use) or all (everything the caller may see). Defaults to shared when ownership is enforced and all otherwise."
           },
           "search": {
             "type": "string"
