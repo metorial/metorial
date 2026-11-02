@@ -35,7 +35,8 @@ export let createOrUpdateItem = SlateTool.create(spec, {
     'To update an existing item, provide itemId and only the fields to change.',
     'Variants are nested inside the item; each variant can have its own SKU, barcode, cost, and price. When updating, include variantId to change an existing variant; variants without variantId are added. Existing variants you do not list are kept.',
     'Setting defaultPrice without defaultPricingType makes the variant price FIXED. VARIABLE pricing means the price is entered at the time of sale.',
-    'Disabling trackStock resets all inventory levels of the item to 0.'
+    'Disabling trackStock resets all inventory levels of the item to 0.',
+    'Cost is omitted for composite items without production. Purchase cost is omitted when stock tracking is disabled.'
   ]
 })
   .input(
@@ -122,7 +123,11 @@ export let createOrUpdateItem = SlateTool.create(spec, {
               .describe('Third option value (required if option3Name is set)'),
             barcode: z.string().nullable().optional().describe('Barcode'),
             cost: z.number().nullable().optional().describe('Cost price'),
-            purchaseCost: z.number().optional().describe('Purchase cost'),
+            purchaseCost: z
+              .number()
+              .nullable()
+              .optional()
+              .describe('Purchase cost when stock tracking is enabled; null omits this field'),
             defaultPricingType: z
               .enum(['FIXED', 'VARIABLE'])
               .optional()
@@ -293,6 +298,13 @@ export let createOrUpdateItem = SlateTool.create(spec, {
       body.variants = [...keptVariants, ...updatedVariants];
     } else if (isUpdate && existingVariants.length > 0) {
       body.variants = existingVariants.map(toWritableVariant);
+    }
+
+    // Existing variants can carry costs that the resulting item settings forbid.
+    for (let variant of body.variants ?? []) {
+      if (body.is_composite && !body.use_production) variant.cost = undefined;
+      if (!body.track_stock || variant.purchase_cost === null)
+        variant.purchase_cost = undefined;
     }
 
     let result = await client.createOrUpdateItem(body);
