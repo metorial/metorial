@@ -9,7 +9,7 @@ export type ProviderEnvelope<T extends ProviderRecord = ProviderRecord> = Provid
 };
 
 export type AdvancedCompanySearchEnvelope = ProviderRecord & {
-  hits: string;
+  hits: string | number;
   items?: ProviderRecord[];
   top_hit?: ProviderRecord;
 };

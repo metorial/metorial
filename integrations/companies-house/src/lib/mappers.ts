@@ -745,9 +745,14 @@ export const mapChargeRecord = (value: unknown, fallbackId?: string): MappedChar
       'companies_house_response_invalid'
     );
   }
-  if (!Array.isArray(record.classification)) {
+  let classification = Array.isArray(record.classification)
+    ? record.classification
+    : asRecord(record.classification)
+      ? [record.classification]
+      : undefined;
+  if (!classification) {
     throw companiesHouseValidationError(
-      'Companies House returned a charge record without a required classification array.',
+      'Companies House returned a charge record without a required classification object or array.',
       'companies_house_response_invalid'
     );
   }
@@ -763,7 +768,7 @@ export const mapChargeRecord = (value: unknown, fallbackId?: string): MappedChar
     deliveredOn: stringValue(record.delivered_on),
     resolvedOn: stringValue(record.resolved_on),
     satisfiedOn: stringValue(record.satisfied_on),
-    classification: record.classification
+    classification: classification
       .map(mapChargeDescription)
       .filter((item): item is MappedChargeDescription => item !== undefined),
     securedDetails: mapOptionalArray(record.secured_details, mapChargeDescription),
@@ -1117,7 +1122,13 @@ export const mapAdvancedCompanySearchEnvelope = (
 ): MappedPage<MappedCompanySearchItem> => {
   let record = asRecord(value) as AdvancedCompanySearchEnvelope | undefined;
   let hits = record?.hits;
-  if (!record || typeof hits !== 'string' || !/^(0|[1-9]\d*)$/.test(hits)) {
+  if (
+    !record ||
+    !(
+      (typeof hits === 'string' && /^(0|[1-9]\d*)$/.test(hits)) ||
+      (typeof hits === 'number' && Number.isInteger(hits) && hits >= 0)
+    )
+  ) {
     throw companiesHouseValidationError(
       'Companies House advanced search returned an invalid hits count.',
       'companies_house_advanced_search_invalid'
