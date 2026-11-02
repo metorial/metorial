@@ -28,7 +28,9 @@ Use this tool to build custom reports, fetch performance metrics, or look up spe
       pageSize: z
         .number()
         .optional()
-        .describe('Maximum number of results per page (default: 10000)'),
+        .describe(
+          'Deprecated and ignored: Google Ads uses fixed pages of 10,000 rows. Use LIMIT in the GAQL query to cap the total results.'
+        ),
       pageToken: z.string().optional().describe('Page token for pagination')
     })
   )
@@ -53,7 +55,6 @@ Use this tool to build custom reports, fetch performance metrics, or look up spe
     let response = await client.search(
       ctx.input.customerId,
       ctx.input.query,
-      ctx.input.pageSize,
       ctx.input.pageToken
     );
 

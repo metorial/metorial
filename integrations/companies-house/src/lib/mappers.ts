@@ -734,6 +734,9 @@ let mapOptionalArray = <T>(value: unknown, mapper: (item: unknown) => T | undefi
     ? value.map(mapper).filter((item): item is T => item !== undefined)
     : undefined;
 
+let mapOneOrMany = <T>(value: unknown, mapper: (item: unknown) => T | undefined) =>
+  mapOptionalArray(asRecord(value) ? [value] : value, mapper);
+
 export const mapChargeRecord = (value: unknown, fallbackId?: string): MappedCharge => {
   let record = asRecord(value) ?? {};
   let links = asRecord(record.links) ?? recordArray(record.links);
@@ -745,9 +748,10 @@ export const mapChargeRecord = (value: unknown, fallbackId?: string): MappedChar
       'companies_house_response_invalid'
     );
   }
-  if (!Array.isArray(record.classification)) {
+  let classification = mapOneOrMany(record.classification, mapChargeDescription);
+  if (!classification) {
     throw companiesHouseValidationError(
-      'Companies House returned a charge record without a required classification array.',
+      'Companies House returned a charge record without a required classification object or array.',
       'companies_house_response_invalid'
     );
   }
@@ -763,11 +767,9 @@ export const mapChargeRecord = (value: unknown, fallbackId?: string): MappedChar
     deliveredOn: stringValue(record.delivered_on),
     resolvedOn: stringValue(record.resolved_on),
     satisfiedOn: stringValue(record.satisfied_on),
-    classification: record.classification
-      .map(mapChargeDescription)
-      .filter((item): item is MappedChargeDescription => item !== undefined),
-    securedDetails: mapOptionalArray(record.secured_details, mapChargeDescription),
-    particulars: mapOptionalArray(record.particulars, mapChargeParticular),
+    classification,
+    securedDetails: mapOneOrMany(record.secured_details, mapChargeDescription),
+    particulars: mapOneOrMany(record.particulars, mapChargeParticular),
     personsEntitled: mapOptionalArray(record.persons_entitled, mapPersonEntitled),
     moreThanFourPersonsEntitled: booleanValue(record.more_than_four_persons_entitled),
     transactions: mapOptionalArray(record.transactions, mapChargeTransaction),
@@ -1117,7 +1119,13 @@ export const mapAdvancedCompanySearchEnvelope = (
 ): MappedPage<MappedCompanySearchItem> => {
   let record = asRecord(value) as AdvancedCompanySearchEnvelope | undefined;
   let hits = record?.hits;
-  if (!record || typeof hits !== 'string' || !/^(0|[1-9]\d*)$/.test(hits)) {
+  if (
+    !record ||
+    !(
+      (typeof hits === 'string' && /^(0|[1-9]\d*)$/.test(hits)) ||
+      (typeof hits === 'number' && Number.isInteger(hits) && hits >= 0)
+    )
+  ) {
     throw companiesHouseValidationError(
       'Companies House advanced search returned an invalid hits count.',
       'companies_house_advanced_search_invalid'

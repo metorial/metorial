@@ -66,12 +66,10 @@ export class GoogleAdsClient {
   async search(
     customerId: string,
     query: string,
-    pageSize?: number,
     pageToken?: string
   ): Promise<SearchResponse> {
     let cid = customerId.replace(/-/g, '');
     let body: Record<string, any> = { query };
-    if (pageSize) body.pageSize = pageSize;
     if (pageToken) body.pageToken = pageToken;
 
     let response = await this.http.post(`/customers/${cid}/googleAds:search`, body);

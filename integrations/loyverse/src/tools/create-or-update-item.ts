@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { toWritableVariant } from '../lib/items';
@@ -35,7 +35,8 @@ export let createOrUpdateItem = SlateTool.create(spec, {
     'To update an existing item, provide itemId and only the fields to change.',
     'Variants are nested inside the item; each variant can have its own SKU, barcode, cost, and price. When updating, include variantId to change an existing variant; variants without variantId are added. Existing variants you do not list are kept.',
     'Setting defaultPrice without defaultPricingType makes the variant price FIXED. VARIABLE pricing means the price is entered at the time of sale.',
-    'Disabling trackStock resets all inventory levels of the item to 0.'
+    'Disabling trackStock resets all inventory levels of the item to 0.',
+    'Variant cost cannot be set on composite items unless useProduction is enabled, and purchaseCost requires trackStock.'
   ]
 })
   .input(
@@ -122,7 +123,10 @@ export let createOrUpdateItem = SlateTool.create(spec, {
               .describe('Third option value (required if option3Name is set)'),
             barcode: z.string().nullable().optional().describe('Barcode'),
             cost: z.number().nullable().optional().describe('Cost price'),
-            purchaseCost: z.number().optional().describe('Purchase cost'),
+            purchaseCost: z
+              .number()
+              .optional()
+              .describe('Purchase cost; requires stock tracking on the item'),
             defaultPricingType: z
               .enum(['FIXED', 'VARIABLE'])
               .optional()
@@ -293,6 +297,27 @@ export let createOrUpdateItem = SlateTool.create(spec, {
       body.variants = [...keptVariants, ...updatedVariants];
     } else if (isUpdate && existingVariants.length > 0) {
       body.variants = existingVariants.map(toWritableVariant);
+    }
+
+    let costForbidden = !!body.is_composite && !body.use_production;
+    if (costForbidden && input.variants?.some(v => v.cost !== undefined && v.cost !== null)) {
+      throw createApiServiceError(
+        'Variant cost cannot be set on a composite item unless useProduction is enabled.',
+        { reason: 'invalid_input' }
+      );
+    }
+    if (!body.track_stock && input.variants?.some(v => v.purchaseCost !== undefined)) {
+      throw createApiServiceError(
+        'Variant purchaseCost requires trackStock to be enabled on the item.',
+        { reason: 'invalid_input' }
+      );
+    }
+
+    for (let variant of body.variants ?? []) {
+      if (costForbidden) variant.cost = undefined;
+      if (!body.track_stock || variant.purchase_cost === null) {
+        variant.purchase_cost = undefined;
+      }
     }
 
     let result = await client.createOrUpdateItem(body);

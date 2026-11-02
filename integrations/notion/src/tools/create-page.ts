@@ -8,7 +8,8 @@ export let createPage = SlateTool.create(spec, {
   name: 'Create Page',
   key: 'create_page',
   description: `Create a new page in Notion as a child of an existing page or as an entry in a database.
-Provide a parent (either a page ID or database ID) and properties. For database parents, properties must match the database schema.
+Provide a parent (a page ID, database ID, or data source ID) and properties. For database parents, properties must match the database schema.
+For databases with multiple data sources, use parentDataSourceId; get_database lists the available data sources.
 Optionally include initial content as block children, and set an icon or cover image.`,
   instructions: [
     'For pages under another page, only the "title" property is supported.',
@@ -25,11 +26,17 @@ Optionally include initial content as block children, and set an icon or cover i
       parentPageId: z
         .string()
         .optional()
-        .describe('ID of the parent page (use this OR parentDatabaseId)'),
+        .describe('ID of the parent page (use one parent field)'),
       parentDatabaseId: z
         .string()
         .optional()
-        .describe('ID of the parent database (use this OR parentPageId)'),
+        .describe('ID of the parent database (use one parent field)'),
+      parentDataSourceId: z
+        .string()
+        .optional()
+        .describe(
+          'ID of the parent data source, required for databases with multiple data sources (use one parent field)'
+        ),
       properties: z
         .record(z.string(), z.any())
         .describe(
@@ -63,19 +70,23 @@ Optionally include initial content as block children, and set an icon or cover i
       parentType: z
         .string()
         .optional()
-        .describe('Type of parent (page_id, database_id, workspace)')
+        .describe('Type of parent (page_id, database_id, data_source_id, workspace)')
     })
   )
   .handleInvocation(async ctx => {
     let client = new NotionClient({ token: ctx.auth.token });
 
     let parent: Record<string, any>;
-    if (ctx.input.parentDatabaseId) {
+    if (ctx.input.parentDataSourceId) {
+      parent = { type: 'data_source_id', data_source_id: ctx.input.parentDataSourceId };
+    } else if (ctx.input.parentDatabaseId) {
       parent = { type: 'database_id', database_id: ctx.input.parentDatabaseId };
     } else if (ctx.input.parentPageId) {
       parent = { type: 'page_id', page_id: ctx.input.parentPageId };
     } else {
-      throw createApiServiceError('Either parentPageId or parentDatabaseId must be provided');
+      throw createApiServiceError(
+        'One of parentPageId, parentDatabaseId, or parentDataSourceId must be provided'
+      );
     }
 
     let page = await client.createPage({
