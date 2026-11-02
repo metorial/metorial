@@ -14,12 +14,12 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
@@ -42,7 +42,7 @@ jobs:
         run: bun run integrations:validate-pr -- --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
 
       - name: Update PR comment
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           PR_COMMENT_PATH: ${{ runner.temp }}/changed-integrations-comment.md
         with:
