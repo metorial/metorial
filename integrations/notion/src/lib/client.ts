@@ -223,15 +223,10 @@ export class NotionClient {
         let response = await this.axios.post(`/databases/${databaseId}/query`, body);
         return response.data;
       } catch (error) {
-        let normalized = SlateError.fromUnknown(error);
-        let serviceErrorData = normalized.data.baggage?.serviceErrorData;
-        let upstreamCode =
-          ('upstreamCode' in normalized.data ? normalized.data.upstreamCode : undefined) ??
-          normalized.data.upstream?.code ??
-          (isApiErrorRecord(serviceErrorData) ? serviceErrorData.upstreamCode : undefined);
         if (
-          upstreamCode !== 'validation_error' ||
-          !normalized.message.includes(
+          !SlateError.is(error) ||
+          error.data.upstream?.code !== 'validation_error' ||
+          !error.message.includes(
             'Databases with multiple data sources are not supported in this API version.'
           )
         ) {

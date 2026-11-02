@@ -55,7 +55,6 @@ Use this tool to build custom reports, fetch performance metrics, or look up spe
     let response = await client.search(
       ctx.input.customerId,
       ctx.input.query,
-      ctx.input.pageSize,
       ctx.input.pageToken
     );
 

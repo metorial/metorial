@@ -66,12 +66,10 @@ export class GoogleAdsClient {
   async search(
     customerId: string,
     query: string,
-    _pageSize?: number,
     pageToken?: string
   ): Promise<SearchResponse> {
     let cid = customerId.replace(/-/g, '');
     let body: Record<string, any> = { query };
-    // Search uses fixed 10,000-row pages; retain the argument for existing callers.
     if (pageToken) body.pageToken = pageToken;
 
     let response = await this.http.post(`/customers/${cid}/googleAds:search`, body);

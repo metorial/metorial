@@ -632,7 +632,7 @@ export const chargeRecordSchema = z
   .object({
     id: z.string(),
     charge_number: z.number(),
-    classification: z.array(providerRecordSchema),
+    classification: z.union([providerRecordSchema, z.array(providerRecordSchema)]),
     status: z.string(),
     created_on: z.string().optional(),
     delivered_on: z.string().optional(),
@@ -678,7 +678,7 @@ export const providerEnvelopeSchema = z
 
 export const advancedCompanySearchEnvelopeSchema = z
   .object({
-    hits: z.string(),
+    hits: z.union([z.string(), z.number()]),
     items: z.array(providerRecordSchema).optional(),
     top_hit: providerRecordSchema.optional()
   })
