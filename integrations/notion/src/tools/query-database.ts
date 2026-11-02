@@ -8,7 +8,7 @@ export let queryDatabase = SlateTool.create(spec, {
   key: 'query_database',
   description: `Query a Notion database to retrieve its entries (pages) with optional filtering and sorting.
 Supports complex filter conditions using compound "and"/"or" filters as well as property-specific filters (text, number, date, checkbox, select, etc.).
-For databases with multiple data sources, supply dataSourceId; omitting it returns the available source names and IDs in an error.
+For databases with multiple data sources, supply dataSourceId; get_database lists the available data sources.
 Results are paginated; use the cursor to fetch subsequent pages.`,
   instructions: [
     'Filters follow Notion\'s filter format, e.g. { "property": "Status", "select": { "equals": "Done" } }',

@@ -11,7 +11,8 @@ Use this to add, rename, or remove properties from a database schema, or to chan
   instructions: [
     'To add a property, include it in the properties object with its type config.',
     'To rename a property, include it with its existing key and set a "name" field.',
-    'To remove a property, set it to null in the properties object.'
+    'To remove a property, set it to null in the properties object.',
+    'For databases with multiple data sources, schema changes need dataSourceId; get_database lists the available data sources.'
   ],
   tags: {
     destructive: false,
@@ -21,6 +22,13 @@ Use this to add, rename, or remove properties from a database schema, or to chan
   .input(
     z.object({
       databaseId: z.string().describe('ID of the database to update'),
+      dataSourceId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Data source whose schema to change, for databases with multiple data sources'
+        ),
       title: z.string().optional().describe('New title for the database'),
       description: z.string().optional().describe('New description for the database'),
       properties: z
@@ -45,7 +53,8 @@ Use this to add, rename, or remove properties from a database schema, or to chan
     z.object({
       databaseId: z.string().describe('ID of the updated database'),
       url: z.string().optional().describe('URL of the database'),
-      lastEditedTime: z.string().optional().describe('When the database was last edited')
+      lastEditedTime: z.string().optional().describe('When the database was last edited'),
+      dataSourceId: z.string().optional().describe('Data source selected for this update')
     })
   )
   .handleInvocation(async ctx => {
@@ -61,6 +70,7 @@ Use this to add, rename, or remove properties from a database schema, or to chan
         : undefined;
 
     let db = await client.updateDatabase(ctx.input.databaseId, {
+      dataSourceId: ctx.input.dataSourceId,
       title: titleRichText,
       description: descriptionRichText,
       properties: ctx.input.properties,
@@ -74,7 +84,8 @@ Use this to add, rename, or remove properties from a database schema, or to chan
       output: {
         databaseId: db.id,
         url: db.url,
-        lastEditedTime: db.last_edited_time
+        lastEditedTime: db.last_edited_time,
+        ...(db.dataSourceId ? { dataSourceId: db.dataSourceId } : {})
       },
       message: `Updated database **${db.id}**${db.url ? ` — [Open in Notion](${db.url})` : ''}`
     };
