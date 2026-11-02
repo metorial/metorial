@@ -1,8 +1,14 @@
-import { createApiServiceError, createAxios } from 'slates';
+import { createApiServiceError, createAxios, isApiErrorRecord, SlateError } from 'slates';
 import { notionApiError } from './errors';
 import { requestWithNotionRateLimitRetry } from './rate-limit';
 
 let NOTION_API_VERSION = '2022-06-28';
+let DATA_SOURCE_API_VERSION = '2025-09-03';
+
+interface DatabaseDataSource {
+  id: string;
+  name: string;
+}
 
 export interface PaginatedResponse<T> {
   object: 'list';
@@ -199,20 +205,92 @@ export class NotionClient {
   async queryDatabase(
     databaseId: string,
     params?: {
+      dataSourceId?: string;
       filter?: Record<string, any>;
       sorts?: any[];
       startCursor?: string;
       pageSize?: number;
     }
-  ): Promise<PaginatedResponse<any>> {
+  ): Promise<PaginatedResponse<any> & { dataSourceId?: string }> {
     let body: Record<string, any> = {};
     if (params?.filter) body.filter = params.filter;
     if (params?.sorts) body.sorts = params.sorts;
     if (params?.startCursor) body.start_cursor = params.startCursor;
     if (params?.pageSize) body.page_size = params.pageSize;
 
-    let response = await this.axios.post(`/databases/${databaseId}/query`, body);
-    return response.data;
+    if (!params?.dataSourceId) {
+      try {
+        let response = await this.axios.post(`/databases/${databaseId}/query`, body);
+        return response.data;
+      } catch (error) {
+        let normalized = SlateError.fromUnknown(error);
+        let serviceErrorData = normalized.data.baggage?.serviceErrorData;
+        let upstreamCode =
+          ('upstreamCode' in normalized.data ? normalized.data.upstreamCode : undefined) ??
+          normalized.data.upstream?.code ??
+          (isApiErrorRecord(serviceErrorData) ? serviceErrorData.upstreamCode : undefined);
+        if (
+          upstreamCode !== 'validation_error' ||
+          !normalized.message.includes(
+            'Databases with multiple data sources are not supported in this API version.'
+          )
+        ) {
+          throw error;
+        }
+      }
+    }
+
+    let sources = await this.getDatabaseDataSources(databaseId);
+    let selectedSource = params?.dataSourceId
+      ? sources.find(
+          source =>
+            source.id.replaceAll('-', '').toLowerCase() ===
+            params.dataSourceId?.replaceAll('-', '').toLowerCase()
+        )
+      : sources.length === 1
+        ? sources[0]
+        : undefined;
+    if (!selectedSource) {
+      let choices = sources
+        .map(source => `${JSON.stringify(source.name)} (${source.id})`)
+        .join(', ');
+      throw createApiServiceError(
+        `${params?.dataSourceId ? 'The dataSourceId does not belong to this database.' : 'This database has multiple data sources.'} Retry query_database with databaseId and a dataSourceId from: ${choices}. Reuse that dataSourceId for subsequent pages.`,
+        { reason: 'notion_data_source_selection_required' }
+      );
+    }
+
+    let response = await this.axios.post<PaginatedResponse<any>>(
+      `/data_sources/${selectedSource.id}/query`,
+      body,
+      { headers: { 'Notion-Version': DATA_SOURCE_API_VERSION } }
+    );
+    return { ...response.data, dataSourceId: selectedSource.id };
+  }
+
+  private async getDatabaseDataSources(databaseId: string): Promise<DatabaseDataSource[]> {
+    let response = await this.axios.get<{ data_sources?: unknown }>(
+      `/databases/${databaseId}`,
+      { headers: { 'Notion-Version': DATA_SOURCE_API_VERSION } }
+    );
+    let sources = response.data?.data_sources;
+    if (
+      !Array.isArray(sources) ||
+      sources.length === 0 ||
+      !sources.every(
+        (source): source is DatabaseDataSource =>
+          isApiErrorRecord(source) &&
+          typeof source.id === 'string' &&
+          source.id.length > 0 &&
+          typeof source.name === 'string'
+      )
+    ) {
+      throw createApiServiceError(
+        'Notion returned no usable data sources for this database. Check the database ID and connection access, then retry.',
+        { reason: 'notion_data_sources_unavailable' }
+      );
+    }
+    return sources;
   }
 
   // --- Search ---
