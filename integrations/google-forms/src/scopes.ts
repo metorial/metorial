@@ -39,9 +39,8 @@ export let googleFormsActionScopes = {
   updateForm: formStructureWrite,
   setPublishSettings: formStructureWrite,
   manageWatches: formStructureWrite,
-  // One clause per call the trigger makes: account identity, reading a selected form,
-  // and reading responses, which a RESPONSES watch needs too. Every scope in the last
-  // two clauses also allows listing, creating, renewing and deleting watches.
+  // One clause per call: identity, reading a selected form, reading responses. Every scope in
+  // the last two also manages watches.
   newResponse: allOf(
     anyOf(googleFormsScopes.userInfoProfile, googleFormsScopes.userInfoEmail),
     anyOf(

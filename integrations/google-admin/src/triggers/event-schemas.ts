@@ -51,7 +51,6 @@ export const activitySchema = z
     events: z.array(auditEventSchema)
   })
   .passthrough();
-// Records and their events are validated one at a time during reconciliation.
 export const activityRecordSchema = activitySchema.extend({ events: z.array(z.unknown()) });
 export const activityPageSchema = z.object({
   kind: z.literal('admin#reports#activities'),
@@ -74,7 +73,6 @@ export const stateSchema = z.object({
   ownerId: z.string().min(1),
   watermark: z.iso.datetime(),
   seen: z.record(z.string(), z.number().finite()),
-  // The window and position of an audit read that ran out of budget.
   pending: z
     .object({
       start: z.iso.datetime(),

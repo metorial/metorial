@@ -21,6 +21,5 @@ export const leadForms = triggerGroup(spec, {
     },
     process: ctx => processLeadWebhook(ctx.input, ctx)
   })
-  // Automatic targets route through subscriptions, not connection matchers.
   .routingMatchers(async () => [])
   .build();

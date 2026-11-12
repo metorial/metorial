@@ -27,10 +27,8 @@ type LeadTarget = z.infer<typeof leadTargetSchema>;
 type LeadRegistration = z.infer<typeof leadRegistrationSchema>;
 type Log = { warn: (message: object) => void };
 
-// An ownership marker keeps already registered forms in rediscovery. It is NOT
-// sufficient to mutate a hook: register replaces a marked hook only when it also
-// points at the receive URL being registered, and cleanup requires an exact match
-// of the saved URL and random secret.
+// The marker only keeps forms in rediscovery. A marked hook is replaced only at this receive
+// URL, and cleanup needs an exact match of the saved URL and secret.
 const LEAD_SECRET_PREFIX = 'gads-lead-v1-';
 const ownedSecret = new RegExp(`^${LEAD_SECRET_PREFIX}[a-f0-9]{64}$`);
 // The version Google's lead form sample sets:
@@ -171,8 +169,7 @@ export const listLeadTargets = async (
     const client = clientFor(auth, config, work.loginCustomerId);
     try {
       if (work.kind === 'customer') {
-        // ListAccessibleCustomers includes directly accessible advertisers as
-        // well as managers. CustomerClient exists only for manager customers.
+        // ListAccessibleCustomers returns advertisers and managers; CustomerClient exists only for managers.
         const root = z
           .object({
             id: positiveGoogleAdsIdSchema,
@@ -209,8 +206,7 @@ export const listLeadTargets = async (
         if (response.nextPageToken)
           state.pending.unshift({ ...work, apiPageToken: response.nextPageToken });
         if (work.kind === 'hierarchy') {
-          // A manager's customer_client includes itself and ALL transitive descendants.
-          // No depth filter is used, so nested managers do not hide client accounts.
+          // customer_client includes the manager and all descendants; no depth filter, so nesting hides none.
           for (const row of response.results ?? []) {
             const customer = z
               .object({
@@ -336,8 +332,7 @@ export const registerLeadWebhook = async (
   const asset = await readLeadAsset(client, target);
   const previous = asset.leadFormAsset.deliveryMethods;
   const hooks = previous.filter(method => method.webhook !== undefined);
-  // An earlier attempt whose result was never saved leaves our hook at this receive
-  // URL with a secret no registration knows. It is replaced; any other hook is kept.
+  // An unsaved earlier attempt leaves our hook here with an unknown secret: replace it, keep others.
   const abandoned =
     hooks.length === 1 &&
     ownedSecret.test(hooks[0]?.webhook?.googleSecret ?? '') &&
@@ -361,8 +356,7 @@ export const registerLeadWebhook = async (
       }
     }
   ];
-  // Google provides no compare-and-swap/ETag for asset updates. The read above
-  // refuses foreign hooks; external concurrent edits remain a provider limitation.
+  // No ETag on asset updates: foreign hooks are refused above; concurrent external edits can still race.
   try {
     await writeDeliveryMethods(client, target, methods);
     const readback = await readLeadAsset(client, target);
@@ -380,8 +374,8 @@ export const registerLeadWebhook = async (
       );
     }
   } catch (error) {
-    // A timed-out mutation may have succeeded. Always inspect ownership before
-    // rollback, and verify removal; never clear a different CRM's configuration.
+    // A timed-out mutation may have succeeded: check ownership before rollback, verify removal,
+    // and never clear another CRM's configuration.
     try {
       await clearOwnedLeadWebhook(client, registration);
     } catch {
@@ -406,9 +400,7 @@ export const unregisterLeadWebhook = async (
   if (!parsed.success)
     throw createApiServiceError('The saved Google Ads lead webhook registration is invalid.');
   const registration = parsed.data;
-  // Prefer the current connection's manager route. If the creator's route is no
-  // longer available, another subscriber may have direct access or another root
-  // manager. Only authorized asset reads can select an alternate cleanup route.
+  // Prefer this connection's manager route; only an authorized asset read may pick another one.
   const initial = clientFor(auth, config, registration.loginCustomerId);
   let selected = initial;
   try {

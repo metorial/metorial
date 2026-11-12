@@ -140,8 +140,7 @@ export let googleCalendarActionScopes = {
   )
 } as const;
 
-// Trigger activation includes discovery and channel ownership checks, beyond
-// the permissions needed by an individual event tool.
+// Activation also needs discovery and channel ownership checks, beyond any single event tool.
 export const googleCalendarTriggerScopes = allOf(
   googleCalendarActionScopes.eventChanges,
   googleCalendarActionScopes.calendarListChanges,

@@ -86,8 +86,7 @@ export const mailboxEvents = triggerGroup(spec, {
       }
       const client = new Client({ token: ctx.auth.token, userId: ctx.config.userId });
       await assertMailbox(client, saved);
-      // Notification history IDs are hints, not checkpoints. Always advance from
-      // fully fetched history, even for duplicates, reordered hints and timer runs.
+      // Notification history IDs are only hints; always advance from fully fetched history.
       return syncMailbox(client, saved, ctx.input.state);
     }
   })

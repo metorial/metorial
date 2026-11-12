@@ -19,10 +19,8 @@ const GOOGLE_PUBSUB_ISSUERS = ['https://accounts.google.com', 'accounts.google.c
 const CLOCK_TOLERANCE_SECONDS = 60;
 
 /**
- * How long after its expiry a push token is still accepted when an integration verifies
- * a delivery the runtime already authenticated on receipt. The runtime retries a failed
- * delivery 25 times with backoff capped at 10 minutes (about three hours) and can hold
- * a backlog on top of that; one day covers both while still refusing old tokens.
+ * Grace past expiry for a push the runtime already authenticated: covers 25 retries
+ * (backoff capped at 10 minutes, about three hours) plus backlog, yet refuses old tokens.
  */
 export const GOOGLE_PUBSUB_PROCESSING_GRACE_SECONDS = 24 * 60 * 60;
 
@@ -71,10 +69,7 @@ let envelopeSchema = z.object({
 export type GooglePubSubPushVerifyOptions = {
   request: Request;
   now?: Date;
-  /**
-   * Accept a token this many seconds past its expiry. Only for a delivery the runtime
-   * already verified on receipt; see `GOOGLE_PUBSUB_PROCESSING_GRACE_SECONDS`.
-   */
+  /** Seconds past expiry to accept; only for runtime-verified deliveries. */
   expiredTokenGraceSeconds?: number;
 } & (
   | {
@@ -147,8 +142,7 @@ export let createGooglePubSubPushVerifier = (keyResolver: JWTVerifyGetKey = goog
           clockTolerance: CLOCK_TOLERANCE_SECONDS
         }));
       } catch (error) {
-        // jose checks the signature, issuer, audience and not-before time before expiry,
-        // so an expired-token error carries an otherwise verified payload.
+        // jose checks everything else before expiry, so an expired-token error carries a verified payload.
         if (!(graceSeconds > 0 && error instanceof errors.JWTExpired && error.claim === 'exp'))
           throw error;
         payload = error.payload;
@@ -238,9 +232,8 @@ export let createGooglePubSubPushVerifier = (keyResolver: JWTVerifyGetKey = goog
 export let verifyGooglePubSubPush = createGooglePubSubPushVerifier();
 
 /**
- * Verifies a push inside an integration's `process` handler: the runtime authenticated it
- * on receipt, so a token that expired while the delivery waited is still accepted. A
- * failure carries the skipped result to return. `verify` is injectable for offline tests.
+ * Verifies a push in a `process` handler, accepting a token that expired while it waited.
+ * A failure carries the skipped result to return.
  */
 export let verifyGooglePubSubPushForProcessing = async (
   request: Request,

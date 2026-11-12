@@ -48,8 +48,7 @@ const received = (message: GmailMessage, mailbox: string) => {
   const labels = new Set(message.labelIds ?? []);
   if (['DRAFT', 'SPAM', 'TRASH', 'CHAT'].some(label => labels.has(label))) return false;
   if (!labels.has('SENT') || labels.has('INBOX')) return true;
-  // Sent mail that skipped the inbox is incoming only when addressed to the
-  // mailbox itself, such as self-addressed mail archived by a rule.
+  // Sent mail that skipped the inbox is incoming only when self-addressed.
   return ['To', 'Cc', 'Bcc', 'Delivered-To'].some(name =>
     addresses(extractHeader(message, name) ?? '').includes(mailbox)
   );
@@ -70,8 +69,7 @@ const event = (
   )
     return fail('Gmail returned an invalid message internal date.');
   const attachments: EmailReceived['attachments'] = extractAttachments(message.payload);
-  // Small named parts can carry inline data without an attachmentId. Expose
-  // their metadata too, without copying encoded file content into events.
+  // Small parts can carry inline data without an attachmentId; expose only their metadata.
   const collectInlineMetadata = (part: MessagePart) => {
     if (part.filename && !part.body?.attachmentId) {
       attachments.push({
@@ -145,8 +143,7 @@ export const syncMailbox = async (
   let budget = GMAIL_SYNC_MAX_MESSAGES;
   let progressed = false;
   let remembered = 0;
-  // An upstream failure ends the call. Work already checkpointed is returned;
-  // with none, the failure is rethrown and the saved state stays as it was.
+  // On upstream failure return the checkpointed work, or rethrow when there is none.
   const halt = (error: unknown) => {
     if (!progressed) throw error;
     budget = 0;
@@ -183,8 +180,7 @@ export const syncMailbox = async (
     let cursor = start;
     let pageToken = savedPage;
     let rewound = false;
-    // Resume after the last finished record; when none finished, resume this
-    // same listing at the page it reached.
+    // Resume after the last finished record, or else at the page this listing reached.
     const stop = () =>
       cursor === start && pageToken
         ? { cursor, pageToken, complete: false }
@@ -194,8 +190,7 @@ export const syncMailbox = async (
       try {
         response = await client.listHistory(start, pageToken);
       } catch (error) {
-        // A 404 means the cursor itself expired. Any other rejection of a saved
-        // page is answered by reading the listing again from the cursor.
+        // A 404 means the cursor expired; any other rejected page is re-read from the cursor.
         if (
           page === 0 &&
           pageToken &&
@@ -264,9 +259,8 @@ export const syncMailbox = async (
         });
       } catch (error) {
         if (page === 0 && pageToken && rejectsSavedPage(error)) {
-          // Gmail documents no lifetime for page tokens. Searching again from
-          // the start only converges while `seen` still holds every message
-          // this recovery handled; past that point the rest is given up.
+          // Page tokens have no documented lifetime. Restarting converges only while `seen` holds
+          // every message this recovery handled; past that the rest is given up.
           if (
             handled > GMAIL_SEEN_MAX_ENTRIES ||
             now - Date.parse(summary.observedAt) > GMAIL_RECOVERY_WINDOW_MS
@@ -301,8 +295,7 @@ export const syncMailbox = async (
   if (drained) {
     if (recovery?.pending && budget > 0) recovery = await searchRecent(recovery);
   } else {
-    // Capture a new cursor BEFORE searching: arrivals during recovery are then
-    // included by history, not skipped by a post-search profile snapshot.
+    // Capture the cursor before searching so arrivals during recovery come through history.
     const baseline = await client.getProfile();
     const cursor = parseWithServiceError(
       historyIdSchema,

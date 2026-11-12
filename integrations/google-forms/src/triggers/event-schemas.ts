@@ -70,7 +70,7 @@ export const formStateSchema = z.object({
     z.object({
       activatedAt: timestampSchema,
       cursor: timestampSchema,
-      // Response ID to first submission time, kept only while the overlap window can return it again.
+      // Response ID to first submission time, kept while the overlap window can return it.
       recentResponses: z.record(z.string().min(1), timestampSchema),
       scan: z
         .object({

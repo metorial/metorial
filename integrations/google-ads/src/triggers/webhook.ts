@@ -27,11 +27,8 @@ export const processLeadWebhook = async (
     const bytes = await input.request.arrayBuffer();
     if (bytes.byteLength > 2 * 1024 * 1024) return reject('body_too_large', 413);
     const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    // Integers remain distinguishable from JSON strings during validation, so
-    // numeric answer values cannot masquerade as strings. The ID schemas convert
-    // bigint to decimal strings before any event is emitted. An int64 has at most
-    // 19 digits; a longer run is never an ID and is not worth an exact conversion
-    // before the key is checked.
+    // Integers stay distinct from strings during validation; ID schemas turn bigints into decimal
+    // strings. A run over 19 digits is never an int64, so it is not converted exactly.
     body = parse(raw, undefined, number =>
       /^-?\d{1,19}$/.test(number) ? BigInt(number) : Number(number)
     );
@@ -49,9 +46,8 @@ export const processLeadWebhook = async (
     log.info({ reason: 'google_ads_lead_webhook_test_acknowledged', formIdentityMatched });
     return { events: [], response: accepted };
   }
-  // The per-registration key is the only authentication Google defines. Google does
-  // not document form_id as the asset ID and never retries a 4xx, so a differing
-  // form_id is reported, not rejected.
+  // The key is the only authentication. form_id is not documented as the asset ID and a 4xx is
+  // never retried, so a mismatch is reported, not rejected.
   if (!formIdentityMatched) {
     log.warn({ reason: 'google_ads_lead_webhook_form_id_differs', formIdentityMatched });
   }

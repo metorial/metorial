@@ -88,8 +88,7 @@ export const rowStateSchema = z.object({
   schemaVersion: z.literal(1),
   fingerprint: z.string(),
   epoch: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  // Removed keys are not remembered. This is the highest revision any removed key
-  // reached; a key without a record starts above it, so it cannot reuse an event ID.
+  // Highest revision a removed key reached; new keys start above it so event IDs are never reused.
   revisionFloor: revision,
   headers: z.array(rowCellSchema),
   records: z.array(

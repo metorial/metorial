@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-// IDs arrive as JSON int64 numbers. The raw-body parser preserves their decimal
-// spelling before this schema sees them; never coerce an already-rounded Number.
+// int64 IDs keep their decimal spelling from the raw-body parser; never coerce a rounded Number.
 const googleAdsIdSchema = z
   .string()
   .regex(/^(0|[1-9]\d{0,18})$/)
@@ -22,8 +21,7 @@ const leadColumnSchema = z.object({
   string_value: z.string()
 });
 
-// Unknown column IDs are deliberately accepted. Top-level secrets and unknown
-// envelope fields are stripped rather than copied into callback output.
+// Unknown column IDs are accepted; secrets and unknown envelope fields are stripped.
 export const leadWebhookSchema = z.object({
   lead_id: z.string().min(1),
   google_key: z.string().min(1).max(512),

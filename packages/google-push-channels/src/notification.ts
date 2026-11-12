@@ -6,13 +6,8 @@ export type GoogleChannelNotification<T extends GoogleWatchChannel> =
   | { ok: false; skip: ReturnType<typeof skipWebhook> };
 
 /**
- * Authenticates a push notification against the saved channels: `POST`, a known channel
- * ID, its token (compared in constant time), its resource ID, an unexpired channel and a
- * positive message number. With `emptyBody`, a notification that carries a body is
- * rejected. Failures are skipped deliveries with `<integration>_webhook_<what>` reasons.
- *
- * Google signs nothing and sends no timestamp: the channel token is the only secret, so
- * an authenticated notification is a wakeup hint, never event data.
+ * Authenticates a notification against the saved channels. Google signs nothing, so an
+ * authenticated notification is a wakeup hint, never event data.
  */
 export let verifyChannelNotification = async <T extends GoogleWatchChannel>(options: {
   integration: string;
@@ -34,8 +29,7 @@ export let verifyChannelNotification = async <T extends GoogleWatchChannel>(opti
   if (!channel) return fail('channel_mismatch', 403);
   if (!timingSafeStringEqual(channel.token, request.headers.get('x-goog-channel-token')))
     return fail('token_invalid', 401);
-  // X-Goog-Resource-URI is version-specific and can carry query details the watch
-  // response does not; the stable resource ID identifies the watched resource.
+  // X-Goog-Resource-URI is version-specific; the resource ID is the stable identity.
   if (request.headers.get('x-goog-resource-id') !== channel.resourceId)
     return fail('resource_mismatch', 403);
   if (!isChannelLive(channel)) return fail('channel_expired', 403);

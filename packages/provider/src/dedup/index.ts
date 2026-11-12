@@ -9,10 +9,7 @@ export type SeenEntry = z.infer<typeof seenEntrySchema>;
 export let seenEntryKey = (idempotencyKey: string) =>
   createHash('sha256').update(idempotencyKey).digest('base64url').slice(0, 16);
 
-/**
- * Keeps the entries at or after `cutoff` (and any marked `retain`), newest first, and at
- * most `maxEntries` of them. `onOverflow` receives how many of the oldest were dropped.
- */
+/** Keeps entries at or after `cutoff` (or `retain`), newest first, at most `maxEntries`. */
 export let pruneSeenEntries = (
   entries: Iterable<SeenEntry & { retain?: boolean }>,
   options: { cutoff: number; maxEntries: number; onOverflow?: (dropped: number) => void }

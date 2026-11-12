@@ -25,7 +25,7 @@ import {
 const DAY = 24 * 60 * 60 * 1000;
 const RENEW_RETRY_MS = 60 * 60 * 1000;
 const TARGETS_PER_PAGE = 20;
-// forms.get sends nothing but the ID, so these answers are about the selected ID itself.
+// forms.get sends only the ID, so these errors are about the ID itself.
 const UNUSABLE_FORM_STATUSES = [400, 403, 404];
 export const formTargetId = (ownerId: string, formId: string) => `forms:${ownerId}:${formId}`;
 export const assertFormSelected = (formId: string, selection: unknown) => {
@@ -117,8 +117,8 @@ const acquireWatch = async (
       await client.renewWatch(formId, watch.id);
       changed = true;
     } catch (error) {
-      // Tolerated only when another registration already renewed, replaced or removed the
-      // shared watch, or when Google reports it as expired, which is NOT_FOUND on renewal.
+      // Tolerated when another registration already renewed, replaced or removed the shared watch,
+      // or it expired (NOT_FOUND).
       ({ watch } = await listResponseWatches(client, formId, topicName));
       const usable = usableWatch(watch);
       const current = usable && (!renew || Date.parse(usable.expiresAt) - DAY > Date.now());
@@ -133,9 +133,8 @@ const acquireWatch = async (
       await client.createWatch(formId, 'RESPONSES', topicName, createdId);
       created = changed = true;
     } catch (error) {
-      // A racing registration may have created the shared watch first. Otherwise only a
-      // refusal that says the slot is taken leaves the registration without a watch: a
-      // conflict, or a failed precondition (400) explained by a watch on another topic.
+      // A racing registration may have created the watch first. Otherwise only a "slot taken"
+      // refusal (a conflict, or a 400 from a watch on another topic) leaves this one without a watch.
       const listed = await listResponseWatches(client, formId, topicName);
       watch = listed.watch;
       if (!watch) {

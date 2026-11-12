@@ -158,8 +158,7 @@ export class SheetsClient {
     selection: { sheetId: number; range: string }
   ): Promise<unknown> {
     const path = `/spreadsheets/${encodeURIComponent(spreadsheetId)}`;
-    // spreadsheets.get accepts spreadsheets.readonly; getByDataFilter does not.
-    // Resolve the current title, then the poll handler verifies the returned immutable ID.
+    // spreadsheets.get accepts spreadsheets.readonly (getByDataFilter does not); the poller checks the ID.
     const metadata = await this.axios.get(path, {
       params: { fields: 'spreadsheetId,sheets.properties(sheetId,title)' }
     });

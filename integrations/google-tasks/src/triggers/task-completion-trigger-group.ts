@@ -40,9 +40,8 @@ let taskSchema = z.object({
   links: taskCompletedEventSchema.shape.links
 });
 
-// `checkpoint` is the time through which every task list has been read. `scan` is a
-// window that ran out of page budget: lists up to `afterListId` (in ID order) are done.
-// `seen` holds the completions already reported that a later read can return again.
+// `checkpoint`: time through which every list was read. `scan`: a window out of page budget,
+// done up to `afterListId` (ID order). `seen`: reported completions a later read may return.
 let pollStateSchema = z.object({
   checkpoint: completionTimestampSchema,
   scan: z
@@ -92,8 +91,7 @@ let resolveWindow = (
   return { from: checkpoint - OVERLAP_MS, to: now, seen };
 };
 
-// Validate each page before accepting an empty result or moving to its next token.
-// An item that fails its schema fails the page unless the caller chooses to skip it.
+// Validate each page before using it; a bad item fails the page unless the caller skips it.
 async function* pages<T>(
   schema: z.ZodType<T>,
   fetchPage: (pageToken?: string) => Promise<unknown>,
@@ -163,8 +161,7 @@ export let taskCompletionEvents = triggerGroup(spec, {
         let reportedNow = new Map<string, number>();
         let invalidTasks = 0;
 
-        // tasks.list has no documented order, so a window is resumed by task list, in
-        // ID order, and never by a position inside one list.
+        // tasks.list has no documented order, so windows resume by task list in ID order, never mid-list.
         let lists = new Map<string, z.infer<typeof taskListSchema>>();
         for await (let list of pages(taskListSchema, pageToken =>
           client.listTaskLists({ maxResults: 100, pageToken })
@@ -260,9 +257,7 @@ export let taskCompletionEvents = triggerGroup(spec, {
           });
         }
 
-        // The next window starts one overlap before this window's end. Task lists that
-        // an unfinished window has not read yet can still return what earlier checks
-        // reported, so those entries stay until the window is finished.
+        // The next window starts one overlap earlier; entries stay until an unfinished window is done.
         let partial = stoppedAfter !== undefined;
         let nextWindowStart = window.to - OVERLAP_MS;
         let seen = pruneSeenEntries(

@@ -21,10 +21,7 @@ export let createHmacSignature = ({
 }: CreateHmacSignatureOptions) =>
   `${prefix}${createHmac(algorithm, secret).update(payload).digest(digest)}`;
 
-/**
- * Compares a received secret with the expected one in time independent of their contents.
- * An empty expected secret matches nothing.
- */
+/** Constant-time secret comparison; an empty expected secret matches nothing. */
 export let timingSafeStringEqual = (expected: string, received: string | null | undefined) => {
   let expectedBytes = Buffer.from(expected);
   let receivedBytes = Buffer.from(received ?? '');

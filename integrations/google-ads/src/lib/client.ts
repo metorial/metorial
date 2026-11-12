@@ -90,8 +90,7 @@ export class GoogleAdsClient {
     return results;
   }
 
-  // Lead form delivery settings are updated on the existing asset. AssetService
-  // has no remove operation; never replace or delete the form to install a webhook.
+  // AssetService has no remove: update the existing form's delivery settings, never replace it.
   async mutateAssets(
     customerId: string,
     operations: MutateOperation[]

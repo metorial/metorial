@@ -17,8 +17,7 @@ import {
 } from './event-schemas';
 
 export const AUDIT_OVERLAP_MS = 24 * 60 * 60 * 1000;
-// One call stops at the first page boundary past any of these; the rest
-// continues from the saved position.
+// One call stops at the first page boundary past any limit; the rest resumes later.
 export const AUDIT_PAGES_PER_CALL = 100;
 export const AUDIT_BATCH_EVENTS = 2500;
 const AUDIT_BUDGET_MS = 45_000;
@@ -74,8 +73,7 @@ export async function reconcileAdminActivities(
       'The administrator audit checkpoint belongs to a different account or customer.'
     );
   const now = Date.now();
-  // Another worker's clock can run slightly ahead of this one: a time a little
-  // in the future is read as now, while a larger gap means corrupt state.
+  // A slightly future time is another worker's clock skew and reads as now; a larger gap is corrupt.
   const settled = (value: string) => {
     const time = Date.parse(value);
     if (time > now + AUDIT_CLOCK_SKEW_MS)
@@ -88,8 +86,7 @@ export async function reconcileAdminActivities(
   const start = resumed
     ? settled(resumed.start)
     : Math.max(settled(saved.startedAt), settled(state.watermark) - AUDIT_OVERLAP_MS);
-  // Google retains audit records for 180 days. Never silently jump a checkpoint
-  // beyond that retention window and claim the missing lifecycle history was read.
+  // Audit records are kept 180 days; never jump the checkpoint past that and claim the gap was read.
   if (start < now - 180 * AUDIT_OVERLAP_MS)
     throw createApiServiceError(
       'The administrator audit checkpoint is older than Google audit retention. Reconnect to establish a new baseline.'
@@ -158,8 +155,7 @@ export async function reconcileAdminActivities(
           'Google returned an invalid administrator audit activity page.'
         );
         for (const item of result.items) {
-          // A record that cannot be read stays inside every later overlap window,
-          // so failing here would stall the checkpoint for good.
+          // An unreadable record stays in every later overlap window, so failing here stalls forever.
           const record = activityRecordSchema.safeParse(item);
           if (!record.success) {
             warn({
@@ -275,9 +271,7 @@ export async function reconcileAdminActivities(
   // An unfinished window can still be read again from its start.
   const keepFrom = pending ? Math.min(start, end - AUDIT_OVERLAP_MS) : end - AUDIT_OVERLAP_MS;
   const kept = Object.entries(seen).filter(([, occurred]) => occurred >= keepFrom);
-  // Past the cap the oldest identities go first: they leave the overlap window
-  // soonest. A repeat of one is dropped only while the delivery deduplication
-  // window still holds its idempotency key.
+  // Past the cap drop the oldest first; their repeats are then caught only by delivery dedup.
   if (kept.length > AUDIT_SEEN_MAX) {
     kept.sort(([, a], [, b]) => b - a);
     kept.length = AUDIT_SEEN_MAX;

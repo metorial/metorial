@@ -10,14 +10,12 @@ import type { GoogleCalendarClient } from '../lib/client';
 import { calendarEventSchema } from './event-schemas';
 
 export const CALENDAR_SYNC_MAX_PAGES = 100;
-// An incremental drain stops at the first page boundary at or past this many
-// changes. A page holds at most 2,500, so one batch stays under 5,000.
+// A drain stops at the first page boundary past this; pages hold at most 2,500 changes.
 export const CALENDAR_SYNC_BATCH_EVENTS = 2500;
 const SYNC_BUDGET_MS = 45_000;
 const BUDGET_EXCEEDED = 'google_calendar_sync_budget_exceeded';
 
-// `pageToken` continues the incremental sync that started from `syncToken`, or,
-// without a `syncToken`, a silent baseline that has not reached its last page.
+// `pageToken` continues the sync from `syncToken`, or an unfinished baseline when there is none.
 type CalendarCursor = { syncToken?: string; pageToken?: string };
 type Warn = (message: { message: string; reason: string; calendarId: string }) => void;
 type CalendarChange = {
@@ -34,11 +32,9 @@ type CalendarChange = {
 const upstreamStatus = (error: unknown) =>
   Number(isServiceError(error) ? error.data.upstreamStatus : getApiErrorStatus(error));
 
-// The same parameters must be used for full and incremental sync. Expanding a
-// recurring series without a time limit is unbounded, so retain series/exceptions.
-// Only a resumable drain may return before the last page; Google issues the next
-// sync token there, so until then the cursor keeps the sync token it started
-// from (none for a baseline) together with the next page token.
+// Full and incremental sync must share parameters; series are not expanded (unbounded).
+// Google issues the next sync token on the last page, so a resumable drain keeps its
+// starting sync token plus the next page token.
 export const drainCalendarChanges = async (
   client: GoogleCalendarClient,
   calendarId: string,
@@ -75,8 +71,7 @@ export const drainCalendarChanges = async (
         'Google Calendar returned an event without a valid identity.'
       );
       const kind = event.status === 'cancelled' ? 'event_cancelled' : 'event_changed';
-      // Sparse tombstones need a repeatable fallback for this sync transition.
-      // iCalUID is deliberately not used: recurring instances share it.
+      // Fallback key for sparse tombstones; not iCalUID, which recurring instances share.
       const revision = event.etag ?? event.updated ?? `${kind}:${syncToken}`;
       const revisionId = createHash('sha256')
         .update(JSON.stringify([calendarId, event.id, revision]))
@@ -108,8 +103,7 @@ export const syncCalendar = async (
   cursor: CalendarCursor,
   warn: Warn
 ) => {
-  // A baseline larger than one call's budget is read across calls. Google does
-  // not miss entries that change while a full sync is being paged.
+  // A large baseline spans calls; Google keeps entries changed while a full sync pages.
   const baseline = async (from: { pageToken?: string } = {}) => {
     const result = await drainCalendarChanges(client, calendarId, from, true);
     if (!result.syncToken)
@@ -150,8 +144,7 @@ export const syncCalendar = async (
       resumable
     );
   } catch (error) {
-    // The unbatched re-read after a rejected page cannot resume. If it does not
-    // fit the budget it would fail the same way on every later call.
+    // The unbatched re-read cannot resume; over budget it would fail on every later call.
     const unfinished =
       !resumable && isServiceError(error) && error.data.reason === BUDGET_EXCEEDED;
     if (!unfinished && upstreamStatus(error) !== 410) throw error;

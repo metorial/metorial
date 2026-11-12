@@ -19,8 +19,7 @@ function fileTrigger(
       return parsed.success && parsed.data.type === key;
     })
     .map(async ctx => {
-      // Expansion read this event with the same connection after verifying its
-      // account, so mapping needs no further provider call.
+      // Expansion already read this event on a verified connection, so mapping makes no provider call.
       const { type, ...output } = ctx.input;
       return { type, id: driveEventId(ctx.input), output };
     })

@@ -3,8 +3,7 @@ import { z } from 'zod';
 import { artifactEventTypes, subscriptionNameSchema } from '../lib/events-client';
 
 export const targetSchema = z.object({ ownerId: z.string().regex(/^\d+$/) });
-// A registration may return at most 16 routing keys: the current subscription
-// plus every previous one that is still accepted.
+// At most 16 routing keys: the current subscription plus still-accepted previous ones.
 export const MAX_PREVIOUS_SUBSCRIPTIONS = 15;
 export const savedRegistrationSchema = targetSchema.extend({
   subscriptionName: subscriptionNameSchema,

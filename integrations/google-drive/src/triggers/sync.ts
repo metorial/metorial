@@ -13,8 +13,7 @@ import {
 } from './event-schemas';
 
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
-// Change page tokens do not expire, so a longer backlog resumes from the saved
-// cursor on the next notification or scheduled reconciliation.
+// Change tokens do not expire, so a longer backlog resumes on the next run.
 export const DRIVE_CHANGE_PAGES_PER_DRAIN = 20;
 const escapeQuery = (value: string) => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
@@ -40,8 +39,7 @@ export async function resolveDriveTarget(
   }
   let cursorDriveId: string | null = null;
   if (folder.driveId) {
-    // A shared-drive member needs its drive log. An individually shared item for
-    // a non-member belongs to the user's log instead (Drive about-changes guide).
+    // Shared-drive members read the drive log; non-members with a shared item read their user log.
     let pageToken: string | undefined;
     const visited = new Set<string>();
     do {
@@ -147,8 +145,7 @@ export async function drainDriveChanges(
         );
       const version = fileVersion(file);
       const prior = members[file.fileId];
-      // Listing a baseline and draining its earlier cursor can observe the same
-      // current revision twice, or return an older revision already superseded.
+      // Listing and draining can see a revision twice, or one already superseded.
       if (prior && BigInt(version) <= BigInt(prior)) continue;
       members[file.fileId] = version;
       if (!emit) continue;
@@ -184,8 +181,7 @@ export async function drainDriveChanges(
         reason: 'google_drive_cursor_missing'
       });
     }
-    // Checked once per bounded read rather than per page, so a removal later
-    // in the same read can offset an addition.
+    // Checked per read, not per page, so a later removal can offset an addition.
     if (overFolderLimit(members)) return { overLimit: true as const };
     return {
       overLimit: false as const,
@@ -195,14 +191,12 @@ export async function drainDriveChanges(
   }
 }
 
-// Resolves to null, as soon as the listing shows it, when the folder has more
-// children than the limit.
+// Resolves to null as soon as the listing exceeds the child limit.
 export async function baselineDriveFolder(
   client: GoogleDriveClient,
   target: DriveTarget
 ): Promise<DriveFolderState | null> {
-  // Start before the listing, then reconcile everything that changed while it
-  // was paginated. Activation is complete only after the silent drain succeeds.
+  // Start the cursor before listing and drain what changed meanwhile; activation ends after the drain.
   const cursor = await client.getStartPageToken(target.cursorDriveId ?? undefined);
   if (!cursor)
     throw createApiServiceError('Google Drive did not return a starting change cursor.', {

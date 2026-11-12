@@ -7,8 +7,7 @@ const dateTimeSchema = z.object({
   timeZone: z.string().optional()
 });
 
-// Deleted events may contain only id; cancelled recurring exceptions additionally
-// preserve recurringEventId and originalStartTime. Do not require title or dates.
+// Deleted events may carry only id (exceptions add recurringEventId and originalStartTime).
 export const calendarEventSchema = z
   .object({
     id: z.string().min(1),
@@ -65,7 +64,6 @@ export const calendarTargetSchema = z.object({
 const channelSchema = googleWatchChannelSchema.extend({ resourceUri: z.url() });
 
 export const calendarRegistrationSchema = calendarTargetSchema.extend({
-  // A baseline that did not finish at registration saves its page position instead.
   initialSyncToken: z.string().min(1).optional(),
   initialPageToken: z.string().min(1).optional(),
   channel: channelSchema,

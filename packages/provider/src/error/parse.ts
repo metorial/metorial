@@ -1,10 +1,7 @@
 import type { z } from 'zod';
 import { createApiServiceError } from './api';
 
-/**
- * Parses a value the integration saved or received, throwing a user-facing
- * `ServiceError` with `message` (and the optional `reason`) when it does not match.
- */
+/** Parses a saved or received value, throwing a user-facing `ServiceError` on mismatch. */
 export let parseWithServiceError = <T extends z.ZodType>(
   schema: T,
   value: unknown,

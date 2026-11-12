@@ -3,8 +3,7 @@ import { googleWatchChannelSchema } from '@slates/google-push-channels';
 import { parseWithServiceError } from 'slates';
 import { z } from 'zod';
 
-// One baseline page is 1,000 files; a tracked child costs about 60 bytes of saved
-// state, so a full folder stays near 300 KB.
+// 1,000 files per page at ~60 bytes of state each keeps a full folder near 300 KB.
 export const DRIVE_FOLDER_MAX_CHILDREN = 5000;
 
 export const driveFolderSelectionSchema = z.object({
@@ -33,7 +32,6 @@ const driveTargetIdSchema = z.tuple([
   z.string(),
   z.string().nullable()
 ]);
-// The account and folder named by a `driveTargetId`; undefined for any other string.
 export const driveTargetIdOwner = (targetId: string) => {
   let parts: unknown;
   try {
@@ -51,7 +49,6 @@ export const driveFolderStateSchema = z.object({
   members: z.record(z.string(), z.string().regex(/^\d+$/))
 });
 export type DriveFolderState = z.infer<typeof driveFolderStateSchema>;
-// Saved in place of the membership map while a folder is over the child limit.
 const driveOverLimitStateSchema = z.object({
   targetId: z.string().min(1),
   overLimit: z.literal(true)

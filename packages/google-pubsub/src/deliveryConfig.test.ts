@@ -212,8 +212,7 @@ describe('delivery config setup', () => {
     expect(document).not.toMatch(/slates|runtime|hub|binding|registration/i);
   });
 
-  // A line at column 0 that is not a numbered step ends the list, and the renderer then
-  // shows the next step number as running text.
+  // A column-0 line that is not a numbered step ends the list and breaks the numbering.
   it.each(
     products
   )('renders the %s steps as one consecutively numbered list', async product => {

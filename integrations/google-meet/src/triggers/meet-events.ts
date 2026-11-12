@@ -190,8 +190,7 @@ export const meetArtifactEvents = triggerGroup(spec, {
           'The meeting artifact resource type does not match its event.'
         );
       const client = new MeetClient({ token: ctx.auth.token });
-      // Google also delivers events for meetings the user was only invited to. The
-      // user may be unable to read their details, and no retry changes that.
+      // Events also arrive for meetings the user was only invited to, whose details may stay unreadable.
       const skipInaccessible = (error: unknown) => {
         if (!isMeetResourceInaccessible(error)) throw error;
         ctx.warn({

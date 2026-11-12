@@ -184,8 +184,7 @@ export class Client {
     return response.data;
   }
 
-  // `generation` permanently deletes that version. Without it the live version is
-  // removed, which keeps it as a noncurrent version on buckets with versioning.
+  // With `generation` that version is gone for good; without it, versioned buckets keep a noncurrent copy.
   async deleteObject(
     bucketName: string,
     objectName: string,
@@ -244,8 +243,7 @@ export class Client {
       undefined,
       { ...params, sourceGeneration: source.generation }
     );
-    // The precondition removes the source only while the copied generation is
-    // still live; a replacement or an older generation is left untouched.
+    // The precondition deletes the source only while the copied generation is still live.
     try {
       await this.deleteObject(sourceBucket, sourceObject, {
         ifGenerationMatch: source.generation

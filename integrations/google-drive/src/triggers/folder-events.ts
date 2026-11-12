@@ -243,8 +243,7 @@ const renew: SlateWebhookRenewHandler<{}, Auth> = async ctx => {
   }
   if (registration.operationId === ctx.input.operationId && isChannelLive(active))
     return leaseResult(registration);
-  // The existing cursor remains in the per-folder expansion state. A new watch
-  // only wakes it; never replace the baseline or advance that cursor on renewal.
+  // Renewal only wakes the saved cursor; never replace the baseline or advance the cursor.
   const watchCursor = await client.getStartPageToken(target.cursorDriveId ?? undefined);
   const channel = await createChannel(
     client,
@@ -275,8 +274,7 @@ const unregister: SlateWebhookUnregisterHandler<{}, Auth> = async ctx => {
         reason: 'google_drive_channel_creator_mismatch'
       }
     );
-  // Drive has no channel get/list operation. An active channel's 404 cannot
-  // establish absence; leave cleanup retryable until confirmed stop or expiry.
+  // No channel get/list API: a 404 proves nothing, so cleanup stays retryable until stop or expiry.
   try {
     await stopLiveChannels(registration.channels, channel =>
       client.stopChannel(channel.id, channel.resourceId)
@@ -293,8 +291,7 @@ const unregister: SlateWebhookUnregisterHandler<{}, Auth> = async ctx => {
 };
 
 const processWebhook: SlateWebhookProcessHandler = async ctx => {
-  // Only the channel fields are read here; the saved folder baseline is left
-  // unvalidated until an authenticated expansion needs it.
+  // Only channel fields are read here; the folder baseline is validated when expansion needs it.
   const parsed = driveChannelRegistrationSchema.safeParse(
     ctx.input.webhookRegistrationPayload
   );
@@ -345,8 +342,7 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
     );
   const state = parseDriveContract(savedStateSchema, ctx.input.state ?? {}, 'saved state');
   const saved = state.driveFolders?.[targetId];
-  // The registration baseline only seeds the first expansion; afterwards the
-  // saved state is authoritative and the baseline is not read again.
+  // The registration baseline only seeds the first expansion; saved state wins afterwards.
   const previous =
     saved === undefined
       ? parseDriveContract(
@@ -355,8 +351,7 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
           'registration baseline'
         )
       : parseDriveContract(driveSavedFolderStateSchema, saved, 'saved state');
-  // Keeps one entry per selected folder of this account, so state left by folders
-  // that are no longer watched does not accumulate.
+  // One entry per selected folder, so state from unwatched folders does not pile up.
   const save = (folder: DriveSavedFolderState) => {
     const selected = new Set(
       parseDriveContract(driveFolderSelectionSchema, ctx.input.selection, 'folder selection')
@@ -378,8 +373,7 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
         'The saved Drive cursor belongs to another folder or account.',
         { reason: 'google_drive_cursor_identity_mismatch' }
       );
-    // Only scheduled reconciliation rechecks a folder that is over the limit;
-    // a notification must not cost any Drive request for it.
+    // Only scheduled reconciliation rechecks an over-limit folder; notifications cost no request.
     if (wakeup) {
       selectedTarget(registration.target, ctx.input.selection);
       return { events: [] };
@@ -394,16 +388,14 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
     });
     return { events: [], updatedState: save(baseline) };
   }
-  // A notification only reads the change log. Scheduled reconciliation rechecks the
-  // folder and account, so a busy folder does not spend extra requests on every change.
+  // Notifications only read the change log; scheduled reconciliation rechecks folder and account.
   if (wakeup) selectedTarget(registration.target, ctx.input.selection);
   else await assertTarget(client, registration.target, targetId, ctx.input.selection);
   let result: Awaited<ReturnType<typeof drainDriveChanges>>;
   try {
     result = await drainDriveChanges(client, registration.target, previous, true);
   } catch (error) {
-    // Drive documents non-expiring tokens; this defensive recovery also handles
-    // a provider-invalidated cursor without declaring all existing files new.
+    // Tokens should not expire; this recovers an invalidated cursor without reporting every file as new.
     if (Number(getApiErrorStatus(error)) !== 410) throw error;
     ctx.warn({
       message:

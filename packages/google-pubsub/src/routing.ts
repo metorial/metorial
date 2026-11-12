@@ -15,10 +15,7 @@ export let googlePubSubRoutingKey = {
 
 let text = (value: unknown) => (typeof value === 'string' && value.trim() ? value : undefined);
 
-/**
- * Identifies which registrations a delivery on a shared subscription belongs to. The keys
- * must equal the ones a registration returned through `googlePubSubRoutingKey`.
- */
+/** Registrations a shared-subscription push addresses; keys match `googlePubSubRoutingKey`. */
 export let extractGooglePubSubRoutingKeys = (
   product: GooglePubSubProduct,
   message: Pick<PubSubMessage, 'data' | 'attributes'>

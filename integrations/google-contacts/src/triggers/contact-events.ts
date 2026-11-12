@@ -55,12 +55,9 @@ const personSchema = z.looseObject({
     .optional()
 });
 
-// `checkpoint` is the time through which changed contacts have been fully read.
-// Contacts are listed newest first and cannot be filtered by time, so a read that
-// runs out of pages cannot move it. `scan` remembers that read instead: when it
-// began (the next checkpoint), the token of the last page read, and the oldest
-// change read so far. `seen` holds the revisions already reported that a later read
-// can return again.
+// `checkpoint`: time through which changes are fully read. Contacts list newest first with no
+// time filter, so an unfinished read cannot move it; `scan` tracks that read (start, last page
+// token, oldest change). `seen`: reported revisions a later read may return again.
 const pollStateSchema = z.object({
   checkpoint: z.iso.datetime(),
   scan: z
@@ -148,9 +145,8 @@ const readState = (state: unknown, now: number, warn: (message: string) => void)
 const pageTokenRefused = (error: unknown) =>
   [400, 410].includes(getUpstreamErrorStatus(error) ?? 0);
 
-// Reads newest-first pages until one is entirely older than `cutoff`. A resumed read
-// starts by rereading its last page and is `disconnected` unless that page still
-// reaches the oldest change already read, which proves nothing in between was skipped.
+// Reads newest-first pages until one is older than `cutoff`. A resumed read rereads its last
+// page and is `disconnected` unless it still reaches the oldest change read.
 const readRevisions = async (d: {
   client: GooglePeopleClient;
   accountId: string;
@@ -263,8 +259,7 @@ const readRevisions = async (d: {
 
     if (d.resume && page === 1 && !(newest >= d.resume.floor)) return finish('disconnected');
 
-    // CONTACT-only results are ordered by last modification. Finish the whole
-    // page before stopping; empty pages and pages without usable metadata continue.
+    // CONTACT-only results are ordered by last modification; finish the page before stopping.
     // https://developers.google.com/people/api/rest/v1/people.connections/list#SortOrder
     if (!nextPageToken || entirelyBeforeWindow) return finish('complete');
     if (!rememberPageToken(seenTokens, nextPageToken)) {
@@ -357,9 +352,7 @@ export const contactEvents = triggerGroup(spec, {
         });
       }
 
-      // The next read starts one window before the new checkpoint. A read that is
-      // continued has not reached the older changes yet and rereads its last page,
-      // so what was reported there, and everything reported earlier, is kept.
+      // The next read starts one window before the checkpoint; a continued read keeps all it reported.
       const continuing =
         read.status === 'partial' && read.pageToken !== undefined && !restarted;
       const nextCutoff = startedAt - CONTACT_SNAPSHOT_WINDOW_MS;

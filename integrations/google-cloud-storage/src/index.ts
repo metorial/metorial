@@ -31,9 +31,8 @@ export let provider = Slate.create({
     manageLifecycle,
     manageNotifications
   ],
-  // TODO: register the object triggers again; they are postponed because every watched
-  // bucket's Cloud project must be allowed to publish to the delivery topic, which the
-  // managed OAuth app cannot arrange without an operator adding each customer project.
+  // TODO: re-register the object triggers. Postponed: each bucket's project must be allowed to
+  // publish to the delivery topic, which needs an operator per customer project.
   // triggerGroups: [objectEvents],
   // triggers: [objectFinalized]
   triggers: []

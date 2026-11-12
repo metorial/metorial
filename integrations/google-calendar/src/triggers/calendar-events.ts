@@ -38,8 +38,7 @@ export const calendarEvents = triggerGroup(spec, {
       );
       if (!registration.success)
         return skipWebhook('google_calendar_webhook_registration_invalid', { status: 500 });
-      // Calendar push has an empty body, a shared channel token, and no signed
-      // timestamp. Never parse invented event JSON or compare delivery order.
+      // Push has an empty body and only a shared token; never parse event JSON or trust delivery order.
       const verified = await verifyChannelNotification({
         integration: 'google_calendar',
         request: ctx.input.request,
@@ -55,7 +54,6 @@ export const calendarEvents = triggerGroup(spec, {
         events: [
           {
             payload: { kind: 'calendar_sync', calendarId: registration.data.calendarId },
-            // Automatic target subscriptions provide routing and credential isolation.
             matchers: [],
             idempotencyKey: `${channel.id}:${message}`
           }

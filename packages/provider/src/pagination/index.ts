@@ -1,7 +1,4 @@
-/**
- * Records a provider page token in `seen`. Returns `false` when the listing already
- * returned it, which means following it would loop forever.
- */
+/** Records a page token in `seen`; `false` means it repeated and following it would loop. */
 export let rememberPageToken = (seen: Set<string>, token: string) => {
   if (seen.has(token)) return false;
   seen.add(token);

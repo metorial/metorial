@@ -71,8 +71,7 @@ export const adminLifecycle = triggerGroup(spec, {
         )
       )
         return skipWebhook('google_admin_webhook_event_mismatch', { status: 400 });
-      // Google echoes a channel secret but provides no payload signature or signed
-      // timestamp. Treat the body only as a wakeup; authenticated audit reads emit events.
+      // Google signs nothing: the body is only a wakeup; authenticated audit reads emit events.
       return {
         events: [
           {
@@ -116,7 +115,6 @@ export const adminLifecycle = triggerGroup(spec, {
       );
     }
   })
-  // Automatic target subscriptions own routing; channel and customer checks isolate delivery.
   .routingMatchers(async () => [])
   .build();
 

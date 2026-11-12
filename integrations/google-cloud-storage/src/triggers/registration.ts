@@ -22,8 +22,7 @@ import {
 } from './event-schemas';
 
 const OWNER_ATTRIBUTE = 'callback_owner';
-// Events carry object names, sizes, hashes and custom metadata, so a target needs
-// object read access as well as the access to manage bucket notifications.
+// Events carry object metadata, so targets need object read access besides notification access.
 const REQUIRED_PERMISSIONS = [
   'storage.buckets.get',
   'storage.buckets.update',
@@ -52,8 +51,7 @@ const listedSchema = z.object({
 });
 const notificationsSchema = z.object({ items: z.array(notificationSchema).optional() });
 
-// Bucket names are reused: a bucket created after the saved one is a different
-// bucket that never held the saved bucket's notifications.
+// Bucket names are reused; a newer bucket with the same name never held the saved notifications.
 const bucketIncarnation = async (
   client: Client,
   saved: BucketTarget
@@ -80,8 +78,7 @@ const currentBucket = async (client: Client, saved: BucketTarget) => {
   if ((await bucketIncarnation(client, saved)) === 'replaced')
     throw createApiServiceError('The bucket has been deleted and created again.');
 };
-// A bucket list is complete or fails, so a listing of the saved project without
-// the bucket proves what a 404 on the bucket alone does not: it is gone.
+// Bucket lists are complete or fail, so absence from the listing proves deletion; a 404 does not.
 const isBucketListed = async (client: Client, saved: BucketTarget) => {
   let pageToken: string | undefined;
   for (let page = 0; page < MAX_DISCOVERY_PAGES; page++) {
@@ -125,8 +122,7 @@ const matches = (notification: StorageNotification, topic: string, ownershipId: 
   notification.event_types[0] === 'OBJECT_FINALIZE' &&
   !notification.object_name_prefix;
 
-// API-generated notification IDs cannot be chosen in advance. A stable custom
-// attribute recovers an accepted create whose response was lost on retry.
+// Notification IDs are server-made; a stable custom attribute recovers a create whose response was lost.
 const ensureNotification = async (
   client: Client,
   bucketName: string,
@@ -150,8 +146,7 @@ const ensureNotification = async (
         customAttributes: { [OWNER_ATTRIBUTE]: ownershipId }
       });
     } catch (error) {
-      // A readback also recovers an ambiguous transport failure without creating
-      // a second notification. Unverifiable failures remain retryable.
+      // Readback also recovers ambiguous transport failures; unverifiable ones stay retryable.
       owned = (await listNotifications(client, bucketName)).filter(item =>
         matches(item, topic, ownershipId)
       );
@@ -176,8 +171,7 @@ const ensureNotification = async (
     );
   owned.sort((a, b) => a.id.localeCompare(b.id));
   const selected = owned[0]!;
-  // Concurrent/ambiguous creates can leave duplicate owned notifications. Their
-  // configuration and marker are checked before removing only the duplicates.
+  // Ambiguous creates can leave duplicate owned notifications; only verified duplicates are removed.
   for (const duplicate of owned.slice(1))
     await client.deleteNotification(bucketName, duplicate.id);
   const readback = parseWithServiceError(
@@ -308,8 +302,7 @@ export const storageAutoRegistration = {
     )
       throw createApiServiceError('The saved bucket notification identifier does not match.');
     const client = new Client({ token: ctx.auth.token, projectId: ctx.config.projectId });
-    // An inaccessible bucket, or one whose absence cannot be confirmed, stays a
-    // retryable failure.
+    // An inaccessible bucket, or unconfirmed absence, stays a retryable failure.
     if (await isBucketGone(client, saved.bucket)) return;
     const existing = (await listNotifications(client, saved.bucket.bucketName)).find(
       item => item.id === saved.notificationId

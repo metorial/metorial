@@ -80,8 +80,7 @@ let getErrorStatusText = (error: unknown) => {
 let trimmed = (value: unknown) =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;
 
-// Google's canonical status (such as PERMISSION_DENIED) plus the first ErrorInfo
-// or legacy reason and its domain, which say what the status was caused by.
+// Google's canonical status plus the first ErrorInfo (or legacy) reason and its domain.
 let extractGoogleErrorCause = (
   error: unknown
 ): { code?: string; reason?: string; domain?: string } => {
@@ -165,10 +164,8 @@ export let isMeetAlreadyExists = (error: unknown) =>
   error instanceof ServiceError &&
   (error.data.upstreamCode === 'ALREADY_EXISTS' ||
     (error.data.upstreamStatus === 409 && error.data.upstreamCode === undefined));
-// Google's API infrastructure reports a missing scope, a disabled API or a spent
-// quota as 403 with the reason domain "googleapis.com" (legacy: "usageLimits", or
-// the reason "insufficientPermissions"). Those concern the whole connection and
-// stay failures; any other 403 concerns the one resource.
+// Missing scope, disabled API or spent quota is a 403 with domain "googleapis.com" (legacy:
+// "usageLimits" or "insufficientPermissions"); those fail the connection, other 403s one resource.
 let CONNECTION_WIDE_DOMAINS = ['googleapis.com', 'usageLimits'];
 export let isMeetResourceInaccessible = (error: unknown) => {
   if (!(error instanceof ServiceError)) return false;

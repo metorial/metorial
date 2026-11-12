@@ -153,9 +153,8 @@ export const adminAutoRegistration = {
       ctx.input.selection
     );
     const startedAt = new Date(Date.now()).toISOString();
-    // Reuse the runtime's operation identity on an ambiguous first attempt. Google
-    // cannot read a channel back: a duplicate-ID conflict remains an error, not
-    // permission to create another untracked channel on every retry.
+    // Retries reuse the operation's channel ID; with no readback a duplicate-ID conflict stays
+    // an error instead of creating untracked channels.
     const channel = await createAdminChannel(
       client,
       identity.customerId,

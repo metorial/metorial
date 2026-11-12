@@ -74,8 +74,7 @@ const watch = async (client: Client, topicName: string) => {
     !Number.isFinite(new Date(expiration).getTime()) ||
     expiration <= Date.now() + 60 * 60 * 1000
   ) {
-    // Gmail exposes no readback endpoint. Never pretend that a malformed response
-    // proves absence or stop a possibly newer mailbox-wide watch as rollback.
+    // No watch readback: a malformed response proves nothing, and a rollback stop could end a newer watch.
     throw createApiServiceError(
       'Gmail returned an invalid mailbox watch lease; retry registration with the same destination.'
     );
@@ -155,8 +154,7 @@ export const gmailAutoRegistration = {
       );
     const client = new Client({ token: ctx.auth.token, userId: ctx.config.userId });
     await assertMailbox(client, saved);
-    // Repeating watch for the same mailbox/topic is a safe update. Crucially,
-    // renewal must never replace the original baseline with its new history ID.
+    // Re-watching is a safe update; renewal must keep the original baseline history ID.
     return result({ ...saved, expiresAt: await watch(client, delivery.topicName) });
   },
   webhookUnregister: async ctx => {
@@ -168,8 +166,7 @@ export const gmailAutoRegistration = {
     const client = new Client({ token: ctx.auth.token, userId: ctx.config.userId });
     await assertMailbox(client, saved);
     if (Date.parse(saved.expiresAt) <= Date.now()) return;
-    // There is no watch get/list API. A successful users.stop is the documented
-    // completion signal; errors (including 404) stay failed and retryable.
+    // No watch get/list API: only a successful users.stop counts; errors, even 404, stay retryable.
     await client.stopMailboxWatch();
   }
 } satisfies SlateTriggerGroupWebhookAutoRegistrationParameters<

@@ -132,9 +132,8 @@ const findOwned = async (client: MeetEventsClient, ownerId: string, topicName: s
   return existing;
 };
 
-// Google keeps one subscription per user and target for an OAuth project, and
-// the topic is shared by every registration of the OAuth app. A subscription
-// on this topic is adopted; one on any other topic is never touched.
+// One subscription per user and target per OAuth project, on a topic the app shares: adopt one
+// on this topic, never touch others.
 const createOrRecover = async (
   client: MeetEventsClient,
   ownerId: string,
@@ -146,8 +145,7 @@ const createOrRecover = async (
   try {
     created = await client.createSubscription(ownerId, infrastructure.topicName);
   } catch (error) {
-    // An accepted request can time out, and another registration of the same
-    // account can create the subscription first.
+    // A request may time out after success, or another registration may create it first.
     const recovered = await findOwned(client, ownerId, infrastructure.topicName);
     if (recovered) return { subscription: recovered, created: false };
     if (isMeetAlreadyExists(error))
@@ -157,8 +155,7 @@ const createOrRecover = async (
       );
     throw error;
   }
-  // Only the subscription this call created may be rolled back. Failed reads
-  // are ambiguous: retaining it permits safe retry recovery.
+  // Only a subscription this call created may be rolled back; ambiguous failed reads keep it.
   assertDeliveryIdentity(created, ownerId, infrastructure.topicName);
   const readback = await client.getSubscription(created.name);
   assertDeliveryIdentity(readback, ownerId, infrastructure.topicName);
@@ -258,8 +255,7 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
       throw createApiServiceError(
         'Google still lists the deleted meeting subscription. Retry after deletion completes.'
       );
-    // Retry after an uncertain update reads the current expiry. Daily renewal
-    // doesn't continually mutate an already renewed lease.
+    // A retry after an uncertain update reads the current expiry instead of renewing again.
     if (Date.parse(subscription.expireTime) < Date.now() + 5 * 86400_000)
       subscription = await client.renewSubscription(subscription);
     return registrationResult(
@@ -283,9 +279,8 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
       throw createApiServiceError('The meeting subscription cleanup identity does not match.');
     const client = new MeetEventsClient(ctx.auth.token);
     await assertMeetOwner(client, saved.ownerId);
-    // A fully authorized list establishes absence. A bare GET/DELETE 404 does not.
-    // A differently named subscription on the shared topic replaced the saved
-    // one and belongs to the registrations that returned its routing key.
+    // Only a fully authorized list proves absence, not a bare 404. A differently named subscription
+    // on the topic replaced the saved one and belongs to whoever returned its routing key.
     const subscription = await findOwned(
       client,
       saved.ownerId,
@@ -306,9 +301,7 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
   }
 };
 
-// Resolves to false when the saved subscription no longer exists. Another
-// registration of the account can recreate the shared subscription under a new
-// name; this one adopts it at its next renewal.
+// False when the saved subscription is gone; a recreated one is adopted at the next renewal.
 export const reconcileMeetSubscription = async (
   client: MeetEventsClient,
   saved: MeetRegistration

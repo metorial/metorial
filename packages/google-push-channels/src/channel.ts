@@ -64,10 +64,8 @@ let resourceUriAccepted = (value: unknown, matches: (uri: URL) => boolean) => {
 };
 
 /**
- * Starts a watch and checks that Google created exactly the requested channel: the same
- * ID and token, a resource ID, an expiry in the future (and within `maxLifetimeMs`), and
- * when `resourceUriMatches` is given, the watched resource. A mismatched channel is
- * stopped by the requested ID, never by an unrelated returned ID.
+ * Starts a watch and checks Google created exactly the requested channel. A mismatch is
+ * stopped by the requested ID, never the returned one.
  */
 export async function createVerifiedChannel(
   options: CreateGoogleWatchChannelOptions & { resourceUriMatches: (uri: URL) => boolean }
@@ -113,10 +111,7 @@ export async function createVerifiedChannel(
   };
 }
 
-/**
- * The channel ID for one registration operation. Retrying the same operation requests
- * the same channel instead of creating another one.
- */
+/** Channel ID for one registration operation; retries request the same channel. */
 export let registrationChannelId = (
   targetIdentifier: string,
   webhookUrl: string,
@@ -127,12 +122,8 @@ export let registrationChannelId = (
     .digest('hex');
 
 /**
- * The replacement channel for one renewal operation. Retrying the same operation derives
- * the same ID and token, so a lost watch response never creates a second channel.
- *
- * `tokenSeed` is a secret saved with the registration and never sent to Google, so a
- * leaked channel token does not reveal the tokens that follow it. A registration saved
- * without a seed derives its next token from the previous one.
+ * Replacement channel for one renewal operation; retries derive the same ID and token.
+ * `tokenSeed` is never sent to Google, so a leaked token does not reveal the next one.
  */
 export let renewalChannelIdentity = (
   previous: Pick<GoogleWatchChannel, 'id' | 'token'>,
@@ -170,9 +161,8 @@ export let rotateChannels = <T extends { expiresAt: string }>(
 ) => [...previous, replaced].filter(isChannelLive);
 
 /**
- * Stops every unexpired channel. Google has no channel read or list API, so a failed
- * stop (including a 404) cannot prove removal: the first failure is rethrown after
- * the other channels were attempted, keeping cleanup retryable.
+ * Stops every unexpired channel. With no read API a failed stop (even 404) proves nothing,
+ * so the first failure is rethrown after trying the rest.
  */
 export let stopLiveChannels = async <T extends { expiresAt: string }>(
   channels: readonly T[],

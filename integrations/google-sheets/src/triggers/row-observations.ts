@@ -202,9 +202,7 @@ export const rowObservations = triggerGroup(spec, {
         throw fail(
           'Google Sheets returned a grid that does not match the selected range. No partial snapshot was accepted.'
         );
-      // A bounded GridData response omits trailing blank cells/rows, and rows or
-      // columns of the range that lie outside the sheet grid. Both read as blank;
-      // never page, cap, or slice a provider response.
+      // GridData omits trailing blanks and out-of-grid cells; both read as blank. Never slice a response.
       const rows = (grid.rowData ?? []).map(row =>
         columns.map((_, index) => normalizeCell(row.values?.[index]?.userEnteredValue))
       );
@@ -245,8 +243,7 @@ export const rowObservations = triggerGroup(spec, {
           );
       }
 
-      // Columns are identified by letter. Only the key column's header is part of the
-      // baseline identity; other header edits never discard row observations.
+      // Columns are identified by letter; only the key column's header is part of the baseline identity.
       const fingerprint = digest({
         ...selection,
         watchedColumns,
@@ -269,8 +266,7 @@ export const rowObservations = triggerGroup(spec, {
       )
         throw fail('The saved row baseline has invalid row values. Reset this subscription.');
       const previous = new Map(previousRecords.map(record => [record.token, record]));
-      // A changed header usually means the column under that letter was moved or
-      // replaced, so its value differences are not reported for this one read.
+      // A changed header usually means the column moved, so its differences are skipped for this read.
       const previousHeaders = continued?.headers ?? headers;
       const reheaded = watched.filter(
         ({ index }) =>
@@ -281,8 +277,7 @@ export const rowObservations = triggerGroup(spec, {
       let revisionFloor = startingFloor;
       const records = new Map<string, RowState['records'][number]>();
       for (const [token, record] of previous) {
-        // A key now shared by several rows is still in the table: keep its last
-        // unambiguous snapshot and compare against it once the key is unique again.
+        // A duplicated key keeps its last unambiguous snapshot until it is unique again.
         if (current.has(token) || duplicated.has(token)) records.set(token, record);
         else revisionFloor = Math.max(revisionFloor, record.revision);
       }
@@ -387,6 +382,5 @@ export const rowObservations = triggerGroup(spec, {
       return { events, updatedState };
     }
   })
-  // Poll results belong only to their own selected subscription; no shared webhook routing.
   .routingMatchers(async () => [])
   .build();

@@ -105,8 +105,6 @@ const registrationResult = (saved: CalendarRegistration) => ({
   renewAfter: channelRenewAfter(saved.channel.expiresAt, RENEW_WINDOW)
 });
 
-// Explicit handler types let the builder carry authenticated context without
-// coupling resource discovery to an auth/config form.
 export const calendarAutoRegistration = {
   webhookTargetList: async ctx => {
     const page =
@@ -155,8 +153,7 @@ export const calendarAutoRegistration = {
       ctx.input.webhookTargetIdentifier,
       ctx.input.webhookTargetPayload
     );
-    // A calendar too large for one budget keeps its page position; later
-    // notifications and scheduled checks finish the silent baseline from there.
+    // An oversized calendar keeps its page position; later runs finish the silent baseline.
     const baseline = await drainCalendarChanges(client, target.calendarId, {}, true);
     const channel = await createChannel(
       client,
@@ -206,8 +203,7 @@ export const calendarAutoRegistration = {
     if (!ctx.input.operationId)
       throw createApiServiceError('Calendar channel renewal requires an operation identity.');
     if (saved.renewalOperationId === ctx.input.operationId) return registrationResult(saved);
-    // Retrying the same operation never invents a different provider channel.
-    // A conflict after a lost watch response stays retryable: no readback API exists.
+    // Retries reuse the same channel; a conflict after a lost response stays retryable (no readback).
     const { id, token } = renewalChannelIdentity(
       saved.channel,
       ctx.input.operationId,
@@ -241,8 +237,7 @@ export const calendarAutoRegistration = {
       throw createApiServiceError('The saved calendar channel identity does not match.');
     const client = new GoogleCalendarClient(ctx.auth.token);
     await assertOwner(client, saved.ownerId);
-    // Google exposes no channel get/list endpoint. An unconfirmed 404 must
-    // remain a cleanup failure; natural expiration is independently known.
+    // No channel get/list API: an unconfirmed 404 stays a cleanup failure until expiry.
     await stopLiveChannels([saved.channel, ...saved.previousChannels], channel =>
       client.stopChannel(channel.id, channel.resourceId)
     );

@@ -83,9 +83,7 @@ export const reconcileFormResponses = async (
     const status = getUpstreamErrorStatus(error);
     const refused = status && status < 500 && ![401, 403, 429].includes(status);
     if (!entry.scan || !refused) throw error;
-    // The saved page token is the only part of this request a fresh read would not send, so
-    // Google no longer accepts it: read the same window again. Responses already reported
-    // are recognised, so only the unread ones produce events.
+    // Google rejected the saved page token: reread the window; reported responses are recognised.
     scan = beginScan(entry.scan.restarts + 1);
     fetched = await fetchPage();
   }
@@ -111,8 +109,7 @@ export const reconcileFormResponses = async (
         throw createApiServiceError('Google Forms returned response timestamps out of order.');
       if (submitted <= scanStarted && submitted > timestampNanos(scan.highWater))
         scan.highWater = item.lastSubmittedTime;
-      // A first submission before the window was reported by an earlier scan; it is only
-      // listed again because it was edited.
+      // Submitted before the window, so already reported; it reappears only because it was edited.
       if (created < activated || created < since || recent.has(item.responseId)) continue;
       recent.set(item.responseId, item.createTime);
       const eventId = createHash('sha256')
@@ -142,16 +139,14 @@ export const reconcileFormResponses = async (
     fetched = await fetchPage();
   }
 
-  // Restarts only count while they find nothing new, which means the window cannot be read
-  // to its end in one call and its position cannot be carried to the next.
+  // Restarts count only while they find nothing new, i.e. the window cannot be read in one call.
   if (events.length) scan.restarts = 0;
   if (!complete && scan.restarts > FORM_SCAN_MAX_RESTARTS)
     throw createApiServiceError(
       'Google Forms keeps rejecting the saved position in this form and its recent responses do not fit one synchronization. Progress was not advanced.'
     );
 
-  // The cursor only moves once every page of the window has been read, because the
-  // listing order is not documented and an unread page may hold an earlier response.
+  // The cursor moves only after the whole window is read: listing order is undocumented.
   const cursor = complete ? scan.highWater : entry.cursor;
   const keepFrom = timestampNanos(windowStart(saved.activatedAt, cursor));
   const recentResponses = Object.fromEntries(

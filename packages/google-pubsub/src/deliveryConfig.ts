@@ -113,10 +113,7 @@ let setupDocument = (product: GooglePubSubProduct, webhookUrl: string) =>
     '> NOTE: The endpoint rejects deliveries until you save this setup here.'
   ].join('\n');
 
-/**
- * The delivery setup of a trigger group that declares `googlePubSub: { product }`: a
- * person creates the topic and push subscription once per OAuth app and enters their names.
- */
+/** Delivery setup for a `googlePubSub` group: topic and push subscription, once per OAuth app. */
 export let googlePubSubDeliveryConfig = (
   product: GooglePubSubProduct
 ): SlateTriggerGroupWebhookDeliveryConfigParameters<

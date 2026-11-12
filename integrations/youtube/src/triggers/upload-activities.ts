@@ -215,8 +215,7 @@ export const uploadActivities = triggerGroup(spec, {
         const activatedAt = Date.parse(prior.activatedAt);
         const checkpoint = Date.parse(prior.checkpoint);
         const scanUntil = prior.scanUntil ? Date.parse(prior.scanUntil) : undefined;
-        // A backlog too large for one poll is read in consecutive windows, without the
-        // overlap, so each poll starts where the previous one ended.
+        // A large backlog is read in consecutive windows without overlap.
         const catchingUp =
           scanUntil !== undefined && scanUntil > checkpoint && scanUntil < now;
         const earliest = catchingUp
@@ -307,8 +306,7 @@ export const uploadActivities = triggerGroup(spec, {
         });
       }
 
-      // A channel missing from one listing keeps its checkpoint for a day, so a transient
-      // omission resumes from where it stopped instead of starting a new silent baseline.
+      // A channel missing from a listing keeps its checkpoint for a day instead of rebaselining.
       const missing = previous.channels
         .filter(
           channel =>
