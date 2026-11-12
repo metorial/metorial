@@ -352,29 +352,42 @@ export let expectSlateContract = async (d: {
   return contract;
 };
 
-export let registerSlateTriggerGroupWebhook = async (d: {
-  client: SlatesTestClient;
-  triggerGroupId: string;
-  webhookTargetIdentifier: string;
-  webhookTargetPayload: any;
-  webhookUrl: string;
-}) =>
-  d.client.registerTriggerGroupWebhook({
-    triggerGroupId: d.triggerGroupId,
-    webhookTargetIdentifier: d.webhookTargetIdentifier,
-    webhookTargetPayload: d.webhookTargetPayload,
-    webhookUrl: d.webhookUrl
-  });
+export let registerSlateTriggerGroupWebhook = async (
+  d: { client: SlatesTestClient } & Parameters<
+    SlatesTestClient['registerTriggerGroupWebhook']
+  >[0]
+) => {
+  let { client, ...input } = d;
+  return client.registerTriggerGroupWebhook(input);
+};
+
+export let renewSlateTriggerGroupWebhook = async (
+  d: { client: SlatesTestClient } & Parameters<SlatesTestClient['renewTriggerGroupWebhook']>[0]
+) => {
+  let { client, ...input } = d;
+  return client.renewTriggerGroupWebhook(input);
+};
+
+export let expandSlateTriggerGroupWebhook = async (
+  d: { client: SlatesTestClient } & Parameters<
+    SlatesTestClient['expandTriggerGroupWebhook']
+  >[0]
+) => {
+  let { client, ...input } = d;
+  return client.expandTriggerGroupWebhook(input);
+};
 
 export let pollSlateTriggerGroupEvents = async (d: {
   client: SlatesTestClient;
   triggerGroupId: string;
   state?: any;
+  selection?: Record<string, any>;
 }) => {
   d.client.ensureSession();
   return d.client.pollTriggerGroup({
     triggerGroupId: d.triggerGroupId,
-    state: d.state ?? null
+    state: d.state ?? null,
+    selection: d.selection
   });
 };
 

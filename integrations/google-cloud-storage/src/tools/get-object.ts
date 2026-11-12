@@ -1,4 +1,4 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { googleCloudStorageActionScopes } from '../scopes';
@@ -17,6 +17,13 @@ export let getObject = SlateTool.create(spec, {
     z.object({
       bucketName: z.string().describe('Name of the bucket containing the object'),
       objectName: z.string().describe('Full name (path) of the object'),
+      generation: z
+        .string()
+        .regex(/^[1-9]\d*$/)
+        .optional()
+        .describe(
+          'Exact object generation, for example from an object finalized event. Omit for the current generation.'
+        ),
       includeContent: z
         .boolean()
         .optional()
@@ -47,15 +54,33 @@ export let getObject = SlateTool.create(spec, {
       projectId: ctx.config.projectId
     });
 
-    let metadata = await client.getObjectMetadata(ctx.input.bucketName, ctx.input.objectName);
-
-    let content: Buffer | undefined;
-    if (ctx.input.includeContent) {
-      content = await client.downloadObject(ctx.input.bucketName, ctx.input.objectName);
+    let metadata = await client.getObjectMetadata(
+      ctx.input.bucketName,
+      ctx.input.objectName,
+      ctx.input.generation
+    );
+    if (
+      metadata.bucket !== ctx.input.bucketName ||
+      metadata.name !== ctx.input.objectName ||
+      typeof metadata.generation !== 'string' ||
+      !/^[1-9]\d*$/.test(metadata.generation) ||
+      (ctx.input.generation && metadata.generation !== ctx.input.generation)
+    ) {
+      throw createApiServiceError(
+        'Cloud Storage returned metadata for an unexpected object generation.'
+      );
     }
-
     let contentType = metadata.contentType || 'application/octet-stream';
-    let sizeBytes = metadata.size ?? (content ? String(content.byteLength) : undefined);
+    let sizeBytes = metadata.size;
+    if (ctx.input.includeContent) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(ctx.input.bucketName)}/o/${encodeURIComponent(ctx.input.objectName)}`,
+        query: { alt: 'media', generation: metadata.generation },
+        headers: { Authorization: `Bearer ${ctx.auth.token}` },
+        mimeType: contentType
+      });
+    }
 
     return {
       output: {
@@ -74,11 +99,7 @@ export let getObject = SlateTool.create(spec, {
         eventBasedHold: metadata.eventBasedHold,
         retentionExpiresAt: metadata.retentionExpirationTime
       },
-      attachments:
-        content !== undefined
-          ? [createBase64Attachment(content.toString('base64'), contentType)]
-          : undefined,
-      message: `Retrieved object **${metadata.name}** from bucket **${metadata.bucket}** (${sizeBytes ?? 'unknown'} bytes, ${contentType}).${content !== undefined ? ' Downloadable file included.' : ''}`
+      message: `Retrieved object **${metadata.name}** from bucket **${metadata.bucket}** (${sizeBytes ?? 'unknown'} bytes, ${contentType}).${ctx.input.includeContent ? ' Downloadable file included.' : ''}`
     };
   })
   .build();

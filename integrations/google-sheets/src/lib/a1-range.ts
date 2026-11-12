@@ -19,7 +19,7 @@ const findA1SheetSeparator = (range: string) => {
   return -1;
 };
 
-const quoteA1SheetName = (sheetName: string) => `'${sheetName.replaceAll("'", "''")}'`;
+export const quoteA1SheetName = (sheetName: string) => `'${sheetName.replaceAll("'", "''")}'`;
 
 const isAmbiguousA1SheetName = (sheetName: string) =>
   /^[A-Za-z]{1,3}\d+$/.test(sheetName) || /^R\d+C\d+$/i.test(sheetName);

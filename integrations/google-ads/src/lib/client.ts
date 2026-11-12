@@ -90,6 +90,17 @@ export class GoogleAdsClient {
     return results;
   }
 
+  // Lead form delivery settings are updated on the existing asset. AssetService
+  // has no remove operation; never replace or delete the form to install a webhook.
+  async mutateAssets(
+    customerId: string,
+    operations: MutateOperation[]
+  ): Promise<Record<string, any>> {
+    const cid = customerId.replace(/-/g, '');
+    const response = await this.http.post(`/customers/${cid}/assets:mutate`, { operations });
+    return response.data;
+  }
+
   // Campaign Management
 
   async mutateCampaigns(

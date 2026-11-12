@@ -9,16 +9,17 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
+    "@slates/google-pubsub": "1.0.0",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.31",
+    "slates": "1.0.0-rc.33",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.14",
+    "@slates/test": "1.0.0-rc.28",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.3",
+  "version": "0.3.0",
   "peerDependencies": {
     "@slates/oauth-google": "1.0.7"
   },

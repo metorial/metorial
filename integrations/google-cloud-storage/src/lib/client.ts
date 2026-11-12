@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { createApiServiceError, createAxios } from 'slates';
+import { createApiServiceError, createAxios, getApiErrorStatus } from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -28,10 +28,15 @@ export class Client {
 
   // ── Buckets ──
 
-  async listBuckets(params?: { prefix?: string; maxResults?: number; pageToken?: string }) {
+  async listBuckets(params?: {
+    project?: string;
+    prefix?: string;
+    maxResults?: number;
+    pageToken?: string;
+  }) {
     let response = await this.api.get('/b', {
       params: {
-        project: this.config.projectId,
+        project: params?.project ?? this.config.projectId,
         prefix: params?.prefix,
         maxResults: params?.maxResults,
         pageToken: params?.pageToken
@@ -127,37 +132,12 @@ export class Client {
     return response.data;
   }
 
-  async getObjectMetadata(bucketName: string, objectName: string) {
-    let response = await this.api.get(
-      `/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectName)}`
-    );
-    return response.data;
-  }
-
-  async downloadObject(bucketName: string, objectName: string): Promise<Buffer> {
+  async getObjectMetadata(bucketName: string, objectName: string, generation?: string) {
     let response = await this.api.get(
       `/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectName)}`,
-      { params: { alt: 'media' }, responseType: 'arraybuffer' }
+      { params: { generation } }
     );
-
-    if (Buffer.isBuffer(response.data)) {
-      return Buffer.from(response.data);
-    }
-    if (response.data instanceof ArrayBuffer) {
-      return Buffer.from(response.data);
-    }
-    if (ArrayBuffer.isView(response.data)) {
-      return Buffer.from(
-        response.data.buffer,
-        response.data.byteOffset,
-        response.data.byteLength
-      );
-    }
-
-    throw createApiServiceError(
-      'Cloud Storage returned an invalid binary response for the requested object.',
-      { reason: 'google_cloud_storage_download_content_invalid' }
-    );
+    return response.data;
   }
 
   async uploadObject(
@@ -204,14 +184,21 @@ export class Client {
     return response.data;
   }
 
+  // `generation` permanently deletes that version. Without it the live version is
+  // removed, which keeps it as a noncurrent version on buckets with versioning.
   async deleteObject(
     bucketName: string,
     objectName: string,
-    params?: { generation?: string }
+    params?: { generation?: string; ifGenerationMatch?: string }
   ) {
     await this.api.delete(
       `/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectName)}`,
-      { params: { generation: params?.generation } }
+      {
+        params: {
+          ...(params?.generation ? { generation: params.generation } : {}),
+          ...(params?.ifGenerationMatch ? { ifGenerationMatch: params.ifGenerationMatch } : {})
+        }
+      }
     );
   }
 
@@ -220,11 +207,13 @@ export class Client {
     sourceObject: string,
     destinationBucket: string,
     destinationObject: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
+    params?: { sourceGeneration?: string; ifGenerationMatch?: string }
   ) {
     let response = await this.api.post(
       `/b/${encodeURIComponent(sourceBucket)}/o/${encodeURIComponent(sourceObject)}/copyTo/b/${encodeURIComponent(destinationBucket)}/o/${encodeURIComponent(destinationObject)}`,
-      metadata || {}
+      metadata || {},
+      { params }
     );
     return response.data;
   }
@@ -233,26 +222,51 @@ export class Client {
     sourceBucket: string,
     sourceObject: string,
     destinationBucket: string,
-    destinationObject: string
+    destinationObject: string,
+    params?: { sourceGeneration?: string; ifGenerationMatch?: string }
   ) {
-    let copied = await this.copyObject(
+    // Pin the source before copy/delete so a concurrent replacement is never deleted.
+    const source = await this.getObjectMetadata(
+      sourceBucket,
+      sourceObject,
+      params?.sourceGeneration
+    );
+    if (typeof source.generation !== 'string' || !/^[1-9]\d*$/.test(source.generation)) {
+      throw createApiServiceError(
+        'Cloud Storage did not return the source object generation.'
+      );
+    }
+    const resource = await this.copyObject(
       sourceBucket,
       sourceObject,
       destinationBucket,
-      destinationObject
+      destinationObject,
+      undefined,
+      { ...params, sourceGeneration: source.generation }
     );
-    await this.deleteObject(sourceBucket, sourceObject);
-    return copied;
+    // The precondition removes the source only while the copied generation is
+    // still live; a replacement or an older generation is left untouched.
+    try {
+      await this.deleteObject(sourceBucket, sourceObject, {
+        ifGenerationMatch: source.generation
+      });
+    } catch (error) {
+      if (Number(getApiErrorStatus(error)) !== 412) throw error;
+      return { resource, sourceDeleted: false };
+    }
+    return { resource, sourceDeleted: true };
   }
 
   async updateObjectMetadata(
     bucketName: string,
     objectName: string,
-    metadata: Record<string, any>
+    metadata: Record<string, any>,
+    params?: { generation?: string; ifMetagenerationMatch?: string }
   ) {
     let response = await this.api.patch(
       `/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectName)}`,
-      metadata
+      metadata,
+      { params }
     );
     return response.data;
   }
@@ -326,6 +340,30 @@ export class Client {
   }
 
   // ── Notifications ──
+
+  async testBucketPermissions(bucketName: string, permissions: string[]): Promise<string[]> {
+    const response = await this.api.get(
+      `/b/${encodeURIComponent(bucketName)}/iam/testPermissions`,
+      {
+        params: { permissions },
+        paramsSerializer: { indexes: null }
+      }
+    );
+    if (response.data.permissions === undefined) return [];
+    if (
+      !Array.isArray(response.data.permissions) ||
+      response.data.permissions.some((value: unknown) => typeof value !== 'string')
+    )
+      throw createApiServiceError('Cloud Storage returned invalid bucket permissions.');
+    return response.data.permissions;
+  }
+
+  async getNotification(bucketName: string, notificationId: string) {
+    const response = await this.api.get(
+      `/b/${encodeURIComponent(bucketName)}/notificationConfigs/${encodeURIComponent(notificationId)}`
+    );
+    return response.data;
+  }
 
   async listNotifications(bucketName: string) {
     let response = await this.api.get(

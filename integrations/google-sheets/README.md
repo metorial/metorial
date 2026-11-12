@@ -4,7 +4,56 @@ Create, read, and update spreadsheets and their cell data. Read and write values
 
 ## Events
 
-This integration does not currently expose event triggers.
+`row_added` and `row_updated` observe a selected keyed table every 15 minutes.
+The first successful read establishes a silent baseline. Select a spreadsheet
+ID, stable numeric sheet ID (discover it with **Get Spreadsheet**), bounded A1
+range such as `A1:D1000`, and immutable key column such as `A`. The first row of
+the range is the header row. Optional watched-column letters limit update
+events; by default all columns except the key are watched.
+
+Every row to be observed needs a unique, nonblank text, number, or boolean key.
+A row whose key is blank, a formula, or shared with another row is skipped; all
+other rows are still observed, and each check reports a warning with the number
+of skipped rows and a few row numbers. A skipped row is reported as added once
+it has a usable key. A known key that is typed into a second row keeps its last
+unambiguous values and, when it is unique again, reports an update only if its
+watched values changed. Entirely blank rows are ignored. Sorting or inserting
+blank rows changes positions, not identities. Changing a key is treated as a
+different record; the integration does not create, repair, or enforce keys in
+your spreadsheet.
+
+Comparison preserves entered text, numbers, and booleans. Formulas are returned
+as `{ "formula": "=SUM(C2:D2)" }` and compared by expression, separately from
+literal text. Formula recalculation, formatting, and calculated spill cells do
+not produce changes. Dates retain their underlying numeric serial values.
+Blank and empty-string cells are normalized to `null`, including omitted
+trailing cells. Changing the selection or the header of the key column
+establishes another silent baseline and reports a warning. Columns are
+identified by letter, so editing any other header keeps every row observation.
+When the header of a watched column changes, value changes in that column alone
+are left out of that one check, because a changed header usually means the
+column was moved or replaced; this prevents a flood of updates after a column
+is inserted or deleted.
+
+Outputs include the spreadsheet/tab identity, immutable key, current row
+number, columns, headers, entered values, durable revision, and `observedAt`.
+Updates also include previous values and the watched columns that changed.
+These are net changes between successful reads: intermediate edits can be
+missed, and `observedAt` is not an edit timestamp. Rows outside the selected
+range are not monitored; deletions have no event. A key that leaves the range
+and later returns is a new addition observation with a new revision. Removed
+keys are not remembered, so a table whose keys keep rotating can be observed
+indefinitely; `revision` increases with every reported observation of a key and
+is never reused for it, but is not necessarily consecutive. The range may extend
+past the sheet's last row or column: cells the sheet does not have read as
+blank, so a sheet that is shorter than the range, or that shrinks, keeps being
+observed.
+
+This feature requires a runtime that persists polling baselines and selection,
+serializes concurrent polls, and atomically accepts events with their updated
+baseline. There is no stateless fallback. OAuth and service-account access are
+supported; API-key authentication is not advertised for these events. See the
+[event contract](./docs/SPEC.md#row-observation-events) for limits and recovery.
 
 ## Tools
 

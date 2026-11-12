@@ -9,19 +9,23 @@
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.31",
+    "slates": "1.0.0-rc.33",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.26",
+    "@slates/test": "1.0.0-rc.28",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.14",
+  "version": "0.2.15",
   "peerDependencies": {
+    "@slates/google-push-channels": "1.0.0",
     "@slates/oauth-google": "1.0.7"
   },
   "peerDependenciesMeta": {
+    "@slates/google-push-channels": {
+      "optional": true
+    },
     "@slates/oauth-google": {
       "optional": true
     }

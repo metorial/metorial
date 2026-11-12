@@ -32,7 +32,7 @@ describe('google-calendar provider contract', () => {
         'get_colors',
         'get_settings'
       ],
-      triggerIds: [],
+      triggerIds: ['event_changed', 'event_cancelled'],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'create_event', readOnly: false, destructive: false },
@@ -52,10 +52,10 @@ describe('google-calendar provider contract', () => {
         { id: 'get_colors', readOnly: true, destructive: false },
         { id: 'get_settings', readOnly: true, destructive: false }
       ],
-      triggers: []
+      triggers: [{ id: 'event_changed' }, { id: 'event_cancelled' }]
     });
 
-    expect(contract.actions).toHaveLength(16);
+    expect(contract.actions).toHaveLength(18);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {

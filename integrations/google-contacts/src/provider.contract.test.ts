@@ -33,7 +33,7 @@ describe('google-contacts provider contract', () => {
         'manage_contact_photo',
         'batch_modify_contacts'
       ],
-      triggerIds: [],
+      triggerIds: ['contact_changed'],
       authMethodIds: ['google_oauth', 'api_key'],
       tools: [
         { id: 'create_contact', readOnly: false, destructive: false },
@@ -56,11 +56,15 @@ describe('google-contacts provider contract', () => {
         { id: 'manage_contact_photo', readOnly: false, destructive: true },
         { id: 'batch_modify_contacts', readOnly: false, destructive: true }
       ],
-      triggerGroupIds: [],
-      triggers: []
+      triggerGroupIds: ['contact_events'],
+      triggers: [{ id: 'contact_changed' }]
     });
 
-    expect(contract.actions).toHaveLength(19);
+    expect(contract.actions).toHaveLength(20);
+    expect(contract.actions.find(action => action.id === 'contact_changed')).toMatchObject({
+      scopes: googleContactsActionScopes.listContacts,
+      authMethods: ['google_oauth']
+    });
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {

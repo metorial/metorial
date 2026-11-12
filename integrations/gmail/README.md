@@ -4,7 +4,11 @@ Send, read, and search email messages with support for recipients, attachments, 
 
 ## Events
 
-This integration does not currently expose event triggers.
+**Email received** starts a workflow for each newly added incoming message, including replies in an existing thread, self-addressed mail, mail you sent that also arrived in your inbox (through a mailing list or one of your aliases), and messages automatically archived by rules. Drafts, ordinary outbound messages, chats, spam, and trash are excluded. The event includes mailbox/message/thread IDs, headers, labels, snippet, message time, observation time, and attachment metadata. Use Get Message or Get Attachment for the complete content.
+
+Incoming-mail watches renew automatically and reconcile every 15 minutes if a notification is missed. Existing mailbox contents are not replayed on activation. Importing or inserting a message can produce this event; it describes a newly observed mailbox message rather than proof of SMTP delivery. A large backlog, such as a bulk import or the mail that arrived during a long interruption, is delivered in batches of up to 200 messages per notification or 15-minute check until it is cleared.
+
+This requires Google Pub/Sub delivery to be set up once for the connected Google OAuth application: a topic that Gmail may publish to and an authenticated push subscription, both in the application's Cloud project. If you connect with your own OAuth application, follow the guided delivery setup and enter its OAuth client ID, topic name, subscription name, and push service account; for the built-in application the service operator has done this. Several connections can watch the same mailbox and share its single Gmail watch. The same OAuth application must not manage a watch for that mailbox anywhere else; Gmail offers no way to inspect another watch before replacing it. If that delivery is not set up, enabling the event fails instead of asking for mailbox API credentials. If Gmail's saved history expires, recovery checks at most the previous 24 hours and cannot recover deleted messages or older imports with backdated message times. See the specification for recovery and verification limits.
 
 ## Tools
 

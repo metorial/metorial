@@ -1,4 +1,4 @@
-# Slates Specification for Google Tasks
+# Google Tasks Specification
 
 ## Overview
 
@@ -31,6 +31,8 @@ Google Tasks API uses **OAuth 2.0** exclusively for authentication, as it access
 | ------------------------------------------------ | -------------------------------------------------- |
 | `https://www.googleapis.com/auth/tasks`          | Create, edit, organize, and delete all your tasks. |
 | `https://www.googleapis.com/auth/tasks.readonly` | View your tasks.                                   |
+| `https://www.googleapis.com/auth/userinfo.profile` | Identify the connected Google account. |
+| `https://www.googleapis.com/auth/userinfo.email` | View the connected account email and identity. |
 
 Use `access_type=offline` when generating the authorization URL to receive a refresh token for long-lived access.
 
@@ -53,7 +55,7 @@ Create, read, update, and delete individual tasks within a task list. Tasks supp
 
 - A user can have up to 20,000 non-hidden tasks per list and up to 100,000 tasks in total.
 - Tasks assigned from Docs or Chat Spaces cannot be inserted from the Tasks API; they can only be created by assigning them from Docs or Chat Spaces.
-- Tasks created or assigned from Google Docs are not available via the API. This is a known limitation.
+- Listing assigned tasks requires `showAssigned=true`; ordinary task listings and the completion trigger exclude them.
 
 ### Task Ordering and Hierarchy
 
@@ -73,4 +75,16 @@ The `list_tasks` tool accepts an optional task-list ID. Supplying an ID lists ta
 
 ## Events
 
-The provider does not support events. Google Tasks API does not offer webhooks, push notifications, or any built-in mechanism for subscribing to changes. Detecting changes requires polling the API using the task listing endpoints with appropriate filters (e.g., `updatedMin`).
+### Task Completed (`task_completed`)
+
+Google Tasks provides no native change subscription. The `task_completion_events` polling group checks every 15 minutes and keeps a checkpoint: the time through which every task list has been read. Each check observes tasks currently completed between one hour before the checkpoint and the current time, including the lower and upper time boundaries, and moves the checkpoint to that current time only after every page of every task list was read. The first check has no checkpoint and covers the preceding hour. It fully paginates task lists and tasks with `completedMin`/`completedMax`, `showCompleted=true`, `showHidden=true`, `showDeleted=false`, and `showAssigned=false`. Hidden tasks, including tasks hidden by clearing completed tasks, remain eligible; deleted, assigned, incomplete, and invalid-timestamp tasks do not emit events. Pages with no items but a next-page token are followed. Invalid pages and upstream failures fail the check without moving the checkpoint, so the next check covers the same period again. A single task that does not have the documented task fields is skipped instead: the check continues, the checkpoint moves, and a warning names the task list, the task ID, and the task's timestamps, never its title, notes, or links. At most ten such warnings are written per check, followed by the total number skipped.
+
+An interruption of any length is therefore recovered: the next successful check reads everything completed since the checkpoint. `tasks.list` returns at most 100 tasks per page and documents no result order, so a period is never split inside one task list. Once a check has read 50 task pages or has run for 30 seconds, it finishes the task list in progress and stops; the period is kept as it is, and following checks read the remaining task lists, in task-list ID order, before a newer period starts. A checkpoint later than the current time is treated as the current time, and an unreadable checkpoint restarts from the preceding hour with a warning. When no checkpoint is kept between checks, every check covers the preceding hour, as the first one does.
+
+Account identity is resolved from the authenticated Google userinfo endpoint, requiring either the declared profile or email scope in addition to Tasks read access. No account ID configuration is required. The trigger maps only observations belonging to the authenticated account.
+
+Outputs include `accountId`, `taskListId`, optional `taskListTitle`, `taskId`, optional `title`, `status=completed`, provider `completed` and optional `updated` timestamps, optional hidden status and links, and `observedAt`. The completion identity contains account, list, task, and the provider's completion timestamp. It excludes modification time and etag, so title edits and clearing completed tasks retain the original identity. A different completion timestamp after reopening produces a different identity; moving between lists also changes identity and can produce another observation.
+
+This is an observation, not exact transition history or a task-creation event. Initial activation can replay completions from the preceding hour. The one-hour overlap re-reads completions that were already reported. The group remembers a short fingerprint and the completion time of every completion it reported inside the overlap, skips those on later checks, and forgets each one once the overlap has moved past it, so an interruption of any length does not report a completion twice. A task that is reopened and completed again has a new completion time and is reported again. At most 10,000 completions are remembered; beyond that the newest are kept, a warning is written, and the oldest can be reported a second time. A completion whose timestamp lies more than an hour before the checkpoint when it first becomes visible is not observed. A task completed and reopened between checks can be missed. Recompletion cannot be distinguished if Google preserves the original completion timestamp. Task pagination is not an atomic snapshot, so concurrent edits or moves can affect observations.
+
+Sources: [tasks.list](https://developers.google.com/workspace/tasks/reference/rest/v1/tasks/list), [Task resource](https://developers.google.com/workspace/tasks/reference/rest/v1/tasks), and [Google userinfo contract](https://www.googleapis.com/discovery/v1/apis/oauth2/v2/rest).

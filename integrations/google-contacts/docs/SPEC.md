@@ -87,4 +87,101 @@ Google Workspace users can utilize the API to list and search domain profiles an
 
 ## Events
 
-This integration does not currently expose event triggers.
+Enable callbacks with Google OAuth and either `contacts` or `contacts.readonly`
+to receive `contact_changed` from the `contact_events` group. API keys are not
+supported. Older connections without recorded scopes must reconnect. Account routing
+uses the authenticated `people/me` resource identity, never an email address.
+
+Every 15 minutes, the integration reads `people/me/connections`, requesting
+`READ_SOURCE_TYPE_CONTACT`, `LAST_MODIFIED_DESCENDING`, `metadata`, and normalized
+contact fields. Pages use a fixed size of 1000 with identical request parameters.
+Empty pages with a next token are followed.
+
+The group keeps a checkpoint: the time through which changed contacts have been
+fully read. The listing is newest first and has no modification-time filter, so a
+check reads from the newest change downward until a whole page is older than one
+hour before the checkpoint, or the listing ends. Only then does the checkpoint move,
+to the time that read began. The first check has no checkpoint and covers the
+preceding hour. A failed check leaves the checkpoint where it was, so the next one
+covers the same period again; an interruption of any length is recovered this way.
+A checkpoint later than the current time is treated as the current time, and an
+unreadable one restarts from the preceding hour with a warning.
+
+One check reads at most 10 pages and stops after 30 seconds. When that is not enough
+to reach the checkpoint,
+the snapshots read so far are delivered, the checkpoint stays, and the position is
+saved: the token of the last page read, the oldest change read, and the time the
+read began. The next check rereads that page and continues downward. It continues
+only when the reread page still reaches the oldest change already read, which shows
+that no change between the two reads was skipped; contacts changed after the read
+began sort above the saved position and are picked up by the following check. When
+the saved position is refused, no longer joins, repeats, or makes no progress, the
+check rereads from the newest change instead, with a limit of 30 pages. Google
+Contacts stores at most 25,000 contacts per account, so 30 full pages cover the whole
+listing. If that reread still ends before the checkpoint, its snapshots are delivered,
+a warning names the oldest change that was read, and the checkpoint moves on; this is
+the only case in which older changes are left out. A page token repeated during a
+read from the newest change fails the check, and so does a listing that is not an
+object with a list of connections; neither moves the checkpoint.
+
+A single contact that Google returns in an unexpected form, for example an email
+entry without a value, is skipped instead: the check continues, the checkpoint moves,
+and a warning names the contact's resource name, its contact-source ID, the source
+update time, and the names of the fields that did not fit, never a name, email
+address, phone number, or other contact detail. At most ten such warnings are written
+per check, followed by the total number skipped.
+
+Each usable `CONTACT` source revision emits this shape:
+
+```json
+{
+  "type": "contact_changed",
+  "accountId": "people/123456789",
+  "contact": {
+    "resourceName": "people/c12345",
+    "etag": "person-revision",
+    "names": [{ "displayName": "Ada Example" }],
+    "emailAddresses": [{ "value": "ada@example.com", "type": "work" }]
+  },
+  "source": {
+    "type": "CONTACT",
+    "id": "12345",
+    "updateTime": "2026-11-10T11:45:00.123456789Z",
+    "etag": "contact-source-revision"
+  }
+}
+```
+
+The event ID is the JSON-encoded tuple `[accountId, source.id, source.updateTime,
+source.etag ?? null]`. The original timestamp retains Google's nanosecond precision;
+it is not replaced with the observation time. Different accounts and different source
+revisions have different identities, while overlapping polls reuse the same identity.
+Source metadata remains separate from the normalized contact; the person etag is
+available for contact operations but is not the source revision identity.
+
+This feed reports snapshots, including newly created contacts. It cannot
+classify a snapshot as a creation versus edit, guarantee every intermediate edit,
+or report deletions. Profile-only changes, Other Contacts, and directory contacts
+are excluded. The first check may emit any eligible revision from the preceding hour.
+A contact changed several times between two checks, or during an interruption, is
+reported once with its latest revision. The one-hour overlap rereads revisions that
+were already reported. The group remembers a short fingerprint and the update time of
+every revision it reported inside the overlap, skips those on later checks, and
+forgets each one once the overlap has moved past it, so an interruption of any length
+does not report a revision twice. A contact that changes again has a new revision and
+is reported again. While a read is being continued over several checks, the revisions
+reported from its last page are remembered as well, because that page is read again.
+At most 10,000 revisions are remembered; beyond that the newest are kept, a warning
+is written, and the oldest can be reported a second time. A revision that first becomes
+visible in the listing more than an hour after its own timestamp is not observed.
+Sources without a usable source ID and timestamp are skipped with a warning rather
+than replayed on every check.
+
+The newest-first order and the comparison with each contact source's `updateTime`
+follow Google's `LAST_MODIFIED_DESCENDING` description. Google does not document how
+long a page token stays valid; the continuation rules above do not depend on it.
+
+Provider references: [connections list and paging](https://developers.google.com/people/api/rest/v1/people.connections/list),
+[source revision metadata](https://developers.google.com/people/api/rest/v1/people#Source),
+[authenticated identity](https://developers.google.com/people/api/rest/v1/people/get),
+and [contact storage limits](https://support.google.com/contacts/answer/148779).

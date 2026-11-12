@@ -14,6 +14,7 @@ import {
   updateObjectMetadata,
   uploadObject
 } from './tools';
+import { objectEvents, objectFinalized } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +31,6 @@ export let provider = Slate.create({
     manageLifecycle,
     manageNotifications
   ],
-  triggers: []
+  triggerGroups: [objectEvents],
+  triggers: [objectFinalized]
 });

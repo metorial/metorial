@@ -56,6 +56,70 @@ Create an event using natural language text, just like the "Quick Add" feature i
 
 Update an existing Google Calendar event. Only the provided fields will be modified; all other fields remain unchanged. Can also be used to **move an event** to a different calendar by specifying destinationCalendarId.
 
+## Event notifications
+
+Enable event callbacks to watch subscribed calendars that the connected Google
+account can read. Calendar discovery and channel registration are automatic.
+Existing events establish a silent baseline; they are not announced as new.
+
+Callbacks require event-reading access, CalendarList discovery access, and
+basic Google account identity access. Full Calendar or Calendar read-only
+access covers the first two requirements. Granular event scopes also need
+`calendar.calendarlist` or `calendar.calendarlist.readonly`; account identity
+requires `userinfo.profile` or `userinfo.email`.
+
+- `event_changed`: an event was added or changed on the watched calendar.
+- `event_cancelled`: an event was cancelled or deleted on that calendar. This
+  does not imply every attendee's copy was cancelled.
+
+Outputs include `calendarId`, `eventId`, `revisionId`, and a typed `event` with
+available title, status, ETag, dates, timezone, attendees, recurrence, and links.
+All-day events keep `date` values and an exclusive end date. Recurring exceptions
+keep `recurringEventId` and `originalStartTime`. Deleted events can contain only
+their ID and cancelled status; missing fields are not invented.
+
+```json
+{
+  "kind": "event_changed",
+  "calendarId": "calendar@example.com",
+  "eventId": "event123",
+  "revisionId": "revision-hash",
+  "event": {
+    "id": "event123",
+    "etag": "\"revision1\"",
+    "status": "confirmed",
+    "summary": "Planning day",
+    "start": { "date": "2026-11-12" },
+    "end": { "date": "2026-11-13" }
+  }
+}
+```
+
+The revision key combines calendar ID, event ID, and ETag (or update time).
+Sparse cancellation records without either use the synchronization transition
+as a fallback. `iCalUID` is not used for identity because recurring instances
+share it. A changed event is an observed snapshot, not proof of exact creation
+or a complete edit history. When Google expires a sync token, the baseline is
+rebuilt without announcing existing events and a warning is recorded: changes
+made between the expired token and the resynchronization are not delivered.
+Channels renew before their returned expiration and allow overlap. Reconciliation
+also checks for missed notifications.
+
+The callback service must support durable synchronization state, authenticated
+notification expansion, scheduled reconciliation, and channel renewal. One scan
+of a calendar reads at most 100 pages or 45 seconds. A calendar whose initial
+scan, or rebuilt baseline, needs more continues it on the next notification or
+the 15-minute reconciliation, with a warning; no events are delivered for that
+calendar until the scan completes. Later changes
+are delivered in batches: after about 2,500 changes, or the same page and time
+budget, the rest follow on the next notification or the 15-minute reconciliation.
+Google has no channel readback API, so ambiguous registration or cleanup results
+remain retryable. Cleanup needs the original Google account and OAuth client.
+
+References: [push notifications](https://developers.google.com/workspace/calendar/api/guides/push),
+[incremental sync](https://developers.google.com/workspace/calendar/api/guides/sync),
+[event resource](https://developers.google.com/workspace/calendar/api/v3/reference/events).
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

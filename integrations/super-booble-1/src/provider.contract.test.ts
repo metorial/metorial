@@ -57,13 +57,15 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
     expect(sourceToolsFor('google-drive')).toHaveLength(29);
     expect(sourceToolsFor('google-docs')).toHaveLength(8);
     expect(sourceToolsFor('google-sheets')).toHaveLength(17);
-    expect(sourceToolsFor('google-chat')).toHaveLength(25);
+    expect(sourceToolsFor('google-chat')).toHaveLength(41);
     expect(sourceToolsFor('google-contacts')).toHaveLength(19);
-    expect(superGoogle1ToolManifest).toHaveLength(116);
+    expect(superGoogle1ToolManifest).toHaveLength(132);
     expect(superGoogle1ExpectedToolKeys).toHaveLength(77);
     expect(provider.actions.map(action => action.key)).toEqual(superGoogle1ExpectedToolKeys);
     expect(provider.actions.every(action => action.type === 'tool')).toBe(true);
-    expect(superGoogle1ToolInventory.sourceToolCount).toBe(116);
+    expect(provider.triggerGroups).toHaveLength(0);
+    expect(provider.adapters).toHaveLength(0);
+    expect(superGoogle1ToolInventory.sourceToolCount).toBe(132);
     expect(superGoogle1ToolInventory.importedToolCount).toBe(77);
   });
 
@@ -139,6 +141,22 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
       ['google-sheets', 'batch_update'],
       ['google-sheets', 'manage_named_ranges'],
       ['google-chat', 'get_attachment'],
+      ['google-chat', 'list_members'],
+      ['google-chat', 'manage_membership'],
+      ['google-chat', 'metorial_chat$message.send'],
+      ['google-chat', 'metorial_chat$message.edit'],
+      ['google-chat', 'metorial_chat$message.delete'],
+      ['google-chat', 'metorial_chat$message.get'],
+      ['google-chat', 'metorial_chat$message.sendEphemeral'],
+      ['google-chat', 'metorial_chat$channel.list'],
+      ['google-chat', 'metorial_chat$channel.get'],
+      ['google-chat', 'metorial_chat$channel.members'],
+      ['google-chat', 'metorial_chat$workspace.list'],
+      ['google-chat', 'metorial_chat$workspace.get'],
+      ['google-chat', 'metorial_chat$dm.openSingle'],
+      ['google-chat', 'metorial_chat$user.getAuthenticated'],
+      ['google-chat', 'metorial_chat$file.download'],
+      ['google-chat', 'metorial_chat$setup.get'],
       ['google-contacts', 'create_contact'],
       ['google-contacts', 'get_contact'],
       ['google-contacts', 'update_contact'],

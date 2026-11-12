@@ -21,12 +21,20 @@ export let createHmacSignature = ({
 }: CreateHmacSignatureOptions) =>
   `${prefix}${createHmac(algorithm, secret).update(payload).digest(digest)}`;
 
-export let verifyHmacSignature = (options: VerifyHmacSignatureOptions) => {
-  let expected = createHmacSignature(options);
+/**
+ * Compares a received secret with the expected one in time independent of their contents.
+ * An empty expected secret matches nothing.
+ */
+export let timingSafeStringEqual = (expected: string, received: string | null | undefined) => {
   let expectedBytes = Buffer.from(expected);
-  let signatureBytes = Buffer.from(options.signature);
-  let lengthsMatch = signatureBytes.length === expectedBytes.length;
-  let comparableSignature = lengthsMatch ? signatureBytes : Buffer.alloc(expectedBytes.length);
+  let receivedBytes = Buffer.from(received ?? '');
+  let lengthsMatch = receivedBytes.length === expectedBytes.length;
+  let comparable = lengthsMatch ? receivedBytes : Buffer.alloc(expectedBytes.length);
 
-  return timingSafeEqual(comparableSignature, expectedBytes) && lengthsMatch;
+  return (
+    timingSafeEqual(comparable, expectedBytes) && lengthsMatch && expectedBytes.length > 0
+  );
 };
+
+export let verifyHmacSignature = (options: VerifyHmacSignatureOptions) =>
+  timingSafeStringEqual(createHmacSignature(options), options.signature);

@@ -38,7 +38,7 @@ describe('google-admin provider contract', () => {
         'transfer_data',
         'get_customer_info'
       ],
-      triggerIds: [],
+      triggerIds: ['user_created', 'user_suspended', 'user_deleted'],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_users', readOnly: true, destructive: false },
@@ -67,7 +67,7 @@ describe('google-admin provider contract', () => {
       triggers: []
     });
 
-    expect(contract.actions).toHaveLength(22);
+    expect(contract.actions).toHaveLength(25);
     expect(Object.keys(contract.configSchema.properties ?? {}).sort()).toEqual([
       'customerId',
       'domain'

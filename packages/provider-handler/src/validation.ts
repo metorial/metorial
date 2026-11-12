@@ -26,8 +26,9 @@ export let validate = <T>(
   return result.data;
 };
 
-export let toJsonSchema = (schema: z.ZodType<any>) =>
+export let toJsonSchema = (schema: z.ZodType<any>, io: 'input' | 'output' = 'output') =>
   schema.toJSONSchema({
+    io,
     unrepresentable: 'any',
     override: ctx => {
       let def = ctx.zodSchema._zod.def;

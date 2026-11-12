@@ -26,12 +26,12 @@ describe('google-cloud-storage provider contract', () => {
         'manage_lifecycle',
         'manage_notifications'
       ],
-      triggerIds: [],
+      triggerIds: ['object_finalized'],
       authMethodIds: ['oauth', 'service_account'],
-      triggers: []
+      triggers: [{ id: 'object_finalized' }]
     });
 
-    expect(contract.actions).toHaveLength(12);
+    expect(contract.actions).toHaveLength(13);
 
     let expectedScopes = {
       list_buckets: googleCloudStorageActionScopes.listBuckets,

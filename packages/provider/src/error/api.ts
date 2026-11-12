@@ -149,6 +149,17 @@ export let getApiErrorResponse = (error: unknown): ApiErrorResponse | undefined 
 export let getApiErrorStatus = (error: unknown): ApiErrorStatus | undefined =>
   getApiErrorResponse(error)?.status;
 
+/**
+ * The upstream HTTP status of a failure, whether it is still the HTTP client's error
+ * or already a ServiceError carrying `upstreamStatus`.
+ */
+export let getUpstreamErrorStatus = (error: unknown): number | undefined => {
+  let value =
+    error instanceof ServiceError ? error.data.upstreamStatus : getApiErrorStatus(error);
+  let status = Number(value);
+  return Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
+};
+
 // Like getApiErrorResponse, but also recovers the upstream response body from
 // interceptor-normalized SlateErrors. createAxios stores the body (sanitized by
 // sanitizeForBaggage) at SlateError.data.baggage.response, so provider-specific

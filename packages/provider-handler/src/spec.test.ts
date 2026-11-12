@@ -1,4 +1,5 @@
 import { isServiceError } from '@lowerdeck/error';
+import { slatesTriggerGroup } from '@slates/proto';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -8,11 +9,13 @@ import {
   getExposedTriggerGroups,
   getMappableAction,
   getTriggersForGroup,
+  getWebhookManualRegistration,
   isMappableTrigger,
   mapAction,
   mapAdapter,
   mapAuthMethod,
-  mapToolCategory
+  mapToolCategory,
+  mapTriggerGroup
 } from './spec';
 
 let baseAction = {
@@ -199,6 +202,78 @@ describe('adapter exposure', () => {
       name: 'Chat',
       capabilities: []
     });
+  });
+});
+
+describe('webhook registration config', () => {
+  let config = {
+    userConfigSchema: z.object({ secret: z.string().describe('Signing secret') }),
+    fullConfigSchema: z.object({ secret: z.string(), endpoint: z.string() }),
+    setup: async () => ({ webhookSetupDocument: '', partialWebhookRegistrationPayload: {} }),
+    finish: async () => ({ webhookRegistrationPayload: {} })
+  };
+  let schemas = {
+    userConfigSchema: {
+      type: 'object',
+      properties: { secret: { type: 'string', description: 'Signing secret' } },
+      required: ['secret']
+    },
+    fullConfigSchema: {
+      type: 'object',
+      properties: { secret: { type: 'string' }, endpoint: { type: 'string' } },
+      required: ['secret', 'endpoint']
+    }
+  };
+  let autoRegistration = {
+    webhookTargetList: async () => ({ targets: [], nextPageToken: null }),
+    webhookRegister: async () => ({
+      webhookRegistrationIdentifier: 'reg',
+      webhookRegistrationPayload: {}
+    }),
+    webhookUnregister: async () => {}
+  };
+  let group = (webhook: Record<string, unknown>): any => ({
+    key: 'group',
+    name: 'Group',
+    source: 'webhook',
+    webhook: { process: async () => ({ events: [] }), ...webhook }
+  });
+  let auto = group({ autoRegistration });
+  let manual = group({ manualRegistration: config });
+  let configured = group({ autoRegistration, deliveryConfig: config });
+
+  it('keeps plain automatic and manual groups serialised as before', () => {
+    expect(mapTriggerGroup(auto).invocation).toEqual({
+      type: 'webhook',
+      registration: { mode: 'auto' }
+    });
+    expect(mapTriggerGroup(manual).invocation).toMatchObject({
+      type: 'webhook',
+      registration: { mode: 'manual', ...schemas }
+    });
+    expect(
+      Object.keys((mapTriggerGroup(manual).invocation as any).registration).sort()
+    ).toEqual(['fullConfigSchema', 'mode', 'userConfigSchema']);
+  });
+
+  it('advertises the delivery config of an automatic group', () => {
+    let mapped = mapTriggerGroup(configured);
+    expect(mapped.invocation).toMatchObject({
+      type: 'webhook',
+      registration: { mode: 'auto', config: schemas }
+    });
+    expect(slatesTriggerGroup.parse(mapped).invocation).toEqual(mapped.invocation);
+  });
+
+  it('serves setup and finish for manual groups and automatic groups with a delivery config', () => {
+    expect(getWebhookManualRegistration(manual)).toBe(config);
+    expect(getWebhookManualRegistration(configured)).toBe(config);
+    expect(() => getWebhookManualRegistration(auto)).toThrow(
+      'Trigger group does not support manual webhook registration: group'
+    );
+    expect(() =>
+      getWebhookManualRegistration({ key: 'poll', name: 'Poll', source: 'polling' } as any)
+    ).toThrow('Trigger group does not support manual webhook registration: poll');
   });
 });
 

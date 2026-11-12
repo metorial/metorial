@@ -7,6 +7,7 @@ import {
   createApiServiceError,
   decodeApiErrorBody,
   getApiErrorResponseWithBody,
+  getUpstreamErrorStatus,
   looksLikeHtmlErrorBody,
   pushBoundedApiErrorDetail,
   readApiErrorText,
@@ -95,6 +96,27 @@ describe('API service error helpers', () => {
     expect(error.data.message).toBe(
       'Example API search messages failed: HTTP 404: Method not found.'
     );
+  });
+
+  it('reads the upstream status from client errors and normalized ServiceErrors', () => {
+    expect(getUpstreamErrorStatus(axiosFailure(404, {}))).toBe(404);
+    expect(
+      getUpstreamErrorStatus(
+        new SlateError({ code: 'gone', message: 'Gone.', upstream: { status: 410 } })
+      )
+    ).toBe(410);
+    expect(
+      getUpstreamErrorStatus(createApiServiceError('Conflict', { upstreamStatus: 409 }))
+    ).toBe(409);
+    expect(
+      getUpstreamErrorStatus(createApiServiceError('Limited', { upstreamStatus: '429' }))
+    ).toBe(429);
+    expect(getUpstreamErrorStatus(createApiServiceError('No status'))).toBeUndefined();
+    expect(
+      getUpstreamErrorStatus(createApiServiceError('Bad', { upstreamStatus: 'ECONNRESET' }))
+    ).toBeUndefined();
+    expect(getUpstreamErrorStatus(new Error('ETIMEDOUT'))).toBeUndefined();
+    expect(getUpstreamErrorStatus(null)).toBeUndefined();
   });
 
   it('allows provider-specific status and message extraction', () => {

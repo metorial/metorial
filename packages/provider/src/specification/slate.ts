@@ -63,12 +63,14 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
       seenTriggerGroupKeys.add(group.key);
     }
 
-    let manualWebhookTriggerGroups = triggerGroups.filter(
-      group => group.source === 'webhook' && group.webhook?.manualRegistration
+    let configuredWebhookTriggerGroups = triggerGroups.filter(
+      group =>
+        group.source === 'webhook' &&
+        (group.webhook?.manualRegistration || group.webhook?.deliveryConfig)
     );
-    if (manualWebhookTriggerGroups.length > 1) {
+    if (configuredWebhookTriggerGroups.length > 1) {
       throw new SlateDeclarationError(
-        `Only one trigger group may use manual webhook registration, but found: ${manualWebhookTriggerGroups
+        `Only one trigger group may use manual webhook registration or a delivery config, but found: ${configuredWebhookTriggerGroups
           .map(group => group.key)
           .join(', ')}`
       );
