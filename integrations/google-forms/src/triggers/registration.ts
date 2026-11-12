@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import {
   googlePubSubRoutingKey,
-  isSameGooglePubSubInfrastructure,
-  parseGooglePubSubInfrastructure
+  isSameGooglePubSubDeliveryConfig,
+  parseGooglePubSubDeliveryConfig
 } from '@slates/google-pubsub';
 import {
   createApiServiceError,
@@ -226,14 +226,14 @@ export const formAutoRegistration = {
     if (formTargetId(target.ownerId, target.formId) !== ctx.input.webhookTargetIdentifier)
       throw createApiServiceError('The form watch target identity does not match.');
     assertFormSelected(target.formId, ctx.input.selection);
-    const infrastructure = parseGooglePubSubInfrastructure(
-      ctx.input.infrastructure,
+    const delivery = parseGooglePubSubDeliveryConfig(
+      ctx.input.deliveryConfig,
       'Google Forms notification delivery has not been configured for this OAuth project.'
     );
     const client = new GoogleFormsClient(ctx.auth.token);
     await assertOwner(client, target.ownerId);
     await assertForm(client, target.formId);
-    const watch = await acquireWatch(client, target.formId, infrastructure.topicName, false);
+    const watch = await acquireWatch(client, target.formId, delivery.topicName, false);
     if (!watch) ctx.warn(WATCH_HELD_ELSEWHERE);
     const now = Date.now();
     return result(
@@ -243,7 +243,7 @@ export const formAutoRegistration = {
         // An adopted watch predates this registration, so its creation is not the baseline.
         activatedAt: watch?.created ? watch.createdAt : new Date(now).toISOString(),
         expiresAt: watch?.expiresAt ?? null,
-        infrastructure
+        delivery
       },
       now
     );
@@ -268,11 +268,11 @@ export const formAutoRegistration = {
     )
       throw createApiServiceError('The form watch renewal identity does not match.');
     assertFormSelected(saved.formId, ctx.input.selection);
-    const infrastructure = parseGooglePubSubInfrastructure(
-      ctx.input.infrastructure,
+    const delivery = parseGooglePubSubDeliveryConfig(
+      ctx.input.deliveryConfig,
       'The form delivery infrastructure is unavailable.'
     );
-    if (!isSameGooglePubSubInfrastructure(saved.infrastructure, infrastructure))
+    if (!isSameGooglePubSubDeliveryConfig(saved.delivery, delivery))
       throw createApiServiceError(
         'The form delivery infrastructure changed; the saved watch was not modified.'
       );
@@ -280,12 +280,7 @@ export const formAutoRegistration = {
     await assertOwner(client, saved.ownerId);
     await assertForm(client, saved.formId);
     // activatedAt is kept, so a recreated or newly adopted watch does not reset the baseline.
-    const watch = await acquireWatch(
-      client,
-      saved.formId,
-      saved.infrastructure.topicName,
-      true
-    );
+    const watch = await acquireWatch(client, saved.formId, saved.delivery.topicName, true);
     if (!watch) ctx.warn(WATCH_HELD_ELSEWHERE);
     return result(
       { ...saved, watchId: watch?.watchId ?? null, expiresAt: watch?.expiresAt ?? null },
@@ -306,7 +301,7 @@ export const formAutoRegistration = {
     const client = new GoogleFormsClient(ctx.auth.token);
     await assertOwner(client, saved.ownerId);
     await assertForm(client, saved.formId);
-    const topicName = saved.infrastructure.topicName;
+    const topicName = saved.delivery.topicName;
     // The saved watch ID may be stale or absent, so the topic decides what is removed.
     const { shared } = await listResponseWatches(client, saved.formId, topicName);
     if (!shared.length) return;

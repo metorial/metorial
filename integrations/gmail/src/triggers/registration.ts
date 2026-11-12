@@ -1,7 +1,7 @@
 import {
   googlePubSubRoutingKey,
-  isSameGooglePubSubInfrastructure,
-  parseGooglePubSubInfrastructure
+  isSameGooglePubSubDeliveryConfig,
+  parseGooglePubSubDeliveryConfig
 } from '@slates/google-pubsub';
 import {
   createApiServiceError,
@@ -111,8 +111,8 @@ export const gmailAutoRegistration = {
     );
     if (ctx.input.webhookTargetIdentifier !== mailboxTargetId(target.accountId))
       throw createApiServiceError('The Gmail mailbox target identity does not match.');
-    const delivery = parseGooglePubSubInfrastructure(
-      ctx.input.infrastructure,
+    const delivery = parseGooglePubSubDeliveryConfig(
+      ctx.input.deliveryConfig,
       'Gmail notification delivery is not set up for this OAuth application. Complete its Google Pub/Sub delivery setup and try again.'
     );
     const client = new Client({ token: ctx.auth.token, userId: ctx.config.userId });
@@ -144,11 +144,11 @@ export const gmailAutoRegistration = {
       target.mailbox !== saved.mailbox
     )
       throw createApiServiceError('The Gmail renewal target does not match the saved watch.');
-    const delivery = parseGooglePubSubInfrastructure(
-      ctx.input.infrastructure,
+    const delivery = parseGooglePubSubDeliveryConfig(
+      ctx.input.deliveryConfig,
       'Gmail notification delivery is no longer set up for this OAuth application.'
     );
-    if (!isSameGooglePubSubInfrastructure(saved.delivery, delivery))
+    if (!isSameGooglePubSubDeliveryConfig(saved.delivery, delivery))
       throw createApiServiceError(
         'The Gmail delivery destination changed; create a new callback subscription.'
       );

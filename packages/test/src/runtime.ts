@@ -437,6 +437,24 @@ export let processSlateTriggerGroupWebhook = async (d: {
     webhookRegistrationPayload: d.webhookRegistrationPayload ?? null
   });
 
+export let authenticateSlateTriggerGroupWebhookDelivery = async (d: {
+  client: SlatesTestClient;
+  triggerGroupId: string;
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string | Uint8Array | null;
+  deliveryConfig: unknown;
+}) =>
+  d.client.authenticateTriggerGroupWebhookDelivery({
+    triggerGroupId: d.triggerGroupId,
+    url: d.url,
+    method: d.method ?? 'POST',
+    headers: d.headers,
+    body: d.body,
+    deliveryConfig: d.deliveryConfig
+  });
+
 export let unregisterSlateTriggerGroupWebhook = async (d: {
   client: SlatesTestClient;
   triggerGroupId: string;

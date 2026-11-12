@@ -1,4 +1,4 @@
-import { googlePubSubInfrastructureSchema } from '@slates/google-pubsub';
+import { googlePubSubDeliveryConfigSchema } from '@slates/google-pubsub';
 import { createApiServiceError } from 'slates';
 import { z } from 'zod';
 
@@ -25,7 +25,7 @@ export const formRegistrationSchema = formTargetSchema
     watchId: watchIdSchema.nullable(),
     activatedAt: timestampSchema,
     expiresAt: timestampSchema.nullable(),
-    infrastructure: googlePubSubInfrastructureSchema
+    delivery: googlePubSubDeliveryConfigSchema
   })
   .refine(value => (value.watchId === null) === (value.expiresAt === null));
 export type FormRegistration = z.infer<typeof formRegistrationSchema>;

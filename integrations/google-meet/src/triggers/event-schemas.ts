@@ -1,4 +1,4 @@
-import { googlePubSubInfrastructureSchema } from '@slates/google-pubsub';
+import { googlePubSubDeliveryConfigSchema } from '@slates/google-pubsub';
 import { z } from 'zod';
 import { artifactEventTypes, subscriptionNameSchema } from '../lib/events-client';
 
@@ -7,7 +7,7 @@ export const targetSchema = z.object({ ownerId: z.string().regex(/^\d+$/) });
 export const MAX_PREVIOUS_SUBSCRIPTIONS = 15;
 export const savedRegistrationSchema = targetSchema.extend({
   subscriptionName: subscriptionNameSchema,
-  infrastructure: googlePubSubInfrastructureSchema,
+  delivery: googlePubSubDeliveryConfigSchema,
   startedAt: z.iso.datetime({ offset: true }),
   expiresAt: z.iso.datetime({ offset: true }),
   previousSubscriptions: z

@@ -55,7 +55,8 @@ let createAutoWebhookTriggerGroup = (
               webhookSetupDocument: '',
               partialWebhookRegistrationPayload: {}
             }),
-            finish: async () => ({ webhookRegistrationPayload: {} })
+            finish: async () => ({ webhookRegistrationPayload: {} }),
+            authenticate: async () => ({ routingKeys: [] })
           }
         : undefined,
       autoRegistration: {

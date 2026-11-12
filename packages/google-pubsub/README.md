@@ -1,21 +1,20 @@
 # Google Pub/Sub transport
 
-Shared Google Pub/Sub delivery for trigger groups that declare
-`googlePubSub: { product }` (Gmail, Forms, Meet, Cloud Storage). A person
-creates the Pub/Sub resources once per Google OAuth app and saves them as a
+Shared Google Pub/Sub delivery for automatic trigger groups whose events
+arrive on one topic per Google OAuth app (Gmail, Forms, Meet, Cloud Storage).
+A person creates the Pub/Sub resources once per OAuth app and saves them as a
 delivery config; integrations own their producer watches, renewal, event
 schemas and per-registration identity checks. This package never calls the
 Pub/Sub API and needs no credentials.
 
 ## Delivery config
 
-Each group declares the shared setup next to its capability:
+Each group declares the shared setup for its product:
 
 ```ts
 import { googlePubSubDeliveryConfig } from '@slates/google-pubsub';
 
 triggerGroup(spec, { key: 'mailbox_events', name: 'Incoming email' }).webhook({
-  googlePubSub: { product: 'gmail' },
   deliveryConfig: googlePubSubDeliveryConfig('gmail'),
   autoRegistration,
   process
@@ -32,18 +31,22 @@ triggerGroup(spec, { key: 'mailbox_events', name: 'Incoming email' }).webhook({
   `forms-notifications@system.gserviceaccount.com`, or
   `meet-api-event-push@system.gserviceaccount.com`; for Cloud Storage it is
   the Cloud Storage service agent of each project that owns a watched bucket.
-- **What the person enters** (`userConfigSchema`): `oauthClientId`,
-  `topicName` (`projects/<project>/topics/<name>`), `subscriptionName`
+- **What the person enters** (`userConfigSchema`): `topicName`
+  (`projects/<project>/topics/<name>`), `subscriptionName`
   (`projects/<project>/subscriptions/<name>`), and `pushServiceAccountEmail`.
-- **What is saved** (`googlePubSubDeliveryConfigSchema`):
-  `{ oauthClientId, googlePubSub }`, where `googlePubSub` is the descriptor
-  below. `finish` takes the project from the topic name, uses the delivery URL
-  as the audience, requires the topic and subscription to share a project, and
+- **What is saved** (`googlePubSubDeliveryConfigSchema`): the flat descriptor
+  `{ projectId, topicName, subscriptionName, pushServiceAccountEmail, audience }`.
+  `finish` takes the project from the topic name, uses the delivery URL as the
+  audience, requires the topic and subscription to share a project, and
   rejects invalid input with an error that names the field.
+- **Authenticate** (`authenticate`): verifies a push received on the delivery
+  URL against the saved config and returns the routing keys it addresses (see
+  below).
 
-The operator saves a config for the platform's managed OAuth app; a customer
-saves one for their own OAuth app. The delivery URL rejects pushes until the
-config is saved.
+The package never asks for an OAuth client ID. A customer selects their OAuth
+app in the dashboard before saving its config; the platform operator supplies
+the client ID of the managed OAuth app. The delivery URL rejects pushes until
+the config is saved.
 
 ## Shared delivery model
 
@@ -51,39 +54,46 @@ One topic and one push subscription serve every registration of a product for
 an OAuth app. Nothing is created or deleted per registration.
 
 1. **Configure (person).** The saved delivery config names the topic,
-   subscription, push service account and audience. Connections of that OAuth
-   app receive it as the nonsecret descriptor `infrastructure.googlePubSub`.
-2. **Register (integration).** Validate the descriptor with
-   `parseGooglePubSubInfrastructure`, start or adopt the producer watch on its
-   topic, save the descriptor in the registration payload (typed with
-   `googlePubSubInfrastructureSchema`), and return `routingKeys` built with
-   `googlePubSubRoutingKey`. On renewal, refuse a descriptor that differs from
-   the saved one (`isSameGooglePubSubInfrastructure`).
-3. **Receive (runtime).** Each push is verified once with
-   `verifyGooglePubSubPush`, its keys are read with
-   `extractGooglePubSubRoutingKeys`, and the request is handed to every active
-   registration holding one of those keys.
+   subscription, push service account and audience. Register and renew of
+   every connection of that OAuth app receive it as `ctx.input.deliveryConfig`.
+2. **Register (integration).** Validate it with
+   `parseGooglePubSubDeliveryConfig`, start or adopt the producer watch on its
+   topic, save it in the registration payload (typed with
+   `googlePubSubDeliveryConfigSchema`), and return `routingKeys` built with
+   `googlePubSubRoutingKey`. On renewal, refuse a delivery config that differs
+   from the saved one (`isSameGooglePubSubDeliveryConfig`).
+3. **Receive (`authenticate`).** The platform calls the delivery config's
+   `authenticate` once per push. It verifies the push with
+   `verifyGooglePubSubPush` (no expiry grace) and returns the keys
+   `extractGooglePubSubRoutingKeys` reads from it; the platform hands the
+   request to every active registration holding one of them. A push that is
+   authenticated but malformed, has invalid data or names another subscription
+   is acknowledged with no keys, since rejecting it would only make Pub/Sub
+   redeliver it. Every other failure is rejected with the verifier's status,
+   including 503 when Google's signing keys are unavailable, so Pub/Sub
+   retries. A saved config that is not a valid descriptor is rejected with
+   404.
 4. **Process (integration).** Verify the push again against the saved
-   descriptor, then check the producer identity (mailbox, form, subscription,
-   bucket notification) against the registration.
+   delivery config, then check the producer identity (mailbox, form,
+   subscription, bucket notification) against the registration.
 5. **Unregister (integration).** Remove only the producer watch, and only when
    no other registration still uses it. The shared topic and subscription stay.
 
 ```ts
 import {
   googlePubSubRoutingKey,
-  parseGooglePubSubInfrastructure,
+  parseGooglePubSubDeliveryConfig,
   verifyGooglePubSubPushForProcessing
 } from '@slates/google-pubsub';
 
 // Register
-const infrastructure = parseGooglePubSubInfrastructure(
-  ctx.input.infrastructure,
+const delivery = parseGooglePubSubDeliveryConfig(
+  ctx.input.deliveryConfig,
   'Notification delivery is not set up for this OAuth application.'
 );
-await client.watchMailbox(infrastructure.topicName);
+await client.watchMailbox(delivery.topicName);
 return {
-  webhookRegistrationPayload: { mailbox, delivery: infrastructure },
+  webhookRegistrationPayload: { mailbox, delivery },
   routingKeys: [googlePubSubRoutingKey.gmail(mailbox)]
 };
 
@@ -105,14 +115,14 @@ decoding. Attribute-only messages are supported. Attributes, message ID and
 publication time remain available; use the message ID in the event's
 idempotency key.
 
-The runtime verifies a push when it arrives, but an integration may process it
-later, after retries or a backlog, when the token has expired.
+`authenticate` verifies a push when it arrives, but an integration may
+process it later, after retries or a backlog, when the token has expired.
 `expiredTokenGraceSeconds` accepts that lateness only: the signature, issuer,
 audience, email and subscription checks stay strict.
 `verifyGooglePubSubPushForProcessing` passes
 `GOOGLE_PUBSUB_PROCESSING_GRACE_SECONDS` (one day, beyond the runtime's retry
-horizon) and turns a failure into the skipped result `process` returns; the
-runtime's own verification uses no grace. Tests can inject keys with
+horizon) and turns a failure into the skipped result `process` returns;
+`authenticate` uses no grace. Tests can inject keys with
 `createGooglePubSubPushVerifier(keyResolver)`.
 
 The verifier expects wrapped v1 messages, so the push subscription must keep

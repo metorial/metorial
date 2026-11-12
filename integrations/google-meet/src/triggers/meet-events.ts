@@ -63,7 +63,6 @@ export const meetArtifactEvents = triggerGroup(spec, {
     .passthrough()
 })
   .webhook({
-    googlePubSub: { product: 'meet' },
     deliveryConfig: googlePubSubDeliveryConfig('meet'),
     autoRegistration: meetAutoRegistration,
     reconcileIntervalSeconds: 900,
@@ -76,7 +75,7 @@ export const meetArtifactEvents = triggerGroup(spec, {
       const saved = registration.data;
       const verified = await verifyGooglePubSubPushForProcessing(
         ctx.input.request,
-        saved.infrastructure
+        saved.delivery
       );
       if (!verified.ok) return verified.skipped;
       const attributes = attributesSchema.safeParse(verified.message.attributes);

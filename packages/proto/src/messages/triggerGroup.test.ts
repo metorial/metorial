@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { slatesTriggerGroup } from '../types';
 import {
-  slatesGooglePubSubCapability,
-  slatesTriggerGroup,
-  slatesTriggerGroupInfrastructure
-} from '../types';
-import {
+  slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest,
+  slatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse,
   slatesMessageTriggerGroupWebhookExpandRequest,
   slatesMessageTriggerGroupWebhookExpandResponse,
+  slatesMessageTriggerGroupWebhookProcessRequest,
+  slatesMessageTriggerGroupWebhookRegisterRequest,
   slatesMessageTriggerGroupWebhookRenewRequest,
   slatesMessageTriggerGroupWebhookRenewResponse,
   slatesTriggerGroupRequestsByMethod,
@@ -15,39 +15,6 @@ import {
 } from './triggerGroup';
 
 describe('trigger lifecycle wire contracts', () => {
-  it('restricts managed products and requires complete nonsecret infrastructure descriptors', () => {
-    for (let product of ['gmail', 'forms', 'meet', 'storage']) {
-      expect(slatesGooglePubSubCapability.parse({ product })).toEqual({ product });
-    }
-    expect(slatesGooglePubSubCapability.safeParse({ product: 'arbitrary' }).success).toBe(
-      false
-    );
-    expect(
-      slatesGooglePubSubCapability.safeParse({ product: 'gmail', publisher: 'untrusted' })
-        .success
-    ).toBe(false);
-    let googlePubSub = {
-      projectId: 'project',
-      topicName: 'topic',
-      subscriptionName: 'subscription',
-      pushServiceAccountEmail: 'push@example.com',
-      audience: 'audience'
-    };
-    expect(slatesTriggerGroupInfrastructure.parse({ googlePubSub })).toEqual({ googlePubSub });
-    for (let key of Object.keys(googlePubSub)) {
-      expect(
-        slatesTriggerGroupInfrastructure.safeParse({
-          googlePubSub: { ...googlePubSub, [key]: '' }
-        }).success
-      ).toBe(false);
-      expect(
-        slatesTriggerGroupInfrastructure.safeParse({
-          googlePubSub: { ...googlePubSub, [key]: undefined }
-        }).success
-      ).toBe(false);
-    }
-  });
-
   it('registers additive request and response methods', () => {
     expect(slatesTriggerGroupRequestsByMethod['slates/trigger_group.webhook.expand']).toBe(
       slatesMessageTriggerGroupWebhookExpandRequest
@@ -61,6 +28,12 @@ describe('trigger lifecycle wire contracts', () => {
     expect(slatesTriggerGroupResponsesByMethod['slates/trigger_group.webhook.renew']).toBe(
       slatesMessageTriggerGroupWebhookRenewResponse
     );
+    expect(
+      slatesTriggerGroupRequestsByMethod['slates/trigger_group.webhook.delivery_authenticate']
+    ).toBe(slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest);
+    expect(
+      slatesTriggerGroupResponsesByMethod['slates/trigger_group.webhook.delivery_authenticate']
+    ).toBe(slatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse);
   });
 
   it('preserves state omission versus explicit null across serialized responses', () => {
@@ -140,9 +113,9 @@ describe('trigger lifecycle wire contracts', () => {
     expect(
       slatesTriggerGroupWebhookRegistrationResult.parse({
         ...registration,
-        routingKeys: ['gmail:user@example.com']
+        routingKeys: ['mailbox:user@example.com']
       }).routingKeys
-    ).toEqual(['gmail:user@example.com']);
+    ).toEqual(['mailbox:user@example.com']);
     for (let routingKeys of [[''], ['x'.repeat(513)], Array(17).fill('key'), 'key']) {
       expect(
         slatesTriggerGroupWebhookRegistrationResult.safeParse({ ...registration, routingKeys })
@@ -163,21 +136,146 @@ describe('trigger lifecycle wire contracts', () => {
   it('carries an optional delivery config on automatic webhook registration', () => {
     let config = {
       userConfigSchema: { type: 'object', properties: { topicName: { type: 'string' } } },
-      fullConfigSchema: { type: 'object', properties: { googlePubSub: { type: 'object' } } }
+      fullConfigSchema: { type: 'object', properties: { audience: { type: 'string' } } }
     };
     let group = (registration: Record<string, unknown>) => ({
       id: 'group',
       name: 'Group',
       invocation: { type: 'webhook', registration }
     });
-    let configured = group({ mode: 'auto', config });
+    let configured = group({ mode: 'auto', deliveryConfig: config });
     expect(slatesTriggerGroup.parse(configured)).toEqual(configured);
     let manual = group({ mode: 'manual', ...config });
     expect(slatesTriggerGroup.parse(manual)).toEqual(manual);
     for (let invalid of [{}, { userConfigSchema: {} }, { fullConfigSchema: {} }, 'config']) {
       expect(
-        slatesTriggerGroup.safeParse(group({ mode: 'auto', config: invalid })).success
+        slatesTriggerGroup.safeParse(group({ mode: 'auto', deliveryConfig: invalid })).success
       ).toBe(false);
     }
+  });
+
+  it('passes the saved delivery config to register and renew unchanged', () => {
+    let deliveryConfig = { topic: 'topic', nested: { secret: 'kept' } };
+    let register = {
+      jsonrpc: '2.0',
+      id: 'id',
+      method: 'slates/trigger_group.webhook.register',
+      params: {
+        triggerGroupId: 'group',
+        webhookTargetIdentifier: 'target',
+        webhookTargetPayload: {},
+        webhookUrl: 'https://hooks.example/receive',
+        deliveryConfig
+      }
+    };
+    expect(
+      slatesMessageTriggerGroupWebhookRegisterRequest.parse(register).params.deliveryConfig
+    ).toEqual(deliveryConfig);
+    let renew = {
+      ...register,
+      method: 'slates/trigger_group.webhook.renew',
+      params: {
+        ...register.params,
+        webhookRegistrationIdentifier: 'registration',
+        webhookRegistrationPayload: {},
+        operationId: 'operation'
+      }
+    };
+    expect(
+      slatesMessageTriggerGroupWebhookRenewRequest.parse(renew).params.deliveryConfig
+    ).toEqual(deliveryConfig);
+    let { deliveryConfig: _, ...withoutConfig } = register.params;
+    expect(
+      slatesMessageTriggerGroupWebhookRegisterRequest.parse({
+        ...register,
+        params: withoutConfig
+      }).params
+    ).not.toHaveProperty('deliveryConfig');
+  });
+});
+
+describe('webhook delivery authentication wire contract', () => {
+  let request = {
+    jsonrpc: '2.0',
+    id: 'id',
+    method: 'slates/trigger_group.webhook.delivery_authenticate',
+    params: {
+      triggerGroupId: 'group',
+      url: 'https://hooks.example/receive/config',
+      method: 'POST',
+      headers: { authorization: 'Bearer token' },
+      body: { encoding: 'base64', content: 'e30=' },
+      deliveryConfig: { audience: 'https://hooks.example/receive/config' }
+    }
+  };
+  let response = (result: unknown) =>
+    slatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse.safeParse({
+      jsonrpc: '2.0',
+      id: 'id',
+      result
+    });
+
+  it('carries the received request in the shape of webhook processing plus the saved config', () => {
+    expect(slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest.parse(request)).toEqual(
+      request
+    );
+    let { deliveryConfig: _, ...http } = request.params;
+    expect(
+      slatesMessageTriggerGroupWebhookProcessRequest.safeParse({
+        ...request,
+        method: 'slates/trigger_group.webhook.process',
+        params: { ...http, webhookRegistrationPayload: {} }
+      }).success
+    ).toBe(true);
+    expect(
+      slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest.safeParse({
+        ...request,
+        params: { ...request.params, body: null }
+      }).success
+    ).toBe(true);
+    for (let change of [
+      { url: undefined },
+      { headers: { count: 1 } },
+      { body: { encoding: 'utf-8', content: '{}' } },
+      { triggerGroupId: undefined }
+    ]) {
+      expect(
+        slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest.safeParse({
+          ...request,
+          params: { ...request.params, ...change }
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it('returns routing keys, an unroutable empty list, or a rejection status', () => {
+    for (let result of [
+      { routingKeys: ['mailbox:user@example.com'] },
+      { routingKeys: [] },
+      { routingKeys: ['a', 'b'], rejected: null },
+      { routingKeys: [], rejected: { status: 401 } },
+      { routingKeys: [], rejected: { status: 503 } }
+    ]) {
+      expect(response(result)).toMatchObject({ success: true, data: { result } });
+    }
+  });
+
+  it('bounds routing keys and rejection statuses', () => {
+    for (let result of [
+      {},
+      { rejected: { status: 401 } },
+      { routingKeys: [''] },
+      { routingKeys: ['x'.repeat(513)] },
+      { routingKeys: Array(17).fill('key') },
+      { routingKeys: 'key' },
+      { routingKeys: [], rejected: { status: 200 } },
+      { routingKeys: [], rejected: { status: 399 } },
+      { routingKeys: [], rejected: { status: 600 } },
+      { routingKeys: [], rejected: { status: 401.5 } },
+      { routingKeys: [], rejected: {} }
+    ]) {
+      expect(response(result).success).toBe(false);
+    }
+    expect(response({ routingKeys: Array(16).fill('k'.repeat(512)) }).success).toBe(true);
   });
 });

@@ -10,7 +10,7 @@ import {
 } from 'jose';
 import { createApiServiceError, skipWebhook } from 'slates';
 import { z } from 'zod';
-import type { GooglePubSubInfrastructure } from './infrastructure';
+import type { GooglePubSubDeliveryConfig } from './deliveryConfigSchema';
 import type { PubSubMessage, PubSubPushIdentity } from './types';
 
 const GOOGLE_PUBSUB_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
@@ -66,20 +66,17 @@ let envelopeSchema = z.object({
   })
 });
 
+type GooglePubSubPushDeliveryConfig = Pick<
+  GooglePubSubDeliveryConfig,
+  'audience' | 'pushServiceAccountEmail' | 'subscriptionName'
+>;
+
 export type GooglePubSubPushVerifyOptions = {
   request: Request;
   now?: Date;
   /** Seconds past expiry to accept; only for runtime-verified deliveries. */
   expiredTokenGraceSeconds?: number;
-} & (
-  | {
-      infrastructure: Pick<
-        GooglePubSubInfrastructure,
-        'audience' | 'pushServiceAccountEmail' | 'subscriptionName'
-      >;
-    }
-  | PubSubPushIdentity
-);
+} & ({ deliveryConfig: GooglePubSubPushDeliveryConfig } | PubSubPushIdentity);
 
 /** The key resolver is injectable for offline cryptographic contract tests. */
 export let createGooglePubSubPushVerifier = (keyResolver: JWTVerifyGetKey = googleKeys) => {
@@ -99,11 +96,11 @@ export let createGooglePubSubPushVerifier = (keyResolver: JWTVerifyGetKey = goog
   return async (options: GooglePubSubPushVerifyOptions): Promise<PubSubPushVerification> => {
     let { request } = options;
     let identity: PubSubPushIdentity =
-      'infrastructure' in options
+      'deliveryConfig' in options
         ? {
-            audience: options.infrastructure.audience,
-            serviceAccountEmail: options.infrastructure.pushServiceAccountEmail,
-            subscriptionName: options.infrastructure.subscriptionName
+            audience: options.deliveryConfig.audience,
+            serviceAccountEmail: options.deliveryConfig.pushServiceAccountEmail,
+            subscriptionName: options.deliveryConfig.subscriptionName
           }
         : options;
     let graceSeconds = options.expiredTokenGraceSeconds ?? 0;
@@ -237,15 +234,12 @@ export let verifyGooglePubSubPush = createGooglePubSubPushVerifier();
  */
 export let verifyGooglePubSubPushForProcessing = async (
   request: Request,
-  infrastructure: Pick<
-    GooglePubSubInfrastructure,
-    'audience' | 'pushServiceAccountEmail' | 'subscriptionName'
-  >,
+  deliveryConfig: GooglePubSubPushDeliveryConfig,
   verify: typeof verifyGooglePubSubPush = verifyGooglePubSubPush
 ) => {
   let verified = await verify({
     request,
-    infrastructure,
+    deliveryConfig,
     expiredTokenGraceSeconds: GOOGLE_PUBSUB_PROCESSING_GRACE_SECONDS
   });
   return verified.ok

@@ -281,6 +281,20 @@ export let getWebhookManualRegistration = <ConfigType extends {}, AuthType exten
   return registration;
 };
 
+export let getWebhookDeliveryConfig = <ConfigType extends {}, AuthType extends {}>(
+  group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
+) => {
+  if (group.source !== 'webhook' || !group.webhook?.deliveryConfig) {
+    throw new ServiceError(
+      badRequestError({
+        message: `Trigger group does not support webhook delivery authentication: ${group.key}`
+      })
+    );
+  }
+
+  return group.webhook.deliveryConfig;
+};
+
 let mapWebhookConfigSchemas = (config: {
   userConfigSchema: z.ZodType<any>;
   fullConfigSchema: z.ZodType<any>;
@@ -339,9 +353,6 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
             ...(group.webhook?.reconcileIntervalSeconds !== undefined
               ? { reconcileIntervalSeconds: group.webhook.reconcileIntervalSeconds }
               : {}),
-            ...(group.webhook?.googlePubSub
-              ? { googlePubSub: group.webhook.googlePubSub }
-              : {}),
             registration: group.webhook?.manualRegistration
               ? {
                   mode: 'manual',
@@ -350,7 +361,9 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
               : {
                   mode: 'auto',
                   ...(group.webhook?.deliveryConfig
-                    ? { config: mapWebhookConfigSchemas(group.webhook.deliveryConfig) }
+                    ? {
+                        deliveryConfig: mapWebhookConfigSchemas(group.webhook.deliveryConfig)
+                      }
                     : {})
                 }
           }

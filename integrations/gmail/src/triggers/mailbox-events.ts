@@ -28,7 +28,6 @@ export const mailboxEvents = triggerGroup(spec, {
   eventSchema: z.object({ kind: z.enum(['mailbox_wakeup', 'email_received']) }).passthrough()
 })
   .webhook({
-    googlePubSub: { product: 'gmail' },
     deliveryConfig: googlePubSubDeliveryConfig('gmail'),
     autoRegistration: gmailAutoRegistration,
     reconcileIntervalSeconds: 900,

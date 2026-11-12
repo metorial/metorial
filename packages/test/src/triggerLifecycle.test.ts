@@ -2,7 +2,6 @@ import {
   Slate,
   SlateAuth,
   SlateConfig,
-  type SlateGooglePubSubCapability,
   SlateSpecification,
   SlateTrigger,
   triggerGroup
@@ -10,6 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  authenticateSlateTriggerGroupWebhookDelivery,
   createLocalSlateTestClient,
   expandSlateTriggerGroupWebhook,
   pollSlateTriggerGroupEvents,
@@ -26,7 +26,7 @@ let fixture = (
     renewAfter?: string | null;
     invalidExpansion?: boolean;
     reconcileIntervalSeconds?: number;
-    googlePubSub?: SlateGooglePubSubCapability;
+    deliveryConfig?: boolean;
   } = {}
 ) => {
   let contexts: { operation: string; auth: unknown; config: unknown; input: any }[] = [];
@@ -64,8 +64,7 @@ let fixture = (
   let group = triggerGroup(spec, { key: 'webhook', name: 'Webhook', selectionSchema })
     .webhook({
       reconcileIntervalSeconds: options.reconcileIntervalSeconds,
-      googlePubSub: options.googlePubSub,
-      deliveryConfig: options.googlePubSub
+      deliveryConfig: options.deliveryConfig
         ? {
             userConfigSchema: z.object({ topicName: z.string() }),
             fullConfigSchema: z.object({ topicName: z.string(), audience: z.string() }),
@@ -84,6 +83,13 @@ let fixture = (
                   audience: ctx.input.webhookUrl
                 }
               };
+            },
+            authenticate: async ctx => {
+              record('authenticate', ctx);
+              let status = Number(ctx.input.request.headers.get('x-reject'));
+              if (status) return { rejected: { status } };
+              let body = JSON.parse(await ctx.input.request.text()) as { keys: string[] };
+              return { routingKeys: body.keys };
             }
           }
         : undefined,
@@ -206,57 +212,40 @@ let expansionInput = {
 };
 
 describe('trigger lifecycle protocol helpers', () => {
-  it('passes managed Pub/Sub descriptors independently from user selection', async () => {
-    let { client, contexts } = fixture({ googlePubSub: { product: 'forms' } });
-    expect((await client.getTriggerGroup('webhook')).triggerGroup.invocation).toMatchObject({
-      googlePubSub: { product: 'forms' }
-    });
-    let googlePubSub = {
-      projectId: 'managed-project',
-      topicName: 'projects/managed-project/topics/form-events',
-      subscriptionName: 'projects/managed-project/subscriptions/form-events',
-      pushServiceAccountEmail: 'push@managed-project.iam.gserviceaccount.com',
-      audience: 'https://example.com/webhook'
+  it('passes the saved delivery config unchanged and independently from user selection', async () => {
+    let { client, contexts } = fixture({ deliveryConfig: true });
+    let deliveryConfig = {
+      topicName: 'projects/p/topics/t',
+      audience: 'https://example.com/delivery',
+      nested: { kept: ['as', 'saved'] }
     };
-    let infrastructure = { googlePubSub: { ...googlePubSub, privateKey: 'must-not-forward' } };
     await registerSlateTriggerGroupWebhook({
       client,
       ...registrationInput,
       operationId: 'initial-registration-operation',
-      infrastructure
+      deliveryConfig
     });
-    await renewSlateTriggerGroupWebhook({ client, ...renewalInput, infrastructure });
-    expect(contexts.map(ctx => ctx.input.infrastructure)).toEqual([
-      { googlePubSub },
-      { googlePubSub }
+    await renewSlateTriggerGroupWebhook({ client, ...renewalInput, deliveryConfig });
+    expect(contexts.map(ctx => [ctx.operation, ctx.input.deliveryConfig])).toEqual([
+      ['register', deliveryConfig],
+      ['renew', deliveryConfig]
     ]);
     expect(contexts[0]?.input.operationId).toBe('initial-registration-operation');
     await registerSlateTriggerGroupWebhook({
       client,
       ...registrationInput,
-      selection: { infrastructure }
+      selection: { deliveryConfig }
     });
-    expect(contexts.at(-1)?.input.infrastructure).toBeUndefined();
+    expect(contexts.at(-1)?.input.deliveryConfig).toBeUndefined();
     expect(contexts.at(-1)?.input.operationId).toBeUndefined();
-    expect(() =>
-      fixture({ googlePubSub: { product: 'tasks' } as unknown as SlateGooglePubSubCapability })
-    ).toThrow('supported product');
-    expect(() =>
-      fixture({
-        googlePubSub: {
-          product: 'forms',
-          publisherServiceAccountEmail: 'untrusted@example.com'
-        } as unknown as SlateGooglePubSubCapability
-      })
-    ).toThrow('supported product');
   });
 
   it('exposes the delivery config of an automatic group and completes it without credentials', async () => {
-    let { client, contexts } = fixture({ googlePubSub: { product: 'forms' } });
+    let { client, contexts } = fixture({ deliveryConfig: true });
     expect((await client.getTriggerGroup('webhook')).triggerGroup.invocation).toMatchObject({
       registration: {
         mode: 'auto',
-        config: {
+        deliveryConfig: {
           userConfigSchema: { type: 'object', required: ['topicName'] },
           fullConfigSchema: { type: 'object', required: ['topicName', 'audience'] }
         }
@@ -292,6 +281,52 @@ describe('trigger lifecycle protocol helpers', () => {
         webhookUrl
       })
     ).rejects.toThrow('does not support manual webhook registration');
+  });
+
+  it('authenticates a delivery through the delivery config without credentials', async () => {
+    let { client, contexts } = fixture({ deliveryConfig: true });
+    client.clearAuth();
+    let deliveryConfig = {
+      topicName: 'projects/p/topics/t',
+      audience: 'https://example.com/d'
+    };
+    let delivery = {
+      client,
+      triggerGroupId: 'webhook',
+      url: 'https://example.com/d',
+      deliveryConfig
+    };
+    expect(
+      await authenticateSlateTriggerGroupWebhookDelivery({
+        ...delivery,
+        body: JSON.stringify({ keys: ['resource:one', 'resource:two'] })
+      })
+    ).toEqual({ routingKeys: ['resource:one', 'resource:two'], rejected: null });
+    expect(
+      await authenticateSlateTriggerGroupWebhookDelivery({
+        ...delivery,
+        body: JSON.stringify({ keys: [] })
+      })
+    ).toEqual({ routingKeys: [], rejected: null });
+    expect(
+      await authenticateSlateTriggerGroupWebhookDelivery({
+        ...delivery,
+        headers: { 'x-reject': '503' }
+      })
+    ).toEqual({ routingKeys: [], rejected: { status: 503 } });
+    expect(contexts.map(ctx => [ctx.operation, ctx.auth, ctx.config])).toEqual(
+      Array(3).fill(['authenticate', {}, {}])
+    );
+    expect(contexts.map(ctx => ctx.input.deliveryConfig)).toEqual(
+      Array(3).fill(deliveryConfig)
+    );
+    await expect(
+      authenticateSlateTriggerGroupWebhookDelivery({
+        ...delivery,
+        client: fixture().client,
+        body: JSON.stringify({ keys: [] })
+      })
+    ).rejects.toThrow('does not support webhook delivery authentication');
   });
 
   it('advertises schemas and capabilities while preserving old group specifications', async () => {

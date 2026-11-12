@@ -6,27 +6,19 @@
 import { ServiceError } from '@lowerdeck/error';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import {
-  googlePubSubDeliveryConfig,
-  googlePubSubDeliveryConfigSchema
-} from './deliveryConfig';
+import { googlePubSubDeliveryConfig } from './deliveryConfig';
+import { googlePubSubDeliveryConfigSchema } from './deliveryConfigSchema';
 
 let webhookUrl = 'https://delivery.example/receive/key';
 let input = {
-  oauthClientId: '1234567890-abc123.apps.googleusercontent.com',
   topicName: 'projects/delivery-project/topics/gmail-events',
   subscriptionName: 'projects/delivery-project/subscriptions/gmail-events',
   pushServiceAccountEmail: 'push@delivery-project.iam.gserviceaccount.com'
 };
 let saved = {
-  oauthClientId: input.oauthClientId,
-  googlePubSub: {
-    projectId: 'delivery-project',
-    topicName: input.topicName,
-    subscriptionName: input.subscriptionName,
-    pushServiceAccountEmail: input.pushServiceAccountEmail,
-    audience: webhookUrl
-  }
+  projectId: 'delivery-project',
+  ...input,
+  audience: webhookUrl
 };
 
 let finish = (userWebhookRegistrationPayload: unknown, url = webhookUrl) =>
@@ -47,11 +39,11 @@ let rejection = (message: string) =>
   expect.objectContaining({ data: expect.objectContaining({ message, status: 400 }) });
 
 describe('delivery config schemas', () => {
-  it('describes the four values a person enters with labels and help text', () => {
+  it('describes the three values a person enters with labels and help text', () => {
     let schema = z.toJSONSchema(googlePubSubDeliveryConfig('gmail').userConfigSchema);
     expect(schema).toMatchObject({
       type: 'object',
-      required: ['oauthClientId', 'topicName', 'subscriptionName', 'pushServiceAccountEmail']
+      required: ['topicName', 'subscriptionName', 'pushServiceAccountEmail']
     });
     expect(Object.keys(schema.properties!)).toEqual(schema.required);
     for (let property of Object.values(schema.properties!)) {
@@ -63,29 +55,24 @@ describe('delivery config schemas', () => {
     }
   });
 
-  it('saves the OAuth client ID with the delivery descriptor', () => {
+  it('saves the Pub/Sub resources and audience as the delivery config', () => {
     expect(googlePubSubDeliveryConfig('gmail').fullConfigSchema).toBe(
       googlePubSubDeliveryConfigSchema
     );
     expect(googlePubSubDeliveryConfigSchema.parse(saved)).toEqual(saved);
     expect(z.toJSONSchema(googlePubSubDeliveryConfigSchema)).toMatchObject({
-      required: ['oauthClientId', 'googlePubSub'],
-      properties: {
-        googlePubSub: {
-          required: [
-            'projectId',
-            'topicName',
-            'subscriptionName',
-            'pushServiceAccountEmail',
-            'audience'
-          ]
-        }
-      }
+      required: [
+        'projectId',
+        'topicName',
+        'subscriptionName',
+        'pushServiceAccountEmail',
+        'audience'
+      ]
     });
     for (let invalid of [
-      { ...saved, oauthClientId: '' },
-      { oauthClientId: saved.oauthClientId },
-      { ...saved, googlePubSub: { ...saved.googlePubSub, projectId: 'other-project' } }
+      { ...saved, audience: '' },
+      { topicName: saved.topicName },
+      { ...saved, projectId: 'other-project' }
     ]) {
       expect(googlePubSubDeliveryConfigSchema.safeParse(invalid).success).toBe(false);
     }
@@ -104,28 +91,23 @@ describe('delivery config finish', () => {
           Object.entries(input).map(([key, value]) => [key, ` ${value}\n`])
         ),
         audience: 'https://attacker.example',
-        googlePubSub: { projectId: 'other' }
+        projectId: 'other',
+        oauthClientId: '1234567890-abc123.apps.googleusercontent.com'
       })
     ).toEqual({ webhookRegistrationPayload: saved });
   });
 
   // Push tokens carry the service account email in lower case and it is compared exactly.
-  it('saves the push service account in lower case and the client ID as entered', async () => {
+  it('saves the push service account in lower case', async () => {
     let result = await finish({
       ...input,
-      oauthClientId: '1234567890-ABC123.apps.googleusercontent.com',
       pushServiceAccountEmail: 'Push@Delivery-Project.iam.gserviceaccount.com'
     });
-    expect(result.webhookRegistrationPayload).toEqual({
-      ...saved,
-      oauthClientId: '1234567890-ABC123.apps.googleusercontent.com'
-    });
+    expect(result.webhookRegistrationPayload).toEqual(saved);
   });
 
   it.each([
-    ['oauthClientId', undefined, 'OAuth client ID must end with .apps.googleusercontent.com.'],
-    ['oauthClientId', '1234567890-abc123', 'OAuth client ID must end with'],
-    ['oauthClientId', 'a b.apps.googleusercontent.com', 'OAuth client ID must end with'],
+    ['topicName', undefined, 'Topic name must look like'],
     [
       'topicName',
       'gmail-events',
@@ -174,9 +156,7 @@ describe('delivery config finish', () => {
   it('rejects missing input and an endpoint that is not HTTPS', async () => {
     for (let missing of [undefined, null, 'text', []]) {
       await expect(finish(missing)).rejects.toEqual(
-        rejection(
-          'Enter the OAuth client ID, topic name, subscription name, and push service account.'
-        )
+        rejection('Enter the topic name, subscription name, and push service account.')
       );
     }
     await expect(finish(input, 'http://delivery.example/receive/key')).rejects.toEqual(
@@ -210,6 +190,8 @@ describe('delivery config setup', () => {
     expect(document).toContain('Pub/Sub Publisher');
     expect(document).toContain('rejects deliveries until you save this setup');
     expect(document).not.toMatch(/slates|runtime|hub|binding|registration/i);
+    expect(document).toContain('open the project that owns your OAuth app');
+    expect(document).not.toMatch(/client ID/i);
   });
 
   // A column-0 line that is not a numbered step ends the list and breaks the numbering.
@@ -254,18 +236,13 @@ describe('delivery config setup', () => {
 
   it.each(
     products
-  )('ends the %s steps with the four fields in the order of the form', async product => {
+  )('ends the %s steps with the three fields in the order of the form', async product => {
     let config = googlePubSubDeliveryConfig(product);
     let document = (await setup(product)).webhookSetupDocument;
     let finalStep = document.slice(document.search(/^5\. /m)).split('\n\n')[0]!;
     let labels = [...finalStep.matchAll(/^ {3}- \*\*(.+?)\*\*/gm)].map(match => match[1]);
 
-    expect(labels).toEqual([
-      'OAuth client ID',
-      'Topic name',
-      'Subscription name',
-      'Push service account'
-    ]);
+    expect(labels).toEqual(['Topic name', 'Subscription name', 'Push service account']);
     expect(labels).toEqual(
       Object.values(z.toJSONSchema(config.userConfigSchema).properties!).map(
         property => (property as { title?: string }).title

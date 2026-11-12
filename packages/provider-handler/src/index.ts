@@ -9,8 +9,10 @@ import {
   SLATES_PROTOCOL_VERSION,
   type SlatesMessageAuthAdminCallbackHandleRequest,
   type SlatesMessageAuthAuthorizationUrlGetRequest,
+  type SlatesMessageTriggerGroupWebhookProcessRequest,
   type SlatesParticipant,
   type SlatesRuntimeInfo,
+  slatesTriggerGroupWebhookDeliveryAuthentication,
   slatesTriggerGroupWebhookExpansionResult,
   slatesTriggerGroupWebhookRegistrationResult
 } from '@slates/proto';
@@ -41,6 +43,7 @@ import {
   getExposedTriggerGroups,
   getTriggerGroup,
   getWebhookAutoRegistration,
+  getWebhookDeliveryConfig,
   getWebhookManualRegistration,
   isMappableTrigger,
   mapAction,
@@ -75,6 +78,18 @@ let validateWebhookRegistration = (result: unknown) =>
     'trigger_group.webhook.registration',
     'Webhook registration returned an invalid result'
   );
+
+let toWebhookRequest = (
+  params: Pick<
+    SlatesMessageTriggerGroupWebhookProcessRequest['params'],
+    'url' | 'method' | 'headers' | 'body'
+  >
+) =>
+  new Request(params.url, {
+    method: params.method,
+    headers: params.headers,
+    body: params.body ? Uint8Array.from(atob(params.body.content), c => c.charCodeAt(0)) : null
+  });
 
 let routeAttachmentsThroughDirectUpload = async (
   attachments: SlateAttachment[] | undefined,
@@ -1348,7 +1363,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           webhookUrl: params.webhookUrl,
           operationId: params.operationId,
           selection: validateTriggerGroupSelection(group, params.selection),
-          infrastructure: params.infrastructure
+          deliveryConfig: params.deliveryConfig
         },
         ctx.auth?.output!
       );
@@ -1397,7 +1412,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           webhookTargetPayload: params.webhookTargetPayload,
           operationId: params.operationId,
           selection: validateTriggerGroupSelection(group, params.selection),
-          infrastructure: params.infrastructure
+          deliveryConfig: params.deliveryConfig
         },
         ctx.auth?.output!
       );
@@ -1530,18 +1545,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         );
       }
 
-      let req = new Request(params.url, {
-        method: params.method,
-        headers: params.headers,
-        body: params.body
-          ? Uint8Array.from(atob(params.body.content), c => c.charCodeAt(0))
-          : null
-      });
-
       let context = createContext(
         {},
         {
-          request: req,
+          request: toWebhookRequest(params),
           webhookRegistrationPayload: params.webhookRegistrationPayload
         },
         {}
@@ -1598,6 +1605,59 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         skipped: res.skipped ?? null
       });
     });
+
+    manager.onRequest(
+      'slates/trigger_group.webhook.delivery_authenticate',
+      async ({ params }) => {
+        let group = getTriggerGroup(slate, params.triggerGroupId);
+        let deliveryConfig = getWebhookDeliveryConfig(group);
+
+        let context = createContext(
+          {},
+          {
+            request: toWebhookRequest(params),
+            deliveryConfig: params.deliveryConfig
+          },
+          {}
+        );
+        let res = await traceProviderCall(
+          {
+            component: 'action',
+            functionName: 'webhookDeliveryAuthenticate',
+            message: `Authenticating a delivery for trigger group ${formatEntityLabel(group.name, group.key)}`,
+            successMessage: result =>
+              result.rejected
+                ? `Rejected a delivery with status ${result.rejected.status} for trigger group ${formatEntityLabel(group.name, group.key)}`
+                : `Authenticated a delivery for ${result.routingKeys.length} routing key(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+            errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while authenticating a delivery`,
+            metadata: {
+              triggerGroupId: group.key,
+              triggerGroupName: group.name,
+              requestMethod: params.method,
+              hasRequestBody: !!params.body
+            },
+            onSuccess: result => ({
+              routingKeyCount: result.routingKeys.length,
+              rejectedStatus: result.rejected?.status ?? null
+            })
+          },
+          () =>
+            runWithContext(context, async () => {
+              let authentication = await deliveryConfig.authenticate(context);
+              return validate(
+                slatesTriggerGroupWebhookDeliveryAuthentication,
+                authentication.rejected
+                  ? { routingKeys: [], rejected: authentication.rejected }
+                  : { routingKeys: authentication.routingKeys, rejected: null },
+                'trigger_group.webhook.delivery_authentication',
+                'Webhook delivery authentication returned an invalid result'
+              );
+            })
+        );
+
+        return withRequestTraces(context, res);
+      }
+    );
 
     manager.onRequest('slates/trigger_group.webhook.expand', async ({ params }) => {
       let ctx = getContextFull();

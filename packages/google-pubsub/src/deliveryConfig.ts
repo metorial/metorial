@@ -3,23 +3,15 @@ import {
   type SlateTriggerGroupWebhookDeliveryConfigParameters
 } from 'slates';
 import { z } from 'zod';
-import { googlePubSubInfrastructureSchema } from './infrastructure';
-import type { GooglePubSubProduct } from './routing';
+import { googlePubSubDeliveryConfigSchema } from './deliveryConfigSchema';
+import { extractGooglePubSubRoutingKeys, type GooglePubSubProduct } from './routing';
+import { type PubSubPushFailure, verifyGooglePubSubPush } from './verify';
 
 let field = (pattern: RegExp, error: string, meta: { title: string; description: string }) =>
   z.string(error).trim().regex(pattern, error).meta(meta);
 
 let userConfigSchema = z.object(
   {
-    oauthClientId: field(
-      /^\S+\.apps\.googleusercontent\.com$/,
-      'OAuth client ID must end with .apps.googleusercontent.com.',
-      {
-        title: 'OAuth client ID',
-        description:
-          'Client ID of the Google OAuth app whose connections use this setup. It ends with .apps.googleusercontent.com.'
-      }
-    ),
     topicName: field(
       /^projects\/[^/\s]+\/topics\/[^/\s]+$/,
       'Topic name must look like projects/<project>/topics/<name>.',
@@ -48,16 +40,15 @@ let userConfigSchema = z.object(
       }
     )
   },
-  'Enter the OAuth client ID, topic name, subscription name, and push service account.'
+  'Enter the topic name, subscription name, and push service account.'
 );
 
-/** The saved delivery setup of one Google OAuth app. */
-export let googlePubSubDeliveryConfigSchema = z.object({
-  oauthClientId: z.string().min(1),
-  googlePubSub: googlePubSubInfrastructureSchema
-});
-
-export type GooglePubSubDeliveryConfig = z.infer<typeof googlePubSubDeliveryConfigSchema>;
+// Authenticated but unroutable: rejecting them only makes Pub/Sub redeliver until expiry.
+let unroutableFailures: PubSubPushFailure[] = [
+  'body_invalid',
+  'data_invalid',
+  'subscription_mismatch'
+];
 
 let productNames: Record<GooglePubSubProduct, string> = {
   gmail: 'Gmail',
@@ -104,8 +95,7 @@ let setupDocument = (product: GooglePubSubProduct, webhookUrl: string) =>
     '   - **Expiration period**: Never expire',
     '   - **Acknowledgement deadline**: 60 seconds',
     '   - **Retry policy**: Retry after exponential backoff delay',
-    '5. Return here and enter these four values:',
-    '   - **OAuth client ID**: the client ID of your OAuth app, under **APIs & Services > Credentials**; it ends with `.apps.googleusercontent.com`',
+    '5. Return here and enter these three values:',
     '   - **Topic name**: the full name shown on the topic’s page, in the form `projects/<project>/topics/<name>`',
     '   - **Subscription name**: the full name shown on the subscription’s page, in the form `projects/<project>/subscriptions/<name>`',
     '   - **Push service account**: the email of the service account from step 3',
@@ -113,7 +103,7 @@ let setupDocument = (product: GooglePubSubProduct, webhookUrl: string) =>
     '> NOTE: The endpoint rejects deliveries until you save this setup here.'
   ].join('\n');
 
-/** Delivery setup for a `googlePubSub` group: topic and push subscription, once per OAuth app. */
+/** Delivery setup for a Google Pub/Sub group: topic and push subscription, once per OAuth app. */
 export let googlePubSubDeliveryConfig = (
   product: GooglePubSubProduct
 ): SlateTriggerGroupWebhookDeliveryConfigParameters<
@@ -129,11 +119,10 @@ export let googlePubSubDeliveryConfig = (
   finish: async ctx => {
     let user = userConfigSchema.safeParse(ctx.input.userWebhookRegistrationPayload);
     if (!user.success) throw createApiServiceError(user.error.issues[0]!.message);
-    let { oauthClientId, ...entered } = user.data;
     // Google signs pushes with the lower-case address, and verification compares exactly.
     let resources = {
-      ...entered,
-      pushServiceAccountEmail: entered.pushServiceAccountEmail.toLowerCase()
+      ...user.data,
+      pushServiceAccountEmail: user.data.pushServiceAccountEmail.toLowerCase()
     };
     let projectId = resources.topicName.split('/')[1]!;
     if (resources.subscriptionName.split('/')[1] !== projectId)
@@ -141,8 +130,9 @@ export let googlePubSubDeliveryConfig = (
         'Topic and subscription must be in the same Google Cloud project.'
       );
     let config = googlePubSubDeliveryConfigSchema.safeParse({
-      oauthClientId,
-      googlePubSub: { projectId, ...resources, audience: ctx.input.webhookUrl }
+      projectId,
+      ...resources,
+      audience: ctx.input.webhookUrl
     });
     if (!config.success)
       throw createApiServiceError(
@@ -151,5 +141,18 @@ export let googlePubSubDeliveryConfig = (
           : 'The delivery endpoint must be an HTTPS URL.'
       );
     return { webhookRegistrationPayload: config.data };
+  },
+  authenticate: async ctx => {
+    let config = googlePubSubDeliveryConfigSchema.safeParse(ctx.input.deliveryConfig);
+    if (!config.success) return { rejected: { status: 404 } };
+    let verified = await verifyGooglePubSubPush({
+      request: ctx.input.request,
+      deliveryConfig: config.data
+    });
+    if (!verified.ok)
+      return unroutableFailures.includes(verified.failure)
+        ? { routingKeys: [] }
+        : { rejected: { status: verified.status } };
+    return { routingKeys: extractGooglePubSubRoutingKeys(product, verified.message) };
   }
 });

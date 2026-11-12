@@ -1,4 +1,4 @@
-import { googlePubSubInfrastructureSchema } from '@slates/google-pubsub';
+import { googlePubSubDeliveryConfigSchema } from '@slates/google-pubsub';
 import { z } from 'zod';
 
 export const historyIdSchema = z.string().regex(/^[1-9]\d*$/);
@@ -10,7 +10,7 @@ export const mailboxRegistrationSchema = mailboxTargetSchema.extend({
   initialHistoryId: historyIdSchema,
   activatedAt: z.iso.datetime(),
   expiresAt: z.iso.datetime(),
-  delivery: googlePubSubInfrastructureSchema
+  delivery: googlePubSubDeliveryConfigSchema
 });
 export type MailboxRegistration = z.infer<typeof mailboxRegistrationSchema>;
 export const mailboxWakeupSchema = z.object({

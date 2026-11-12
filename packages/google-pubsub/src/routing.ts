@@ -1,7 +1,6 @@
-import type { SlateGooglePubSubProduct } from 'slates';
 import type { PubSubMessage } from './types';
 
-export type GooglePubSubProduct = SlateGooglePubSubProduct;
+export type GooglePubSubProduct = 'gmail' | 'forms' | 'meet' | 'storage';
 
 const WORKSPACE_EVENTS_SOURCE = '//workspaceevents.googleapis.com/';
 

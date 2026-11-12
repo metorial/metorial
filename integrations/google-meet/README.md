@@ -104,7 +104,7 @@ These triggers require recording/transcription entitlement, read access to
 meeting spaces, and Google event delivery set up once for the OAuth client: a
 Pub/Sub topic that Google Meet may publish to and an authenticated push
 subscription in the client's Cloud project. If you connect with your own OAuth
-client, follow the guided delivery setup and enter its client ID, topic name,
+client, select it in the guided delivery setup and enter the topic name,
 subscription name, and push service account; for the built-in client the
 service operator has done this. Subscriptions renew before expiry. Google also
 reports transcripts of meetings you were invited to but do not own; such an

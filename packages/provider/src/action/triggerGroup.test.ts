@@ -28,7 +28,8 @@ let manualRegistration = {
 };
 let deliveryConfig = {
   ...manualRegistration,
-  finish: async () => ({ webhookRegistrationPayload: {} })
+  finish: async () => ({ webhookRegistrationPayload: {} }),
+  authenticate: async () => ({ routingKeys: [] })
 };
 
 type WebhookProps = Parameters<ReturnType<typeof triggerGroup>['webhook']>[0];
@@ -44,8 +45,7 @@ describe('webhook trigger group declaration', () => {
     expect(build({ autoRegistration }).webhook).toMatchObject({
       autoRegistration,
       manualRegistration: undefined,
-      deliveryConfig: undefined,
-      googlePubSub: undefined
+      deliveryConfig: undefined
     });
     expect(build({ manualRegistration }).webhook).toMatchObject({
       autoRegistration: undefined,
@@ -62,36 +62,29 @@ describe('webhook trigger group declaration', () => {
     expect(() => build({ autoRegistration, manualRegistration })).toThrow(message);
   });
 
-  it('allows a delivery config only with automatic registration and a finish handler', () => {
+  it('allows a delivery config only with automatic registration and its handlers', () => {
     expect(build({ autoRegistration, deliveryConfig }).webhook?.deliveryConfig).toBe(
       deliveryConfig
     );
     expect(() => build({ manualRegistration, deliveryConfig })).toThrow(
       'A webhook delivery config requires automatic webhook registration'
     );
+    let { finish: _, ...withoutFinish } = deliveryConfig;
     expect(() =>
       build({
         autoRegistration,
-        deliveryConfig: manualRegistration as unknown as typeof deliveryConfig
+        deliveryConfig: withoutFinish as unknown as typeof deliveryConfig
       })
     ).toThrow('A webhook delivery config requires a finish handler');
   });
 
-  it('requires automatic registration and a delivery config for Google Pub/Sub delivery', () => {
-    let googlePubSub = { product: 'gmail' as const };
-    let message =
-      'Google Pub/Sub delivery requires a supported product, automatic webhook registration, and a delivery config';
-    expect(
-      build({ autoRegistration, deliveryConfig, googlePubSub }).webhook?.googlePubSub
-    ).toEqual(googlePubSub);
-    expect(() => build({ autoRegistration, googlePubSub })).toThrow(message);
-    expect(() => build({ manualRegistration, googlePubSub })).toThrow(message);
+  it('requires a delivery config to authenticate the requests it receives', () => {
+    let { authenticate: _, ...withoutAuthenticate } = deliveryConfig;
     expect(() =>
       build({
         autoRegistration,
-        deliveryConfig,
-        googlePubSub: { product: 'tasks' } as unknown as typeof googlePubSub
+        deliveryConfig: withoutAuthenticate as unknown as typeof deliveryConfig
       })
-    ).toThrow(message);
+    ).toThrow('A webhook delivery config requires an authenticate handler');
   });
 });

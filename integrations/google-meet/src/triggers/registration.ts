@@ -1,8 +1,8 @@
 import {
-  type GooglePubSubInfrastructure,
+  type GooglePubSubDeliveryConfig,
   googlePubSubRoutingKey,
-  isSameGooglePubSubInfrastructure,
-  parseGooglePubSubInfrastructure
+  isSameGooglePubSubDeliveryConfig,
+  parseGooglePubSubDeliveryConfig
 } from '@slates/google-pubsub';
 import {
   createApiServiceError,
@@ -77,11 +77,11 @@ const assertActive = (subscription: MeetSubscription) => {
 const registrationResult = (
   subscription: MeetSubscription,
   ownerId: string,
-  infrastructure: GooglePubSubInfrastructure,
+  delivery: GooglePubSubDeliveryConfig,
   startedAt: string,
   previous?: MeetRegistration
 ) => {
-  assertOwnedSubscription(subscription, ownerId, infrastructure.topicName);
+  assertOwnedSubscription(subscription, ownerId, delivery.topicName);
   assertActive(subscription);
   const expiresAt = subscription.expireTime;
   const remaining = Date.parse(expiresAt) - Date.now();
@@ -99,7 +99,7 @@ const registrationResult = (
     );
   const saved: MeetRegistration = {
     ownerId,
-    infrastructure,
+    delivery,
     subscriptionName: subscription.name,
     startedAt,
     expiresAt,
@@ -137,16 +137,16 @@ const findOwned = async (client: MeetEventsClient, ownerId: string, topicName: s
 const createOrRecover = async (
   client: MeetEventsClient,
   ownerId: string,
-  infrastructure: GooglePubSubInfrastructure
+  delivery: GooglePubSubDeliveryConfig
 ): Promise<{ subscription: MeetSubscription; created: boolean }> => {
-  const existing = await findOwned(client, ownerId, infrastructure.topicName);
+  const existing = await findOwned(client, ownerId, delivery.topicName);
   if (existing) return { subscription: existing, created: false };
   let created: MeetSubscription;
   try {
-    created = await client.createSubscription(ownerId, infrastructure.topicName);
+    created = await client.createSubscription(ownerId, delivery.topicName);
   } catch (error) {
     // A request may time out after success, or another registration may create it first.
-    const recovered = await findOwned(client, ownerId, infrastructure.topicName);
+    const recovered = await findOwned(client, ownerId, delivery.topicName);
     if (recovered) return { subscription: recovered, created: false };
     if (isMeetAlreadyExists(error))
       throw createApiServiceError(
@@ -156,16 +156,16 @@ const createOrRecover = async (
     throw error;
   }
   // Only a subscription this call created may be rolled back; ambiguous failed reads keep it.
-  assertDeliveryIdentity(created, ownerId, infrastructure.topicName);
+  assertDeliveryIdentity(created, ownerId, delivery.topicName);
   const readback = await client.getSubscription(created.name);
-  assertDeliveryIdentity(readback, ownerId, infrastructure.topicName);
+  assertDeliveryIdentity(readback, ownerId, delivery.topicName);
   try {
-    assertOwnedSubscription(readback, ownerId, infrastructure.topicName);
+    assertOwnedSubscription(readback, ownerId, delivery.topicName);
     return { subscription: readback, created: true };
   } catch (error) {
     // The etag prevents removing a resource changed since this readback.
     await client.deleteSubscription(readback);
-    if (await findOwned(client, ownerId, infrastructure.topicName))
+    if (await findOwned(client, ownerId, delivery.topicName))
       throw createApiServiceError(
         'Google has not confirmed rollback of the invalid meeting subscription. Retry cleanup.'
       );
@@ -204,13 +204,13 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
     );
     if (ctx.input.webhookTargetIdentifier !== targetIdentifier(target.ownerId))
       throw createApiServiceError('The meeting event target identity does not match.');
-    const infrastructure = parseGooglePubSubInfrastructure(
-      ctx.input.infrastructure,
+    const delivery = parseGooglePubSubDeliveryConfig(
+      ctx.input.deliveryConfig,
       'Google event delivery is not configured for this OAuth client. Complete its Google Pub/Sub delivery setup and try again.'
     );
     const client = new MeetEventsClient(ctx.auth.token);
     await assertMeetOwner(client, target.ownerId);
-    const found = await createOrRecover(client, target.ownerId, infrastructure);
+    const found = await createOrRecover(client, target.ownerId, delivery);
     let subscription = found.subscription;
     if (subscription.state === 'SUSPENDED')
       subscription = await client.reactivateSubscription(subscription);
@@ -218,7 +218,7 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
     const startedAt = found.created
       ? subscription.createTime
       : new Date(Date.now()).toISOString();
-    return registrationResult(subscription, target.ownerId, infrastructure, startedAt);
+    return registrationResult(subscription, target.ownerId, delivery, startedAt);
   },
   webhookRenew: async ctx => {
     const saved = parseWithServiceError(
@@ -231,24 +231,23 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
       ctx.input.webhookTargetPayload,
       'The meeting event target is invalid.'
     );
-    const infrastructure = parseGooglePubSubInfrastructure(
-      ctx.input.infrastructure,
+    const delivery = parseGooglePubSubDeliveryConfig(
+      ctx.input.deliveryConfig,
       'Google event delivery is not configured for this OAuth client.'
     );
     if (
       target.ownerId !== saved.ownerId ||
       ctx.input.webhookTargetIdentifier !== targetIdentifier(saved.ownerId) ||
       ctx.input.webhookRegistrationIdentifier !== saved.subscriptionName ||
-      !isSameGooglePubSubInfrastructure(saved.infrastructure, infrastructure)
+      !isSameGooglePubSubDeliveryConfig(saved.delivery, delivery)
     )
       throw createApiServiceError(
         'The saved meeting subscription or delivery identity does not match renewal.'
       );
     const client = new MeetEventsClient(ctx.auth.token);
     await assertMeetOwner(client, saved.ownerId);
-    let subscription = (await createOrRecover(client, saved.ownerId, infrastructure))
-      .subscription;
-    assertOwnedSubscription(subscription, saved.ownerId, infrastructure.topicName);
+    let subscription = (await createOrRecover(client, saved.ownerId, delivery)).subscription;
+    assertOwnedSubscription(subscription, saved.ownerId, delivery.topicName);
     if (subscription.state === 'SUSPENDED')
       subscription = await client.reactivateSubscription(subscription);
     if (subscription.state === 'DELETED')
@@ -258,13 +257,7 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
     // A retry after an uncertain update reads the current expiry instead of renewing again.
     if (Date.parse(subscription.expireTime) < Date.now() + 5 * 86400_000)
       subscription = await client.renewSubscription(subscription);
-    return registrationResult(
-      subscription,
-      saved.ownerId,
-      infrastructure,
-      saved.startedAt,
-      saved
-    );
+    return registrationResult(subscription, saved.ownerId, delivery, saved.startedAt, saved);
   },
   webhookUnregister: async ctx => {
     const saved = parseWithServiceError(
@@ -281,19 +274,15 @@ export const meetAutoRegistration: SlateTriggerGroupWebhookAutoRegistrationParam
     await assertMeetOwner(client, saved.ownerId);
     // Only a fully authorized list proves absence, not a bare 404. A differently named subscription
     // on the topic replaced the saved one and belongs to whoever returned its routing key.
-    const subscription = await findOwned(
-      client,
-      saved.ownerId,
-      saved.infrastructure.topicName
-    );
+    const subscription = await findOwned(client, saved.ownerId, saved.delivery.topicName);
     if (subscription?.name !== saved.subscriptionName) return;
-    assertOwnedSubscription(subscription, saved.ownerId, saved.infrastructure.topicName);
+    assertOwnedSubscription(subscription, saved.ownerId, saved.delivery.topicName);
     try {
       await client.deleteSubscription(subscription);
     } catch (error) {
       if (getUpstreamErrorStatus(error) !== 404) throw error;
     }
-    const remaining = await findOwned(client, saved.ownerId, saved.infrastructure.topicName);
+    const remaining = await findOwned(client, saved.ownerId, saved.delivery.topicName);
     if (remaining?.name === saved.subscriptionName)
       throw createApiServiceError(
         'Google has not confirmed removal of the meeting event subscription. Cleanup will need to retry.'
@@ -314,10 +303,10 @@ export const reconcileMeetSubscription = async (
     return false;
   }
   if (subscription.state === 'DELETED') return false;
-  assertOwnedSubscription(subscription, saved.ownerId, saved.infrastructure.topicName);
+  assertOwnedSubscription(subscription, saved.ownerId, saved.delivery.topicName);
   if (subscription.state === 'SUSPENDED')
     subscription = await client.reactivateSubscription(subscription);
-  assertOwnedSubscription(subscription, saved.ownerId, saved.infrastructure.topicName);
+  assertOwnedSubscription(subscription, saved.ownerId, saved.delivery.topicName);
   assertActive(subscription);
   return true;
 };

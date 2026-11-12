@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   googlePubSubRoutingKey,
-  parseGooglePubSubInfrastructure
+  parseGooglePubSubDeliveryConfig
 } from '@slates/google-pubsub';
 import {
   createApiServiceError,
@@ -260,8 +260,8 @@ export const storageAutoRegistration = {
     );
     if (ctx.input.webhookTargetIdentifier !== bucketTargetId(bucket))
       throw createApiServiceError('The bucket notification target identity does not match.');
-    const infrastructure = parseGooglePubSubInfrastructure(
-      ctx.input.infrastructure,
+    const delivery = parseGooglePubSubDeliveryConfig(
+      ctx.input.deliveryConfig,
       'Authenticated Pub/Sub delivery has not been configured for this connection.'
     );
     const receiver = z.url().safeParse(ctx.input.webhookUrl);
@@ -275,7 +275,7 @@ export const storageAutoRegistration = {
     const notificationId = await ensureNotification(
       client,
       bucket.bucketName,
-      infrastructure.topicName,
+      delivery.topicName,
       ownershipId
     );
     return {
@@ -285,7 +285,7 @@ export const storageAutoRegistration = {
         bucket,
         notificationId,
         ownershipId,
-        infrastructure
+        delivery
       },
       routingKeys: [googlePubSubRoutingKey.storage(bucket.bucketName, notificationId)]
     };
@@ -308,7 +308,7 @@ export const storageAutoRegistration = {
       item => item.id === saved.notificationId
     );
     if (!existing) return;
-    if (!matches(existing, saved.infrastructure.topicName, saved.ownershipId))
+    if (!matches(existing, saved.delivery.topicName, saved.ownershipId))
       throw createApiServiceError(
         'The notification no longer matches this connection; it was not deleted.'
       );

@@ -30,7 +30,6 @@ export const formResponses = triggerGroup(spec, {
   eventSchema: z.union([formSyncSchema, newResponseSchema])
 })
   .webhook({
-    googlePubSub: { product: 'forms' },
     deliveryConfig: googlePubSubDeliveryConfig('forms'),
     autoRegistration: formAutoRegistration,
     reconcileIntervalSeconds: 900,
@@ -40,7 +39,7 @@ export const formResponses = triggerGroup(spec, {
       const saved = parsed.data;
       const verified = await verifyGooglePubSubPushForProcessing(
         ctx.input.request,
-        saved.infrastructure
+        saved.delivery
       );
       if (!verified.ok) return verified.skipped;
       const attributes = verified.message.attributes;
@@ -54,7 +53,7 @@ export const formResponses = triggerGroup(spec, {
           {
             matchers: [],
             payload: { kind: 'form_sync', formId: saved.formId },
-            idempotencyKey: `${saved.formId}:${saved.infrastructure.subscriptionName}:${verified.message.messageId}`
+            idempotencyKey: `${saved.formId}:${saved.delivery.subscriptionName}:${verified.message.messageId}`
           }
         ]
       };

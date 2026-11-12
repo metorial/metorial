@@ -214,18 +214,18 @@ describe('authenticated wrapped Google Pub/Sub push', () => {
     ).toMatchObject({ status: 400 });
   });
 
-  it('verifies against a saved infrastructure descriptor', async () => {
-    let infrastructure = {
+  it('verifies against a saved delivery config', async () => {
+    let deliveryConfig = {
       audience: identity.audience,
       pushServiceAccountEmail: identity.serviceAccountEmail,
       subscriptionName: identity.subscriptionName
     };
-    expect(await verify({ infrastructure, now, request: await request() })).toMatchObject({
+    expect(await verify({ deliveryConfig, now, request: await request() })).toMatchObject({
       ok: true
     });
     expect(
       await verify({
-        infrastructure: { ...infrastructure, pushServiceAccountEmail: 'other@example.com' },
+        deliveryConfig: { ...deliveryConfig, pushServiceAccountEmail: 'other@example.com' },
         now,
         request: await request()
       })
@@ -294,7 +294,7 @@ describe('authenticated wrapped Google Pub/Sub push', () => {
 
   it('verifies for processing with the grace and turns a failure into a skipped result', async () => {
     let grace = GOOGLE_PUBSUB_PROCESSING_GRACE_SECONDS;
-    let infrastructure = {
+    let deliveryConfig = {
       audience: identity.audience,
       pushServiceAccountEmail: identity.serviceAccountEmail,
       subscriptionName: identity.subscriptionName
@@ -304,14 +304,14 @@ describe('authenticated wrapped Google Pub/Sub push', () => {
     expect(
       await verifyGooglePubSubPushForProcessing(
         await request(undefined, expired),
-        infrastructure,
+        deliveryConfig,
         atNow
       )
     ).toMatchObject({ ok: true, message: { messageId: '2070443601311540' } });
     expect(
       await verifyGooglePubSubPushForProcessing(
         await request(undefined, { email_verified: false }),
-        infrastructure,
+        deliveryConfig,
         atNow
       )
     ).toEqual({

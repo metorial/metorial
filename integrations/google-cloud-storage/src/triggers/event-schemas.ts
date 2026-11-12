@@ -1,4 +1,4 @@
-import { googlePubSubInfrastructureSchema } from '@slates/google-pubsub';
+import { googlePubSubDeliveryConfigSchema } from '@slates/google-pubsub';
 import { z } from 'zod';
 
 export const generationSchema = z.string().regex(/^[1-9]\d*$/);
@@ -13,7 +13,7 @@ export const storageRegistrationSchema = z.object({
   bucket: bucketTargetSchema,
   notificationId: z.string().min(1),
   ownershipId: z.string().regex(/^[a-f0-9]{64}$/),
-  infrastructure: googlePubSubInfrastructureSchema
+  delivery: googlePubSubDeliveryConfigSchema
 });
 export const notificationSchema = z.object({
   id: z.string().min(1),

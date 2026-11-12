@@ -10,27 +10,6 @@ export type SlateTriggerRoutingMatcher = Record<string, any>;
 
 export type SlateTriggerGroupSelection = Record<string, any>;
 
-export let slateGooglePubSubProducts = ['gmail', 'forms', 'meet', 'storage'] as const;
-
-export type SlateGooglePubSubProduct = (typeof slateGooglePubSubProducts)[number];
-
-export interface SlateGooglePubSubCapability {
-  product: SlateGooglePubSubProduct;
-}
-
-export interface SlateGooglePubSubInfrastructure {
-  projectId: string;
-  topicName: string;
-  subscriptionName: string;
-  pushServiceAccountEmail: string;
-  audience: string;
-}
-
-/** Nonsecret delivery infrastructure the runtime supplies from a saved delivery config. */
-export interface SlateTriggerGroupInfrastructure {
-  googlePubSub: SlateGooglePubSubInfrastructure;
-}
-
 export type SlateWebhookTargetOwnership = 'single_user' | 'multi_user';
 
 export interface SlateWebhookTarget {
@@ -114,7 +93,7 @@ export type SlateWebhookRegisterHandler<ConfigType extends {}, AuthType extends 
       webhookUrl: string;
       operationId?: string;
       selection?: SlateTriggerGroupSelection;
-      infrastructure?: SlateTriggerGroupInfrastructure;
+      deliveryConfig?: unknown;
     }
   >
 ) => Promise<SlateWebhookRegistrationResult>;
@@ -140,7 +119,7 @@ export type SlateWebhookRenewHandler<ConfigType extends {}, AuthType extends {}>
       webhookTargetPayload: any;
       operationId: string;
       selection?: SlateTriggerGroupSelection;
-      infrastructure?: SlateTriggerGroupInfrastructure;
+      deliveryConfig?: unknown;
     }
   >
 ) => Promise<SlateWebhookRegistrationResult>;
@@ -220,6 +199,18 @@ export interface SlateWebhookSkipped {
   reason: string;
 }
 
+/**
+ * Routing keys name the registrations a request addresses; an empty list acknowledges it
+ * without handing it to any. A rejection answers the sender with its status.
+ */
+export type SlateWebhookDeliveryAuthentication =
+  | { routingKeys: string[]; rejected?: undefined }
+  | { rejected: { status: number }; routingKeys?: undefined };
+
+export type SlateWebhookDeliveryAuthenticateHandler = (
+  context: SlateContext<{}, {}, { request: Request; deliveryConfig: unknown }>
+) => Promise<SlateWebhookDeliveryAuthentication>;
+
 export interface SlateTriggerGroupPollingParameters<
   ConfigType extends {},
   AuthType extends {}
@@ -265,6 +256,7 @@ export type SlateTriggerGroupWebhookDeliveryConfigParameters<
   FullConfigSchema
 > & {
   finish: SlateWebhookManualFinishHandler<UserConfigSchema, FullConfigSchema>;
+  authenticate: SlateWebhookDeliveryAuthenticateHandler;
 };
 
 export interface SlateTriggerGroupWebhookParameters<
@@ -277,7 +269,6 @@ export interface SlateTriggerGroupWebhookParameters<
   process: SlateWebhookProcessHandler;
   expandWebhook?: SlateWebhookExpandHandler<ConfigType, AuthType>;
   reconcileIntervalSeconds?: number;
-  googlePubSub?: SlateGooglePubSubCapability;
 }
 
 export interface SlateTriggerGroupCreateParameters<
@@ -429,7 +420,6 @@ export class SlateTriggerGroupBuilder<
     process: SlateWebhookProcessHandler;
     expandWebhook?: SlateWebhookExpandHandler<ConfigType, AuthType>;
     reconcileIntervalSeconds?: number;
-    googlePubSub?: SlateGooglePubSubCapability;
   }): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
     if (this.#source) {
       throw new SlateDeclarationError('Trigger group invocation is already defined');
@@ -450,6 +440,11 @@ export class SlateTriggerGroupBuilder<
       if (!props.deliveryConfig.finish) {
         throw new SlateDeclarationError('A webhook delivery config requires a finish handler');
       }
+      if (!props.deliveryConfig.authenticate) {
+        throw new SlateDeclarationError(
+          'A webhook delivery config requires an authenticate handler'
+        );
+      }
     }
 
     if (props.reconcileIntervalSeconds !== undefined) {
@@ -468,17 +463,6 @@ export class SlateTriggerGroupBuilder<
       }
     }
 
-    if (props.googlePubSub !== undefined) {
-      let capability = z
-        .strictObject({ product: z.enum(slateGooglePubSubProducts) })
-        .safeParse(props.googlePubSub);
-      if (!capability.success || !props.autoRegistration || !props.deliveryConfig) {
-        throw new SlateDeclarationError(
-          'Google Pub/Sub delivery requires a supported product, automatic webhook registration, and a delivery config'
-        );
-      }
-    }
-
     this.#source = 'webhook';
     this.#webhook = {
       autoRegistration: props.autoRegistration,
@@ -486,8 +470,7 @@ export class SlateTriggerGroupBuilder<
       deliveryConfig: props.deliveryConfig,
       process: props.process,
       expandWebhook: props.expandWebhook,
-      reconcileIntervalSeconds: props.reconcileIntervalSeconds,
-      googlePubSub: props.googlePubSub
+      reconcileIntervalSeconds: props.reconcileIntervalSeconds
     };
 
     return this;

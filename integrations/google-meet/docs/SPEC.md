@@ -95,9 +95,10 @@ and actual use of the feature during the meeting.
   by following the guided setup: create a Pub/Sub topic in that project, allow
   `meet-api-event-push@system.gserviceaccount.com` to publish to it, create a
   service account for push authentication, and create a push subscription that
-  uses the shown delivery URL as its endpoint and audience. They then save the
-  OAuth client ID, topic name, subscription name, and push service account
-  email. Nothing is created in Google Cloud automatically, and a user token is
+  uses the shown delivery URL as its endpoint and audience. They then select the
+  OAuth client and save the topic name, subscription name, and push service
+  account email; the service operator supplies the client ID of the built-in
+  client. Nothing is created in Google Cloud automatically, and a user token is
   never used for this setup. A missing delivery setup fails activation with a
   setup error.
 - One delivery topic and one authenticated push subscription serve every

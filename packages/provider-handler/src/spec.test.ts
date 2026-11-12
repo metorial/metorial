@@ -9,6 +9,7 @@ import {
   getExposedTriggerGroups,
   getMappableAction,
   getTriggersForGroup,
+  getWebhookDeliveryConfig,
   getWebhookManualRegistration,
   isMappableTrigger,
   mapAction,
@@ -210,7 +211,8 @@ describe('webhook registration config', () => {
     userConfigSchema: z.object({ secret: z.string().describe('Signing secret') }),
     fullConfigSchema: z.object({ secret: z.string(), endpoint: z.string() }),
     setup: async () => ({ webhookSetupDocument: '', partialWebhookRegistrationPayload: {} }),
-    finish: async () => ({ webhookRegistrationPayload: {} })
+    finish: async () => ({ webhookRegistrationPayload: {} }),
+    authenticate: async () => ({ routingKeys: [] })
   };
   let schemas = {
     userConfigSchema: {
@@ -260,9 +262,22 @@ describe('webhook registration config', () => {
     let mapped = mapTriggerGroup(configured);
     expect(mapped.invocation).toMatchObject({
       type: 'webhook',
-      registration: { mode: 'auto', config: schemas }
+      registration: { mode: 'auto', deliveryConfig: schemas }
     });
     expect(slatesTriggerGroup.parse(mapped).invocation).toEqual(mapped.invocation);
+  });
+
+  it('authenticates deliveries only for automatic groups with a delivery config', () => {
+    expect(getWebhookDeliveryConfig(configured)).toBe(config);
+    for (let unsupported of [
+      auto,
+      manual,
+      { key: 'group', name: 'Group', source: 'polling' } as any
+    ]) {
+      expect(() => getWebhookDeliveryConfig(unsupported)).toThrow(
+        'Trigger group does not support webhook delivery authentication: group'
+      );
+    }
   });
 
   it('serves setup and finish for manual groups and automatic groups with a delivery config', () => {

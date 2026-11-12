@@ -35,7 +35,6 @@ export const objectEvents = triggerGroup(spec, {
   eventSchema: objectFinalizedSchema
 })
   .webhook({
-    googlePubSub: { product: 'storage' },
     deliveryConfig: googlePubSubDeliveryConfig('storage'),
     autoRegistration: storageAutoRegistration,
     process: async ctx => {
@@ -43,7 +42,7 @@ export const objectEvents = triggerGroup(spec, {
       if (!saved.success) return skipWebhook('invalid_registration', { status: 500 });
       const verified = await verifyGooglePubSubPushForProcessing(
         ctx.input.request,
-        saved.data.infrastructure
+        saved.data.delivery
       );
       if (!verified.ok) return verified.skipped;
       const attributes = attributesSchema.safeParse(verified.message.attributes);
