@@ -127,7 +127,9 @@ A notification configuration is attached to a bucket and specifies a target Pub/
 
 Object change notifications are a legacy mechanism in Cloud Storage for notifying an application about changes to objects within a bucket. When an Object change notification is set up, Cloud Storage sends HTTP POST requests (webhooks) to a specified application URL whenever an object is added, updated, or deleted. This mechanism requires a publicly accessible HTTPS endpoint. Google recommends using Pub/Sub notifications for Cloud Storage for new implementations due to its reliability, scalability, and flexibility.
 
-## Implemented trigger: object_finalized
+## Planned trigger: object_finalized (not available yet)
+
+**Status: postponed.** The trigger is implemented but not offered: the integration currently exposes no event triggers. Cloud Storage publishes as the service agent of the project that owns each bucket, so every such project must be allowed to publish to the delivery topic, and for the built-in OAuth application that would mean the service operator adding each customer project by hand. The rest of this section describes the trigger as it will work when it is offered; the generation-aware tool behavior it describes is available today.
 
 Only `OBJECT_FINALIZE` is watched, using `JSON_API_V1` metadata. Enabling events discovers configured-project buckets in pages of 50, checks `storage.buckets.get`, `storage.buckets.update`, `storage.objects.list`, and `storage.objects.get`, and bounds discovery to ten pages. The object permissions are required because events carry object names, sizes, checksums, and custom metadata; a caller who cannot read a bucket's objects is not offered that bucket. A partial scan does not imply missing buckets were removed. A watched bucket is identified by its name, project number, and creation timestamp, so a new bucket that reuses a deleted bucket's name does not inherit the earlier bucket's notification.
 

@@ -14,7 +14,7 @@ import {
   updateObjectMetadata,
   uploadObject
 } from './tools';
-import { objectEvents, objectFinalized } from './triggers';
+// import { objectEvents, objectFinalized } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -31,6 +31,10 @@ export let provider = Slate.create({
     manageLifecycle,
     manageNotifications
   ],
-  triggerGroups: [objectEvents],
-  triggers: [objectFinalized]
+  // TODO: register the object triggers again; they are postponed because every watched
+  // bucket's Cloud project must be allowed to publish to the delivery topic, which the
+  // managed OAuth app cannot arrange without an operator adding each customer project.
+  // triggerGroups: [objectEvents],
+  // triggers: [objectFinalized]
+  triggers: []
 });

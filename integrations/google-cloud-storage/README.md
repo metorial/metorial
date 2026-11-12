@@ -64,7 +64,9 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 
 New connections request `devstorage.full_control`, `userinfo.profile`, `userinfo.email`. Tool gates retain provider-supported legacy grants for existing connections.
 
-## Object finalized trigger
+## Object finalized trigger (planned)
+
+**Not available yet.** Cloud Storage does not offer event triggers at the moment; this section describes the planned object finalized trigger and is kept for when it becomes available. The generation and precondition options of **Get Object**, **Delete Object**, **Update Object Metadata**, and **Copy Object** described below work today.
 
 Enabling callbacks discovers buckets in the configured project where the connection can read bucket settings, create notifications, and list and read objects (`storage.buckets.get`, `storage.buckets.update`, `storage.objects.list`, `storage.objects.get`). Events carry object names, sizes, checksums, and custom metadata, so a bucket whose objects the connection cannot read is not offered. `object_finalized` fires when an object generation becomes available, including completed uploads, copies, rewrites, and restores. Existing objects are not replayed when callbacks are enabled. Metadata edits, deletion, and archive notifications are not included.
 
