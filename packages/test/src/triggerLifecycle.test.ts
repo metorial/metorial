@@ -159,21 +159,24 @@ let fixture = (
     .routingMatchers(async () => [])
     .build();
   let matches = 0;
+  let selectedInput = z.object({
+    kind: z.string().optional(),
+    id: z.string().optional(),
+    raw: z.boolean().optional()
+  });
   let selected = SlateTrigger.create(spec, { key: 'selected', name: 'Selected' })
     .triggerGroup(group)
-    .input(
-      z.object({
-        kind: z.string().optional(),
-        id: z.string().optional(),
-        raw: z.boolean().optional()
-      })
-    )
+    .input(selectedInput)
     .output(z.object({ id: z.string() }))
-    .matches(event => {
+    .matches(payload => {
       matches++;
-      return event.kind === 'selected' || event.raw === true;
+      let event = selectedInput.safeParse(payload);
+      return event.success && (event.data.kind === 'selected' || event.data.raw === true);
     })
-    .map(async ctx => ({ type: 'selected', output: { id: ctx.input.id ?? 'raw' } }))
+    .map(async ctx => {
+      let id = ctx.input.id ?? 'raw';
+      return { type: 'selected', id, output: { id } };
+    })
     .build();
   let slate = Slate.create({
     spec,
