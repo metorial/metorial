@@ -48,6 +48,16 @@ Update the title of an existing task list. Provide the task list ID and the new 
 
 Update properties of an existing task. Supports modifying the title, notes, due date, and completion status. Only the provided fields will be updated; omitted fields remain unchanged.
 
+## Task Completed Trigger
+
+`task_completed` checks every task list every 15 minutes for tasks completed since the previous check. It includes hidden and cleared completed tasks, but excludes deleted tasks and tasks assigned from Docs or Chat Spaces. All list and task pages are read. Google profile or email access, already requested during connection setup, identifies the connected account.
+
+The event returns the account ID, task-list ID/title, task ID/title, completion time, last modification time, available links, and observation time. Duplicate observations use the account, list, task, and completion timestamp; editing a title or clearing completed tasks does not create another completion event.
+
+This is a completion observation, not a full transition history. Initial activation can include completions from the preceding hour. Each later check starts one hour before the point the previous check reached, so completions that appear late are still picked up without a second event. After an interruption of any length, checking resumes from that point and delivers the completions made in between; a very large backlog is worked through over several checks before newer completions. Completions already reported inside that hour are remembered and skipped, so an interruption of any length does not report a completion twice. A task that Google returns in an unexpected form is skipped with a warning and does not hold up the others. A completion reopened before the next check can be missed. Recompletion is distinguishable only if Google returns a different completion timestamp. Moving a task between lists changes its completion identity and can produce another observation. There are no task-created, reopened, or assigned event promises.
+
+See Google's [task listing parameters](https://developers.google.com/workspace/tasks/reference/rest/v1/tasks/list) and [task resource](https://developers.google.com/workspace/tasks/reference/rest/v1/tasks).
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

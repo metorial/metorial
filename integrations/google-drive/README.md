@@ -8,7 +8,8 @@ Use **OAuth** for Drive access and to read the label definitions your organizati
 
 ## Events
 
-This integration does not currently expose event triggers.
+Watch explicitly selected folders with **File Added to Folder** and **File Updated**.
+See [Folder triggers](#folder-triggers) for scope and delivery details.
 
 ## Tools
 
@@ -79,6 +80,29 @@ Update a file or folder's metadata in Google Drive. Can rename, change descripti
 ### Upload File
 
 Upload a file with content to Google Drive. Provide file content as plain text or base64-encoded string. The file will be created with the given name, content type, and optional parent folder.
+
+## Folder triggers
+
+Select 1–100 folder IDs using `folderIds` to watch their immediate children.
+**File Added to Folder** includes newly visible files, moves, restores, and shares;
+it does not imply that the file was newly created. **File Updated** reports a newer
+version of an already known child, including content and metadata changes.
+Existing files are recorded silently on activation, and nested contents are not
+watched recursively. Rapid changes can be combined into the latest observed state.
+
+A watched folder can have at most 5,000 immediate children. A larger folder
+cannot be watched; watch a smaller folder, such as a subfolder, instead. A folder
+that grows past the limit stops delivering events, and the periodic check
+reports an error until it is back within the limit. Watching then resumes from
+the folder's contents at that moment: changes made while it was over the limit
+are not delivered. A very long backlog of changes is delivered in batches, with
+the remainder following on the next notification or the periodic reconciliation.
+
+My Drive and shared-drive folders use the appropriate change log for the connected
+account. Coverage remains limited by its granted access. Notifications require an
+HTTPS callback, durable change state, automatic lease renewal and periodic
+reconciliation. See the [event contract](./docs/SPEC.md#events) for delivery,
+recovery, and cleanup details.
 
 ## License
 

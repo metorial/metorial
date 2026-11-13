@@ -1,4 +1,4 @@
-import { anyOf } from 'slates';
+import { allOf, anyOf } from 'slates';
 
 export let googleAdminScopes = {
   adminDirectoryUser: 'https://www.googleapis.com/auth/admin.directory.user',
@@ -51,6 +51,14 @@ export let googleAdminScopes = {
 } as const;
 
 export let googleAdminActionScopes = {
+  userLifecycle: allOf(
+    googleAdminScopes.adminReportsAuditReadonly,
+    googleAdminScopes.userInfoEmail,
+    anyOf(
+      googleAdminScopes.adminDirectoryCustomer,
+      googleAdminScopes.adminDirectoryCustomerReadonly
+    )
+  ),
   listUsers: anyOf(
     googleAdminScopes.adminDirectoryUser,
     googleAdminScopes.adminDirectoryUserReadonly

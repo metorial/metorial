@@ -12,9 +12,18 @@ export let slatesTriggerGroupInvocation = z.union([
   }),
   z.object({
     type: z.literal('webhook'),
+    supportsExpansion: z.boolean().optional(),
+    supportsRenewal: z.boolean().optional(),
+    reconcileIntervalSeconds: z.number().int().min(900).optional(),
     registration: z.union([
       z.object({
-        mode: z.literal('auto')
+        mode: z.literal('auto'),
+        deliveryConfig: z
+          .object({
+            userConfigSchema: z.record(z.string(), z.any()),
+            fullConfigSchema: z.record(z.string(), z.any())
+          })
+          .optional()
       }),
       z.object({
         mode: z.literal('manual'),
@@ -30,6 +39,7 @@ export let slatesTriggerGroup = z.object({
   name: z.string(),
   description: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
+  selectionSchema: z.record(z.string(), z.any()).optional(),
 
   invocation: slatesTriggerGroupInvocation
 });

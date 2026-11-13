@@ -6,7 +6,7 @@ Store, retrieve, and manage unstructured data as objects in Google Cloud Storage
 
 ### Copy Object
 
-Copy an object within or between Cloud Storage buckets. The source object remains unchanged. Can also be used to rename or move an object by setting **deleteSource** to true.
+Copy an object within or between Cloud Storage buckets. The source object remains unchanged. Can also be used to rename or move an object by setting **deleteSource** to true. A move removes the source only while the copied generation is still its live version; on a bucket with versioning the removed version is kept as a noncurrent version. Check **sourceDeleted** in the result.
 
 ### Delete Object
 
@@ -63,3 +63,17 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 ## OAuth consent
 
 New connections request `devstorage.full_control`, `userinfo.profile`, `userinfo.email`. Tool gates retain provider-supported legacy grants for existing connections.
+
+## Object finalized trigger (planned)
+
+**Not available yet.** Cloud Storage does not offer event triggers at the moment; this section describes the planned object finalized trigger and is kept for when it becomes available. The generation and precondition options of **Get Object**, **Delete Object**, **Update Object Metadata**, and **Copy Object** described below work today.
+
+Enabling callbacks discovers buckets in the configured project where the connection can read bucket settings, create notifications, and list and read objects (`storage.buckets.get`, `storage.buckets.update`, `storage.objects.list`, `storage.objects.get`). Events carry object names, sizes, checksums, and custom metadata, so a bucket whose objects the connection cannot read is not offered. `object_finalized` fires when an object generation becomes available, including completed uploads, copies, rewrites, and restores. Existing objects are not replayed when callbacks are enabled. Metadata edits, deletion, and archive notifications are not included.
+
+The event contains `bucketName`, `objectName`, string-valued `generation` and `metageneration`, `eventTime`, `sizeBytes`, and available content type, checksums, and custom metadata. An overwritten object also includes `overwroteGeneration`. Event identity combines the bucket incarnation, object name, and generation; duplicate delivery is possible and ordering is not guaranteed.
+
+Use the event's `generation` with **Get Object**, **Delete Object**, or **Update Object Metadata**, and `sourceGeneration` with **Copy Object**. Downloads remain pinned to the retrieved generation. Metadata updates accept `ifMetagenerationMatch`; copies accept a destination `ifGenerationMatch` (`"0"` requires an absent destination). Moving an object removes the source only if the copied generation is still its live version: on a bucket with versioning that version is kept as a noncurrent version instead of being permanently deleted, and a source that was replaced in the meantime, or an older generation, is left in place with `sourceDeleted: false`.
+
+Authenticated Pub/Sub delivery must be set up once for the connected Google OAuth application: a topic and an authenticated push subscription in the application's Cloud project. If you connect with your own OAuth application, select it in the guided delivery setup and enter the topic name, subscription name, and push service account; for the built-in application the service operator has done this. Cloud Storage publishes as the service agent of the project that owns each bucket, so every such project's Cloud Storage service agent needs the Pub/Sub Publisher role on the delivery topic; the setup steps show how to find it. The delivery setup belongs to an OAuth application, so connections that use a service account key do not receive this event; their tools remain available. Bucket discovery is bounded to 500 buckets per cycle and reports a partial result if that limit is reached.
+
+See [Google's notification contract](https://docs.cloud.google.com/storage/docs/pubsub-notifications). Notification setup, readback and ownership-aware cleanup are automatic once delivery is configured.

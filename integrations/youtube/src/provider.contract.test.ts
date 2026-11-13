@@ -37,7 +37,8 @@ describe('youtube provider contract', () => {
         'set_thumbnail',
         'list_activities'
       ],
-      triggerIds: [],
+      triggerIds: ['new_video'],
+      triggerGroupIds: ['upload_activities'],
       authMethodIds: ['oauth2', 'api_key'],
       tools: [
         { id: 'search_content', readOnly: true, destructive: false },
@@ -56,10 +57,10 @@ describe('youtube provider contract', () => {
         { id: 'download_caption', readOnly: true, destructive: false },
         { id: 'set_thumbnail', readOnly: false, destructive: false }
       ],
-      triggers: []
+      triggers: [{ id: 'new_video' }]
     });
 
-    expect(contract.actions).toHaveLength(21);
+    expect(contract.actions).toHaveLength(22);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {

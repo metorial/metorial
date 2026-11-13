@@ -1,9 +1,23 @@
 import { createApiServiceError, createAxios } from 'slates';
-import { normalizeA1Range } from './a1-range';
+import { z } from 'zod';
+import { normalizeA1Range, quoteA1SheetName } from './a1-range';
 
 const MAX_SHEET_TITLES_IN_HINT = 20;
 const MAX_SHEET_TITLES_HINT_LENGTH = 1000;
 const MAX_UPSTREAM_DETAIL_LENGTH = 300;
+// A selection holds at most 100,000 cells but a cell can hold 50,000 characters.
+export const MAX_ROW_OBSERVATION_RESPONSE_BYTES = 64 * 1024 * 1024;
+const rowObservationSheetListSchema = z.object({
+  spreadsheetId: z.string(),
+  sheets: z.array(
+    z.object({
+      properties: z.object({
+        sheetId: z.number().int().nonnegative(),
+        title: z.string().min(1)
+      })
+    })
+  )
+});
 
 const isUnparseableRangeError = (error: unknown): error is Error =>
   error instanceof Error && /unable to parse range/i.test(error.message);
@@ -138,6 +152,43 @@ export class SheetsClient {
   }
 
   // --- Reading Data ---
+
+  async getRowObservationGrid(
+    spreadsheetId: string,
+    selection: { sheetId: number; range: string }
+  ): Promise<unknown> {
+    const path = `/spreadsheets/${encodeURIComponent(spreadsheetId)}`;
+    // spreadsheets.get accepts spreadsheets.readonly (getByDataFilter does not); the poller checks the ID.
+    const metadata = await this.axios.get(path, {
+      params: { fields: 'spreadsheetId,sheets.properties(sheetId,title)' }
+    });
+    const parsed = rowObservationSheetListSchema.safeParse(metadata.data);
+    if (!parsed.success || parsed.data.spreadsheetId !== spreadsheetId) {
+      throw createApiServiceError(
+        'Google Sheets returned invalid sheet metadata. The previous row baseline was preserved.',
+        { reason: 'google_sheets_row_metadata_invalid' }
+      );
+    }
+    const matches = parsed.data.sheets.filter(
+      sheet => sheet.properties.sheetId === selection.sheetId
+    );
+    const sheet = matches[0];
+    if (matches.length !== 1 || !sheet) {
+      throw createApiServiceError(
+        'Google Sheets did not return the selected sheet ID. The previous row baseline was preserved.',
+        { reason: 'google_sheets_row_sheet_missing' }
+      );
+    }
+    const response = await this.axios.get(path, {
+      params: {
+        ranges: `${quoteA1SheetName(sheet.properties.title)}!${selection.range}`,
+        fields:
+          'spreadsheetId,sheets(properties(sheetId,title,sheetType,gridProperties(rowCount,columnCount)),data(startRow,startColumn,rowData(values(userEnteredValue))))'
+      },
+      maxContentLength: MAX_ROW_OBSERVATION_RESPONSE_BYTES
+    });
+    return response.data;
+  }
 
   async getValues(
     spreadsheetId: string,

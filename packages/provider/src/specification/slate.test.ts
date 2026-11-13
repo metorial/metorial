@@ -37,12 +37,28 @@ let createManualWebhookTriggerGroup = (spec: ReturnType<typeof createTestSpec>, 
     .routingMatchers(async () => [])
     .build();
 
-let createAutoWebhookTriggerGroup = (spec: ReturnType<typeof createTestSpec>, key: string) =>
+let createAutoWebhookTriggerGroup = (
+  spec: ReturnType<typeof createTestSpec>,
+  key: string,
+  options: { deliveryConfig?: boolean } = {}
+) =>
   SlateTriggerGroup.create(spec, {
     key,
     name: key
   })
     .webhook({
+      deliveryConfig: options.deliveryConfig
+        ? {
+            userConfigSchema: z.object({}),
+            fullConfigSchema: z.object({}),
+            setup: async () => ({
+              webhookSetupDocument: '',
+              partialWebhookRegistrationPayload: {}
+            }),
+            finish: async () => ({ webhookRegistrationPayload: {} }),
+            authenticate: async () => ({ routingKeys: [] })
+          }
+        : undefined,
       autoRegistration: {
         webhookTargetList: async () => ({ targets: [], nextPageToken: null }),
         webhookRegister: async () => ({
@@ -70,8 +86,43 @@ describe('Slate.create', () => {
         triggerGroups: [first, second]
       })
     ).toThrow(
-      'Only one trigger group may use manual webhook registration, but found: manual_one, manual_two'
+      'Only one trigger group may use manual webhook registration or a delivery config, but found: manual_one, manual_two'
     );
+  });
+
+  it('rejects more than one trigger group with a manual registration or delivery config', () => {
+    let spec = createTestSpec();
+    let manual = createManualWebhookTriggerGroup(spec, 'manual_group');
+    let first = createAutoWebhookTriggerGroup(spec, 'config_one', { deliveryConfig: true });
+    let second = createAutoWebhookTriggerGroup(spec, 'config_two', { deliveryConfig: true });
+    let create = (triggerGroups: (typeof manual)[]) =>
+      Slate.create({ spec, tools: [], triggers: [], triggerGroups });
+
+    expect(() => create([first, second])).toThrow(
+      'Only one trigger group may use manual webhook registration or a delivery config, but found: config_one, config_two'
+    );
+    expect(() => create([manual, first])).toThrow('but found: manual_group, config_one');
+  });
+
+  it('allows a single delivery config alongside plain automatic trigger groups', () => {
+    let spec = createTestSpec();
+    let configured = createAutoWebhookTriggerGroup(spec, 'config_group', {
+      deliveryConfig: true
+    });
+    let auto = createAutoWebhookTriggerGroup(spec, 'auto_group');
+
+    let slate = Slate.create({
+      spec,
+      tools: [],
+      triggers: [],
+      triggerGroups: [auto, configured, createAutoWebhookTriggerGroup(spec, 'other_auto')]
+    });
+
+    expect(slate.triggerGroups.map(group => group.key)).toEqual([
+      'auto_group',
+      'config_group',
+      'other_auto'
+    ]);
   });
 
   it('allows a single manual webhook trigger group alongside other trigger groups', () => {

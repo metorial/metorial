@@ -36,7 +36,7 @@ describe('google-meet provider contract', () => {
         'get_transcript_entry',
         'list_transcript_entries'
       ],
-      triggerIds: [],
+      triggerIds: ['transcript_ready', 'recording_ready'],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'create_space', readOnly: false, destructive: false },
@@ -62,10 +62,10 @@ describe('google-meet provider contract', () => {
         { id: 'get_transcript_entry', readOnly: true, destructive: false },
         { id: 'list_transcript_entries', readOnly: true, destructive: false }
       ],
-      triggers: []
+      triggers: [{ id: 'transcript_ready' }, { id: 'recording_ready' }]
     });
 
-    expect(contract.actions).toHaveLength(22);
+    expect(contract.actions).toHaveLength(24);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {

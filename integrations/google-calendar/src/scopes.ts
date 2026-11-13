@@ -139,3 +139,10 @@ export let googleCalendarActionScopes = {
     googleCalendarScopes.calendarCalendarListReadonly
   )
 } as const;
+
+// Activation also needs discovery and channel ownership checks, beyond any single event tool.
+export const googleCalendarTriggerScopes = allOf(
+  googleCalendarActionScopes.eventChanges,
+  googleCalendarActionScopes.calendarListChanges,
+  [googleCalendarScopes.userInfoProfile, googleCalendarScopes.userInfoEmail]
+);

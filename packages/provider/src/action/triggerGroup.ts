@@ -8,6 +8,8 @@ export let SlateDefaultPollingIntervalSeconds = 60 * 10;
 
 export type SlateTriggerRoutingMatcher = Record<string, any>;
 
+export type SlateTriggerGroupSelection = Record<string, any>;
+
 export type SlateWebhookTargetOwnership = 'single_user' | 'multi_user';
 
 export interface SlateWebhookTarget {
@@ -25,7 +27,11 @@ export type SlateTriggerGroupRoutingMatchersHandler<
 > = (context: SlateContext<ConfigType, AuthType, {}>) => Promise<SlateTriggerRoutingMatcher[]>;
 
 export type SlateTriggerGroupPollHandler<ConfigType extends {}, AuthType extends {}> = (
-  context: SlateContext<ConfigType, AuthType, { state: any | null }>
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { state: any | null; selection?: SlateTriggerGroupSelection }
+  >
 ) => Promise<{
   events: { payload: any; idempotencyKey?: string }[];
   updatedState?: any;
@@ -65,7 +71,11 @@ export type SlateTriggerGroupGatewayReceiveHandler<
 }>;
 
 export type SlateWebhookTargetListHandler<ConfigType extends {}, AuthType extends {}> = (
-  context: SlateContext<ConfigType, AuthType, { pageToken: any | null }>
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { pageToken: any | null; selection?: SlateTriggerGroupSelection }
+  >
 ) => Promise<{
   targets: SlateWebhookTarget[];
   nextPageToken: any | null;
@@ -81,11 +91,54 @@ export type SlateWebhookRegisterHandler<ConfigType extends {}, AuthType extends 
       webhookTargetIdentifier: string;
       webhookTargetPayload: any;
       webhookUrl: string;
+      operationId?: string;
+      selection?: SlateTriggerGroupSelection;
+      deliveryConfig?: unknown;
+    }
+  >
+) => Promise<SlateWebhookRegistrationResult>;
+
+export interface SlateWebhookRegistrationResult {
+  webhookRegistrationIdentifier: string;
+  webhookRegistrationPayload: any;
+  expiresAt?: string | null;
+  renewAfter?: string | null;
+  /** Identities of this registration on a delivery channel shared with other registrations. */
+  routingKeys?: string[];
+}
+
+export type SlateWebhookRenewHandler<ConfigType extends {}, AuthType extends {}> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    {
+      webhookRegistrationIdentifier: string;
+      webhookRegistrationPayload: any;
+      webhookUrl: string;
+      webhookTargetIdentifier: string;
+      webhookTargetPayload: any;
+      operationId: string;
+      selection?: SlateTriggerGroupSelection;
+      deliveryConfig?: unknown;
+    }
+  >
+) => Promise<SlateWebhookRegistrationResult>;
+
+export type SlateWebhookExpandHandler<ConfigType extends {}, AuthType extends {}> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    {
+      payload: unknown | null;
+      state: any | null;
+      selection?: SlateTriggerGroupSelection;
+      deliveryId: string;
+      webhookRegistrationPayload: any;
     }
   >
 ) => Promise<{
-  webhookRegistrationIdentifier: string;
-  webhookRegistrationPayload: any;
+  events: { payload: any; idempotencyKey?: string }[];
+  updatedState?: any;
 }>;
 
 export type SlateWebhookUnregisterHandler<ConfigType extends {}, AuthType extends {}> = (
@@ -146,6 +199,18 @@ export interface SlateWebhookSkipped {
   reason: string;
 }
 
+/**
+ * Routing keys name the registrations a request addresses; an empty list acknowledges it
+ * without handing it to any. A rejection answers the sender with its status.
+ */
+export type SlateWebhookDeliveryAuthentication =
+  | { routingKeys: string[]; rejected?: undefined }
+  | { rejected: { status: number }; routingKeys?: undefined };
+
+export type SlateWebhookDeliveryAuthenticateHandler = (
+  context: SlateContext<{}, {}, { request: Request; deliveryConfig: unknown }>
+) => Promise<SlateWebhookDeliveryAuthentication>;
+
 export interface SlateTriggerGroupPollingParameters<
   ConfigType extends {},
   AuthType extends {}
@@ -168,6 +233,7 @@ export interface SlateTriggerGroupWebhookAutoRegistrationParameters<
 > {
   webhookTargetList: SlateWebhookTargetListHandler<ConfigType, AuthType>;
   webhookRegister: SlateWebhookRegisterHandler<ConfigType, AuthType>;
+  webhookRenew?: SlateWebhookRenewHandler<ConfigType, AuthType>;
   webhookUnregister: SlateWebhookUnregisterHandler<ConfigType, AuthType>;
 }
 
@@ -181,13 +247,28 @@ export interface SlateTriggerGroupWebhookManualRegistrationParameters<
   finish?: SlateWebhookManualFinishHandler<UserConfigSchema, FullConfigSchema>;
 }
 
+/** A delivery setup a person completes once for an automatically registered group. */
+export type SlateTriggerGroupWebhookDeliveryConfigParameters<
+  UserConfigSchema extends z.ZodType<any> = z.ZodType<any>,
+  FullConfigSchema extends z.ZodType<any> = z.ZodType<any>
+> = SlateTriggerGroupWebhookManualRegistrationParameters<
+  UserConfigSchema,
+  FullConfigSchema
+> & {
+  finish: SlateWebhookManualFinishHandler<UserConfigSchema, FullConfigSchema>;
+  authenticate: SlateWebhookDeliveryAuthenticateHandler;
+};
+
 export interface SlateTriggerGroupWebhookParameters<
   ConfigType extends {},
   AuthType extends {}
 > {
   autoRegistration?: SlateTriggerGroupWebhookAutoRegistrationParameters<ConfigType, AuthType>;
   manualRegistration?: SlateTriggerGroupWebhookManualRegistrationParameters<any, any>;
+  deliveryConfig?: SlateTriggerGroupWebhookDeliveryConfigParameters<any, any>;
   process: SlateWebhookProcessHandler;
+  expandWebhook?: SlateWebhookExpandHandler<ConfigType, AuthType>;
+  reconcileIntervalSeconds?: number;
 }
 
 export interface SlateTriggerGroupCreateParameters<
@@ -198,6 +279,7 @@ export interface SlateTriggerGroupCreateParameters<
   description?: string;
   metadata?: Record<string, any>;
   eventSchema?: z.ZodType<InputType>;
+  selectionSchema?: z.ZodType<SlateTriggerGroupSelection>;
 }
 
 export interface SlateTriggerGroupParameters<
@@ -259,6 +341,10 @@ export class SlateTriggerGroup<
 
   get source() {
     return this._params.source;
+  }
+
+  get selectionSchema() {
+    return this._params.selectionSchema;
   }
 
   get polling() {
@@ -327,7 +413,13 @@ export class SlateTriggerGroupBuilder<
       UserConfigSchema,
       FullConfigSchema
     >;
+    deliveryConfig?: SlateTriggerGroupWebhookDeliveryConfigParameters<
+      UserConfigSchema,
+      FullConfigSchema
+    >;
     process: SlateWebhookProcessHandler;
+    expandWebhook?: SlateWebhookExpandHandler<ConfigType, AuthType>;
+    reconcileIntervalSeconds?: number;
   }): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
     if (this.#source) {
       throw new SlateDeclarationError('Trigger group invocation is already defined');
@@ -339,11 +431,46 @@ export class SlateTriggerGroupBuilder<
       );
     }
 
+    if (props.deliveryConfig !== undefined) {
+      if (!props.autoRegistration) {
+        throw new SlateDeclarationError(
+          'A webhook delivery config requires automatic webhook registration'
+        );
+      }
+      if (!props.deliveryConfig.finish) {
+        throw new SlateDeclarationError('A webhook delivery config requires a finish handler');
+      }
+      if (!props.deliveryConfig.authenticate) {
+        throw new SlateDeclarationError(
+          'A webhook delivery config requires an authenticate handler'
+        );
+      }
+    }
+
+    if (props.reconcileIntervalSeconds !== undefined) {
+      if (
+        !Number.isSafeInteger(props.reconcileIntervalSeconds) ||
+        props.reconcileIntervalSeconds < 900
+      ) {
+        throw new SlateDeclarationError(
+          'Webhook reconciliation interval must be an integer of at least 900 seconds'
+        );
+      }
+      if (!props.expandWebhook) {
+        throw new SlateDeclarationError(
+          'Webhook reconciliation requires an expandWebhook handler'
+        );
+      }
+    }
+
     this.#source = 'webhook';
     this.#webhook = {
       autoRegistration: props.autoRegistration,
       manualRegistration: props.manualRegistration,
-      process: props.process
+      deliveryConfig: props.deliveryConfig,
+      process: props.process,
+      expandWebhook: props.expandWebhook,
+      reconcileIntervalSeconds: props.reconcileIntervalSeconds
     };
 
     return this;

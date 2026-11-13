@@ -22,6 +22,7 @@ export interface EventReminder {
 
 export interface CalendarEvent {
   id?: string;
+  etag?: string;
   summary?: string;
   description?: string;
   location?: string;
@@ -83,6 +84,7 @@ export interface CalendarListEntry {
   defaultReminders?: EventReminder[];
   primary?: boolean;
   summaryOverride?: string;
+  deleted?: boolean;
 }
 
 export interface CalendarSetting {
@@ -128,6 +130,7 @@ export interface WatchRequest {
   address: string;
   token?: string;
   expiration?: string;
+  params?: { ttl: string };
 }
 
 export interface WatchResponse {
@@ -136,7 +139,7 @@ export interface WatchResponse {
   resourceId?: string;
   resourceUri?: string;
   token?: string;
-  expiration?: string;
+  expiration?: string | number;
 }
 
 export class GoogleCalendarClient {
@@ -304,6 +307,7 @@ export class GoogleCalendarClient {
     showDeleted?: boolean;
     showHidden?: boolean;
     syncToken?: string;
+    minAccessRole?: string;
   }): Promise<{
     items: CalendarListEntry[];
     nextPageToken?: string;
@@ -446,6 +450,11 @@ export class GoogleCalendarClient {
   }
 
   // Watch (Push Notifications)
+
+  async getCurrentUser(): Promise<{ id?: string }> {
+    let response = await this.api.get('https://www.googleapis.com/oauth2/v2/userinfo');
+    return response.data;
+  }
 
   async watchEvents(calendarId: string, watchRequest: WatchRequest): Promise<WatchResponse> {
     let response = await this.api.post(

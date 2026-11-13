@@ -14,6 +14,20 @@ export let updateObjectMetadata = SlateTool.create(spec, {
     z.object({
       bucketName: z.string().describe('Name of the bucket containing the object'),
       objectName: z.string().describe('Full name (path) of the object'),
+      generation: z
+        .string()
+        .regex(/^[1-9]\d*$/)
+        .optional()
+        .describe(
+          'Exact object generation to update; use the event generation when processing a finalization.'
+        ),
+      ifMetagenerationMatch: z
+        .string()
+        .regex(/^[1-9]\d*$/)
+        .optional()
+        .describe(
+          'Only update if metadata still has this metageneration; prevents overwriting concurrent metadata changes.'
+        ),
       contentType: z.string().optional().describe('New MIME type for the object'),
       contentDisposition: z
         .string()
@@ -73,7 +87,11 @@ export let updateObjectMetadata = SlateTool.create(spec, {
     let result = await client.updateObjectMetadata(
       ctx.input.bucketName,
       ctx.input.objectName,
-      patchBody
+      patchBody,
+      {
+        generation: ctx.input.generation,
+        ifMetagenerationMatch: ctx.input.ifMetagenerationMatch
+      }
     );
 
     return {

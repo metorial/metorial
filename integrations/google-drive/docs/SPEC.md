@@ -100,4 +100,96 @@ Applications can store per-user configuration or data in a hidden app-specific f
 
 ## Events
 
-This integration does not currently expose event triggers.
+The `folder_events` automatic webhook group requires an explicit `folderIds`
+selection (1–100 folder IDs from `search_files`). Each selected folder can have
+at most 5,000 immediate children. It exposes:
+
+- `file_added_to_folder`: a file or folder becomes visible as an immediate child
+  after activation. Moves, restores, and newly shared old files count as additions;
+  this is not a file-creation claim.
+- `file_updated`: a known immediate child has a newer string-valued Drive version,
+  including content and metadata changes.
+
+Nested contents are not watched recursively, and shortcuts are not followed.
+Files present during the initial paginated baseline and catch-up are recorded
+silently. Change entries represent the latest observed resource, so rapid edits
+and moves may coalesce. Removal, trash, or loss of access clears known membership
+without asserting deletion or emitting an unavailable event. Restoring access can
+produce a later addition.
+
+Each selected folder has independent membership and cursor state. Shared-drive
+members use that drive's change log; non-members with individually shared folders
+use the user's log. The selected folder and account are rechecked every 15
+minutes, not on each change notification, so a folder that is trashed or moved
+can keep reporting changes for up to 15 minutes. Coverage
+is limited to the credential's actual grants; `drive.file` cannot observe every
+file visible in the Google Drive UI. There is no claim of an all-drives stream.
+A selected ID that is inaccessible, is not a folder, is a trashed folder, or is
+an alias for another folder ID is skipped with a warning; the other selected
+folders are still watched. Saved state is kept for the selected folders of the
+connected account only, one entry per folder.
+
+The 5,000-child limit bounds what is saved per folder: one ID and version per
+child, about 300 KB for a full folder. Registration fails with a readable error
+as soon as the baseline listing passes the limit, without listing the rest of the
+folder.
+
+If a watched folder later grows past the limit, the expansion that finds it
+stops there: it returns no events, records a warning, and replaces the folder's
+saved membership with an over-limit marker. The check runs once per bounded
+read (up to 20 change pages) rather than per page, so a removal later in the
+same read can offset an addition. While the marker is set:
+
+- a notification returns no events and makes no Drive request for that folder;
+- the 15-minute reconciliation lists the folder, stopping as soon as the limit
+  is passed. If it is still too large, reconciliation fails with the same
+  readable error and the saved state is unchanged. If it is back within the
+  limit, that listing becomes a new silent baseline with a fresh change cursor,
+  the marker is cleared, and a warning records that changes made while the
+  folder was over the limit were not delivered.
+
+`changes.watch` creates an HTTPS channel with a random verification token. Native
+notifications must match the saved channel, resource, token, and live lease;
+their body is not read. `sync` is acknowledged without a business event. That
+check reads only the saved channel fields. The folder baseline saved at registration is validated
+by the first authenticated expansion alone; afterwards the per-folder state is
+authoritative and the saved baseline is not read again. It stays in the saved
+registration because renewal cannot tell whether that first expansion has
+happened, and dropping it earlier could misreport a file added in between.
+
+Authenticated expansion reads up to 20 change pages (20,000 entries) per run and
+returns events with updated state together. A longer backlog continues from the
+saved page token, which Drive documents as non-expiring, on the next notification
+or reconciliation. Failed pages do not advance the cursor. Event deduplication
+uses account, corpus, folder, file ID, version and event kind, never the empty
+legacy `changeId` field. Events carry every output field, including the account
+verified during expansion, so mapping makes no further Drive request.
+
+Channels request a seven-day lease and renew at 80% of the provider-confirmed
+lifetime. Replacement channels retain unexpired overlap identities and the
+original baseline. Scheduled reconciliation requests a catch-up every 15 minutes.
+These guarantees require deployed runtime support for durable state, serialized
+expansion, renewal, and reconciliation; package code alone does not provide it.
+Drive documents non-expiring change tokens; an unexpected 410 defensively creates
+a silent new baseline, with an explicit recovery diagnostic.
+
+Only the creating Google account can clean up channels; Google also enforces the
+creating OAuth client. Drive has no channel read/list API. A successful stop or
+provider-confirmed lease expiry establishes cleanup; an active-channel 404 remains
+retryable because it cannot establish absence. A lost watch response cannot be
+looked up; an unrecorded channel expires within its requested lease.
+
+Root trigger contracts cover native verification (including rejection without
+reading a large saved baseline), activation races, pagination, the folder size
+limit at registration, the over-limit marker and its recovery through
+reconciliation, resumed backlogs, scope/corpus isolation,
+removals, atomic cursor progress, request-free mapping, and lease overlap. The
+live lifecycle scenario uses only a suite-owned folder and reserved `.invalid`
+receiver, validates the watch response, creates and updates real children,
+reconciles them, and stops the channels. It cannot prove callback delivery to a
+deployed receiver or channel absence through readback.
+
+Provider references: [push notifications](https://developers.google.com/workspace/drive/api/guides/push),
+[user and shared-drive change logs](https://developers.google.com/workspace/drive/api/guides/about-changes),
+[changes.list](https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/list),
+[file versions](https://developers.google.com/workspace/drive/api/reference/rest/v3/files).

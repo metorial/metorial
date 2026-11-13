@@ -1,4 +1,4 @@
-import { anyOf } from 'slates';
+import { allOf, anyOf } from 'slates';
 
 export let googleFormsScopes = {
   formsBody: 'https://www.googleapis.com/auth/forms.body',
@@ -39,7 +39,23 @@ export let googleFormsActionScopes = {
   updateForm: formStructureWrite,
   setPublishSettings: formStructureWrite,
   manageWatches: formStructureWrite,
-  newResponse: formResponsesRead,
+  // One clause per call: identity, reading a selected form, reading responses. Every scope in
+  // the last two also manages watches.
+  newResponse: allOf(
+    anyOf(googleFormsScopes.userInfoProfile, googleFormsScopes.userInfoEmail),
+    anyOf(
+      googleFormsScopes.formsBody,
+      googleFormsScopes.formsBodyReadonly,
+      googleFormsScopes.driveFile,
+      googleFormsScopes.drive,
+      googleFormsScopes.driveReadonly
+    ),
+    anyOf(
+      googleFormsScopes.formsResponsesReadonly,
+      googleFormsScopes.driveFile,
+      googleFormsScopes.drive
+    )
+  ),
   formUpdated: formStructureRead,
   inboundWebhook: formStructureRead
 } as const;

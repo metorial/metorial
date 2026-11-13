@@ -74,7 +74,36 @@ Creates, updates, deletes, or gets multiple Google contacts in one People API re
 
 ## Events
 
-This integration does not currently expose event triggers.
+Enable callbacks on an OAuth connection with `contacts` or `contacts.readonly`
+access to receive `contact_changed` snapshots. API keys cannot receive contact
+events. Reconnect older connections whose granted scopes are unavailable.
+
+Contacts are checked every 15 minutes. Each check reads every contact changed since
+one hour before the point the previous check reached. Each event contains
+`accountId`, the normalized `contact` (resource name, names, emails, phone numbers,
+and other available fields), and its `source` (`CONTACT` ID, original update time,
+and optional etag). The account, contact-source ID, original timestamp, and source
+etag identify a revision, so repeated observations reuse the same event ID.
+
+This is a snapshot feed: newly created contacts are included, but creation
+and edits are not distinguished, intermediate edits collapse into the latest snapshot,
+and deletions are not reported. The first check can include contacts changed during
+the preceding hour. After an interruption of any length, the next check resumes from
+the point the last complete check reached and delivers a snapshot of every contact
+changed since then. Revisions already reported inside that hour are remembered and
+skipped, so an interruption of any length does not report a revision twice. Contacts
+without a usable contact-source timestamp are skipped with a warning, and so is a
+contact that Google returns in an unexpected form; neither holds up the others.
+
+One check reads at most 10 pages of 1000 contacts and stops after 30 seconds. When
+more contacts changed than that, the newest snapshots are delivered first and the following checks continue with
+the older ones before the feed moves on; nothing is dropped. If Google no longer
+accepts the saved position, one check rereads up to 30 pages from the newest change,
+which covers a full Google Contacts account.
+
+See the [event output example](./docs/SPEC.md#events), Google's
+[connections list contract](https://developers.google.com/people/api/rest/v1/people.connections/list),
+and [contact source metadata](https://developers.google.com/people/api/rest/v1/people#Source).
 
 ## License
 

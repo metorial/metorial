@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   formatContact,
+  GooglePeopleClient,
   getContactRecipe,
   googlePeopleApiError,
   listContactsRecipe,
@@ -10,6 +11,68 @@ import {
 } from './index';
 
 describe('google people recipes', () => {
+  // https://developers.google.com/people/api/rest/v1/people.connections/list
+  // https://developers.google.com/people/api/rest/v1/people#Source
+  it('requests paginated CONTACT-only revisions without losing source metadata', async () => {
+    const calls: Array<{ url: string; config: any }> = [];
+    const data = {
+      connections: [
+        {
+          resourceName: 'people/c1',
+          metadata: {
+            sources: [
+              {
+                type: 'CONTACT',
+                id: '1',
+                updateTime: '2026-11-10T10:00:00.123456789Z',
+                etag: 'source-etag'
+              }
+            ]
+          }
+        }
+      ],
+      nextPageToken: 'next'
+    };
+    const client = new GooglePeopleClient({
+      token: 'test-token',
+      api: {
+        get: async (url, config) => {
+          calls.push({ url, config });
+          return { data };
+        }
+      }
+    });
+    expect(await client.listContactRevisions()).toEqual(data);
+    expect(await client.listContactRevisions('next')).toEqual(data);
+    expect(calls[0]).toMatchObject({
+      url: 'people/me/connections',
+      config: {
+        params: {
+          sources: 'READ_SOURCE_TYPE_CONTACT',
+          sortOrder: 'LAST_MODIFIED_DESCENDING',
+          pageSize: 1000
+        },
+        headers: { Authorization: 'Bearer test-token' }
+      }
+    });
+    expect(calls[0]!.config.params.personFields.split(',')).toContain('metadata');
+    expect(calls[1]!.config.params).toEqual({ ...calls[0]!.config.params, pageToken: 'next' });
+  });
+
+  it('preserves upstream failures when listing contact revisions', async () => {
+    const client = new GooglePeopleClient({
+      token: 'test-token',
+      api: {
+        get: async () => {
+          throw { response: { status: 429, data: { error: { message: 'Quota exceeded' } } } };
+        }
+      }
+    });
+    await expect(client.listContactRevisions()).rejects.toMatchObject({
+      data: { reason: 'google_people_api_error', upstreamStatus: 429 }
+    });
+  });
+
   it('uses MCP-compatible top-level object input schemas', () => {
     for (let recipe of [listContactsRecipe, searchContactsRecipe, getContactRecipe]) {
       let jsonSchema = z.toJSONSchema(recipe.inputSchema) as Record<string, unknown>;

@@ -20,6 +20,7 @@ import {
   searchMessages,
   sendEmail
 } from './tools';
+import { emailReceived, mailboxEvents } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -43,5 +44,6 @@ export let provider = Slate.create({
     importMessage.build(),
     insertMessage.build()
   ],
-  triggers: []
+  triggerGroups: [mailboxEvents],
+  triggers: [emailReceived]
 });

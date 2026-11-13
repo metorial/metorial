@@ -18,6 +18,7 @@ import {
   respondToEvent,
   updateEvent
 } from './tools';
+import { calendarEvents, eventCancelled, eventChanged } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +39,6 @@ export let provider = Slate.create({
     getColors,
     getSettings
   ],
-  triggers: []
+  triggerGroups: [calendarEvents],
+  triggers: [eventChanged, eventCancelled]
 });

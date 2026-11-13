@@ -13,6 +13,7 @@ import {
   searchReports,
   uploadOfflineConversions
 } from './tools';
+import { leadForms, leadReceived } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +29,6 @@ export let provider = Slate.create({
     uploadOfflineConversions,
     manageAudienceLists
   ] as any,
-  triggers: []
+  triggerGroups: [leadForms],
+  triggers: [leadReceived]
 });

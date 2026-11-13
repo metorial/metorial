@@ -266,7 +266,11 @@ export let getWebhookAutoRegistration = <ConfigType extends {}, AuthType extends
 export let getWebhookManualRegistration = <ConfigType extends {}, AuthType extends {}>(
   group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
 ) => {
-  if (group.source !== 'webhook' || !group.webhook?.manualRegistration) {
+  let registration =
+    group.source === 'webhook'
+      ? (group.webhook?.manualRegistration ?? group.webhook?.deliveryConfig)
+      : undefined;
+  if (!registration) {
     throw new ServiceError(
       badRequestError({
         message: `Trigger group does not support manual webhook registration: ${group.key}`
@@ -274,8 +278,30 @@ export let getWebhookManualRegistration = <ConfigType extends {}, AuthType exten
     );
   }
 
-  return group.webhook.manualRegistration;
+  return registration;
 };
+
+export let getWebhookDeliveryConfig = <ConfigType extends {}, AuthType extends {}>(
+  group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
+) => {
+  if (group.source !== 'webhook' || !group.webhook?.deliveryConfig) {
+    throw new ServiceError(
+      badRequestError({
+        message: `Trigger group does not support webhook delivery authentication: ${group.key}`
+      })
+    );
+  }
+
+  return group.webhook.deliveryConfig;
+};
+
+let mapWebhookConfigSchemas = (config: {
+  userConfigSchema: z.ZodType<any>;
+  fullConfigSchema: z.ZodType<any>;
+}) => ({
+  userConfigSchema: toJsonSchema(config.userConfigSchema),
+  fullConfigSchema: toJsonSchema(config.fullConfigSchema)
+});
 
 export let mapToolCategory = (category: SlateToolCategory): SlatesToolCategory => ({
   id: category.key,
@@ -307,6 +333,9 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   name: group.name,
   description: group.description,
   metadata: group.metadata,
+  ...(group.selectionSchema
+    ? { selectionSchema: toJsonSchema(group.selectionSchema, 'input') }
+    : {}),
   invocation:
     group.source === 'polling'
       ? {
@@ -317,16 +346,25 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
         ? { type: 'gateway' }
         : {
             type: 'webhook',
+            ...(group.webhook?.expandWebhook ? { supportsExpansion: true } : {}),
+            ...(group.webhook?.autoRegistration?.webhookRenew
+              ? { supportsRenewal: true }
+              : {}),
+            ...(group.webhook?.reconcileIntervalSeconds !== undefined
+              ? { reconcileIntervalSeconds: group.webhook.reconcileIntervalSeconds }
+              : {}),
             registration: group.webhook?.manualRegistration
               ? {
                   mode: 'manual',
-                  userConfigSchema: toJsonSchema(
-                    group.webhook.manualRegistration.userConfigSchema
-                  ),
-                  fullConfigSchema: toJsonSchema(
-                    group.webhook.manualRegistration.fullConfigSchema
-                  )
+                  ...mapWebhookConfigSchemas(group.webhook.manualRegistration)
                 }
-              : { mode: 'auto' }
+              : {
+                  mode: 'auto',
+                  ...(group.webhook?.deliveryConfig
+                    ? {
+                        deliveryConfig: mapWebhookConfigSchemas(group.webhook.deliveryConfig)
+                      }
+                    : {})
+                }
           }
 });

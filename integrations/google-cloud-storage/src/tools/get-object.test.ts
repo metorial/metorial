@@ -2,14 +2,12 @@ import { Buffer } from 'node:buffer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let mocks = vi.hoisted(() => ({
-  getObjectMetadata: vi.fn(),
-  downloadObject: vi.fn()
+  getObjectMetadata: vi.fn()
 }));
 
 vi.mock('../lib/client', () => ({
   Client: class {
     getObjectMetadata = mocks.getObjectMetadata;
-    downloadObject = mocks.downloadObject;
   }
 }));
 
@@ -17,22 +15,23 @@ import { getObject } from './get-object';
 
 beforeEach(() => {
   mocks.getObjectMetadata.mockReset();
-  mocks.downloadObject.mockReset();
 });
 
 describe('get_object binary downloads', () => {
-  it('returns exact object bytes as a base64 file with provider metadata', async () => {
+  it('prepares a generation-pinned provider download with metadata', async () => {
     let content = Buffer.from([0, 255, 1, 128, 10]);
     mocks.getObjectMetadata.mockResolvedValue({
       name: 'images/sample.png',
       bucket: 'bucket-name',
       size: String(content.byteLength),
       contentType: 'image/png',
-      storageClass: 'STANDARD'
+      storageClass: 'STANDARD',
+      generation: '1234567890123456789'
     });
-    mocks.downloadObject.mockResolvedValue(content);
 
+    const addAttachment = vi.fn();
     let result = await getObject.handleInvocation({
+      addAttachment,
       auth: { token: 'access-token' },
       config: { projectId: 'example-project' },
       input: {
@@ -48,15 +47,12 @@ describe('get_object binary downloads', () => {
       sizeBytes: String(content.byteLength),
       contentType: 'image/png'
     });
-    expect(result.attachments).toEqual([
-      {
-        mimeType: 'image/png',
-        content: {
-          type: 'content',
-          encoding: 'base64',
-          content: content.toString('base64')
-        }
-      }
-    ]);
+    expect(addAttachment).toHaveBeenCalledWith({
+      type: 'url',
+      url: 'https://storage.googleapis.com/storage/v1/b/bucket-name/o/images%2Fsample.png',
+      mimeType: 'image/png',
+      query: { alt: 'media', generation: '1234567890123456789' },
+      headers: { Authorization: 'Bearer access-token' }
+    });
   });
 });

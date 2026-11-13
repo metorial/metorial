@@ -25,10 +25,16 @@ import {
   type SlatesMessageTriggerGroupPollingPollResponse,
   type SlatesMessageTriggerGroupRoutingMatchersGetResponse,
   type SlatesMessageTriggerGroupsListResponse,
+  type SlatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse,
+  type SlatesMessageTriggerGroupWebhookExpandRequest,
+  type SlatesMessageTriggerGroupWebhookExpandResponse,
   type SlatesMessageTriggerGroupWebhookManualFinishResponse,
   type SlatesMessageTriggerGroupWebhookManualSetupResponse,
   type SlatesMessageTriggerGroupWebhookProcessResponse,
+  type SlatesMessageTriggerGroupWebhookRegisterRequest,
   type SlatesMessageTriggerGroupWebhookRegisterResponse,
+  type SlatesMessageTriggerGroupWebhookRenewRequest,
+  type SlatesMessageTriggerGroupWebhookRenewResponse,
   type SlatesMessageTriggerGroupWebhookTargetsListResponse,
   type SlatesMessageTriggerGroupWebhookUnregisterResponse,
   type SlatesParticipant,
@@ -38,6 +44,17 @@ import {
 import { randomUUID } from 'crypto';
 import { SlateProtocolError } from './error';
 import type { SlatesClientState, SlatesProtocolClientOptions } from './types';
+
+let encodeWebhookBody = (body: string | Uint8Array | null | undefined) => {
+  let content =
+    typeof body === 'string'
+      ? Buffer.from(body, 'utf-8').toString('base64')
+      : body
+        ? Buffer.from(body).toString('base64')
+        : null;
+
+  return content ? { encoding: 'base64' as const, content } : null;
+};
 
 let createDefaultParticipants = (): SlatesParticipant[] => [
   {
@@ -398,22 +415,38 @@ export class SlatesProtocolClient {
   async listTriggerGroupWebhookTargets(d: {
     triggerGroupId: string;
     pageToken?: any;
+    selection?: Record<string, any>;
   }): Promise<SlatesMessageTriggerGroupWebhookTargetsListResponse['result']> {
     this.ensureSession();
     return this.request('slates/trigger_group.webhook.targets_list', {
       triggerGroupId: d.triggerGroupId,
-      pageToken: d.pageToken ?? null
+      pageToken: d.pageToken ?? null,
+      selection: d.selection
     });
   }
 
-  async registerTriggerGroupWebhook(d: {
-    triggerGroupId: string;
-    webhookTargetIdentifier: string;
-    webhookTargetPayload: any;
-    webhookUrl: string;
-  }): Promise<SlatesMessageTriggerGroupWebhookRegisterResponse['result']> {
+  async registerTriggerGroupWebhook(
+    d: SlatesMessageTriggerGroupWebhookRegisterRequest['params']
+  ): Promise<SlatesMessageTriggerGroupWebhookRegisterResponse['result']> {
     this.ensureSession();
     return this.request('slates/trigger_group.webhook.register', d);
+  }
+
+  async renewTriggerGroupWebhook(
+    d: SlatesMessageTriggerGroupWebhookRenewRequest['params']
+  ): Promise<SlatesMessageTriggerGroupWebhookRenewResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.webhook.renew', d);
+  }
+
+  async expandTriggerGroupWebhook(
+    d: SlatesMessageTriggerGroupWebhookExpandRequest['params']
+  ): Promise<SlatesMessageTriggerGroupWebhookExpandResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.webhook.expand', {
+      ...d,
+      state: d.state ?? null
+    });
   }
 
   async unregisterTriggerGroupWebhook(d: {
@@ -449,25 +482,31 @@ export class SlatesProtocolClient {
     body?: string | Uint8Array | null;
     webhookRegistrationPayload: any;
   }): Promise<SlatesMessageTriggerGroupWebhookProcessResponse['result']> {
-    let encodedBody =
-      typeof d.body === 'string'
-        ? Buffer.from(d.body, 'utf-8').toString('base64')
-        : d.body
-          ? Buffer.from(d.body).toString('base64')
-          : null;
-
     return this.request('slates/trigger_group.webhook.process', {
       triggerGroupId: d.triggerGroupId,
       url: d.url,
       method: d.method,
       headers: d.headers ?? {},
-      body: encodedBody
-        ? {
-            encoding: 'base64',
-            content: encodedBody
-          }
-        : null,
+      body: encodeWebhookBody(d.body),
       webhookRegistrationPayload: d.webhookRegistrationPayload
+    });
+  }
+
+  async authenticateTriggerGroupWebhookDelivery(d: {
+    triggerGroupId: string;
+    url: string;
+    method: string;
+    headers?: Record<string, string>;
+    body?: string | Uint8Array | null;
+    deliveryConfig: unknown;
+  }): Promise<SlatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse['result']> {
+    return this.request('slates/trigger_group.webhook.delivery_authenticate', {
+      triggerGroupId: d.triggerGroupId,
+      url: d.url,
+      method: d.method,
+      headers: d.headers ?? {},
+      body: encodeWebhookBody(d.body),
+      deliveryConfig: d.deliveryConfig
     });
   }
 
@@ -481,11 +520,13 @@ export class SlatesProtocolClient {
   async pollTriggerGroup(d: {
     triggerGroupId: string;
     state?: any;
+    selection?: Record<string, any>;
   }): Promise<SlatesMessageTriggerGroupPollingPollResponse['result']> {
     this.ensureSession();
     return this.request('slates/trigger_group.polling.poll', {
       triggerGroupId: d.triggerGroupId,
-      state: d.state ?? null
+      state: d.state ?? null,
+      selection: d.selection
     });
   }
 
