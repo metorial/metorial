@@ -8571,15 +8571,15 @@
     },
     "integrations/metorial-admin": {
       "name": "@slates-integrations/metorial-admin",
-      "version": "0.4.1",
+      "version": "0.5.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.32",
+        "slates": "1.0.0-rc.33",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.27",
+        "@slates/test": "1.0.0-rc.28",
         "typescript": "^5",
         "vitest": "^3.2.4",
       },
@@ -21523,10 +21523,6 @@
 
     "@slates-integrations/metatextai/slates": ["slates@1.0.0-rc.28", "", { "dependencies": { "@slates/provider": "1.0.0-rc.29" } }, "sha512-YO2lOMDrCNh9T7Otj7KTmVFT9+qPLu/n76Dz0VoA9grgCk6R3t353xpyuHv+ullbpxDsFuNJgEskFf732tU1Yw=="],
 
-    "@slates-integrations/metorial-admin/@slates/test": ["@slates/test@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.32", "@slates/profiles": "1.0.0-rc.28" } }, "sha512-BFqG2UEIQv2803kVWUZsh+FCplo2O2iXxXzJL+TIPjCRq3p6O2M14ybhKJMBxWzQZDG9jy0E2GsDktCZj32QCg=="],
-
-    "@slates-integrations/metorial-admin/slates": ["slates@1.0.0-rc.32", "", { "dependencies": { "@slates/provider": "1.0.0-rc.33" } }, "sha512-SSTE6yE7CojJxHLhdpchlIOjr9hbKK4O5fDS1CMrvrvZfk6jk7L+aYqxQrgHoiZGX5qkRZHT5sTAGp/gdEVmnw=="],
-
     "@slates-integrations/mezmo/@slates/test": ["@slates/test@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.26", "@slates/profiles": "1.0.0-rc.24" } }, "sha512-2Z+2tomwvD2+8W/q2DrRO6On1F3aoxkwUlFoIVb5f9NG+vSqVR0BUBCl2qMc4dan+pyAKCQexUOfHRgSnWyhGg=="],
 
     "@slates-integrations/mezmo/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
@@ -24859,10 +24855,6 @@
 
     "@slates-integrations/metatextai/slates/@slates/provider": ["@slates/provider@1.0.0-rc.29", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-aK//o0Jyj+H55crUlY+O0AtWGzv3P/N015Hr91ACsHCx+GwwOCkIRFkaScm23qMSXt6P587pShyYPrYmemwiLg=="],
 
-    "@slates-integrations/metorial-admin/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.32", "", { "dependencies": { "@slates/proto": "1.0.0-rc.28", "@slates/provider": "1.0.0-rc.33", "@slates/provider-handler": "1.0.0-rc.43" } }, "sha512-UrrUHbswMnzsYYrbXqiue945RIY7FtFgBwTl6mr61XBzHn8dIDcM/Y+DF48fx2yDQ2fdxjUIYYEf+1z7U9XIBg=="],
-
-    "@slates-integrations/metorial-admin/slates/@slates/provider": ["@slates/provider@1.0.0-rc.33", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-G/liua2Cdx/a/LMw+D33i43MhADKtpNax77pcSY+3qeijNPoo0NBj7iOTBjNV9syY6T5kPVPnayEOeCQlOORyA=="],
-
     "@slates-integrations/mezmo/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
     "@slates-integrations/microsoft-clarity/slates/@slates/provider": ["@slates/provider@1.0.0-rc.29", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-aK//o0Jyj+H55crUlY+O0AtWGzv3P/N015Hr91ACsHCx+GwwOCkIRFkaScm23qMSXt6P587pShyYPrYmemwiLg=="],
@@ -27356,12 +27348,6 @@
     "@slates-integrations/metabase/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.19", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.13", "@slates/provider": "1.0.0-rc.17", "zod": "^4.2.1" } }, "sha512-E2fLLfIpTPlOwdTBNrNCn5hz7YiETmN0gD8l6NER7hZr/0uK6uCAQU1x8tQO5F3Q1b3BI0oYQ7Muewaibn6Xdg=="],
 
     "@slates-integrations/metabase/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.13", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-LpXwx2UnG6X6JlzKINdGNLFfSFt8F737dIbVvO31Kmv+i2egpBxm6g2mbmclke+Qe2WCBDnv3pMt0B+43PErOQ=="],
-
-    "@slates-integrations/metorial-admin/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.28", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-SOc4jzg3wuinQxmKRmxNMaCu6pV6pyQozOh9VnjMap6oX/qkkv6Q98dNXjQoeJxSRDsuUDCO8dtwLfWqP1HsmQ=="],
-
-    "@slates-integrations/metorial-admin/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.33", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-G/liua2Cdx/a/LMw+D33i43MhADKtpNax77pcSY+3qeijNPoo0NBj7iOTBjNV9syY6T5kPVPnayEOeCQlOORyA=="],
-
-    "@slates-integrations/metorial-admin/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.43", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.28", "@slates/provider": "1.0.0-rc.33", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-r4giVILc0rRf05dO0IPtuy9B3hiKdYEqnBNnZQlTng8aOuWFT86wRHzS1FaWVhZpz++7/Tp29pzgRtH1RLorZA=="],
 
     "@slates-integrations/microsoft-fabric/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
