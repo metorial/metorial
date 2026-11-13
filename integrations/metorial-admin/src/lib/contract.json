@@ -189,164 +189,6 @@
     },
     {
       "key": "providers_list",
-      "name": "List providers",
-      "description": "Returns a paginated list of providers.",
-      "category": "providers",
-      "method": "GET",
-      "path": "/providers",
-      "instanceScoped": true,
-      "readOnly": true,
-      "destructive": false,
-      "params": {
-        "limit": {
-          "in": "query",
-          "name": "limit"
-        },
-        "after": {
-          "in": "query",
-          "name": "after"
-        },
-        "before": {
-          "in": "query",
-          "name": "before"
-        },
-        "cursor": {
-          "in": "query",
-          "name": "cursor"
-        },
-        "order": {
-          "in": "query",
-          "name": "order"
-        },
-        "id": {
-          "in": "query",
-          "name": "id"
-        },
-        "search": {
-          "in": "query",
-          "name": "search"
-        },
-        "auth_method": {
-          "in": "query",
-          "name": "auth_method"
-        },
-        "auth_setup": {
-          "in": "query",
-          "name": "auth_setup"
-        }
-      },
-      "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-          "limit": {
-            "type": "number"
-          },
-          "after": {
-            "type": "string"
-          },
-          "before": {
-            "type": "string"
-          },
-          "cursor": {
-            "type": "string"
-          },
-          "order": {
-            "type": "string",
-            "enum": [
-              "asc",
-              "desc"
-            ]
-          },
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            ],
-            "description": "Filter by provider ID(s)"
-          },
-          "search": {
-            "type": "string",
-            "description": "Search providers by name, description, or readme"
-          },
-          "auth_method": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            ],
-            "description": "Filter by auth method — matches an auth method ID, auth method global ID, key, name, or type (oauth, token, service_account, custom)"
-          },
-          "auth_setup": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "configured",
-                  "not_configured"
-                ]
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "configured",
-                    "not_configured"
-                  ]
-                }
-              }
-            ],
-            "description": "Filter by auth setup status. \"configured\" matches providers with a token or custom auth method, or with auth credentials already configured. \"not_configured\" matches providers with only OAuth auth methods and no auth credentials configured."
-          }
-        }
-      }
-    },
-    {
-      "key": "providers_listings_get",
-      "name": "Get provider listing",
-      "description": "Retrieves a specific provider listing by ID.",
-      "category": "providers",
-      "method": "GET",
-      "path": "/provider-listings/:providerListingId",
-      "instanceScoped": true,
-      "readOnly": true,
-      "destructive": false,
-      "params": {
-        "provider_listing_id": {
-          "in": "path",
-          "name": "providerListingId"
-        }
-      },
-      "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-          "provider_listing_id": {
-            "type": "string",
-            "description": "provider listing id"
-          }
-        },
-        "required": [
-          "provider_listing_id"
-        ]
-      }
-    },
-    {
-      "key": "providers_listings_list",
       "name": "List provider listings",
       "description": "Returns a paginated list of provider listings.",
       "category": "providers",
@@ -35744,6 +35586,10 @@
         "description": {
           "in": "body",
           "name": "description"
+        },
+        "trigger_group_selections": {
+          "in": "body",
+          "name": "trigger_group_selections"
         }
       },
       "inputSchema": {
@@ -35768,6 +35614,14 @@
               "null"
             ],
             "description": "Description for the callback. Defaults to the description of the integration provider."
+          },
+          "trigger_group_selections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "Resource selections keyed by trigger group key. Each value must match that group’s selection schema. Limited to 64 groups and 64 KiB of JSON."
           }
         },
         "required": [
@@ -36041,7 +35895,7 @@
     {
       "key": "callbacks_update",
       "name": "Update callback",
-      "description": "Updates the name, description or metadata of a callback. Everything else about a callback is derived from its integration provider - set `callbacks.status` to `disabled` there to tear it down.",
+      "description": "Updates the name, description, metadata or trigger group selections of a callback. Changing the selections re-registers the affected triggers. Everything else about a callback is derived from its integration provider - set `callbacks.status` to `disabled` there to tear it down.",
       "category": "callbacks",
       "method": "PATCH",
       "path": "/callbacks/:callbackId",
@@ -36064,6 +35918,10 @@
         "metadata": {
           "in": "body",
           "name": "metadata"
+        },
+        "trigger_group_selections": {
+          "in": "body",
+          "name": "trigger_group_selections"
         }
       },
       "inputSchema": {
@@ -36092,6 +35950,17 @@
             ],
             "additionalProperties": {},
             "description": "Updated custom metadata"
+          },
+          "trigger_group_selections": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "Resource selections keyed by trigger group key. Each value must match that group’s selection schema. Limited to 64 groups and 64 KiB of JSON."
           }
         },
         "required": [
