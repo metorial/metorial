@@ -94,9 +94,11 @@ file ID, name, type, link, parent folder IDs and whether the file is in the tras
 spreadsheets. It does not say what changed, and it covers metadata changes such
 as a rename, a move or a new share as well as content edits; compare
 `modifiedTime` to tell them apart. A file that is deleted for good, or that the
-account can no longer open, produces no event. Nothing is remembered per file, so
-**File Added to Folder** never fires in this mode. A busy account is read in
-batches of up to 5,000 changes per run.
+account can no longer open, produces no event. A change Google Drive reports
+without a complete file description is skipped with a warning, so it cannot stop
+later events. Nothing is remembered per file, so **File Added to Folder** never
+fires in this mode. A busy account is read in batches of up to 5,000 changes per
+run.
 
 **Folders selected.** Select up to 100 folders to watch only their immediate
 children; folders can be picked from a searchable list or entered as IDs.

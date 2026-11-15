@@ -132,18 +132,26 @@ The `folder_events` automatic webhook group (shown as "File Events"; the key is
 kept because saved selections are stored under it) takes an optional `folderIds`
 selection.
 
-Without selected folders the whole account is one target: one `changes.watch`
-channel on the user's change log, started at the current `startPageToken`, with
-no file listing. Every `file` change with a file resource becomes a
-`file_updated` event with `folderId: null`, `driveId` taken from the file and
-`trashed` reflecting the file, including newly created files, metadata-only
-changes and files moved to the trash. Changes with `removed: true` (deleted for
-good or no longer accessible) and non-file changes are skipped. No per-file state
-is saved, only the cursor, so `file_added_to_folder` never fires and a repeated
-read of the same version is deduplicated by the event ID alone. One run reads at
-most 5 change pages (5,000 changes); the rest follows on the next notification
-or the 15-minute reconciliation. What the user change log contains for shared
-drives has not been verified against a live account.
+Without selected folders the whole account is one target of its own kind,
+`{ accountId, scope: 'account' }`, handled by `src/triggers/account-events.ts`:
+one `changes.watch` channel on the user's change log, started at the current
+`startPageToken`, with no file listing. Every `file` change with a file resource
+becomes a `file_updated` event with `folderId: null`, `driveId` taken from the
+file and `trashed` reflecting the file, including newly created files,
+metadata-only changes and files moved to the trash. Changes with `removed: true`
+(deleted for good or no longer accessible) and non-file changes produce no event.
+A change that cannot become a valid event (no file resource, mismatching file
+IDs, a missing or non-numeric version, a missing name or type) is skipped rather
+than failing the run, so it cannot hold the cursor back; each run that skips any
+records one `google_drive_change_skipped` warning with the count. Only the cursor
+is saved, as `{ targetId, cursor }` under `driveAccount` in the group state, so
+`file_added_to_folder` never fires and a repeated read of the same version is
+deduplicated by the event ID alone. Expanding the account target drops saved
+folder state, and expanding a folder target drops saved account state. One run
+reads at most 5 change pages (5,000 changes); the rest follows on the next
+notification or the 15-minute reconciliation. An invalidated cursor (410)
+restarts from a fresh `startPageToken` with a warning. What the user change log
+contains for shared drives has not been verified against a live account.
 
 With a selection (1–100 folder IDs from `search_files`) only those folders are
 watched, each as its own target. Each selected folder can have

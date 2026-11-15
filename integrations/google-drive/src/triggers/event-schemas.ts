@@ -17,21 +17,37 @@ export const driveFolderSelectionSchema = z.object({
     })
 });
 
-export const driveTargetSchema = z.object({
+export const driveFolderTargetSchema = z.object({
   accountId: z.string().min(1),
-  // Null watches every file in the account instead of one folder.
-  folderId: z.string().min(1).nullable(),
+  folderId: z.string().min(1),
   driveId: z.string().min(1).nullable(),
   // Non-members with an individually shared folder use their user change log.
   cursorDriveId: z.string().min(1).nullable()
 });
+export type DriveFolderTarget = z.infer<typeof driveFolderTargetSchema>;
+export const driveAccountTargetSchema = z.object({
+  accountId: z.string().min(1),
+  scope: z.literal('account')
+});
+export type DriveAccountTarget = z.infer<typeof driveAccountTargetSchema>;
+export const driveTargetSchema = z.union([driveAccountTargetSchema, driveFolderTargetSchema]);
 export type DriveTarget = z.infer<typeof driveTargetSchema>;
+export const isDriveAccountTarget = (target: DriveTarget): target is DriveAccountTarget =>
+  'scope' in target;
+// Folder IDs have four parts and account IDs two, so the two kinds never collide.
 export const driveTargetId = (target: DriveTarget) =>
-  JSON.stringify([target.accountId, target.cursorDriveId, target.folderId, target.driveId]);
+  isDriveAccountTarget(target)
+    ? JSON.stringify(['account', target.accountId])
+    : JSON.stringify([
+        target.accountId,
+        target.cursorDriveId,
+        target.folderId,
+        target.driveId
+      ]);
 const driveTargetIdSchema = z.tuple([
   z.string(),
   z.string().nullable(),
-  z.string().nullable(),
+  z.string(),
   z.string().nullable()
 ]);
 export const driveTargetIdOwner = (targetId: string) => {
@@ -60,6 +76,11 @@ export const driveSavedFolderStateSchema = z.union([
   driveFolderStateSchema
 ]);
 export type DriveSavedFolderState = z.infer<typeof driveSavedFolderStateSchema>;
+export const driveAccountStateSchema = z.object({
+  targetId: z.string().min(1),
+  cursor: z.string().min(1)
+});
+export type DriveAccountState = z.infer<typeof driveAccountStateSchema>;
 
 // Earlier registrations saved the channel ID as `channelId`.
 const driveChannelSchema = z.preprocess(value => {
@@ -72,11 +93,22 @@ export const driveChannelRegistrationSchema = z.object({
   // The first channel is the current one; the rest are still-accepted predecessors.
   channels: z.array(driveChannelSchema).min(1)
 });
-export const driveRegistrationSchema = driveChannelRegistrationSchema.extend({
-  initialState: driveFolderStateSchema,
+const driveLeaseFields = {
   operationId: z.string().optional(),
   tokenSeed: z.string().min(1).optional()
-});
+};
+export const driveRegistrationSchema = z.union([
+  driveChannelRegistrationSchema.extend({
+    target: driveFolderTargetSchema,
+    initialState: driveFolderStateSchema,
+    ...driveLeaseFields
+  }),
+  driveChannelRegistrationSchema.extend({
+    target: driveAccountTargetSchema,
+    initialState: driveAccountStateSchema,
+    ...driveLeaseFields
+  })
+]);
 
 export const driveFileEventSchema = z.object({
   type: z.enum(['file_added_to_folder', 'file_updated']),

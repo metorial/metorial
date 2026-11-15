@@ -34,8 +34,8 @@ describe('google-sheets provider contract', () => {
         'create_filter_view',
         'merge_cells'
       ],
-      triggerIds: ['new_row'],
-      triggerGroupIds: ['new_rows'],
+      triggerIds: [],
+      triggerGroupIds: [],
       authMethodIds: ['oauth', 'api_key', 'service_account'],
       tools: [
         { id: 'create_spreadsheet', readOnly: false, destructive: false },
@@ -59,7 +59,7 @@ describe('google-sheets provider contract', () => {
       triggers: []
     });
 
-    expect(contract.actions).toHaveLength(18);
+    expect(contract.actions).toHaveLength(17);
 
     let expectedScopes = {
       create_spreadsheet: googleSheetsActionScopes.createSpreadsheet,

@@ -28,7 +28,14 @@ import { z } from 'zod';
 import { GoogleDriveClient } from '../lib/client';
 import { spec } from '../spec';
 import {
+  assertDriveAccountTarget,
+  baselineDriveAccount,
+  expandDriveAccount,
+  resolveDriveAccountTarget
+} from './account-events';
+import {
   DRIVE_FOLDER_MAX_CHILDREN,
+  type DriveFolderTarget,
   type DriveSavedFolderState,
   type DriveTarget,
   driveChannelRegistrationSchema,
@@ -40,6 +47,7 @@ import {
   driveTargetId,
   driveTargetIdOwner,
   driveTargetSchema,
+  isDriveAccountTarget,
   parseDriveContract
 } from './event-schemas';
 import { folderOptions } from './selection-options';
@@ -57,35 +65,27 @@ const RENEW_WINDOW = { lifetimeFraction: 0.8 };
 const CHANNEL_LABELS = { integration: 'google_drive', label: 'Google Drive' };
 const TARGETS_PER_PAGE = 20;
 const savedStateSchema = z
-  .object({ driveFolders: z.record(z.string(), z.unknown()).optional() })
+  .object({
+    driveFolders: z.record(z.string(), z.unknown()).optional(),
+    driveAccount: z.unknown().optional()
+  })
   .passthrough();
 
-function selectedTarget(target: DriveTarget, selection: unknown) {
+function selectedTarget(target: DriveFolderTarget, selection: unknown) {
   const selected = parseDriveContract(
     driveFolderSelectionSchema,
     selection,
     'folder selection'
   );
-  const folderIds = selected.folderIds ?? [];
-  const stillSelected =
-    target.folderId === null ? !folderIds.length : folderIds.includes(target.folderId);
-  if (!stillSelected)
+  if (!selected.folderIds?.includes(target.folderId))
     throw createApiServiceError('The registered Google Drive folder is no longer selected.', {
       reason: 'google_drive_folder_not_selected'
     });
 }
 
-const discoveredTarget = ({ name, ...target }: DriveTarget & { name: string }) => ({
-  webhookTargetIdentifier: driveTargetId(target),
-  webhookTargetPayload: target,
-  name,
-  metadata: { folderId: target.folderId, driveId: target.driveId },
-  targetOwnership: 'single_user' as const
-});
-
-async function assertTarget(
+async function assertFolderTarget(
   client: GoogleDriveClient,
-  target: DriveTarget,
+  target: DriveFolderTarget,
   identifier: string,
   selection: unknown
 ) {
@@ -103,21 +103,52 @@ async function assertTarget(
   }
 }
 
+const assertTarget = (
+  client: GoogleDriveClient,
+  target: DriveTarget,
+  identifier: string,
+  selection: unknown
+) =>
+  isDriveAccountTarget(target)
+    ? assertDriveAccountTarget(client, target, identifier, selection)
+    : assertFolderTarget(client, target, identifier, selection);
+
+async function registrationBaseline(client: GoogleDriveClient, target: DriveTarget) {
+  if (isDriveAccountTarget(target)) return baselineDriveAccount(client, target);
+  const baseline = await baselineDriveFolder(client, target);
+  if (!baseline) throw driveFolderTooLarge();
+  return baseline;
+}
+
+// The account watch reads the user's change log.
+const changeLogDriveId = (target: DriveTarget) =>
+  isDriveAccountTarget(target) ? undefined : (target.cursorDriveId ?? undefined);
+
 const targetList: SlateWebhookTargetListHandler<{}, Auth> = async ctx => {
   const selection = parseDriveContract(
     driveFolderSelectionSchema,
     ctx.input.selection,
     'folder selection'
   );
-  const folderIds = [...new Set(selection.folderIds ?? [])];
+  const folderIds = [...new Set(selection.folderIds)];
   const offset = ctx.input.pageToken == null ? 0 : ctx.input.pageToken;
   const client = new GoogleDriveClient(ctx.auth.token);
   // Without selected folders the whole account is one target.
-  if (!folderIds.length && offset === 0)
+  if (!folderIds.length && offset === 0) {
+    const { name, ...target } = await resolveDriveAccountTarget(client);
     return {
-      targets: [discoveredTarget(await resolveDriveTarget(client, null))],
+      targets: [
+        {
+          webhookTargetIdentifier: driveTargetId(target),
+          webhookTargetPayload: target,
+          name,
+          metadata: { scope: target.scope },
+          targetOwnership: 'single_user' as const
+        }
+      ],
       nextPageToken: null
     };
+  }
   if (!Number.isSafeInteger(offset) || offset < 0 || offset >= folderIds.length) {
     throw createApiServiceError('Invalid Google Drive folder discovery page token.', {
       reason: 'google_drive_target_page_invalid'
@@ -126,7 +157,7 @@ const targetList: SlateWebhookTargetListHandler<{}, Auth> = async ctx => {
   const targets: Awaited<ReturnType<SlateWebhookTargetListHandler<{}, Auth>>>['targets'] = [];
   for (const folderId of folderIds.slice(offset, offset + TARGETS_PER_PAGE)) {
     try {
-      const target = await resolveDriveTarget(client, folderId);
+      const { name, ...target } = await resolveDriveTarget(client, folderId);
       if (folderId !== target.folderId)
         throw createApiServiceError(
           'Use the folder ID returned by Search Files, rather than a folder alias.',
@@ -134,7 +165,13 @@ const targetList: SlateWebhookTargetListHandler<{}, Auth> = async ctx => {
             reason: 'google_drive_folder_alias'
           }
         );
-      targets.push(discoveredTarget(target));
+      targets.push({
+        webhookTargetIdentifier: driveTargetId(target),
+        webhookTargetPayload: target,
+        name,
+        metadata: { folderId: target.folderId, driveId: target.driveId },
+        targetOwnership: 'single_user' as const
+      });
     } catch (error) {
       const reason = getServiceErrorData(error)?.reason;
       if (
@@ -162,7 +199,7 @@ const targetList: SlateWebhookTargetListHandler<{}, Auth> = async ctx => {
   return { targets, nextPageToken: nextOffset < folderIds.length ? nextOffset : null };
 };
 
-function leaseResult(registration: z.infer<typeof driveRegistrationSchema>) {
+function leaseResult<T extends { channels: GoogleWatchChannel[] }>(registration: T) {
   const active = registration.channels[0]!;
   return {
     webhookRegistrationIdentifier: active.id,
@@ -187,7 +224,7 @@ function createChannel(
     watch: async () => {
       const response = await client.watchChanges(cursor, webhookUrl, identity.id, {
         token: identity.token,
-        driveId: target.cursorDriveId ?? undefined,
+        driveId: changeLogDriveId(target),
         expiration: String(Date.now() + CHANNEL_LIFETIME_MS)
       });
       return { ...response, id: response.channelId };
@@ -204,8 +241,7 @@ const register: SlateWebhookRegisterHandler<{}, Auth> = async ctx => {
   );
   const client = new GoogleDriveClient(ctx.auth.token);
   await assertTarget(client, target, ctx.input.webhookTargetIdentifier, ctx.input.selection);
-  const initialState = await baselineDriveFolder(client, target);
-  if (!initialState) throw driveFolderTooLarge();
+  const initialState = await registrationBaseline(client, target);
   const channel = await createChannel(
     client,
     target,
@@ -256,7 +292,7 @@ const renew: SlateWebhookRenewHandler<{}, Auth> = async ctx => {
   if (registration.operationId === ctx.input.operationId && isChannelLive(active))
     return leaseResult(registration);
   // Renewal only wakes the saved cursor; never replace the baseline or advance the cursor.
-  const watchCursor = await client.getStartPageToken(target.cursorDriveId ?? undefined);
+  const watchCursor = await client.getStartPageToken(changeLogDriveId(target));
   const channel = await createChannel(
     client,
     target,
@@ -336,7 +372,8 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
     ctx.input.webhookRegistrationPayload,
     'registration'
   );
-  const targetId = driveTargetId(registration.target);
+  const { target } = registration;
+  const targetId = driveTargetId(target);
   const wakeup =
     ctx.input.payload == null
       ? null
@@ -347,12 +384,23 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
         );
   if (wakeup && wakeup.targetId !== targetId)
     throw createApiServiceError(
-      'Google Drive notification does not belong to the saved folder.',
+      'Google Drive notification does not belong to the saved registration.',
       {
         reason: 'google_drive_notification_target_mismatch'
       }
     );
   const state = parseDriveContract(savedStateSchema, ctx.input.state ?? {}, 'saved state');
+  const client = new GoogleDriveClient(ctx.auth.token);
+  if (isDriveAccountTarget(target))
+    return expandDriveAccount({
+      client,
+      target,
+      notified: wakeup !== null,
+      selection: ctx.input.selection,
+      state,
+      initialState: ctx.input.webhookRegistrationPayload.initialState,
+      warn: message => ctx.warn(message)
+    });
   const saved = state.driveFolders?.[targetId];
   // The registration baseline only seeds the first expansion; saved state wins afterwards.
   const previous =
@@ -367,22 +415,19 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
   const save = (folder: DriveSavedFolderState) => {
     const selected = new Set(
       parseDriveContract(driveFolderSelectionSchema, ctx.input.selection, 'folder selection')
-        .folderIds ?? []
+        .folderIds
     );
-    const kept = new Map<string | null, [string, unknown]>();
+    const kept = new Map<string, [string, unknown]>();
     for (const [key, value] of Object.entries(state.driveFolders ?? {})) {
       const owner = driveTargetIdOwner(key);
-      if (
-        owner?.accountId === registration.target.accountId &&
-        owner.folderId !== null &&
-        selected.has(owner.folderId)
-      )
+      if (owner?.accountId === target.accountId && selected.has(owner.folderId))
         kept.set(owner.folderId, [key, value]);
     }
-    kept.set(registration.target.folderId, [targetId, folder]);
-    return { ...state, driveFolders: Object.fromEntries(kept.values()) };
+    kept.set(target.folderId, [targetId, folder]);
+    // Folders are selected, so saved account state is dropped.
+    const { driveAccount: _, ...rest } = state;
+    return { ...rest, driveFolders: Object.fromEntries(kept.values()) };
   };
-  const client = new GoogleDriveClient(ctx.auth.token);
   if ('overLimit' in previous) {
     if (previous.targetId !== targetId)
       throw createApiServiceError(
@@ -391,11 +436,11 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
       );
     // Only scheduled reconciliation rechecks an over-limit folder; notifications cost no request.
     if (wakeup) {
-      selectedTarget(registration.target, ctx.input.selection);
+      selectedTarget(target, ctx.input.selection);
       return { events: [] };
     }
-    await assertTarget(client, registration.target, targetId, ctx.input.selection);
-    const baseline = await baselineDriveFolder(client, registration.target);
+    await assertFolderTarget(client, target, targetId, ctx.input.selection);
+    const baseline = await baselineDriveFolder(client, target);
     if (!baseline) throw driveFolderTooLarge();
     ctx.warn({
       message:
@@ -405,11 +450,11 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
     return { events: [], updatedState: save(baseline) };
   }
   // Notifications only read the change log; scheduled reconciliation rechecks folder and account.
-  if (wakeup) selectedTarget(registration.target, ctx.input.selection);
-  else await assertTarget(client, registration.target, targetId, ctx.input.selection);
+  if (wakeup) selectedTarget(target, ctx.input.selection);
+  else await assertFolderTarget(client, target, targetId, ctx.input.selection);
   let result: Awaited<ReturnType<typeof drainDriveChanges>>;
   try {
-    result = await drainDriveChanges(client, registration.target, previous, true);
+    result = await drainDriveChanges(client, target, previous, true);
   } catch (error) {
     // Tokens should not expire; this recovers an invalidated cursor without reporting every file as new.
     if (Number(getApiErrorStatus(error)) !== 410) throw error;
@@ -418,7 +463,7 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
         'Google Drive invalidated the change cursor. Rebuilding the folder baseline without replaying existing files.',
       reason: 'google_drive_cursor_reset'
     });
-    const baseline = await baselineDriveFolder(client, registration.target);
+    const baseline = await baselineDriveFolder(client, target);
     result = baseline
       ? { overLimit: false, events: [], state: baseline }
       : { overLimit: true };

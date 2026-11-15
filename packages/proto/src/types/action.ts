@@ -64,13 +64,15 @@ export let slatesEventAttributeMaxValues = 16;
 export let slatesEventAttributeMaxValueLength = 256;
 export let slatesEventAttributeKeyPattern = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
-export let slatesEventAttributes = z.record(
-  z.string().regex(slatesEventAttributeKeyPattern),
-  z
-    .array(z.string().min(1).max(slatesEventAttributeMaxValueLength))
-    .min(1)
-    .max(slatesEventAttributeMaxValues)
-);
+export let slatesEventAttributes = z
+  .record(
+    z.string().regex(slatesEventAttributeKeyPattern),
+    z
+      .array(z.string().min(1).max(slatesEventAttributeMaxValueLength))
+      .min(1)
+      .max(slatesEventAttributeMaxValues)
+  )
+  .refine(attributes => Object.keys(attributes).length <= slatesEventAttributeMaxKeys);
 
 export type SlatesAction = z.infer<typeof slatesAction>;
 export type SlatesActionTool = z.infer<typeof slatesActionTool>;

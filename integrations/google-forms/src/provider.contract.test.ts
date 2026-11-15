@@ -23,7 +23,7 @@ describe('google-forms provider contract', () => {
         'list_responses',
         'manage_watches'
       ],
-      triggerIds: ['new_response'],
+      triggerIds: [],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'create_form', readOnly: false, destructive: false },
@@ -37,7 +37,7 @@ describe('google-forms provider contract', () => {
       triggers: []
     });
 
-    expect(contract.actions).toHaveLength(8);
+    expect(contract.actions).toHaveLength(7);
 
     let expectedScopes = {
       create_form: googleFormsActionScopes.createForm,

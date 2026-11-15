@@ -6,7 +6,7 @@ import {
   DRIVE_FOLDER_MAX_CHILDREN,
   type DriveFileEvent,
   type DriveFolderState,
-  type DriveTarget,
+  type DriveFolderTarget,
   driveEventId,
   driveFileEventSchema,
   driveTargetId,
@@ -15,8 +15,6 @@ import {
 
 // Change tokens do not expire, so a longer backlog resumes on the next run.
 export const DRIVE_CHANGE_PAGES_PER_DRAIN = 20;
-// With the whole account watched every change is an event, so a run reads fewer pages.
-export const DRIVE_ALL_FILES_PAGES_PER_DRAIN = 5;
 
 export async function driveAccountId(client: GoogleDriveClient) {
   const account = await client.getAbout();
@@ -29,17 +27,9 @@ export async function driveAccountId(client: GoogleDriveClient) {
 
 export async function resolveDriveTarget(
   client: GoogleDriveClient,
-  folderId: string | null
-): Promise<DriveTarget & { name: string }> {
+  folderId: string
+): Promise<DriveFolderTarget & { name: string }> {
   const accountId = await driveAccountId(client);
-  if (folderId === null)
-    return {
-      accountId,
-      folderId: null,
-      driveId: null,
-      cursorDriveId: null,
-      name: 'All files'
-    };
   const folder = await client.getFile(folderId);
   if (folder.mimeType !== DRIVE_FOLDER_MIME_TYPE || folder.trashed) {
     throw createApiServiceError('Select an accessible, untrashed Google Drive folder.', {
@@ -70,14 +60,13 @@ export async function resolveDriveTarget(
   };
 }
 
-const repeatedPageToken = () =>
+export const repeatedPageToken = () =>
   createApiServiceError('Google Drive repeated a pagination token.', {
     reason: 'google_drive_pagination_cycle'
   });
 
-function inFolder(file: DriveFile, target: DriveTarget) {
+function inFolder(file: DriveFile, target: DriveFolderTarget) {
   return (
-    target.folderId !== null &&
     !file.trashed &&
     (file.driveId ?? null) === target.driveId &&
     file.parents?.includes(target.folderId)
@@ -109,7 +98,7 @@ function fileVersion(file: DriveFile) {
 
 export async function drainDriveChanges(
   client: GoogleDriveClient,
-  target: DriveTarget,
+  target: DriveFolderTarget,
   previous: DriveFolderState,
   emit: boolean
 ) {
@@ -120,8 +109,6 @@ export async function drainDriveChanges(
         reason: 'google_drive_cursor_identity_mismatch'
       }
     );
-  const allFiles = target.folderId === null;
-  const pageBudget = allFiles ? DRIVE_ALL_FILES_PAGES_PER_DRAIN : DRIVE_CHANGE_PAGES_PER_DRAIN;
   const members = { ...previous.members };
   const events: { payload: DriveFileEvent; idempotencyKey: string }[] = [];
   const visited = new Set<string>([previous.cursor]);
@@ -137,7 +124,7 @@ export async function drainDriveChanges(
     for (const change of page.changes) {
       if ((change.changeType ?? change.type) !== 'file' || !change.fileId) continue;
       const file = change.file;
-      if (change.removed || (file && !allFiles && !inFolder(file, target))) {
+      if (change.removed || (file && !inFolder(file, target))) {
         delete members[change.fileId];
         continue;
       }
@@ -159,15 +146,13 @@ export async function drainDriveChanges(
       const prior = members[file.fileId];
       // Listing and draining can see a revision twice, or one already superseded.
       if (prior && BigInt(version) <= BigInt(prior)) continue;
-      // Files are only remembered per folder; a whole account would not fit in saved state.
-      if (!allFiles) members[file.fileId] = version;
+      members[file.fileId] = version;
       if (!emit) continue;
       const payload = parseDriveContract(
         driveFileEventSchema,
         {
-          type: prior || allFiles ? 'file_updated' : 'file_added_to_folder',
+          type: prior ? 'file_updated' : 'file_added_to_folder',
           ...target,
-          driveId: file.driveId ?? null,
           fileId: file.fileId,
           name: file.name,
           mimeType: file.mimeType,
@@ -177,7 +162,7 @@ export async function drainDriveChanges(
           createdTime: file.createdTime,
           modifiedTime: file.modifiedTime,
           observedAt: new Date().toISOString(),
-          trashed: file.trashed === true,
+          trashed: false,
           removed: false
         },
         'file event'
@@ -187,7 +172,7 @@ export async function drainDriveChanges(
     if (page.nextPageToken) {
       assertNewPageToken(visited, page.nextPageToken, repeatedPageToken);
       cursor = page.nextPageToken;
-      if (pages < pageBudget) continue;
+      if (pages < DRIVE_CHANGE_PAGES_PER_DRAIN) continue;
     } else if (page.newStartPageToken) {
       cursor = page.newStartPageToken;
     } else {
@@ -208,7 +193,7 @@ export async function drainDriveChanges(
 // Resolves to null as soon as the listing exceeds the child limit.
 export async function baselineDriveFolder(
   client: GoogleDriveClient,
-  target: DriveTarget
+  target: DriveFolderTarget
 ): Promise<DriveFolderState | null> {
   // Start the cursor before listing and drain what changed meanwhile; activation ends after the drain.
   const cursor = await client.getStartPageToken(target.cursorDriveId ?? undefined);
@@ -217,14 +202,11 @@ export async function baselineDriveFolder(
       reason: 'google_drive_cursor_missing'
     });
   const members: Record<string, string> = {};
-  // Only changes after activation are reported, so the whole account needs no listing.
-  if (target.folderId === null) return { targetId: driveTargetId(target), cursor, members };
-  const folderQuery = `'${escapeDriveQueryValue(target.folderId)}' in parents and trashed = false`;
   let pageToken: string | undefined;
   const visited = new Set<string>();
   do {
     const page = await client.listFiles({
-      query: folderQuery,
+      query: `'${escapeDriveQueryValue(target.folderId)}' in parents and trashed = false`,
       pageSize: 1000,
       pageToken,
       spaces: 'drive',
