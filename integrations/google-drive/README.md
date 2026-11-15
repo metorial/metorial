@@ -8,8 +8,9 @@ Use **OAuth** for Drive access and to read the label definitions your organizati
 
 ## Events
 
-Watch explicitly selected folders with **File Added to Folder** and **File Updated**.
-See [Folder triggers](#folder-triggers) for scope and delivery details.
+Get **File Updated** for every file in the account, or select folders to watch only
+their contents with **File Added to Folder** and **File Updated**.
+See [File triggers](#file-triggers) for scope and delivery details.
 
 ## Tools
 
@@ -81,14 +82,35 @@ Update a file or folder's metadata in Google Drive. Can rename, change descripti
 
 Upload a file with content to Google Drive. Provide file content as plain text or base64-encoded string. The file will be created with the given name, content type, and optional parent folder.
 
-## Folder triggers
+## File triggers
 
-Select 1–100 folder IDs using `folderIds` to watch their immediate children.
+The folder selection (`folderIds`) is optional.
+
+**No folders selected (default).** Every file the connection can see is watched.
+**File Updated** fires for each file that is created or changed after activation,
+wherever it is: documents, spreadsheets, folders, uploads. The event carries the
+file ID, name, type, link, parent folder IDs and whether the file is in the trash
+(`trashed`), so a consumer can filter by type, for example to react only to
+spreadsheets. It does not say what changed, and it covers metadata changes such
+as a rename, a move or a new share as well as content edits; compare
+`modifiedTime` to tell them apart. A file that is deleted for good, or that the
+account can no longer open, produces no event. A change Google Drive reports
+without a complete file description is skipped with a warning, so it cannot stop
+later events. Nothing is remembered per file, so **File Added to Folder** never
+fires in this mode. A busy account is read in batches of up to 5,000 changes per
+run.
+
+**Folders selected.** Select up to 100 folders to watch only their immediate
+children; folders can be picked from a searchable list or entered as IDs.
 **File Added to Folder** includes newly visible files, moves, restores, and shares;
 it does not imply that the file was newly created. **File Updated** reports a newer
 version of an already known child, including content and metadata changes.
 Existing files are recorded silently on activation, and nested contents are not
 watched recursively. Rapid changes can be combined into the latest observed state.
+
+In both modes, events from either trigger can be filtered by file ID, file type
+(`mimeType`) and parent folder ID, for example to follow one document or every
+spreadsheet in a folder.
 
 A watched folder can have at most 5,000 immediate children. A larger folder
 cannot be watched; watch a smaller folder, such as a subfolder, instead. A folder
@@ -103,6 +125,16 @@ account. Coverage remains limited by its granted access. Notifications require a
 HTTPS callback, durable change state, automatic lease renewal and periodic
 reconciliation. See the [event contract](./docs/SPEC.md#events) for delivery,
 recovery, and cleanup details.
+
+## Option lists
+
+Other integrations can offer files from this connection in their pickers. The
+`files` list holds the files in My Drive, shared with the account and in the
+shared drives it is a member of, most recently modified first, and searches by
+name. An optional `mimeType` limits it to one exact type, such as
+`application/vnd.google-apps.spreadsheet`; without it every file except folders
+is listed. Trashed files are never listed. A connection that only allows access
+to files created or opened with this app lists only those files.
 
 ## License
 

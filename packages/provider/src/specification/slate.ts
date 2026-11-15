@@ -1,4 +1,10 @@
-import type { SlateTool, SlateToolCategory, SlateTrigger, SlateTriggerGroup } from '../action';
+import type {
+  SlateOptionList,
+  SlateTool,
+  SlateToolCategory,
+  SlateTrigger,
+  SlateTriggerGroup
+} from '../action';
 import type { SlateAdapter } from '../adapter';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from './specification';
@@ -13,7 +19,8 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
     private readonly _adapters: SlateAdapter<ConfigType, AuthType>[],
     private readonly _triggerGroups: SlateTriggerGroup<ConfigType, AuthType>[],
     private readonly _toolCategories: SlateToolCategory[],
-    private readonly _toolCategoryKeysByActionKey: Map<string, string[]>
+    private readonly _toolCategoryKeysByActionKey: Map<string, string[]>,
+    private readonly _optionLists: SlateOptionList<ConfigType, AuthType, any>[]
   ) {}
 
   static create<ConfigType extends {}, AuthType extends {}>(params: {
@@ -23,6 +30,7 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
     adapters?: SlateAdapter<ConfigType, AuthType>[];
     triggerGroups?: SlateTriggerGroup<ConfigType, AuthType>[];
     toolCategories?: SlateToolCategory[];
+    optionLists?: SlateOptionList<ConfigType, AuthType, any>[];
   }) {
     let adapters = params.adapters ?? [];
     let actions = [...params.triggers, ...params.tools];
@@ -76,6 +84,17 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
       );
     }
 
+    let optionLists = params.optionLists ?? [];
+    let seenOptionListKeys = new Set<string>();
+    for (let list of optionLists) {
+      if (seenOptionListKeys.has(list.key)) {
+        throw new SlateDeclarationError(
+          `Option list "${list.key}" is registered more than once`
+        );
+      }
+      seenOptionListKeys.add(list.key);
+    }
+
     let toolCategories = params.toolCategories ?? [];
     let toolCategoryKeysByActionKey = resolveToolCategoryMembership(toolCategories, actions);
 
@@ -85,7 +104,8 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
       adapters,
       triggerGroups,
       toolCategories,
-      toolCategoryKeysByActionKey
+      toolCategoryKeysByActionKey,
+      optionLists
     );
   }
 
@@ -107,6 +127,10 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
 
   get toolCategories() {
     return this._toolCategories ?? [];
+  }
+
+  get optionLists() {
+    return this._optionLists ?? [];
   }
 
   // Keys of the tool categories an action belongs to, in declared category order.

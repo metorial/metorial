@@ -1,5 +1,6 @@
 import z from 'zod';
 import {
+  slatesOption,
   slatesTriggerGroup,
   slatesTriggerRoutingMatcher,
   slatesWebhookTarget
@@ -425,6 +426,40 @@ export type SlatesMessageTriggerGroupRoutingMatchersGetResponse = z.infer<
 >;
 
 /**
+ * List Selection Options
+ */
+export let slatesMessageTriggerGroupSelectionOptionsListRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.selection.options_list'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    field: z.string(),
+    query: z.string().nullable().optional(),
+    pageToken: z.any().nullable().optional(),
+    // The selection as entered so far; it may be incomplete and is not validated.
+    selection: z.record(z.string(), z.any()).optional()
+  })
+});
+
+export type SlatesMessageTriggerGroupSelectionOptionsListRequest = z.infer<
+  typeof slatesMessageTriggerGroupSelectionOptionsListRequest
+>;
+
+export let slatesMessageTriggerGroupSelectionOptionsListResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    options: z.array(slatesOption),
+    nextPageToken: z.any().nullable()
+  })
+});
+
+export type SlatesMessageTriggerGroupSelectionOptionsListResponse = z.infer<
+  typeof slatesMessageTriggerGroupSelectionOptionsListResponse
+>;
+
+/**
  * Poll
  */
 export let slatesMessageTriggerGroupPollingPollRequest = z.object({
@@ -546,6 +581,7 @@ export type SlatesTriggerGroupRequests =
   | SlatesMessageTriggerGroupWebhookProcessRequest
   | SlatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest
   | SlatesMessageTriggerGroupRoutingMatchersGetRequest
+  | SlatesMessageTriggerGroupSelectionOptionsListRequest
   | SlatesMessageTriggerGroupPollingPollRequest
   | SlatesMessageTriggerGroupGatewayConnectRequest
   | SlatesMessageTriggerGroupGatewayReceiveRequest;
@@ -563,6 +599,7 @@ export type SlatesTriggerGroupResponses =
   | SlatesMessageTriggerGroupWebhookProcessResponse
   | SlatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse
   | SlatesMessageTriggerGroupRoutingMatchersGetResponse
+  | SlatesMessageTriggerGroupSelectionOptionsListResponse
   | SlatesMessageTriggerGroupPollingPollResponse
   | SlatesMessageTriggerGroupGatewayConnectResponse
   | SlatesMessageTriggerGroupGatewayReceiveResponse;
@@ -586,6 +623,8 @@ export let slatesTriggerGroupResponsesByMethod = {
     slatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetResponse,
+  'slates/trigger_group.selection.options_list':
+    slatesMessageTriggerGroupSelectionOptionsListResponse,
   'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollResponse,
   'slates/trigger_group.gateway.connect': slatesMessageTriggerGroupGatewayConnectResponse,
   'slates/trigger_group.gateway.receive': slatesMessageTriggerGroupGatewayReceiveResponse
@@ -609,6 +648,8 @@ export let slatesTriggerGroupRequestsByMethod = {
     slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetRequest,
+  'slates/trigger_group.selection.options_list':
+    slatesMessageTriggerGroupSelectionOptionsListRequest,
   'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollRequest,
   'slates/trigger_group.gateway.connect': slatesMessageTriggerGroupGatewayConnectRequest,
   'slates/trigger_group.gateway.receive': slatesMessageTriggerGroupGatewayReceiveRequest

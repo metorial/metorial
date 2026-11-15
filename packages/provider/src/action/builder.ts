@@ -17,6 +17,51 @@ import type {
 import { validateScopes } from './scopes';
 import type { SlateTriggerGroup } from './triggerGroup';
 
+// Mirrors the event attribute limits in @slates/proto.
+let EVENT_ATTRIBUTE_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+let EVENT_ATTRIBUTE_MAX_KEYS = 8;
+
+let checkEventAttributeNames = (fields: string[]) => {
+  if (!Array.isArray(fields)) {
+    throw new SlateDeclarationError('Event attributes must be a list of output field names');
+  }
+  if (fields.length > EVENT_ATTRIBUTE_MAX_KEYS) {
+    throw new SlateDeclarationError(
+      `A trigger can declare at most ${EVENT_ATTRIBUTE_MAX_KEYS} event attributes`
+    );
+  }
+
+  let seen = new Set<string>();
+  for (let field of fields) {
+    if (typeof field !== 'string' || !EVENT_ATTRIBUTE_KEY_PATTERN.test(field)) {
+      throw new SlateDeclarationError(
+        `Event attribute "${field}" must start with a letter and contain only letters, digits and underscores (at most 64 characters)`
+      );
+    }
+    if (seen.has(field)) {
+      throw new SlateDeclarationError(`Event attribute "${field}" is declared more than once`);
+    }
+    seen.add(field);
+  }
+};
+
+let checkEventAttributeFields = (fields: string[], outputSchema: z.ZodType<any>) => {
+  if ((outputSchema as any)._zod?.def?.type !== 'object') {
+    throw new SlateDeclarationError(
+      'Event attributes require the output schema to be a zod object'
+    );
+  }
+
+  let shape = (outputSchema as z.ZodObject<any>).shape;
+  for (let field of fields) {
+    if (!Object.hasOwn(shape, field)) {
+      throw new SlateDeclarationError(
+        `Event attribute "${field}" is not a top-level property of the output schema`
+      );
+    }
+  }
+};
+
 export class SlateActionBuilder<
   Type extends SlateActionType,
   ConfigType extends {},
@@ -39,6 +84,7 @@ export class SlateActionBuilder<
   #triggerMatches: SlateTriggerMatchesHandler | null = null;
   #triggerMap: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType> | null =
     null;
+  #eventAttributes: string[] | null = null;
   #interfaceLocked = false;
 
   constructor(
@@ -190,6 +236,26 @@ export class SlateActionBuilder<
     return this;
   }
 
+  /**
+   * Returns the values of these top-level output fields with every mapped event, so events
+   * can be filtered by them. Strings, finite numbers, booleans and arrays of those are used.
+   */
+  eventAttributes(
+    fields: (keyof OutputType & string)[]
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
+    if (this.type !== 'trigger') {
+      throw new SlateDeclarationError('eventAttributes can only be set for trigger actions');
+    }
+
+    checkEventAttributeNames(fields);
+    if (this.#outputSchema) {
+      checkEventAttributeFields(fields, this.#outputSchema);
+    }
+
+    this.#eventAttributes = [...fields];
+    return this;
+  }
+
   build() {
     let scopes = this.#scopes ?? this.params.scopes;
     if (scopes) {
@@ -219,6 +285,9 @@ export class SlateActionBuilder<
     if (this.type === 'trigger' && !this.#triggerMap) {
       throw new SlateDeclarationError('Trigger map handler is not defined');
     }
+    if (this.#eventAttributes) {
+      checkEventAttributeFields(this.#eventAttributes, this.#outputSchema);
+    }
 
     let triggerParams: SlateActionParametersTrigger<
       ConfigType,
@@ -231,7 +300,10 @@ export class SlateActionBuilder<
             type: 'trigger',
             triggerGroup: this.#triggerGroup!,
             matches: this.#triggerMatches!,
-            map: this.#triggerMap! as any
+            map: this.#triggerMap! as any,
+            ...(this.#eventAttributes?.length
+              ? { eventAttributes: this.#eventAttributes }
+              : {})
           }
         : null;
 

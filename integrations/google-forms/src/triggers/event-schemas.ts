@@ -9,9 +9,9 @@ const formIdSchema = z
 export const timestampSchema = z.iso.datetime({ offset: true });
 export const formSelectionSchema = z.object({
   formIds: z.array(z.string().trim().min(1)).min(1).max(100).meta({
-    title: 'Form IDs',
+    title: 'Forms',
     description:
-      "IDs of up to 100 forms to watch for new responses. The connected Google account must be able to edit each form. To find a form's ID, open the form for editing and copy the part of the address between /d/ and /edit. The link shared with respondents contains a different ID that cannot be used."
+      "The forms to watch for new responses, up to 100. You need edit access to each form. To add a form that is not in the list, paste its ID: the part of the form's edit link between /d/ and /edit (the link you send to respondents has a different ID that does not work)."
   })
 });
 export const formTargetSchema = z.object({

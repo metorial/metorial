@@ -1,37 +1,22 @@
 import { SlateTrigger } from 'slates';
 import { googleSheetsActionScopes } from '../scopes';
 import { spec } from '../spec';
-import { rowObservations } from './row-observations';
-import { rowAddedSchema, rowUpdatedSchema } from './row-schemas';
+import { newRows } from './new-rows';
+import { newRowSchema } from './row-schemas';
 
-export { rowObservations };
+export { newRows };
 
-export const rowAdded = SlateTrigger.create(spec, {
-  key: 'row_added',
-  name: 'Row Added',
+export const newRow = SlateTrigger.create(spec, {
+  key: 'new_row',
+  name: 'New Row',
   description:
-    'Observes a new immutable row key in the selected table after its silent baseline, checked every 15 minutes. This is a snapshot observation, not an exact insert timestamp.'
+    'Fires when a row is added at the bottom of a sheet. Checked every 15 minutes, so the event arrives a little after the row was added.'
 })
-  .triggerGroup(rowObservations)
+  .triggerGroup(newRows)
   .authMethods(['oauth', 'service_account'])
   .scopes(googleSheetsActionScopes.readCells)
-  .input(rowAddedSchema)
-  .output(rowAddedSchema)
-  .matches(input => rowAddedSchema.safeParse(input).success)
-  .map(async ctx => ({ type: ctx.input.type, id: ctx.input.observationId, output: ctx.input }))
-  .build();
-
-export const rowUpdated = SlateTrigger.create(spec, {
-  key: 'row_updated',
-  name: 'Row Updated',
-  description:
-    'Observes a change in the watched entered values or formula expressions of an existing row key, checked every 15 minutes. Intermediate edits and formula recalculations are not reported.'
-})
-  .triggerGroup(rowObservations)
-  .authMethods(['oauth', 'service_account'])
-  .scopes(googleSheetsActionScopes.readCells)
-  .input(rowUpdatedSchema)
-  .output(rowUpdatedSchema)
-  .matches(input => rowUpdatedSchema.safeParse(input).success)
-  .map(async ctx => ({ type: ctx.input.type, id: ctx.input.observationId, output: ctx.input }))
+  .input(newRowSchema)
+  .output(newRowSchema)
+  .matches(input => newRowSchema.safeParse(input).success)
+  .map(async ctx => ({ type: ctx.input.type, id: ctx.input.eventId, output: ctx.input }))
   .build();

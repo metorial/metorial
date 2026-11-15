@@ -1,6 +1,7 @@
 export * from './action';
 export * from './builder';
 export * from './getFileUrlTool';
+export * from './optionList';
 export * from './publicTool';
 export * from './scopes';
 export * from './tool';

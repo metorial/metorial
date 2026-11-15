@@ -12,6 +12,7 @@ import {
   authenticateSlateTriggerGroupWebhookDelivery,
   createLocalSlateTestClient,
   expandSlateTriggerGroupWebhook,
+  listSlateTriggerGroupSelectionOptions,
   pollSlateTriggerGroupEvents,
   processSlateTriggerGroupWebhook,
   registerSlateTriggerGroupWebhook,
@@ -149,15 +150,28 @@ let fixture = (
     })
     .routingMatchers(async () => [{ tenant: 'tenant' }])
     .build();
-  let poll = triggerGroup(spec, { key: 'poll', name: 'Poll', selectionSchema })
+  let pollBuilder = triggerGroup(spec, { key: 'poll', name: 'Poll', selectionSchema })
     .polling({
       pollEvents: async ctx => {
         record('poll', ctx);
         return { events: [], updatedState: ctx.input.state };
       }
     })
-    .routingMatchers(async () => [])
-    .build();
+    .routingMatchers(async () => []);
+  if (selectionSchema) {
+    pollBuilder.selectionOptions({
+      resource: {
+        list: async ctx => {
+          record('options', ctx);
+          return {
+            options: [{ value: 'a', label: 'Resource A' }],
+            nextPageToken: ctx.input.pageToken ? null : 'next'
+          };
+        }
+      }
+    });
+  }
+  let poll = pollBuilder.build();
   let matches = 0;
   let selectedInput = z.object({
     kind: z.string().optional(),
@@ -471,6 +485,49 @@ describe('trigger lifecycle protocol helpers', () => {
       selection: { resource: 'explicit' }
     });
     expect(defaults.contexts.at(-1)?.input.selection).toEqual({ resource: 'explicit' });
+  });
+
+  it('lists options for a marked selection field from an incomplete selection', async () => {
+    let { client, contexts } = fixture({ selection: 'required' });
+    let marked = (await client.getTriggerGroup('poll')).triggerGroup.selectionSchema;
+    let unmarked = (await client.getTriggerGroup('webhook')).triggerGroup.selectionSchema;
+    expect(marked?.properties.resource['x-slates-options']).toBe(true);
+    expect(unmarked?.properties.resource).not.toHaveProperty('x-slates-options');
+
+    let first = await listSlateTriggerGroupSelectionOptions({
+      client,
+      triggerGroupId: 'poll',
+      field: 'resource',
+      query: '  res ',
+      selection: { other: 'entered' }
+    });
+    expect(first).toMatchObject({
+      options: [{ value: 'a', label: 'Resource A' }],
+      nextPageToken: 'next'
+    });
+    expect(contexts.at(-1)).toMatchObject({
+      operation: 'options',
+      input: { query: 'res', pageToken: null, selection: { other: 'entered' } }
+    });
+
+    let last = await listSlateTriggerGroupSelectionOptions({
+      client,
+      triggerGroupId: 'poll',
+      field: 'resource',
+      pageToken: 'next'
+    });
+    expect(last.nextPageToken).toBeNull();
+    expect(contexts.at(-1)?.input).toMatchObject({ query: null, selection: {} });
+
+    for (let target of [
+      { triggerGroupId: 'poll', field: 'missing' },
+      { triggerGroupId: 'poll', field: 'constructor' },
+      { triggerGroupId: 'webhook', field: 'resource' }
+    ]) {
+      await expect(
+        listSlateTriggerGroupSelectionOptions({ client, ...target })
+      ).rejects.toThrow('has no options');
+    }
   });
 
   it('keeps groups without selection, expansion, or renewal backward compatible', async () => {

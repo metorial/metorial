@@ -1,3 +1,4 @@
+import { DRIVE_FOLDER_MIME_TYPE, escapeDriveQueryValue } from '@slates/google-drive-files';
 import { assertNewPageToken, createApiServiceError } from 'slates';
 import type { GoogleDriveClient } from '../lib/client';
 import type { DriveFile } from '../lib/types';
@@ -5,17 +6,15 @@ import {
   DRIVE_FOLDER_MAX_CHILDREN,
   type DriveFileEvent,
   type DriveFolderState,
-  type DriveTarget,
+  type DriveFolderTarget,
   driveEventId,
   driveFileEventSchema,
   driveTargetId,
   parseDriveContract
 } from './event-schemas';
 
-const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 // Change tokens do not expire, so a longer backlog resumes on the next run.
 export const DRIVE_CHANGE_PAGES_PER_DRAIN = 20;
-const escapeQuery = (value: string) => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 export async function driveAccountId(client: GoogleDriveClient) {
   const account = await client.getAbout();
@@ -29,10 +28,10 @@ export async function driveAccountId(client: GoogleDriveClient) {
 export async function resolveDriveTarget(
   client: GoogleDriveClient,
   folderId: string
-): Promise<DriveTarget & { name: string }> {
+): Promise<DriveFolderTarget & { name: string }> {
   const accountId = await driveAccountId(client);
   const folder = await client.getFile(folderId);
-  if (folder.mimeType !== FOLDER_MIME_TYPE || folder.trashed) {
+  if (folder.mimeType !== DRIVE_FOLDER_MIME_TYPE || folder.trashed) {
     throw createApiServiceError('Select an accessible, untrashed Google Drive folder.', {
       reason: 'google_drive_folder_required'
     });
@@ -61,12 +60,12 @@ export async function resolveDriveTarget(
   };
 }
 
-const repeatedPageToken = () =>
+export const repeatedPageToken = () =>
   createApiServiceError('Google Drive repeated a pagination token.', {
     reason: 'google_drive_pagination_cycle'
   });
 
-function inFolder(file: DriveFile, target: DriveTarget) {
+function inFolder(file: DriveFile, target: DriveFolderTarget) {
   return (
     !file.trashed &&
     (file.driveId ?? null) === target.driveId &&
@@ -99,7 +98,7 @@ function fileVersion(file: DriveFile) {
 
 export async function drainDriveChanges(
   client: GoogleDriveClient,
-  target: DriveTarget,
+  target: DriveFolderTarget,
   previous: DriveFolderState,
   emit: boolean
 ) {
@@ -194,7 +193,7 @@ export async function drainDriveChanges(
 // Resolves to null as soon as the listing exceeds the child limit.
 export async function baselineDriveFolder(
   client: GoogleDriveClient,
-  target: DriveTarget
+  target: DriveFolderTarget
 ): Promise<DriveFolderState | null> {
   // Start the cursor before listing and drain what changed meanwhile; activation ends after the drain.
   const cursor = await client.getStartPageToken(target.cursorDriveId ?? undefined);
@@ -207,7 +206,7 @@ export async function baselineDriveFolder(
   const visited = new Set<string>();
   do {
     const page = await client.listFiles({
-      query: `'${escapeQuery(target.folderId)}' in parents and trashed = false`,
+      query: `'${escapeDriveQueryValue(target.folderId)}' in parents and trashed = false`,
       pageSize: 1000,
       pageToken,
       spaces: 'drive',

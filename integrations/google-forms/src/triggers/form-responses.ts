@@ -21,6 +21,7 @@ import {
 } from './event-schemas';
 import { assertFormSelected, currentFormsOwner, formAutoRegistration } from './registration';
 import { reconcileFormResponses } from './responses';
+import { formSelection } from './selection-options';
 
 export const formResponses = triggerGroup(spec, {
   key: 'form_responses',
@@ -81,6 +82,7 @@ export const formResponses = triggerGroup(spec, {
     }
   })
   .routingMatchers(async () => [])
+  .selectionOptions({ formIds: formSelection })
   .build();
 
 export const newResponse = SlateTrigger.create(spec, {

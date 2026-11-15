@@ -5,19 +5,42 @@ import { normalizeA1Range, quoteA1SheetName } from './a1-range';
 const MAX_SHEET_TITLES_IN_HINT = 20;
 const MAX_SHEET_TITLES_HINT_LENGTH = 1000;
 const MAX_UPSTREAM_DETAIL_LENGTH = 300;
-// A selection holds at most 100,000 cells but a cell can hold 50,000 characters.
-export const MAX_ROW_OBSERVATION_RESPONSE_BYTES = 64 * 1024 * 1024;
-const rowObservationSheetListSchema = z.object({
+const MAX_TAB_ROWS_RESPONSE_BYTES = 64 * 1024 * 1024;
+
+const sheetTabListSchema = z.object({
   spreadsheetId: z.string(),
-  sheets: z.array(
-    z.object({
-      properties: z.object({
-        sheetId: z.number().int().nonnegative(),
-        title: z.string().min(1)
+  sheets: z
+    .array(
+      z.object({
+        properties: z.object({
+          sheetId: z.number().int().nonnegative(),
+          title: z.string().min(1),
+          sheetType: z.string().optional(),
+          gridProperties: z
+            .object({ rowCount: z.number().int().nonnegative().optional() })
+            .optional()
+        })
       })
-    })
-  )
+    )
+    .default([])
 });
+const tabRowsSchema = z.object({
+  valueRanges: z
+    .array(
+      z.object({
+        values: z.array(z.array(z.union([z.string(), z.number(), z.boolean()]))).default([])
+      })
+    )
+    .default([])
+});
+
+export type SheetTab = {
+  sheetId: number;
+  title: string;
+  isGrid: boolean;
+  rowCount: number;
+};
+export type SheetTabCell = string | number | boolean;
 
 const isUnparseableRangeError = (error: unknown): error is Error =>
   error instanceof Error && /unable to parse range/i.test(error.message);
@@ -153,41 +176,65 @@ export class SheetsClient {
 
   // --- Reading Data ---
 
-  async getRowObservationGrid(
-    spreadsheetId: string,
-    selection: { sheetId: number; range: string }
-  ): Promise<unknown> {
-    const path = `/spreadsheets/${encodeURIComponent(spreadsheetId)}`;
-    // spreadsheets.get accepts spreadsheets.readonly (getByDataFilter does not); the poller checks the ID.
-    const metadata = await this.axios.get(path, {
-      params: { fields: 'spreadsheetId,sheets.properties(sheetId,title)' }
-    });
-    const parsed = rowObservationSheetListSchema.safeParse(metadata.data);
-    if (!parsed.success || parsed.data.spreadsheetId !== spreadsheetId) {
-      throw createApiServiceError(
-        'Google Sheets returned invalid sheet metadata. The previous row baseline was preserved.',
-        { reason: 'google_sheets_row_metadata_invalid' }
-      );
-    }
-    const matches = parsed.data.sheets.filter(
-      sheet => sheet.properties.sheetId === selection.sheetId
+  async listTabs(spreadsheetId: string): Promise<SheetTab[]> {
+    const response = await this.axios.get(
+      `/spreadsheets/${encodeURIComponent(spreadsheetId)}`,
+      {
+        params: {
+          fields:
+            'spreadsheetId,sheets.properties(sheetId,title,sheetType,gridProperties(rowCount))'
+        }
+      }
     );
-    const sheet = matches[0];
-    if (matches.length !== 1 || !sheet) {
-      throw createApiServiceError(
-        'Google Sheets did not return the selected sheet ID. The previous row baseline was preserved.',
-        { reason: 'google_sheets_row_sheet_missing' }
-      );
+    const parsed = sheetTabListSchema.safeParse(response.data);
+    if (!parsed.success || parsed.data.spreadsheetId !== spreadsheetId) {
+      throw createApiServiceError('Google Sheets returned an invalid list of tabs.', {
+        reason: 'google_sheets_tab_list_invalid'
+      });
     }
-    const response = await this.axios.get(path, {
-      params: {
-        ranges: `${quoteA1SheetName(sheet.properties.title)}!${selection.range}`,
-        fields:
-          'spreadsheetId,sheets(properties(sheetId,title,sheetType,gridProperties(rowCount,columnCount)),data(startRow,startColumn,rowData(values(userEnteredValue))))'
-      },
-      maxContentLength: MAX_ROW_OBSERVATION_RESPONSE_BYTES
+    return parsed.data.sheets.map(({ properties }) => ({
+      sheetId: properties.sheetId,
+      title: properties.title,
+      isGrid: (properties.sheetType ?? 'GRID') === 'GRID',
+      rowCount: properties.gridProperties?.rowCount ?? 0
+    }));
+  }
+
+  // Ranges are relative to the tab, for example "1:1" or "2:500".
+  async getTabRows(
+    spreadsheetId: string,
+    tabTitle: string,
+    ranges: string[]
+  ): Promise<SheetTabCell[][][]> {
+    const params = new URLSearchParams({
+      majorDimension: 'ROWS',
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
+      fields: 'valueRanges(values)'
     });
-    return response.data;
+    const tab = quoteA1SheetName(tabTitle);
+    for (const range of ranges) params.append('ranges', `${tab}!${range}`);
+    let response: { data: unknown };
+    try {
+      response = await this.axios.get(
+        `/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchGet`,
+        { params, maxContentLength: MAX_TAB_ROWS_RESPONSE_BYTES }
+      );
+    } catch (error) {
+      if (error instanceof Error && /maxContentLength/.test(error.message))
+        throw createApiServiceError(
+          `These rows of the tab hold more than ${MAX_TAB_ROWS_RESPONSE_BYTES / 1024 / 1024} MiB of data, too much to read at once.`,
+          { reason: 'google_sheets_tab_rows_too_large', parent: error }
+        );
+      throw error;
+    }
+    const parsed = tabRowsSchema.safeParse(response.data);
+    if (!parsed.success || parsed.data.valueRanges.length !== ranges.length) {
+      throw createApiServiceError('Google Sheets returned invalid row data.', {
+        reason: 'google_sheets_tab_rows_invalid'
+      });
+    }
+    return parsed.data.valueRanges.map(range => range.values);
   }
 
   async getValues(
