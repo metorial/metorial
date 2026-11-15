@@ -3,6 +3,7 @@ import type { SlateContext } from '../context';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from '../specification/specification';
 import type { SlateWebhookHttpResponseInit } from './action';
+import type { SlateOptionListPage } from './optionList';
 
 export let SlateDefaultPollingIntervalSeconds = 60 * 10;
 
@@ -25,6 +26,80 @@ export type SlateTriggerGroupRoutingMatchersHandler<
   ConfigType extends {},
   AuthType extends {}
 > = (context: SlateContext<ConfigType, AuthType, {}>) => Promise<SlateTriggerRoutingMatcher[]>;
+
+/** Lists the values an account can pick for one selection field. `selection` holds what is entered so far and may be incomplete. */
+export type SlateTriggerGroupSelectionOptionsHandler<
+  ConfigType extends {},
+  AuthType extends {}
+> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { query: string | null; pageToken: any | null; selection: SlateTriggerGroupSelection }
+  >
+) => Promise<SlateOptionListPage>;
+
+/** An option list exported by another integration, run with that integration's connection for the same account. */
+export interface SlateLinkedOptionList {
+  /** Registry name of the integration, as `<scope>/<name>`. */
+  slate: string;
+  optionList: string;
+  params?: Record<string, any>;
+}
+
+export interface SlateTriggerGroupSelectionOptionsSources<
+  ConfigType extends {},
+  AuthType extends {}
+> {
+  list?: SlateTriggerGroupSelectionOptionsHandler<ConfigType, AuthType>;
+  linked?: SlateLinkedOptionList;
+}
+
+let LINKED_SLATE_PATTERN = /^[^/\s]+\/[^/\s]+$/;
+
+let checkSelectionOptions = <ConfigType extends {}, AuthType extends {}>(
+  field: string,
+  sources: SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>,
+  shape: Record<string, unknown>
+): SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType> => {
+  if (!Object.hasOwn(shape, field)) {
+    throw new SlateDeclarationError(
+      `Selection field "${field}" is not a top-level property of the selection schema`
+    );
+  }
+  if (typeof sources !== 'object' || sources === null) {
+    throw new SlateDeclarationError(
+      `Selection field "${field}" must be declared as { list, linked }`
+    );
+  }
+
+  let { list, linked } = sources;
+  if (!list && !linked) {
+    throw new SlateDeclarationError(
+      `Selection field "${field}" needs its own options list, a linked option list, or both`
+    );
+  }
+  if (list !== undefined && typeof list !== 'function') {
+    throw new SlateDeclarationError(`Selection field "${field}" list must be a function`);
+  }
+  if (linked) {
+    if (typeof linked.slate !== 'string' || !LINKED_SLATE_PATTERN.test(linked.slate)) {
+      throw new SlateDeclarationError(
+        `Selection field "${field}" links to slate "${linked.slate}", which must be written as <scope>/<name>`
+      );
+    }
+    if (typeof linked.optionList !== 'string' || !linked.optionList.trim()) {
+      throw new SlateDeclarationError(
+        `Selection field "${field}" must name the option list it links to`
+      );
+    }
+  }
+
+  return {
+    ...(list ? { list } : {}),
+    ...(linked ? { linked } : {})
+  };
+};
 
 export type SlateTriggerGroupPollHandler<ConfigType extends {}, AuthType extends {}> = (
   context: SlateContext<
@@ -292,6 +367,10 @@ export interface SlateTriggerGroupParameters<
   webhook?: SlateTriggerGroupWebhookParameters<ConfigType, AuthType>;
   gateway?: SlateTriggerGroupGatewayParameters<ConfigType, AuthType>;
   routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType>;
+  selectionOptions?: Record<
+    string,
+    SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>
+  >;
 }
 
 export class SlateTriggerGroup<
@@ -362,6 +441,10 @@ export class SlateTriggerGroup<
   get routingMatchers() {
     return this._params.routingMatchers;
   }
+
+  get selectionOptions() {
+    return this._params.selectionOptions ?? {};
+  }
 }
 
 export class SlateTriggerGroupBuilder<
@@ -375,6 +458,10 @@ export class SlateTriggerGroupBuilder<
   #gateway: SlateTriggerGroupGatewayParameters<ConfigType, AuthType> | null = null;
   #routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType> | null =
     null;
+  #selectionOptions: Record<
+    string,
+    SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>
+  > = {};
 
   constructor(
     private readonly spec: SlateSpecification<ConfigType, AuthType>,
@@ -497,6 +584,34 @@ export class SlateTriggerGroupBuilder<
     return this;
   }
 
+  /**
+   * Lets the dashboard offer a list for these selection fields instead of a typed-in value.
+   * Each field must be a top-level property of the selection schema, which must be a zod object.
+   * For an array property the listed options are values for its items.
+   */
+  selectionOptions(
+    declarations: Record<
+      string,
+      SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>
+    >
+  ): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
+    let schema = this.params.selectionSchema;
+    if (!schema) {
+      throw new SlateDeclarationError('Selection options require a selection schema');
+    }
+    if (schema._zod?.def?.type !== 'object') {
+      throw new SlateDeclarationError(
+        'Selection options require the selection schema to be a zod object'
+      );
+    }
+
+    let shape = (schema as z.ZodObject<any>).shape;
+    for (let [field, sources] of Object.entries(declarations)) {
+      this.#selectionOptions[field] = checkSelectionOptions(field, sources, shape);
+    }
+    return this;
+  }
+
   build(): SlateTriggerGroup<ConfigType, AuthType, InputType> {
     if (!this.#source) {
       throw new SlateDeclarationError(
@@ -513,7 +628,8 @@ export class SlateTriggerGroupBuilder<
       polling: this.#polling ?? undefined,
       webhook: this.#webhook ?? undefined,
       gateway: this.#gateway ?? undefined,
-      routingMatchers: this.#routingMatchers
+      routingMatchers: this.#routingMatchers,
+      selectionOptions: this.#selectionOptions
     });
   }
 }

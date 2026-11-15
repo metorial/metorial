@@ -12,14 +12,14 @@
     "@slates-integrations/google-chat": "0.3.1",
     "@slates-integrations/google-contacts": "0.2.7",
     "@slates-integrations/google-docs": "0.2.2",
-    "@slates-integrations/google-drive": "0.2.15",
-    "@slates-integrations/google-sheets": "0.2.7",
+    "@slates-integrations/google-drive": "0.2.16",
+    "@slates-integrations/google-sheets": "0.3.0",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.33",
+    "slates": "1.0.0-rc.34",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.28",
+    "@slates/test": "1.0.0-rc.29",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
@@ -35,5 +35,5 @@
       "optional": true
     }
   },
-  "version": "0.4.9"
+  "version": "0.4.10"
 }

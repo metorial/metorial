@@ -88,3 +88,85 @@ describe('webhook trigger group declaration', () => {
     ).toThrow('A webhook delivery config requires an authenticate handler');
   });
 });
+
+describe('trigger group selection options', () => {
+  let polling = (
+    selectionSchema: z.ZodType<Record<string, any>> = z.object({
+      fileId: z.string(),
+      tab: z.string().optional(),
+      fileIds: z.array(z.string()),
+      folder: z.object({ id: z.string() })
+    })
+  ) =>
+    triggerGroup(spec, { key: 'group', name: 'Group', selectionSchema })
+      .polling({ pollEvents: async () => ({ events: [] }) })
+      .routingMatchers(async () => []);
+  let list = async () => ({ options: [{ value: 'a', label: 'A' }] });
+  let linked = { slate: 'acme/files', optionList: 'files', params: { kind: 'sheet' } };
+
+  it('rejects fields that are not top-level properties of the selection schema', () => {
+    for (let field of ['fileid', 'folder.id', 'id', 'constructor']) {
+      expect(() => polling().selectionOptions({ [field]: { list } })).toThrow(
+        `Selection field "${field}" is not a top-level property of the selection schema`
+      );
+    }
+  });
+
+  it('rejects a selection schema that is not a zod object', () => {
+    for (let selectionSchema of [
+      z.record(z.string(), z.string()),
+      z.object({ fileId: z.string() }).optional() as z.ZodType<Record<string, any>>
+    ]) {
+      expect(() => polling(selectionSchema).selectionOptions({ fileId: { list } })).toThrow(
+        'Selection options require the selection schema to be a zod object'
+      );
+    }
+    expect(() =>
+      triggerGroup(spec, { key: 'group', name: 'Group' }).selectionOptions({
+        fileId: { list }
+      })
+    ).toThrow('Selection options require a selection schema');
+  });
+
+  it('rejects a bare handler instead of { list, linked }', () => {
+    for (let declaration of [list, null]) {
+      expect(() => polling().selectionOptions({ fileId: declaration as any })).toThrow(
+        'Selection field "fileId" must be declared as { list, linked }'
+      );
+    }
+  });
+
+  it('accepts an own list, a linked list, or both per field', () => {
+    let group = polling()
+      .selectionOptions({ fileId: { list, linked } })
+      .selectionOptions({
+        tab: { linked: { slate: 'acme/files', optionList: 'tabs' } },
+        fileIds: { list }
+      })
+      .build();
+    expect(group.selectionOptions).toEqual({
+      fileId: { list, linked },
+      tab: { linked: { slate: 'acme/files', optionList: 'tabs' } },
+      fileIds: { list }
+    });
+  });
+
+  it('rejects a field without an own list or a linked list', () => {
+    expect(() => polling().selectionOptions({ fileId: {} })).toThrow(
+      'Selection field "fileId" needs its own options list, a linked option list, or both'
+    );
+  });
+
+  it('rejects linked lists that do not name a scoped slate and a list', () => {
+    expect(() =>
+      polling().selectionOptions({
+        fileId: { linked: { slate: 'files', optionList: 'files' } }
+      })
+    ).toThrow('must be written as <scope>/<name>');
+    expect(() =>
+      polling().selectionOptions({
+        fileId: { linked: { slate: 'acme/files', optionList: ' ' } }
+      })
+    ).toThrow('Selection field "fileId" must name the option list it links to');
+  });
+});

@@ -98,11 +98,52 @@ The changes collection provides an efficient way to detect all file changes, inc
 
 Applications can store per-user configuration or data in a hidden app-specific folder that the user cannot directly access. Requires the `drive.appdata` scope.
 
+## Option lists
+
+The slate exports one option list, `files`, that other integrations can link
+their selection fields to (Google Sheets links its spreadsheet field and Google
+Forms its form field, each with its own list as the fallback). It takes one
+optional parameter, `mimeType`, an exact Drive MIME type such as
+`application/vnd.google-apps.spreadsheet`; other parameters are rejected. Without
+`mimeType` every type except folders is listed.
+
+The list reads `files.list` with `corpora=allDrives`, `includeItemsFromAllDrives`
+and `supportsAllDrives`, which covers My Drive, files shared with the account and
+every shared drive it is a member of. It returns 50 options per page with
+Google's page token passed through, ordered `modifiedTime desc`. The query is
+`trashed=false` and `mimeType='<mimeType>'`, or
+`mimeType!='application/vnd.google-apps.folder'` without the parameter; search
+text adds `name contains`. Trashed files are never listed, whatever the type.
+When Google reports `incompleteSearch` (it could not search every shared drive),
+the files it found are returned and a warning is logged. Each option is the file
+ID, labelled with the file name and described by its first owner and last edit
+date.
+
+What it can list depends on the granted scope: `drive`, `drive.readonly`,
+`drive.metadata` and `drive.metadata.readonly` see every file the account can
+open. A connection that granted only `drive.file` lists only the files created
+or opened with this app, usually a small part of the account's files. A
+connection whose scopes do not allow listing gets a readable error asking for
+the file ID instead.
+
 ## Events
 
 The `folder_events` automatic webhook group requires an explicit `folderIds`
 selection (1–100 folder IDs from `search_files`). Each selected folder can have
-at most 5,000 immediate children. It exposes:
+at most 5,000 immediate children. The selection offers a folder list read with
+`files.list`, untrashed folders only. Without search text it holds, in this
+order and each sorted by name: up to 50 folders at the top of My Drive
+(`'root' in parents`), up to 25 folders shared with the account
+(`sharedWithMe=true`), and up to 20 top-level folders of each of the first 5
+shared drives returned by `drives.list` (`corpora=drive`). A folder found twice
+is listed once, and there is no further page. A shared list that Google answers
+with 404, or with 403 other than a rate limit (for example `drives.list` on a
+connection without `drive` or `drive.readonly`), is left out; rate limits and
+server errors fail the list. With search text the list holds every folder whose
+name contains it in My Drive, shared with the account and the shared drives the
+account is a member of (`corpora=allDrives`), most recently modified first, 50
+per page. With only `drive.file`, folders created or opened with this app are
+listed. Any folder ID can be entered instead. It exposes:
 
 - `file_added_to_folder`: a file or folder becomes visible as an immediate child
   after activation. Moves, restores, and newly shared old files count as additions;

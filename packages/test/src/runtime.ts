@@ -391,6 +391,31 @@ export let pollSlateTriggerGroupEvents = async (d: {
   });
 };
 
+export let listSlateTriggerGroupSelectionOptions = async (d: {
+  client: SlatesTestClient;
+  triggerGroupId: string;
+  field: string;
+  query?: string | null;
+  pageToken?: any;
+  selection?: Record<string, any>;
+}) => {
+  let { client, ...input } = d;
+  client.ensureSession();
+  return client.listTriggerGroupSelectionOptions(input);
+};
+
+export let listSlateOptionListOptions = async (d: {
+  client: SlatesTestClient;
+  optionListId: string;
+  query?: string | null;
+  pageToken?: any;
+  params?: Record<string, any>;
+}) => {
+  let { client, ...input } = d;
+  client.ensureSession();
+  return client.listOptionListOptions(input);
+};
+
 export let connectSlateTriggerGroupGateway = async (d: {
   client: SlatesTestClient;
   triggerGroupId: string;

@@ -17,6 +17,7 @@ import {
   type SlatesMessageConfigChangedResponse,
   type SlatesMessageConfigDefaultGetResponse,
   type SlatesMessageConfigSchemaGetResponse,
+  type SlatesMessageOptionListOptionsListResponse,
   type SlatesMessageProviderIdentifyResponse,
   type SlatesMessageToolCategoriesListResponse,
   type SlatesMessageTriggerGroupGatewayConnectResponse,
@@ -24,6 +25,7 @@ import {
   type SlatesMessageTriggerGroupGetResponse,
   type SlatesMessageTriggerGroupPollingPollResponse,
   type SlatesMessageTriggerGroupRoutingMatchersGetResponse,
+  type SlatesMessageTriggerGroupSelectionOptionsListResponse,
   type SlatesMessageTriggerGroupsListResponse,
   type SlatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse,
   type SlatesMessageTriggerGroupWebhookExpandRequest,
@@ -515,6 +517,38 @@ export class SlatesProtocolClient {
   ): Promise<SlatesMessageTriggerGroupRoutingMatchersGetResponse['result']> {
     this.ensureSession();
     return this.request('slates/trigger_group.routing_matchers.get', { triggerGroupId });
+  }
+
+  async listTriggerGroupSelectionOptions(d: {
+    triggerGroupId: string;
+    field: string;
+    query?: string | null;
+    pageToken?: any;
+    selection?: Record<string, any>;
+  }): Promise<SlatesMessageTriggerGroupSelectionOptionsListResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.selection.options_list', {
+      triggerGroupId: d.triggerGroupId,
+      field: d.field,
+      query: d.query ?? null,
+      pageToken: d.pageToken ?? null,
+      selection: d.selection
+    });
+  }
+
+  async listOptionListOptions(d: {
+    optionListId: string;
+    query?: string | null;
+    pageToken?: any;
+    params?: Record<string, any>;
+  }): Promise<SlatesMessageOptionListOptionsListResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/option_list.options_list', {
+      optionListId: d.optionListId,
+      query: d.query ?? null,
+      pageToken: d.pageToken ?? null,
+      params: d.params
+    });
   }
 
   async pollTriggerGroup(d: {

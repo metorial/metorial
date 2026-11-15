@@ -11,9 +11,10 @@ export const driveFolderSelectionSchema = z.object({
     .array(z.string().trim().min(1))
     .min(1)
     .max(100)
-    .describe(
-      `IDs of up to 100 folders to watch. Only immediate children are included; nested folder contents are excluded. Each folder can have at most ${DRIVE_FOLDER_MAX_CHILDREN.toLocaleString('en-US')} immediate children. Find folders with Search Files.`
-    )
+    .meta({
+      title: 'Folders',
+      description: `Up to 100 folders. Only files directly inside a folder are reported, not files in its subfolders, and a folder can hold at most ${DRIVE_FOLDER_MAX_CHILDREN.toLocaleString('en-US')} items. The list starts with the top of My Drive, folders shared with you and the top of your first few shared drives. Search to find any other folder, or paste a folder ID: the last part of its link.`
+    })
 });
 
 export const driveTargetSchema = z.object({

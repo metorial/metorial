@@ -55,6 +55,21 @@ export let slatesWebhookTarget = z.object({
   targetOwnership: slatesWebhookTargetOwnership
 });
 
+// Set on a top-level selection schema property whose values can be listed for a connected
+// account. On an array property the listed options are values for its items.
+export let slatesSelectionOptionsSchemaKey = 'x-slates-options';
+
+// Set on a selection schema property whose values can also be listed by an option list another
+// integration exports, run with that integration's connection for the same account.
+export let slatesSelectionOptionsLinkedSchemaKey = 'x-slates-options-linked';
+
+export let slatesLinkedOptionList = z.object({
+  slate: z.string(),
+  optionList: z.string(),
+  params: z.record(z.string(), z.any()).optional()
+});
+
+export type SlatesLinkedOptionList = z.infer<typeof slatesLinkedOptionList>;
 export type SlatesTriggerRoutingMatcher = z.infer<typeof slatesTriggerRoutingMatcher>;
 export type SlatesTriggerGroupInvocation = z.infer<typeof slatesTriggerGroupInvocation>;
 export type SlatesTriggerGroup = z.infer<typeof slatesTriggerGroup>;

@@ -83,7 +83,8 @@ Upload a file with content to Google Drive. Provide file content as plain text o
 
 ## Folder triggers
 
-Select 1–100 folder IDs using `folderIds` to watch their immediate children.
+Select 1–100 folders using `folderIds` to watch their immediate children; folders
+can be picked from a searchable list or entered as IDs.
 **File Added to Folder** includes newly visible files, moves, restores, and shares;
 it does not imply that the file was newly created. **File Updated** reports a newer
 version of an already known child, including content and metadata changes.
@@ -103,6 +104,16 @@ account. Coverage remains limited by its granted access. Notifications require a
 HTTPS callback, durable change state, automatic lease renewal and periodic
 reconciliation. See the [event contract](./docs/SPEC.md#events) for delivery,
 recovery, and cleanup details.
+
+## Option lists
+
+Other integrations can offer files from this connection in their pickers. The
+`files` list holds the files in My Drive, shared with the account and in the
+shared drives it is a member of, most recently modified first, and searches by
+name. An optional `mimeType` limits it to one exact type, such as
+`application/vnd.google-apps.spreadsheet`; without it every file except folders
+is listed. Trashed files are never listed. A connection that only allows access
+to files created or opened with this app lists only those files.
 
 ## License
 

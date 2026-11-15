@@ -1,3 +1,4 @@
+import { DRIVE_FOLDER_MIME_TYPE, escapeDriveQueryValue } from '@slates/google-drive-files';
 import { assertNewPageToken, createApiServiceError } from 'slates';
 import type { GoogleDriveClient } from '../lib/client';
 import type { DriveFile } from '../lib/types';
@@ -12,10 +13,8 @@ import {
   parseDriveContract
 } from './event-schemas';
 
-const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 // Change tokens do not expire, so a longer backlog resumes on the next run.
 export const DRIVE_CHANGE_PAGES_PER_DRAIN = 20;
-const escapeQuery = (value: string) => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 export async function driveAccountId(client: GoogleDriveClient) {
   const account = await client.getAbout();
@@ -32,7 +31,7 @@ export async function resolveDriveTarget(
 ): Promise<DriveTarget & { name: string }> {
   const accountId = await driveAccountId(client);
   const folder = await client.getFile(folderId);
-  if (folder.mimeType !== FOLDER_MIME_TYPE || folder.trashed) {
+  if (folder.mimeType !== DRIVE_FOLDER_MIME_TYPE || folder.trashed) {
     throw createApiServiceError('Select an accessible, untrashed Google Drive folder.', {
       reason: 'google_drive_folder_required'
     });
@@ -207,7 +206,7 @@ export async function baselineDriveFolder(
   const visited = new Set<string>();
   do {
     const page = await client.listFiles({
-      query: `'${escapeQuery(target.folderId)}' in parents and trashed = false`,
+      query: `'${escapeDriveQueryValue(target.folderId)}' in parents and trashed = false`,
       pageSize: 1000,
       pageToken,
       spaces: 'drive',

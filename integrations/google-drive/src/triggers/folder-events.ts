@@ -42,6 +42,7 @@ import {
   driveTargetSchema,
   parseDriveContract
 } from './event-schemas';
+import { folderOptions } from './selection-options';
 import {
   baselineDriveFolder,
   drainDriveChanges,
@@ -439,4 +440,5 @@ export const driveFolderEvents = triggerGroup(spec, {
   .routingMatchers(async ctx => [
     { driveAccountId: await driveAccountId(new GoogleDriveClient(ctx.auth.token)) }
   ])
+  .selectionOptions({ folderIds: { list: folderOptions } })
   .build();

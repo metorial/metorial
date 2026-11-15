@@ -1,103 +1,65 @@
 import { z } from 'zod';
 
-const column = z.string().regex(/^[A-Z]{1,3}$/);
+const newRowCellSchema = z.union([z.string(), z.number().finite(), z.boolean(), z.null()]);
+export type NewRowCell = z.infer<typeof newRowCellSchema>;
 
-export const rowSelectionSchema = z.object({
-  spreadsheetId: z
-    .string()
-    .min(1)
-    .describe('Spreadsheet ID from its URL or an existing spreadsheet tool result.'),
-  sheetId: z
-    .number()
-    .int()
-    .nonnegative()
-    .describe('Stable numeric tab ID returned by Get Spreadsheet.'),
-  range: z
-    .string()
-    .regex(/^[A-Z]{1,3}[1-9]\d*:[A-Z]{1,3}[1-9]\d*$/)
-    .describe(
-      'Bounded A1 range without a tab name, for example A1:D1000. Its first row contains headers. At most 10,000 rows and 100,000 cells; rows outside it are not observed. It may extend past the last row or column the sheet currently has.'
-    ),
-  keyColumn: column.describe(
-    'Absolute column letter containing a unique, nonblank, immutable text, number, or boolean key for every record. Rows whose key is blank, a formula, or shared with another row are skipped until the key is fixed.'
-  ),
-  watchedColumns: z
-    .array(column)
-    .min(1)
-    .optional()
-    .describe(
-      'Absolute column letters whose entered values or formula expressions should produce update events. Defaults to all selected columns except the key column.'
-    )
+export const newRowSelectionSchema = z.object({
+  spreadsheetId: z.string().trim().min(1).meta({
+    title: 'Spreadsheet',
+    description: 'The spreadsheet to watch. Pick one from the list, or paste its link or ID.'
+  }),
+  sheetId: z.number().int().nonnegative().optional().meta({
+    title: 'Tab',
+    description: 'The tab to watch. Leave empty to use the first tab of the spreadsheet.'
+  })
 });
 
-// Formula objects keep a literal text value such as "=A1" distinct from a formula.
-const rowCellSchema = z.union([
-  z.string(),
-  z.number().finite(),
-  z.boolean(),
-  z.null(),
-  z.object({ formula: z.string() }).strict()
-]);
-export type RowCell = z.infer<typeof rowCellSchema>;
-const rowKeySchema = z.union([z.string().min(1), z.number().finite(), z.boolean()]);
-
-const rowOutput = {
-  observationId: z.string(),
+export const newRowSchema = z.object({
+  type: z.literal('row.new'),
+  eventId: z.string(),
   spreadsheetId: z.string(),
   sheetId: z.number().int().nonnegative(),
   sheetTitle: z.string(),
-  range: z.string(),
-  keyColumn: z.string(),
-  key: rowKeySchema,
   rowNumber: z
     .number()
     .int()
     .positive()
-    .describe('Current one-based position, not record identity.'),
-  columns: z.array(z.string()),
-  headers: z.array(rowCellSchema),
+    .describe('Position of the row in the tab; 1 is the header row.'),
+  headers: z
+    .array(z.string().nullable())
+    .describe(
+      'Text of the first row of the tab, one entry per column. Empty header cells are null.'
+    ),
   values: z
-    .array(rowCellSchema)
+    .array(newRowCellSchema)
     .describe(
-      'Entered cell values aligned with columns; blank cells are null and formulas are objects containing formula.'
+      'Cells of the new row in column order, as shown in the sheet for dates and as calculated for formulas. Empty cells are null.'
     ),
-  revision: z
-    .number()
-    .int()
-    .positive()
+  row: z
+    .record(z.string(), newRowCellSchema)
     .describe(
-      'Increases with every reported observation of this key and is never reused for it. Not necessarily consecutive or starting at 1.'
+      'The same cells by header text. Columns with an empty header are left out. When several columns share a header, the leftmost one is used.'
     ),
-  observedAt: z.iso
-    .datetime()
-    .describe('Time this snapshot was read, not the time of an edit.')
-};
-export const rowAddedSchema = z.object({ type: z.literal('row.added'), ...rowOutput });
-export const rowUpdatedSchema = z.object({
-  type: z.literal('row.updated'),
-  ...rowOutput,
-  previousValues: z.array(rowCellSchema),
-  changedColumns: z.array(z.string()).min(1)
+  observedAt: z.iso.datetime().describe('Time the row was read, not the time it was added.')
 });
-export const rowEventSchema = z.discriminatedUnion('type', [rowAddedSchema, rowUpdatedSchema]);
-export type RowEvent = z.infer<typeof rowEventSchema>;
+export type NewRowEvent = z.infer<typeof newRowSchema>;
 
-const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-
-export const rowStateSchema = z.object({
-  schemaVersion: z.literal(1),
-  fingerprint: z.string(),
-  epoch: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  // Highest revision a removed key reached; new keys start above it so event IDs are never reused.
-  revisionFloor: revision,
-  headers: z.array(rowCellSchema),
-  records: z.array(
-    z.object({
-      token: z.string(),
-      key: rowKeySchema,
-      revision,
-      values: z.array(rowCellSchema)
-    })
-  )
+// Counters and identifiers only; nothing read from the cells is saved.
+export const newRowStateSchema = z.object({
+  schemaVersion: z.literal(2),
+  spreadsheetId: z.string().min(1),
+  sheetId: z.number().int().nonnegative(),
+  // False while the tab is the default first tab rather than one the person picked.
+  tabChosen: z.boolean(),
+  // Row numbers are reused after rows are removed, so each new count gets its own event IDs.
+  epoch: z.number().int().positive(),
+  // Grid rows at the last check: fewer rows now means rows were deleted.
+  rowCount: z.number().int().nonnegative(),
+  // The last row reported or counted; rows at or above it are never reported.
+  rowsSeen: z.number().int().nonnegative(),
+  // Rows below rowsSeen were empty down to this row when last read; the search for rows after a gap resumes here.
+  scannedTo: z.number().int().nonnegative(),
+  // Present while the rows already in the tab are being counted, from this row upwards.
+  countFrom: z.number().int().nonnegative().optional()
 });
-export type RowState = z.infer<typeof rowStateSchema>;
+export type NewRowState = z.infer<typeof newRowStateSchema>;

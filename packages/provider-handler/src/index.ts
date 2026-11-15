@@ -41,6 +41,7 @@ import {
   getExposedActions,
   getExposedToolCategories,
   getExposedTriggerGroups,
+  getOptionList,
   getTriggerGroup,
   getWebhookAutoRegistration,
   getWebhookDeliveryConfig,
@@ -1736,6 +1737,98 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       );
 
       return withRequestTraces(context, { matchers });
+    });
+
+    manager.onRequest('slates/trigger_group.selection.options_list', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let handler = Object.hasOwn(group.selectionOptions, params.field)
+        ? group.selectionOptions[params.field]?.list
+        : undefined;
+      if (!handler) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger group ${params.triggerGroupId} has no options for selection field: ${params.field}`
+          })
+        );
+      }
+
+      let context = createContext(
+        ctx.config,
+        {
+          query: params.query?.trim() || null,
+          pageToken: params.pageToken ?? null,
+          selection: params.selection ?? {}
+        },
+        ctx.auth?.output!
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'selectionOptions',
+          message: `Listing ${params.field} options for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: result =>
+            `Listed ${result.options.length} ${params.field} option(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while listing ${params.field} options`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
+            field: params.field
+          },
+          onSuccess: result => ({
+            optionCount: result.options.length
+          })
+        },
+        () => runWithContext(context, () => handler(context))
+      );
+
+      return withRequestTraces(context, {
+        options: res.options,
+        nextPageToken: res.nextPageToken ?? null
+      });
+    });
+
+    manager.onRequest('slates/option_list.options_list', async ({ params }) => {
+      let ctx = getContextFull();
+      let list = getOptionList(slate, params.optionListId);
+      let listParams = validate(
+        list.paramsSchema,
+        params.params ?? {},
+        'option_list.params',
+        `Invalid params for option list "${list.key}"`
+      );
+
+      let context = createContext(
+        ctx.config,
+        {
+          query: params.query?.trim() || null,
+          pageToken: params.pageToken ?? null,
+          params: listParams
+        },
+        ctx.auth?.output!
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'optionList',
+          message: `Listing options of option list "${list.key}"`,
+          successMessage: result =>
+            `Listed ${result.options.length} option(s) of option list "${list.key}"`,
+          errorMessage: `Option list "${list.key}" failed`,
+          metadata: {
+            optionListId: list.key
+          },
+          onSuccess: result => ({
+            optionCount: result.options.length
+          })
+        },
+        () => runWithContext(context, () => list.list(context))
+      );
+
+      return withRequestTraces(context, {
+        options: res.options,
+        nextPageToken: res.nextPageToken ?? null
+      });
     });
 
     manager.onRequest('slates/trigger_group.polling.poll', async ({ params }) => {

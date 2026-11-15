@@ -4,141 +4,76 @@
 
 Google Sheets is a cloud-based spreadsheet application that is part of the Google Workspace suite. The Google Sheets API is a RESTful interface that lets you read and modify a spreadsheet's data. On Google Sheets API v4, you get access to almost every spreadsheet feature, including charts, pivot tables, and filter views, as well as cell formatting.
 
-## Row observation events
+## New row events
 
-The `row_observations` polling group emits `row_added` (`row.added`) and
-`row_updated` (`row.updated`) every 900 seconds. These are observations of net
-changes in a selected table, not a native edit log or exact insert/update
-timestamps. Existing rows are silent on initial activation. Two
-[`spreadsheets.get`](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get)
-requests resolve the current title by immutable `sheetId`, then read the full
-selected range with only grid properties and entered cell values. These reads
-support `spreadsheets.readonly`. The returned grid must still match the selected
-spreadsheet and sheet IDs: a rename or title reassignment between requests can
-fail the poll, but cannot substitute a different tab into the baseline. Renaming
-a tab does not change record identity. There are no writes during observation.
+The `new_rows` polling group emits `new_row` (`row.new`) every 900 seconds for
+rows added below the last filled row of one tab. Selection is a
+`spreadsheetId` (a bare ID or a Google Sheets link; a `gid` in the link selects
+the tab) and an optional numeric `sheetId`; without one the first tab is used
+and then kept even if tabs are reordered. The first successful count is silent.
 
-### Selection and discovery
+Saved state (`schemaVersion` 2) holds no sheet contents: `spreadsheetId`, the
+resolved `sheetId`, `tabChosen`, `epoch`, `rowCount` (the grid's
+`gridProperties.rowCount` at the last poll), `rowsSeen` (the last row reported
+or counted), `scannedTo` (how far below `rowsSeen` the rows were found empty)
+and, while a count is unfinished, `countFrom`. A state that does not parse,
+including the `schemaVersion` 1 state of earlier builds, starts a new silent
+count with `epoch` 1. `epoch` otherwise carries over from the saved state, also
+when the spreadsheet or tab changes, so returning to a tab never repeats an event
+ID.
 
-Use existing spreadsheet results/URLs for `spreadsheetId`, **Get Spreadsheet**
-to discover `sheetId`, and **Read Cells** to inspect the table before selecting:
+Rows are read with
+[`spreadsheets.values.batchGet`](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/batchGet),
+at most 2,000 rows per range and at most five reads per poll after the tab
+list; a response over 64 MiB is refused while it is read and fails the poll with
+a readable error. The API exposes no row counter, so a count reads upwards from
+a starting row until it finds a filled row; when five reads do not reach one,
+`countFrom` saves where the next poll continues. The first count starts at the
+grid's last row, so a full tab takes one read, and a tab whose last filled row is
+more than 10,000 rows above the grid's last row takes more than one poll.
 
-```json
-{
-  "spreadsheetId": "spreadsheet-id-from-url",
-  "sheetId": 0,
-  "range": "A1:D1000",
-  "keyColumn": "A",
-  "watchedColumns": ["B", "C", "D"]
-}
-```
+Every later poll reads the header row and the 2,000 rows starting on `rowsSeen`,
+and reports filled rows below `rowsSeen`, at most 500 per poll; further rows wait
+for the next poll. When those rows are all empty, up to four more reads of 2,000
+rows continue from `scannedTo` and the first filled rows found there are
+reported; after reaching the grid's last row the search starts again below the
+first read. A row that far below therefore arrives within one poll per 8,000
+rows of distance, more when rows directly below `rowsSeen` keep arriving, since a
+poll that finds those does not search further. The last reported row becomes the
+bottom: rows filled later above it, in an empty stretch that was skipped or
+anywhere else, are never reported.
 
-All selection fields except `watchedColumns` are required. Columns are absolute
-uppercase letters. `range` is one bounded rectangle without a sheet prefix or
-named-range alias; its first row is the header. The key-column header must be
-nonblank text. Omitting `watchedColumns` watches every selected column except
-the key; explicitly watching the key or a column outside the rectangle is an
-error. Column order/duplicates in the watched selection are canonicalized.
+Rows were removed when the grid has fewer rows than `rowCount`, or when row
+`rowsSeen` is now empty. `epoch` then increases and a new count starts at row
+`rowsSeen` (or the grid's last row if that is lower); that poll reports nothing.
+Rows below the old `rowsSeen` are reported from the next poll. A row added
+between the same two polls at or above the old `rowsSeen` is missed: after one
+row is deleted and one appended, the appended row takes the last reported row
+number. Rows inserted above `rowsSeen` without a deletion shift the rows below
+them, and those that move below `rowsSeen` are reported again with new event
+IDs. Rows added while a count is unfinished can be counted as already present.
 
-Every row to be observed needs a unique immutable primitive key. Text `"1"`,
-number `1`, and boolean `true` are distinct identities. Entirely blank rows are
-ignored. A row is skipped when its key is blank or whitespace-only, when its key
-is a formula, or when another row in the range has the same key; in the last
-case every row carrying that key is skipped, because none of them identifies
-the record. Skipped rows never fail the poll: all other rows are observed, and
-one warning per poll gives the number of skipped rows for each reason with up to
-five row numbers each.
+Values are unformatted (numbers and booleans keep their type, formulas report
+their result) with dates as shown in the sheet. Each event has `eventId`,
+`spreadsheetId`, `sheetId`, `sheetTitle`, `rowNumber`, `headers`, `values`,
+`row` (values by header text; blank headers are left out and the leftmost of
+duplicate headers wins), and `observedAt`. `eventId` is derived from the
+spreadsheet, tab, `epoch`, and row number.
 
-Skipped rows follow these transitions. A row that never had a usable key is
-reported as `row.added` once its key becomes usable. A tracked key that becomes
-shared with another row is still in the table, so its last unambiguous snapshot
-is kept unchanged for as long as the key is shared; when exactly one row carries
-it again, that row is compared with the kept snapshot and reported as
-`row.updated` only if a watched value differs. A tracked row whose key is
-cleared or replaced by a formula can no longer be identified, which is the same
-as the key leaving the table: nothing is reported while the key is unusable, and
-one `row.added` is reported if the key is restored.
-
-Keys are a table-owner contract: changing one produces another identity and
-cannot be distinguished from replacing a record. Sorting and row insertion do
-not themselves add records; moving a row outside the rectangle removes it from
-the monitored snapshot.
-
-Columns are identified by letter, not by header text. Changes to the range, the
-key column, the watched columns, or the header of the key column silently
-rebaseline, increment the generation, and emit an explicit warning; a changed
-key header is treated this way because it usually means a different column now
-sits under that letter, which would make every key look new. No other header
-edit rebaselines. A header edit in a column that is not watched has no effect on
-observations. When the header of a watched column changes (a rename, a blank
-header being filled in, or a column shifting under that letter), value
-differences in that column are not reported for that one poll and a warning
-names the column; differences in the other watched columns and added rows are
-reported as usual, and the column is compared normally from the next poll on.
-An inserted, deleted, or reordered column therefore does not create mass
-updates, and a pure rename of a watched header hides at most one poll of edits
-to that one column.
-
-### Comparison and payload
-
-[`userEnteredValue`](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/cells#CellData)
-and its
-[`ExtendedValue`](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/other#ExtendedValue)
-type distinguish strings, numbers, booleans, and formula expressions. Output
-`values` and `previousValues` align with the absolute `columns` array. A formula
-is an object such as `{ "formula": "=C2*2" }`; a literal string beginning with
-`=` remains a string. Missing values and empty strings normalize to `null`, and
-omitted trailing cells are padded to the selected width. Text whitespace is
-otherwise preserved. Dates are numeric serial values. Formula-expression
-changes count, including reference adjustments made by a sort or insert;
-calculated-result changes, formula spill output, cell formatting, and comments
-do not count. This compares entered cells rather than rendered values.
-
-Both events include `observationId`, `spreadsheetId`, `sheetId`, `sheetTitle`,
-`range`, `keyColumn`, typed `key`, current one-based `rowNumber`, `columns`,
-`headers`, `values`, per-key `revision`, and `observedAt`. Updates also include
-the last successful snapshot's `previousValues` and `changedColumns` (watched
-columns only). An unwatched edit quietly refreshes the stored full row. There
-is no deletion event, and removed keys are not remembered: only the highest
-revision reached by any removed key is kept. A key that is new, or that returns
-after leaving the table, is reported as an addition whose revision is above that
-number, so it cannot repeat an earlier `observationId` of the same key however
-long ago the key was removed. `revision` therefore increases with every reported
-observation of a key and is never reused for it, but is not guaranteed to be
-consecutive or to start at 1. Observed A→B→A changes have different IDs; A→B→A
-entirely between polls is invisible.
-
-### Bounds, failures, and runtime prerequisite
-
-Selections are limited to 10,000 rows (including headers) and 100,000 cells.
-The range may extend beyond the sheet's current grid: rows and columns the sheet
-does not have read as blank. A sheet with fewer rows than the range, or one that
-shrinks when rows are deleted, therefore keeps being observed, and keys in rows
-that no longer exist are treated as removed. The header row and the key column
-must exist. A poll reads the full selected range; there is no slicing, paging
-cap, or partial-result success. Invalid response types, mismatched
-sheet/spreadsheet identity, unexpected grid offsets, and oversized responses
-fail the poll; a range response larger than 64 MiB is refused while it is being
-read. Normal trailing empty `GridData` omissions are interpreted as
-blanks, as required for sparse Sheets responses. The baseline holds only the
-keys currently in the range (at most 9,999) and is limited to 8 MiB of entered
-values; exceeding that fails before progress is returned, and selecting a
-smaller range resolves it. Provider errors also preserve the previous baseline,
-including permission loss.
-
-Deployment must provide persisted subscription selection and durable polling
-state, with per-instance lease or compare-and-swap concurrency control and
-atomic acceptance of emitted events plus `updatedState`. Restarting with the
-committed state resumes without replaying unchanged rows. Retrying the same
-transition preserves its event identity. Concurrent stale results must never
-overwrite a newer baseline. A runtime that sends null state on every poll is
-unsupported and cannot deliver these events; there is no stateless fallback.
-The initial null state and an explicit reset establish a new silent baseline.
-Corrupt or incompatible saved state fails visibly rather than auto-resetting.
+The spreadsheet and tab can be picked from lists. Tabs come from the Sheets
+API. Spreadsheets come from Google Drive `files.list`: the `spreadsheetId` field
+is linked to the `files` option list of `google/google-drive` with `mimeType`
+`application/vnd.google-apps.spreadsheet`, which lists every spreadsheet the
+account can see when a Google Drive connection of the same account exists.
+Otherwise the field's own list runs on this connection with the same
+`files.list` query (`corpora=allDrives`, so My Drive, files shared with the
+account and the shared drives it is a member of; most recently modified first,
+50 per page, searched by name). It needs a Drive scope, and with `drive.file`
+returns only the spreadsheets created or opened with this app. Both fields can also be entered directly: a spreadsheet ID or link for
+`spreadsheetId`, and the `sheetId` from **Get Spreadsheet**.
 
 OAuth and service-account triggers use existing spreadsheet read permissions.
-API-key triggers are not advertised. No Apps Script, row mutation, or Drive
-notification is used as a replacement for the durable comparison contract.
+API-key triggers are not advertised.
 
 ## Authentication methods
 
@@ -232,7 +167,3 @@ Merge and unmerge ranges of cells. Supports different merge strategies (merge al
 ### Batch Operations
 
 Perform multiple distinct update operations (formatting, adding sheets, creating charts, etc.) in a single request using `batchUpdate`. This allows complex spreadsheet modifications to be applied atomically.
-
-## Events
-
-This integration does not currently expose event triggers.

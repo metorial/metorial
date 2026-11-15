@@ -6,6 +6,7 @@ export * from './controlFlow';
 export * from './hub';
 export * from './identify';
 export * from './legacyTrigger';
+export * from './optionList';
 export * from './toolCategory';
 export * from './tracing';
 export * from './triggerGroup';
@@ -65,6 +66,12 @@ import {
   slatesLegacyTriggerResponsesByMethod
 } from './legacyTrigger';
 import {
+  type SlatesOptionListRequests,
+  type SlatesOptionListResponses,
+  slatesOptionListRequestsByMethod,
+  slatesOptionListResponsesByMethod
+} from './optionList';
+import {
   type SlatesToolCategoryRequests,
   type SlatesToolCategoryResponses,
   slatesToolCategoryRequestsByMethod,
@@ -92,6 +99,7 @@ export type SlatesRequests =
   | SlatesLegacyTriggerRequests
   | SlatesTriggerGroupRequests
   | SlatesToolCategoryRequests
+  | SlatesOptionListRequests
   | SlatesHubRequests
   | SlatesIdentifyRequests;
 
@@ -104,6 +112,7 @@ export type SlatesResponses =
   | SlatesLegacyTriggerResponses
   | SlatesTriggerGroupResponses
   | SlatesToolCategoryResponses
+  | SlatesOptionListResponses
   | SlatesHubResponses
   | SlatesIdentifyResponses;
 
@@ -116,6 +125,7 @@ export let slatesResponsesByMethod = {
   ...slatesLegacyTriggerResponsesByMethod,
   ...slatesTriggerGroupResponsesByMethod,
   ...slatesToolCategoryResponsesByMethod,
+  ...slatesOptionListResponsesByMethod,
   ...slatesHubResponsesByMethod,
   ...slatesIdentifyResponsesByMethod
 };
@@ -129,6 +139,7 @@ export let slatesRequestsByMethod = {
   ...slatesLegacyTriggerRequestsByMethod,
   ...slatesTriggerGroupRequestsByMethod,
   ...slatesToolCategoryRequestsByMethod,
+  ...slatesOptionListRequestsByMethod,
   ...slatesHubRequestsByMethod,
   ...slatesIdentifyRequestsByMethod
 };

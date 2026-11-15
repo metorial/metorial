@@ -7,11 +7,16 @@ import type {
   SlatesTriggerGroup
 } from '@slates/proto';
 import {
+  slatesSelectionOptionsLinkedSchemaKey,
+  slatesSelectionOptionsSchemaKey
+} from '@slates/proto';
+import {
   type Slate,
   type SlateAdapter,
   SlateDefaultPollingIntervalSeconds,
   type SlateToolCategory,
-  type SlateTrigger
+  type SlateTrigger,
+  type SlateTriggerGroupSelectionOptionsSources
 } from '@slates/provider';
 import z from 'zod';
 import { toJsonSchema } from './validation';
@@ -218,6 +223,20 @@ export let getTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   return group;
 };
 
+export let getOptionList = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  optionListId: string
+) => {
+  let list = (slate.optionLists ?? []).find(l => l.key === optionListId);
+  if (!list) {
+    throw new ServiceError(
+      badRequestError({ message: `Invalid option list ID: ${optionListId}` })
+    );
+  }
+
+  return list;
+};
+
 export let getTriggersForGroup = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   triggerGroupId: string
@@ -326,6 +345,33 @@ export let getExposedToolCategories = <ConfigType extends {}, AuthType extends {
   );
 };
 
+let markSelectionOptions = (
+  schema: Record<string, any>,
+  sources: Record<string, SlateTriggerGroupSelectionOptionsSources<any, any>>
+) => {
+  let entries = Object.entries(sources);
+  if (!entries.length) return schema;
+
+  let properties: Record<string, any> = { ...schema.properties };
+  for (let [field, source] of entries) {
+    properties[field] = {
+      ...properties[field],
+      ...(source.list ? { [slatesSelectionOptionsSchemaKey]: true } : {}),
+      ...(source.linked
+        ? {
+            [slatesSelectionOptionsLinkedSchemaKey]: {
+              slate: source.linked.slate,
+              optionList: source.linked.optionList,
+              params: source.linked.params ?? {}
+            }
+          }
+        : {})
+    };
+  }
+
+  return { ...schema, properties };
+};
+
 export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
 ): SlatesTriggerGroup => ({
@@ -334,7 +380,12 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   description: group.description,
   metadata: group.metadata,
   ...(group.selectionSchema
-    ? { selectionSchema: toJsonSchema(group.selectionSchema, 'input') }
+    ? {
+        selectionSchema: markSelectionOptions(
+          toJsonSchema(group.selectionSchema, 'input'),
+          group.selectionOptions
+        )
+      }
     : {}),
   invocation:
     group.source === 'polling'

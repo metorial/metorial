@@ -4,56 +4,40 @@ Create, read, and update spreadsheets and their cell data. Read and write values
 
 ## Events
 
-`row_added` and `row_updated` observe a selected keyed table every 15 minutes.
-The first successful read establishes a silent baseline. Select a spreadsheet
-ID, stable numeric sheet ID (discover it with **Get Spreadsheet**), bounded A1
-range such as `A1:D1000`, and immutable key column such as `A`. The first row of
-the range is the header row. Optional watched-column letters limit update
-events; by default all columns except the key are watched.
+`new_row` fires when a row is added below the last filled row of a tab, checked
+every 15 minutes. Choose a spreadsheet (from the list, or paste its link or ID)
+and optionally a tab; without one the first tab is used. Rows already in the tab
+when the trigger is turned on are not reported. Each event carries the row
+number, the header row, the row's values, and the values by header text.
 
-Every row to be observed needs a unique, nonblank text, number, or boolean key.
-A row whose key is blank, a formula, or shared with another row is skipped; all
-other rows are still observed, and each check reports a warning with the number
-of skipped rows and a few row numbers. A skipped row is reported as added once
-it has a usable key. A known key that is typed into a second row keeps its last
-unambiguous values and, when it is unique again, reports an update only if its
-watched values changed. Entirely blank rows are ignored. Sorting or inserting
-blank rows changes positions, not identities. Changing a key is treated as a
-different record; the integration does not create, repair, or enforce keys in
-your spreadsheet.
+Only counters are saved between checks (the tab ID, its number of rows and row
+numbers), never sheet contents, so the trigger cannot tell which rows changed:
 
-Comparison preserves entered text, numbers, and booleans. Formulas are returned
-as `{ "formula": "=SUM(C2:D2)" }` and compared by expression, separately from
-literal text. Formula recalculation, formatting, and calculated spill cells do
-not produce changes. Dates retain their underlying numeric serial values.
-Blank and empty-string cells are normalized to `null`, including omitted
-trailing cells. Changing the selection or the header of the key column
-establishes another silent baseline and reports a warning. Columns are
-identified by letter, so editing any other header keeps every row observation.
-When the header of a watched column changes, value changes in that column alone
-are left out of that one check, because a changed header usually means the
-column was moved or replaced; this prevents a flood of updates after a column
-is inserted or deleted.
+- When the tab has fewer rows than at the last check, or the last reported row
+  is now empty, rows were removed. The trigger counts again from the last filled
+  row and reports nothing for that check. A row added within the same 15
+  minutes is reported only if it lands below the row number of the last
+  reported row: after one row is deleted, the next row added takes that number
+  and is missed.
+- A row typed into an empty row above the last reported row is not reported.
+  Rows inserted in the middle push the rows below them down, and those of them
+  that move past the last reported row are reported again.
+- A value far below the data, such as a total, becomes the new last row: it is
+  reported, and rows added above it are not.
+- A tab is read 2,000 rows at a time, at most five times per check. Counting a
+  tab of more than 10,000 rows takes several checks, and rows added before the
+  count finishes can be counted as already there. A row more than 2,000 rows
+  below the last reported row is searched for 8,000 rows further on each check
+  that finds nothing nearer, so it can arrive several checks later.
 
-Outputs include the spreadsheet/tab identity, immutable key, current row
-number, columns, headers, entered values, durable revision, and `observedAt`.
-Updates also include previous values and the watched columns that changed.
-These are net changes between successful reads: intermediate edits can be
-missed, and `observedAt` is not an edit timestamp. Rows outside the selected
-range are not monitored; deletions have no event. A key that leaves the range
-and later returns is a new addition observation with a new revision. Removed
-keys are not remembered, so a table whose keys keep rotating can be observed
-indefinitely; `revision` increases with every reported observation of a key and
-is never reused for it, but is not necessarily consecutive. The range may extend
-past the sheet's last row or column: cells the sheet does not have read as
-blank, so a sheet that is shorter than the range, or that shrinks, keeps being
-observed.
+OAuth and service-account access are supported; API-key authentication is not
+advertised for this event.
 
-This feature requires a runtime that persists polling baselines and selection,
-serializes concurrent polls, and atomically accepts events with their updated
-baseline. There is no stateless fallback. OAuth and service-account access are
-supported; API-key authentication is not advertised for these events. See the
-[event contract](./docs/SPEC.md#row-observation-events) for limits and recovery.
+When a Google Drive connection of the same Google account is set up, the
+spreadsheet list shows every spreadsheet that account can see. Otherwise the
+list comes from this connection, which with the app-files Drive permission
+holds only spreadsheets created or opened with this app; any other spreadsheet
+can still be entered by link or ID.
 
 ## Tools
 

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { SlateTool, SlateTrigger, SlateTriggerGroup, toolCategory } from '../action';
+import {
+  optionList,
+  SlateTool,
+  SlateTrigger,
+  SlateTriggerGroup,
+  toolCategory
+} from '../action';
 import { SlateAuth } from '../auth';
 import { SlateConfig } from '../config';
 import { Slate } from './slate';
@@ -318,5 +324,68 @@ describe('Slate.create tool categories', () => {
         ]
       })
     ).toThrow('Tool category "crm" lists tool "stray", which is not registered in this slate');
+  });
+});
+
+describe('Slate.create option lists', () => {
+  it('keeps option lists in declared order with their params schema', () => {
+    let spec = createTestSpec();
+    let files = optionList(spec, {
+      key: 'files',
+      paramsSchema: z.object({ kind: z.string().optional() }),
+      list: async ctx => ({
+        options: [{ value: ctx.input.params.kind ?? 'any', label: 'Any' }]
+      })
+    });
+    let folders = optionList(spec, {
+      key: 'folders',
+      list: async () => ({ options: [] })
+    });
+
+    let slate = Slate.create({ spec, tools: [], triggers: [], optionLists: [files, folders] });
+
+    expect(slate.optionLists.map(list => list.key)).toEqual(['files', 'folders']);
+    expect(folders.paramsSchema.parse({})).toEqual({});
+    expect(files.paramsSchema.parse({ kind: 'sheet' })).toEqual({ kind: 'sheet' });
+    expect(Slate.create({ spec, tools: [], triggers: [] }).optionLists).toEqual([]);
+  });
+
+  it('rejects params with unknown keys for the default and custom params schemas', () => {
+    let spec = createTestSpec();
+    let list = async () => ({ options: [] });
+    let folders = optionList(spec, { key: 'folders', list });
+    let files = optionList(spec, {
+      key: 'files',
+      paramsSchema: z.object({ kind: z.string().optional() }),
+      list
+    });
+    let loose = optionList(spec, {
+      key: 'loose',
+      paramsSchema: z.object({ kind: z.string() }).passthrough(),
+      list
+    });
+
+    expect(folders.paramsSchema.safeParse({ kind: 'sheet' }).success).toBe(false);
+    expect(files.paramsSchema.safeParse({ knd: 'sheet' }).success).toBe(false);
+    expect(loose.paramsSchema.safeParse({ kind: 'sheet', extra: 1 }).success).toBe(false);
+  });
+
+  it('rejects a params schema that is not a zod object', () => {
+    expect(() =>
+      optionList(createTestSpec(), {
+        key: 'files',
+        paramsSchema: z.record(z.string(), z.string()) as any,
+        list: async () => ({ options: [] })
+      })
+    ).toThrow('Option list "files" params schema must be a zod object');
+  });
+
+  it('rejects duplicate option list keys', () => {
+    let spec = createTestSpec();
+    let list = () => optionList(spec, { key: 'files', list: async () => ({ options: [] }) });
+
+    expect(() =>
+      Slate.create({ spec, tools: [], triggers: [], optionLists: [list(), list()] })
+    ).toThrow('Option list "files" is registered more than once');
   });
 });

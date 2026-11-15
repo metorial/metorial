@@ -1,5 +1,11 @@
 import { isServiceError } from '@lowerdeck/error';
-import { slatesTriggerGroup } from '@slates/proto';
+import {
+  slatesLinkedOptionList,
+  slatesSelectionOptionsLinkedSchemaKey,
+  slatesSelectionOptionsSchemaKey,
+  slatesTriggerGroup
+} from '@slates/proto';
+import { SlateAuth, SlateConfig, SlateSpecification, triggerGroup } from '@slates/provider';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -332,5 +338,68 @@ describe('mapAuthMethod', () => {
       mapAuthMethod(slate, { ...oauthMethod, adminSetup: { required: true } }).capabilities
         .adminSetup
     ).toEqual({ enabled: true, required: true });
+  });
+});
+
+describe('selection options schema markers', () => {
+  let spec = SlateSpecification.create({
+    key: 'demo',
+    name: 'Demo',
+    config: SlateConfig.create(z.object({})),
+    auth: SlateAuth.create<{}>().output(z.object({}))
+  });
+  let list = async () => ({ options: [] });
+  let group = triggerGroup(spec, {
+    key: 'group',
+    name: 'Group',
+    selectionSchema: z.object({
+      own: z.string(),
+      linked: z.string(),
+      both: z.string(),
+      plain: z.string()
+    })
+  })
+    .polling({ pollEvents: async () => ({ events: [] }) })
+    .routingMatchers(async () => [])
+    .selectionOptions({
+      own: { list },
+      linked: { linked: { slate: 'acme/files', optionList: 'files' } },
+      both: {
+        list,
+        linked: { slate: 'acme/files', optionList: 'folders', params: { shared: true } }
+      }
+    })
+    .build();
+
+  it('marks own lists and linked lists separately', () => {
+    let mapped = mapTriggerGroup(group);
+    let properties = (mapped.selectionSchema as any).properties;
+
+    expect(properties.own).toEqual({
+      type: 'string',
+      [slatesSelectionOptionsSchemaKey]: true
+    });
+    expect(properties.linked).toEqual({
+      type: 'string',
+      [slatesSelectionOptionsLinkedSchemaKey]: {
+        slate: 'acme/files',
+        optionList: 'files',
+        params: {}
+      }
+    });
+    expect(properties.both).toEqual({
+      type: 'string',
+      [slatesSelectionOptionsSchemaKey]: true,
+      [slatesSelectionOptionsLinkedSchemaKey]: {
+        slate: 'acme/files',
+        optionList: 'folders',
+        params: { shared: true }
+      }
+    });
+    expect(properties.plain).toEqual({ type: 'string' });
+    expect(
+      slatesLinkedOptionList.parse(properties.both[slatesSelectionOptionsLinkedSchemaKey])
+    ).toEqual({ slate: 'acme/files', optionList: 'folders', params: { shared: true } });
+    expect(slatesTriggerGroup.safeParse(mapped).success).toBe(true);
   });
 });
