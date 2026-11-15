@@ -2,7 +2,9 @@
 
 Create, read, and update spreadsheets and their cell data. Read and write values to individual cells, ranges, or multiple ranges using A1 notation or named ranges. Apply cell formatting including text styles, backgrounds, borders, number formats, and conditional formatting. Manage sheets (tabs) within a spreadsheet—add, delete, copy, rename, and reorder them. Create and manage embedded charts, pivot tables, filter views, data validation rules, protected ranges, named ranges, and merged cells. Perform batch operations to apply multiple updates atomically.
 
-## Events
+## New row trigger (parked)
+
+**Switched off.** This integration does not offer event triggers at the moment: spreadsheet activity is observed through the Google Drive integration's file events instead. This section describes the parked new row trigger and is kept for when it is switched back on.
 
 `new_row` fires when a row is added below the last filled row of a tab, checked
 every 15 minutes. Choose a spreadsheet (from the list, or paste its link or ID)

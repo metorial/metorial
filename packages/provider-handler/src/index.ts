@@ -31,6 +31,7 @@ import {
   type SlateTriggerGroup,
   uploadAttachmentDirect
 } from '@slates/provider';
+import { extractEventAttributes } from './eventAttributes';
 import { PQueue } from './pQueue';
 import {
   evaluateTriggerMatches,
@@ -1252,7 +1253,14 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         () => runWithContext(context, () => action.map(context))
       );
 
-      return withRequestTraces(context, { id: res.id, type: res.type, output: res.output });
+      let attributes = extractEventAttributes(action.eventAttributes ?? [], res.output);
+
+      return withRequestTraces(context, {
+        id: res.id,
+        type: res.type,
+        output: res.output,
+        ...(Object.keys(attributes).length ? { attributes } : {})
+      });
     });
 
     manager.onRequest('slates/action.trigger.poll_events', async ({ params }) => {

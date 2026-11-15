@@ -32,7 +32,9 @@ Publishes or unpublishes a Google Form and controls whether a published form acc
 
 Updates an existing Google Form using batch update requests. Supports updating form info (title, description), settings (quiz mode), and managing items (adding, updating, moving, or deleting questions, sections, images, and videos). Accepts an array of update requests that are applied atomically. Each request can be one of: **updateFormInfo**, **updateSettings**, **createItem**, **updateItem**, **moveItem**, or **deleteItem**.
 
-## Triggers
+## New response trigger (parked)
+
+**Switched off.** This integration does not offer event triggers at the moment: form activity is observed through the Google Drive integration's file events instead. This section describes the parked new response trigger and is kept for when it is switched back on. The **Manage Watches** tool described above works today.
 
 **New response** starts a workflow for a first submission after a form watch is enabled. It includes stable form and response IDs, first/latest submission times, collected respondent email, answers keyed by question ID, and uploaded-file references. Answers reflect the latest submission retrieved; editing an existing response does not create another new-response event.
 

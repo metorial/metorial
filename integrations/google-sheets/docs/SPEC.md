@@ -4,7 +4,9 @@
 
 Google Sheets is a cloud-based spreadsheet application that is part of the Google Workspace suite. The Google Sheets API is a RESTful interface that lets you read and modify a spreadsheet's data. On Google Sheets API v4, you get access to almost every spreadsheet feature, including charts, pivot tables, and filter views, as well as cell formatting.
 
-## New row events
+## Parked trigger: new_row (switched off)
+
+**Status: parked.** The trigger is implemented but not offered: the integration currently exposes no event triggers, because spreadsheet activity is observed through Google Drive file events instead. The code under `src/triggers` is kept, and the rest of this section describes the trigger as it works when it is registered again.
 
 The `new_rows` polling group emits `new_row` (`row.new`) every 900 seconds for
 rows added below the last filled row of one tab. Selection is a

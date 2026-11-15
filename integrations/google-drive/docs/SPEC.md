@@ -128,8 +128,25 @@ the file ID instead.
 
 ## Events
 
-The `folder_events` automatic webhook group requires an explicit `folderIds`
-selection (1–100 folder IDs from `search_files`). Each selected folder can have
+The `folder_events` automatic webhook group (shown as "File Events"; the key is
+kept because saved selections are stored under it) takes an optional `folderIds`
+selection.
+
+Without selected folders the whole account is one target: one `changes.watch`
+channel on the user's change log, started at the current `startPageToken`, with
+no file listing. Every `file` change with a file resource becomes a
+`file_updated` event with `folderId: null`, `driveId` taken from the file and
+`trashed` reflecting the file, including newly created files, metadata-only
+changes and files moved to the trash. Changes with `removed: true` (deleted for
+good or no longer accessible) and non-file changes are skipped. No per-file state
+is saved, only the cursor, so `file_added_to_folder` never fires and a repeated
+read of the same version is deduplicated by the event ID alone. One run reads at
+most 5 change pages (5,000 changes); the rest follows on the next notification
+or the 15-minute reconciliation. What the user change log contains for shared
+drives has not been verified against a live account.
+
+With a selection (1–100 folder IDs from `search_files`) only those folders are
+watched, each as its own target. Each selected folder can have
 at most 5,000 immediate children. The selection offers a folder list read with
 `files.list`, untrashed folders only. Without search text it holds, in this
 order and each sorted by name: up to 50 folders at the top of My Drive
@@ -164,7 +181,7 @@ use the user's log. The selected folder and account are rechecked every 15
 minutes, not on each change notification, so a folder that is trashed or moved
 can keep reporting changes for up to 15 minutes. Coverage
 is limited to the credential's actual grants; `drive.file` cannot observe every
-file visible in the Google Drive UI. There is no claim of an all-drives stream.
+file visible in the Google Drive UI.
 A selected ID that is inaccessible, is not a folder, is a trashed folder, or is
 an alias for another folder ID is skipped with a warning; the other selected
 folders are still watched. Saved state is kept for the selected folders of the
@@ -205,6 +222,11 @@ or reconciliation. Failed pages do not advance the cursor. Event deduplication
 uses account, corpus, folder, file ID, version and event kind, never the empty
 legacy `changeId` field. Events carry every output field, including the account
 verified during expansion, so mapping makes no further Drive request.
+
+Both triggers declare `fileId`, `mimeType` and `parents` as event attributes.
+Each mapped event returns their values next to the output (one file ID, one
+MIME type, up to 16 parent folder IDs), so events can be filtered by file, file
+type or parent folder without reading the full payload.
 
 Channels request a seven-day lease and renew at 80% of the provider-confirmed
 lifetime. Replacement channels retain unexpired overlap identities and the

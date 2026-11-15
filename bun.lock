@@ -5717,14 +5717,14 @@
     },
     "integrations/gmail": {
       "name": "@slates-integrations/gmail",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/google-people-recipes": "1.0.0-rc.12",
         "@slates/google-pubsub": "1.0.0",
         "@slates/tool-recipes": "1.0.0-rc.11",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.33",
+        "slates": "1.0.0-rc.34",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -5950,11 +5950,11 @@
     },
     "integrations/google-cloud-storage": {
       "name": "@slates-integrations/google-cloud-storage",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@slates/google-pubsub": "1.0.0",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.33",
+        "slates": "1.0.0-rc.34",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -6083,12 +6083,12 @@
     },
     "integrations/google-meet": {
       "name": "@slates-integrations/google-meet",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/google-pubsub": "1.0.0",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.33",
+        "slates": "1.0.0-rc.34",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -13084,7 +13084,7 @@
       "name": "@slates-integrations/super-booble-1",
       "version": "0.4.10",
       "dependencies": {
-        "@slates-integrations/gmail": "0.3.0",
+        "@slates-integrations/gmail": "0.3.1",
         "@slates-integrations/google-chat": "0.3.1",
         "@slates-integrations/google-contacts": "0.2.7",
         "@slates-integrations/google-docs": "0.2.2",
@@ -13101,7 +13101,7 @@
       },
       "peerDependencies": {
         "@slates/oauth-google": "1.0.6",
-        "@slates/super-google-tools": "1.0.0-rc.8",
+        "@slates/super-google-tools": "1.0.0-rc.9",
       },
       "optionalPeers": [
         "@slates/oauth-google",
@@ -15436,7 +15436,7 @@
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "jose": "^6.2.3",
-        "slates": "1.0.0-rc.33",
+        "slates": "1.0.0-rc.34",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -15609,9 +15609,9 @@
     },
     "packages/super-google-tools": {
       "name": "@slates/super-google-tools",
-      "version": "1.0.0-rc.8",
+      "version": "1.0.0-rc.9",
       "dependencies": {
-        "slates": "1.0.0-rc.33",
+        "slates": "1.0.0-rc.34",
       },
       "devDependencies": {
         "@lowerdeck/error": "^1.1.0",
@@ -21000,8 +21000,6 @@
 
     "@slates-integrations/gmail/@slates/test": ["@slates/test@1.0.0-rc.28", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.33", "@slates/profiles": "1.0.0-rc.29" } }, "sha512-mk140RL91DRZ4hoLmyj9XWgu9V6SZ8+TqmtjocdDDLg2IiQLqok/OUXtrRdWPCy03ihna1SZXircZ2klEgq1lg=="],
 
-    "@slates-integrations/gmail/slates": ["slates@1.0.0-rc.33", "", { "dependencies": { "@slates/provider": "1.0.0-rc.34" } }, "sha512-gi3M00FIbArNHkRk6rTaWZr0OuxhuI2pDRJpeqeCQ6wlogPHD9koQGsAY518WUsF9tx6h3CI3O3ZDB6j2XlfzA=="],
-
     "@slates-integrations/godial/slates": ["slates@1.0.0-rc.28", "", { "dependencies": { "@slates/provider": "1.0.0-rc.29" } }, "sha512-YO2lOMDrCNh9T7Otj7KTmVFT9+qPLu/n76Dz0VoA9grgCk6R3t353xpyuHv+ullbpxDsFuNJgEskFf732tU1Yw=="],
 
     "@slates-integrations/gong/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
@@ -21048,8 +21046,6 @@
 
     "@slates-integrations/google-cloud-storage/@slates/test": ["@slates/test@1.0.0-rc.28", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.33", "@slates/profiles": "1.0.0-rc.29" } }, "sha512-mk140RL91DRZ4hoLmyj9XWgu9V6SZ8+TqmtjocdDDLg2IiQLqok/OUXtrRdWPCy03ihna1SZXircZ2klEgq1lg=="],
 
-    "@slates-integrations/google-cloud-storage/slates": ["slates@1.0.0-rc.33", "", { "dependencies": { "@slates/provider": "1.0.0-rc.34" } }, "sha512-gi3M00FIbArNHkRk6rTaWZr0OuxhuI2pDRJpeqeCQ6wlogPHD9koQGsAY518WUsF9tx6h3CI3O3ZDB6j2XlfzA=="],
-
     "@slates-integrations/google-cloud-vision/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
 
     "@slates-integrations/google-cloud-vision/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
@@ -21067,8 +21063,6 @@
     "@slates-integrations/google-maps/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
     "@slates-integrations/google-meet/@slates/test": ["@slates/test@1.0.0-rc.28", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.33", "@slates/profiles": "1.0.0-rc.29" } }, "sha512-mk140RL91DRZ4hoLmyj9XWgu9V6SZ8+TqmtjocdDDLg2IiQLqok/OUXtrRdWPCy03ihna1SZXircZ2klEgq1lg=="],
-
-    "@slates-integrations/google-meet/slates": ["slates@1.0.0-rc.33", "", { "dependencies": { "@slates/provider": "1.0.0-rc.34" } }, "sha512-gi3M00FIbArNHkRk6rTaWZr0OuxhuI2pDRJpeqeCQ6wlogPHD9koQGsAY518WUsF9tx6h3CI3O3ZDB6j2XlfzA=="],
 
     "@slates-integrations/google-photos/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
 
@@ -23074,8 +23068,6 @@
 
     "@slates/google-people-recipes/slates": ["slates@1.0.0-rc.33", "", { "dependencies": { "@slates/provider": "1.0.0-rc.34" } }, "sha512-gi3M00FIbArNHkRk6rTaWZr0OuxhuI2pDRJpeqeCQ6wlogPHD9koQGsAY518WUsF9tx6h3CI3O3ZDB6j2XlfzA=="],
 
-    "@slates/google-pubsub/slates": ["slates@1.0.0-rc.33", "", { "dependencies": { "@slates/provider": "1.0.0-rc.34" } }, "sha512-gi3M00FIbArNHkRk6rTaWZr0OuxhuI2pDRJpeqeCQ6wlogPHD9koQGsAY518WUsF9tx6h3CI3O3ZDB6j2XlfzA=="],
-
     "@slates/google-push-channels/slates": ["slates@1.0.0-rc.33", "", { "dependencies": { "@slates/provider": "1.0.0-rc.34" } }, "sha512-gi3M00FIbArNHkRk6rTaWZr0OuxhuI2pDRJpeqeCQ6wlogPHD9koQGsAY518WUsF9tx6h3CI3O3ZDB6j2XlfzA=="],
 
     "@slates/microsoft-dataverse-recipes/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
@@ -23087,8 +23079,6 @@
     "@slates/oauth-zoho/slates": ["slates@1.0.0-rc.29", "", { "dependencies": { "@slates/provider": "1.0.0-rc.30" } }, "sha512-xkKmO6Wj3oXs4SUnRDA585iO/6OTgy3kVSRI6saJoc1ET30WLl7I20wWltYQkmykpOf38hcMtnxo4jiT6PNJkw=="],
 
     "@slates/slack-tools/slates": ["slates@1.0.0-rc.26", "", { "dependencies": { "@slates/provider": "1.0.0-rc.27" } }, "sha512-iQYMPSzrezor9cDDTR2PGSJ/g5I3G3R9NykxA4378h7RAdA7TS+Ex0MIUrGbfTCASema7tU1K7TclJCDF36Sfg=="],
-
-    "@slates/super-google-tools/slates": ["slates@1.0.0-rc.33", "", { "dependencies": { "@slates/provider": "1.0.0-rc.34" } }, "sha512-gi3M00FIbArNHkRk6rTaWZr0OuxhuI2pDRJpeqeCQ6wlogPHD9koQGsAY518WUsF9tx6h3CI3O3ZDB6j2XlfzA=="],
 
     "@slates/tool-recipes/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
 
@@ -24364,8 +24354,6 @@
 
     "@slates-integrations/gmail/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.29", "", { "dependencies": { "@slates/client": "1.0.0-rc.33", "@slates/proto": "1.0.0-rc.29" } }, "sha512-dxVAojGhbm8t0iM33v3dPtPYA5cREe9/UAfRZLEFy2AqXgFx8iMK2Gtu0+rKwfLB5cBc62di3M1r8jaPYSn9lg=="],
 
-    "@slates-integrations/gmail/slates/@slates/provider": ["@slates/provider@1.0.0-rc.34", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-rvo3Nd/q0e9ts6lWXzcp9QPl31aTaY8vGi7BAB4VeBMBXiQNsgN80jP08WEBmoz2mu4B4Vm94U2v5ciCNK9Byg=="],
-
     "@slates-integrations/godial/slates/@slates/provider": ["@slates/provider@1.0.0-rc.29", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-aK//o0Jyj+H55crUlY+O0AtWGzv3P/N015Hr91ACsHCx+GwwOCkIRFkaScm23qMSXt6P587pShyYPrYmemwiLg=="],
 
     "@slates-integrations/gong/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
@@ -24430,8 +24418,6 @@
 
     "@slates-integrations/google-cloud-storage/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.29", "", { "dependencies": { "@slates/client": "1.0.0-rc.33", "@slates/proto": "1.0.0-rc.29" } }, "sha512-dxVAojGhbm8t0iM33v3dPtPYA5cREe9/UAfRZLEFy2AqXgFx8iMK2Gtu0+rKwfLB5cBc62di3M1r8jaPYSn9lg=="],
 
-    "@slates-integrations/google-cloud-storage/slates/@slates/provider": ["@slates/provider@1.0.0-rc.34", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-rvo3Nd/q0e9ts6lWXzcp9QPl31aTaY8vGi7BAB4VeBMBXiQNsgN80jP08WEBmoz2mu4B4Vm94U2v5ciCNK9Byg=="],
-
     "@slates-integrations/google-cloud-vision/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
 
     "@slates-integrations/google-cloud-vision/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.15", "", { "dependencies": { "@slates/client": "1.0.0-rc.17", "@slates/proto": "1.0.0-rc.15" } }, "sha512-54Da7oeshZssih0vTZaLoKtMRvSoROgsFd9VFEHrtIX7rrsizPpnPFNp8CMb8FCb1dM2tuUiI/rECKE9Bw1mfA=="],
@@ -24455,8 +24441,6 @@
     "@slates-integrations/google-meet/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.33", "", { "dependencies": { "@slates/proto": "1.0.0-rc.29", "@slates/provider": "1.0.0-rc.34", "@slates/provider-handler": "1.0.0-rc.44" } }, "sha512-ddmksdp2Flou5++n2csAriK5c+LDn0dmhvYihVujqYIc8bIOD7yabLf6pVlZaIOVxj+1AoEQXW9SzcLRNpk5Vg=="],
 
     "@slates-integrations/google-meet/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.29", "", { "dependencies": { "@slates/client": "1.0.0-rc.33", "@slates/proto": "1.0.0-rc.29" } }, "sha512-dxVAojGhbm8t0iM33v3dPtPYA5cREe9/UAfRZLEFy2AqXgFx8iMK2Gtu0+rKwfLB5cBc62di3M1r8jaPYSn9lg=="],
-
-    "@slates-integrations/google-meet/slates/@slates/provider": ["@slates/provider@1.0.0-rc.34", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-rvo3Nd/q0e9ts6lWXzcp9QPl31aTaY8vGi7BAB4VeBMBXiQNsgN80jP08WEBmoz2mu4B4Vm94U2v5ciCNK9Byg=="],
 
     "@slates-integrations/google-photos/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
 
@@ -26398,8 +26382,6 @@
 
     "@slates/google-people-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.34", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-rvo3Nd/q0e9ts6lWXzcp9QPl31aTaY8vGi7BAB4VeBMBXiQNsgN80jP08WEBmoz2mu4B4Vm94U2v5ciCNK9Byg=="],
 
-    "@slates/google-pubsub/slates/@slates/provider": ["@slates/provider@1.0.0-rc.34", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-rvo3Nd/q0e9ts6lWXzcp9QPl31aTaY8vGi7BAB4VeBMBXiQNsgN80jP08WEBmoz2mu4B4Vm94U2v5ciCNK9Byg=="],
-
     "@slates/google-push-channels/slates/@slates/provider": ["@slates/provider@1.0.0-rc.34", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-rvo3Nd/q0e9ts6lWXzcp9QPl31aTaY8vGi7BAB4VeBMBXiQNsgN80jP08WEBmoz2mu4B4Vm94U2v5ciCNK9Byg=="],
 
     "@slates/microsoft-dataverse-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
@@ -26411,8 +26393,6 @@
     "@slates/oauth-zoho/slates/@slates/provider": ["@slates/provider@1.0.0-rc.30", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-kN6t2173J5RGkTbF4c7H24oRxmCJRggBxlUuF4hRwn1w3YXtRmRDf2piPM/xa37hLtnEAmud8FoHj78C3neE1Q=="],
 
     "@slates/slack-tools/slates/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
-
-    "@slates/super-google-tools/slates/@slates/provider": ["@slates/provider@1.0.0-rc.34", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-rvo3Nd/q0e9ts6lWXzcp9QPl31aTaY8vGi7BAB4VeBMBXiQNsgN80jP08WEBmoz2mu4B4Vm94U2v5ciCNK9Byg=="],
 
     "@slates/tool-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 

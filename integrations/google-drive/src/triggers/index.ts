@@ -14,6 +14,7 @@ function fileTrigger(
     .scopes(googleDriveActionScopes.searchFiles)
     .input(driveFileEventSchema)
     .output(driveFileOutputSchema)
+    .eventAttributes(['fileId', 'mimeType', 'parents'])
     .matches(event => {
       const parsed = driveFileEventSchema.safeParse(event);
       return parsed.success && parsed.data.type === key;
@@ -29,11 +30,11 @@ function fileTrigger(
 export const fileAddedToFolder = fileTrigger(
   'file_added_to_folder',
   'File Added to Folder',
-  'A file or folder becomes visible as an immediate child of a selected folder after activation. Includes moved, restored, and newly shared existing files. Nested folder contents are excluded.'
+  'A file or folder becomes visible as an immediate child of a selected folder after activation. Includes moved, restored, and newly shared existing files. Nested folder contents are excluded. Only fires when folders are selected.'
 );
 export const fileUpdated = fileTrigger(
   'file_updated',
   'File Updated',
-  'A known immediate child of a selected folder has a newer Google Drive version. Includes content and metadata changes; rapid changes can be combined into the latest observed version.'
+  'A file has a newer Google Drive version. With no folders selected this covers every file in the account, including new and trashed files; with folders selected, only known immediate children of those folders. Includes content and metadata changes; rapid changes can be combined into the latest observed version.'
 );
 export { driveFolderEvents };

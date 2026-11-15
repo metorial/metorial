@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.33",
+    "slates": "1.0.0-rc.34",
     "zod": "^4.2",
     "@slates/google-pubsub": "1.0.0"
   },
@@ -18,5 +18,5 @@
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

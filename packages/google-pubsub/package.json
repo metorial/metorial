@@ -29,7 +29,7 @@
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
     "jose": "^6.2.3",
-    "slates": "1.0.0-rc.33",
+    "slates": "1.0.0-rc.34",
     "zod": "^4.2"
   },
   "devDependencies": {

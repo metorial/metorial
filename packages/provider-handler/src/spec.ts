@@ -7,6 +7,7 @@ import type {
   SlatesTriggerGroup
 } from '@slates/proto';
 import {
+  slatesEventAttributeSchemaKey,
   slatesSelectionOptionsLinkedSchemaKey,
   slatesSelectionOptionsSchemaKey
 } from '@slates/proto';
@@ -168,10 +169,22 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
 
   return {
     ...base,
+    outputSchema: markEventAttributes(base.outputSchema, a.eventAttributes ?? []),
     type: 'action.trigger',
     capabilities: {},
     triggerGroupId: a.triggerGroup.key
   };
+};
+
+let markEventAttributes = (schema: Record<string, any>, fields: string[]) => {
+  if (!fields.length) return schema;
+
+  let properties: Record<string, any> = { ...schema.properties };
+  for (let field of fields) {
+    properties[field] = { ...properties[field], [slatesEventAttributeSchemaKey]: true };
+  }
+
+  return { ...schema, properties };
 };
 
 export let isMappableTrigger = <ConfigType extends {}, AuthType extends {}>(

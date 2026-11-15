@@ -66,11 +66,22 @@ function selectedTarget(target: DriveTarget, selection: unknown) {
     selection,
     'folder selection'
   );
-  if (!selected.folderIds.includes(target.folderId))
+  const folderIds = selected.folderIds ?? [];
+  const stillSelected =
+    target.folderId === null ? !folderIds.length : folderIds.includes(target.folderId);
+  if (!stillSelected)
     throw createApiServiceError('The registered Google Drive folder is no longer selected.', {
       reason: 'google_drive_folder_not_selected'
     });
 }
+
+const discoveredTarget = ({ name, ...target }: DriveTarget & { name: string }) => ({
+  webhookTargetIdentifier: driveTargetId(target),
+  webhookTargetPayload: target,
+  name,
+  metadata: { folderId: target.folderId, driveId: target.driveId },
+  targetOwnership: 'single_user' as const
+});
 
 async function assertTarget(
   client: GoogleDriveClient,
@@ -98,18 +109,24 @@ const targetList: SlateWebhookTargetListHandler<{}, Auth> = async ctx => {
     ctx.input.selection,
     'folder selection'
   );
-  const folderIds = [...new Set(selection.folderIds)];
+  const folderIds = [...new Set(selection.folderIds ?? [])];
   const offset = ctx.input.pageToken == null ? 0 : ctx.input.pageToken;
+  const client = new GoogleDriveClient(ctx.auth.token);
+  // Without selected folders the whole account is one target.
+  if (!folderIds.length && offset === 0)
+    return {
+      targets: [discoveredTarget(await resolveDriveTarget(client, null))],
+      nextPageToken: null
+    };
   if (!Number.isSafeInteger(offset) || offset < 0 || offset >= folderIds.length) {
     throw createApiServiceError('Invalid Google Drive folder discovery page token.', {
       reason: 'google_drive_target_page_invalid'
     });
   }
-  const client = new GoogleDriveClient(ctx.auth.token);
   const targets: Awaited<ReturnType<SlateWebhookTargetListHandler<{}, Auth>>>['targets'] = [];
   for (const folderId of folderIds.slice(offset, offset + TARGETS_PER_PAGE)) {
     try {
-      const { name, ...target } = await resolveDriveTarget(client, folderId);
+      const target = await resolveDriveTarget(client, folderId);
       if (folderId !== target.folderId)
         throw createApiServiceError(
           'Use the folder ID returned by Search Files, rather than a folder alias.',
@@ -117,13 +134,7 @@ const targetList: SlateWebhookTargetListHandler<{}, Auth> = async ctx => {
             reason: 'google_drive_folder_alias'
           }
         );
-      targets.push({
-        webhookTargetIdentifier: driveTargetId(target),
-        webhookTargetPayload: target,
-        name,
-        metadata: { folderId: target.folderId, driveId: target.driveId },
-        targetOwnership: 'single_user' as const
-      });
+      targets.push(discoveredTarget(target));
     } catch (error) {
       const reason = getServiceErrorData(error)?.reason;
       if (
@@ -356,12 +367,16 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
   const save = (folder: DriveSavedFolderState) => {
     const selected = new Set(
       parseDriveContract(driveFolderSelectionSchema, ctx.input.selection, 'folder selection')
-        .folderIds
+        .folderIds ?? []
     );
-    const kept = new Map<string, [string, unknown]>();
+    const kept = new Map<string | null, [string, unknown]>();
     for (const [key, value] of Object.entries(state.driveFolders ?? {})) {
       const owner = driveTargetIdOwner(key);
-      if (owner?.accountId === registration.target.accountId && selected.has(owner.folderId))
+      if (
+        owner?.accountId === registration.target.accountId &&
+        owner.folderId !== null &&
+        selected.has(owner.folderId)
+      )
         kept.set(owner.folderId, [key, value]);
     }
     kept.set(registration.target.folderId, [targetId, folder]);
@@ -419,10 +434,11 @@ const expand: SlateWebhookExpandHandler<{}, Auth> = async ctx => {
 };
 
 export const driveFolderEvents = triggerGroup(spec, {
+  // The key predates watching the whole account; saved selections are stored under it.
   key: 'folder_events',
-  name: 'Folder Events',
+  name: 'File Events',
   description:
-    'Observe immediate children of explicitly selected folders using Google Drive change notifications.',
+    'Observe file changes using Google Drive change notifications: every file in the account, or only the immediate children of the folders you select.',
   selectionSchema: driveFolderSelectionSchema,
   eventSchema: driveFileEventSchema
 })

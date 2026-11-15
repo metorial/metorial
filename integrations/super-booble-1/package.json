@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates-integrations/gmail": "0.3.0",
+    "@slates-integrations/gmail": "0.3.1",
     "@slates-integrations/google-chat": "0.3.1",
     "@slates-integrations/google-contacts": "0.2.7",
     "@slates-integrations/google-docs": "0.2.2",
@@ -25,7 +25,7 @@
   },
   "peerDependencies": {
     "@slates/oauth-google": "1.0.6",
-    "@slates/super-google-tools": "1.0.0-rc.8"
+    "@slates/super-google-tools": "1.0.0-rc.9"
   },
   "peerDependenciesMeta": {
     "@slates/oauth-google": {

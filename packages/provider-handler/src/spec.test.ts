@@ -1,5 +1,6 @@
 import { isServiceError } from '@lowerdeck/error';
 import {
+  slatesEventAttributeSchemaKey,
   slatesLinkedOptionList,
   slatesSelectionOptionsLinkedSchemaKey,
   slatesSelectionOptionsSchemaKey,
@@ -72,6 +73,40 @@ describe('mapAction', () => {
   it('maps a well-formed trigger', () => {
     let mapped = mapAction({} as any, validTrigger);
     expect(mapped).toMatchObject({ type: 'action.trigger', triggerGroupId: 'my_group' });
+  });
+
+  it('marks the event attribute fields in a trigger output schema', () => {
+    let trigger = {
+      ...validTrigger,
+      outputSchema: z.object({
+        fileId: z.string(),
+        parents: z.array(z.string()),
+        name: z.string()
+      }),
+      eventAttributes: ['fileId', 'parents']
+    };
+
+    let { properties } = mapAction({} as any, trigger).outputSchema;
+    expect(properties.fileId).toMatchObject({
+      type: 'string',
+      [slatesEventAttributeSchemaKey]: true
+    });
+    expect(properties.parents).toMatchObject({
+      type: 'array',
+      [slatesEventAttributeSchemaKey]: true
+    });
+    expect(properties.name).not.toHaveProperty(slatesEventAttributeSchemaKey);
+  });
+
+  it('leaves trigger output schemas unmarked without event attributes', () => {
+    let trigger = { ...validTrigger, outputSchema: z.object({ fileId: z.string() }) };
+
+    expect(mapAction({} as any, trigger).outputSchema.properties.fileId).not.toHaveProperty(
+      slatesEventAttributeSchemaKey
+    );
+    expect(
+      mapAction({} as any, { ...trigger, eventAttributes: [] }).outputSchema.properties.fileId
+    ).not.toHaveProperty(slatesEventAttributeSchemaKey);
   });
 
   it('includes the tool categories a tool belongs to', () => {
