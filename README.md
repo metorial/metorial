@@ -5,8 +5,8 @@
 <h1 align="center">Metorial (YC F25)</h1>
 
 <p align="center">
-Open-source identity and access layer for AI agents. <br />
-Connect agents to real systems with consistent auth, permissions, and observability.
+Open-source MCP gateway and identity layer for AI agents. <br />
+One URL behind your SSO for every MCP server, tool and skill, with per-user OAuth, permissions and audit logs.
 </p>
 
 > [!TIP]
@@ -18,7 +18,11 @@ Connect agents to real systems with consistent auth, permissions, and observabil
 
 Agents are being connected to production systems, but without a consistent identity and access layer around them: limited access control, no auditing, and no standard access restrictions. Metorial solves that.
 
-Metorial is a control plane for agent access to external systems. It sits between agents and integrations, handling auth, permissions, and observability in a consistent way. Instead of wiring integrations ad hoc, teams get a shared layer that standardizes how agents interact with systems.
+Metorial is an open-source MCP gateway: it sits between AI clients and agents (Claude, ChatGPT, Cursor, Claude Code, Codex, your own agents) and the systems they connect to, handling auth, permissions, and observability in one place. Employees sign in once through your identity provider and get one MCP URL with the servers, tools and skills their role allows. Instead of wiring integrations ad hoc, teams get a shared layer that standardizes how agents interact with systems.
+
+- **What an MCP gateway is and how Metorial works:** [metorial.com/mcp-gateway](https://metorial.com/mcp-gateway)
+- **How it compares** with other open-source and enterprise MCP gateways: [open-source MCP gateways compared](https://metorial.com/comparisons/best-open-source-mcp-gateways), [enterprise MCP gateways compared](https://metorial.com/comparisons/best-enterprise-ai-gateways-2026)
+- **Docs:** [metorial.com/docs](https://metorial.com/docs)
 
 ## Core Capabilities
 
