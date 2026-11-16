@@ -6022,7 +6022,7 @@
     },
     "integrations/google-drive": {
       "name": "@slates-integrations/google-drive",
-      "version": "0.2.16",
+      "version": "0.2.17",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.34",
@@ -13082,13 +13082,13 @@
     },
     "integrations/super-booble-1": {
       "name": "@slates-integrations/super-booble-1",
-      "version": "0.4.10",
+      "version": "0.4.11",
       "dependencies": {
         "@slates-integrations/gmail": "0.3.1",
         "@slates-integrations/google-chat": "0.3.1",
         "@slates-integrations/google-contacts": "0.2.7",
         "@slates-integrations/google-docs": "0.2.2",
-        "@slates-integrations/google-drive": "0.2.16",
+        "@slates-integrations/google-drive": "0.2.17",
         "@slates-integrations/google-sheets": "0.3.0",
         "@types/node": "^20",
         "slates": "1.0.0-rc.34",
