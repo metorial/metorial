@@ -10,23 +10,73 @@ import type {
   MonitorOptions
 } from './types';
 
+let INVOCATION_REQUEST_BUDGET_MS = 890_000;
+export let MAX_METRICS_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+let errorMessage = (error: unknown) => (error instanceof Error ? error.message : '');
+
+let timeoutDuration = (error: unknown) => {
+  let ms = Number(/timeout of (\d+)ms exceeded/i.exec(errorMessage(error))?.[1]);
+  let seconds = Math.max(1, Math.round(ms / 1000));
+  return `${seconds} second${seconds === 1 ? '' : 's'}`;
+};
+
+let isReadRequest = (error: unknown) => {
+  let upstream = (error as { data?: { upstream?: { method?: string; url?: string } } })?.data
+    ?.upstream;
+  return (
+    upstream?.method?.toUpperCase() === 'GET' || /\/search(\?|$)/.test(upstream?.url ?? '')
+  );
+};
+
+let toDatadogError = (error: unknown) => {
+  if (/timeout of \d+ms exceeded/i.test(errorMessage(error))) {
+    return datadogServiceError(
+      isReadRequest(error)
+        ? `Datadog did not respond within ${timeoutDuration(error)}. Narrow the time range or add filters to the query (for example service: or status:), then try again.`
+        : `Datadog did not respond within ${timeoutDuration(error)}. The change may still have been applied, so check its current state before retrying.`,
+      { reason: 'datadog_request_timeout', parent: error }
+    );
+  }
+
+  if (/maxContentLength/.test(errorMessage(error))) {
+    return datadogServiceError(
+      `Datadog returned more than ${MAX_METRICS_RESPONSE_BYTES / 1024 / 1024} MiB of data, too much to process at once. Group by fewer or lower-cardinality tags, narrow the scope, or shorten the time range.`,
+      { reason: 'datadog_response_too_large', parent: error }
+    );
+  }
+
+  return datadogApiError(error);
+};
+
+export let isDatadogResponseTooLarge = (error: unknown) =>
+  (error as { data?: { reason?: unknown } })?.data?.reason === 'datadog_response_too_large';
+
 export class DatadogClient {
   private http: ReturnType<typeof createAxios>;
   private logIntakeHttp: ReturnType<typeof createAxios>;
   private authConfig: DatadogAuthConfig;
+  private baseURL: string;
 
   constructor(authConfig: DatadogAuthConfig) {
     this.authConfig = authConfig;
     let baseURL = `https://api.${authConfig.site}`;
+    this.baseURL = baseURL;
     this.http = createAxios({ baseURL });
     this.logIntakeHttp = createAxios({
       baseURL: `https://http-intake.logs.${authConfig.site}`
     });
 
+    let deadline = Date.now() + INVOCATION_REQUEST_BUDGET_MS;
+
     for (let http of [this.http, this.logIntakeHttp]) {
+      http.interceptors.request.use(request => {
+        request.timeout = Math.max(1, deadline - Date.now());
+        return request;
+      });
       http.interceptors.response.use(
         response => response,
-        error => Promise.reject(datadogApiError(error))
+        error => Promise.reject(toDatadogError(error))
       );
     }
   }
@@ -71,9 +121,24 @@ export class DatadogClient {
         from: params.from,
         to: params.to,
         query: params.query
-      }
+      },
+      maxContentLength: MAX_METRICS_RESPONSE_BYTES
     });
     return response.data;
+  }
+
+  getMetricsQueryDownload(params: MetricsQueryParams) {
+    let { 'Content-Type': _contentType, ...headers } = this.getHeaders();
+
+    return {
+      url: `${this.baseURL}/api/v1/query`,
+      headers: Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== '')),
+      query: {
+        from: String(params.from),
+        to: String(params.to),
+        query: params.query
+      }
+    };
   }
 
   async listActiveMetrics(from: number, host?: string, tagFilter?: string): Promise<any> {

@@ -3456,15 +3456,15 @@
     },
     "integrations/datadog": {
       "name": "@slates-integrations/datadog",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.17",
+        "slates": "1.0.0-rc.34",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.14",
+        "@slates/test": "1.0.0-rc.29",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -6133,7 +6133,7 @@
     },
     "integrations/google-sheets": {
       "name": "@slates-integrations/google-sheets",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.34",
@@ -13082,14 +13082,14 @@
     },
     "integrations/super-booble-1": {
       "name": "@slates-integrations/super-booble-1",
-      "version": "0.4.11",
+      "version": "0.4.12",
       "dependencies": {
         "@slates-integrations/gmail": "0.3.1",
         "@slates-integrations/google-chat": "0.3.1",
         "@slates-integrations/google-contacts": "0.2.7",
         "@slates-integrations/google-docs": "0.2.2",
         "@slates-integrations/google-drive": "0.2.17",
-        "@slates-integrations/google-sheets": "0.3.0",
+        "@slates-integrations/google-sheets": "0.3.1",
         "@types/node": "^20",
         "slates": "1.0.0-rc.34",
         "zod": "^4.2",
@@ -20528,10 +20528,6 @@
 
     "@slates-integrations/databricks/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
-    "@slates-integrations/datadog/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
-
-    "@slates-integrations/datadog/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
-
     "@slates-integrations/dataforseo/@slates/test": ["@slates/test@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.29", "@slates/profiles": "1.0.0-rc.27" } }, "sha512-EN1/ODu2t4nftdbUps/i8uEo3yqwOX//1P38aSc+WCKD7xDf/23gXRaAXHeiPPjGwUTNho1v511wGY/eEPET/Q=="],
 
     "@slates-integrations/dataforseo/slates": ["slates@1.0.0-rc.28", "", { "dependencies": { "@slates/provider": "1.0.0-rc.29" } }, "sha512-YO2lOMDrCNh9T7Otj7KTmVFT9+qPLu/n76Dz0VoA9grgCk6R3t353xpyuHv+ullbpxDsFuNJgEskFf732tU1Yw=="],
@@ -23886,12 +23882,6 @@
 
     "@slates-integrations/databricks/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
-    "@slates-integrations/datadog/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
-
-    "@slates-integrations/datadog/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.15", "", { "dependencies": { "@slates/client": "1.0.0-rc.17", "@slates/proto": "1.0.0-rc.15" } }, "sha512-54Da7oeshZssih0vTZaLoKtMRvSoROgsFd9VFEHrtIX7rrsizPpnPFNp8CMb8FCb1dM2tuUiI/rECKE9Bw1mfA=="],
-
-    "@slates-integrations/datadog/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
-
     "@slates-integrations/dataforseo/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.29", "", { "dependencies": { "@slates/proto": "1.0.0-rc.24", "@slates/provider": "1.0.0-rc.29", "@slates/provider-handler": "1.0.0-rc.39" } }, "sha512-XQEMkWeI7xeBdYxjXfDes4r81mXwJl9yxd3X7i5TnXL9yF+8wsqry5LfjwQr3JyCphGFh9CEUFJ8yqOqV7PFmg=="],
 
     "@slates-integrations/dataforseo/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.27", "", { "dependencies": { "@slates/client": "1.0.0-rc.29", "@slates/proto": "1.0.0-rc.24" } }, "sha512-xRwCNHvUR3hyFiXaEJdMVvR/r4Hn6RIrUwP5e8iN8dKxg6E/gcGsuGiQwsYOr14Evyz/sk3k8rUO7ng5iFzUYw=="],
@@ -26869,14 +26859,6 @@
     "@slates-integrations/databricks/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.22", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "zod": "^4.2.1" } }, "sha512-obqnJjvKmyrzCKkWLfUYXTx/fEQ6pOAWnxkpYfn+WVrKFG1ObHVWAJ4WimG/IyQlG5eA8bF5HFWnDCiL3K96PA=="],
 
     "@slates-integrations/databricks/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
-
-    "@slates-integrations/datadog/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
-
-    "@slates-integrations/datadog/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
-
-    "@slates-integrations/datadog/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.22", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "zod": "^4.2.1" } }, "sha512-obqnJjvKmyrzCKkWLfUYXTx/fEQ6pOAWnxkpYfn+WVrKFG1ObHVWAJ4WimG/IyQlG5eA8bF5HFWnDCiL3K96PA=="],
-
-    "@slates-integrations/datadog/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
     "@slates-integrations/dataforseo/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-g9PAoSrJNmaMzXhvFp+LkYCLhfva0RcdWv3X7aeBegEakl+yOX9pQuNXv96MOQBNuuf7D4DQPzvUqgv+UfItVQ=="],
 

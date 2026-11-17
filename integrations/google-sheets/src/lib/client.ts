@@ -6,6 +6,7 @@ const MAX_SHEET_TITLES_IN_HINT = 20;
 const MAX_SHEET_TITLES_HINT_LENGTH = 1000;
 const MAX_UPSTREAM_DETAIL_LENGTH = 300;
 const MAX_TAB_ROWS_RESPONSE_BYTES = 64 * 1024 * 1024;
+const MAX_VALUES_RESPONSE_BYTES = 32 * 1024 * 1024;
 
 const sheetTabListSchema = z.object({
   spreadsheetId: z.string(),
@@ -41,6 +42,9 @@ export type SheetTab = {
   rowCount: number;
 };
 export type SheetTabCell = string | number | boolean;
+
+const isResponseTooLargeError = (error: unknown) =>
+  error instanceof Error && /maxContentLength/.test(error.message);
 
 const isUnparseableRangeError = (error: unknown): error is Error =>
   error instanceof Error && /unable to parse range/i.test(error.message);
@@ -116,6 +120,19 @@ export class SheetsClient {
           upstreamStatus: 400,
           parent: error
         }
+      );
+    }
+  }
+
+  private async withValuesSizeLimit<T>(request: () => Promise<T>) {
+    try {
+      return await request();
+    } catch (error) {
+      if (!isResponseTooLargeError(error)) throw error;
+
+      throw createApiServiceError(
+        `The requested cells hold more than ${MAX_VALUES_RESPONSE_BYTES / 1024 / 1024} MiB of data, too much to read at once. Read a smaller range, for example fewer rows or only the columns you need.`,
+        { reason: 'google_sheets_values_too_large', parent: error }
       );
     }
   }
@@ -247,10 +264,12 @@ export class SheetsClient {
     }
   ) {
     let normalizedRange = normalizeA1Range(range);
-    let response = await this.withRangeErrorHint(spreadsheetId, () =>
-      this.axios.get(
-        `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(normalizedRange)}`,
-        { params: options }
+    let response = await this.withValuesSizeLimit(() =>
+      this.withRangeErrorHint(spreadsheetId, () =>
+        this.axios.get(
+          `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(normalizedRange)}`,
+          { params: options, maxContentLength: MAX_VALUES_RESPONSE_BYTES }
+        )
       )
     );
     return response.data;
@@ -279,8 +298,13 @@ export class SheetsClient {
       params.set('dateTimeRenderOption', options.dateTimeRenderOption);
     }
 
-    let response = await this.withRangeErrorHint(spreadsheetId, () =>
-      this.axios.get(`/spreadsheets/${spreadsheetId}/values:batchGet`, { params })
+    let response = await this.withValuesSizeLimit(() =>
+      this.withRangeErrorHint(spreadsheetId, () =>
+        this.axios.get(`/spreadsheets/${spreadsheetId}/values:batchGet`, {
+          params,
+          maxContentLength: MAX_VALUES_RESPONSE_BYTES
+        })
+      )
     );
     return response.data;
   }
