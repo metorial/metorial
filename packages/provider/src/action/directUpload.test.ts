@@ -70,6 +70,26 @@ describe('uploadAttachmentDirect', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('caps streams of unknown size at 100 MiB whatever the hub allows', async () => {
+    let fetchSpy = vi.spyOn(globalThis, 'fetch');
+    let chunk = new Uint8Array(1024 * 1024);
+    let enqueued = 0;
+    let body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(chunk);
+        if (++enqueued > 100) controller.close();
+      }
+    });
+
+    await expect(
+      uploadAttachmentDirect({
+        live: { ...live, maxAttachmentSizeBytes: 500 * 1024 * 1024 },
+        body
+      })
+    ).rejects.toThrow(`maximum size of ${100 * 1024 * 1024} bytes`);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('uploads parts of a sized stream without buffering it and completes with receipts', async () => {
     let multipartLive = { ...live, maxAttachmentSizeBytes: 100 };
     let calls: { url: string; init: RequestInit }[] = [];

@@ -4,6 +4,8 @@ let PART_CONCURRENCY = 3;
 let PART_ATTEMPTS = 3;
 let PART_RETRY_DELAY_MS = 500;
 let MAX_PARTS_PER_SIGNING = 8;
+// A stream of unknown size is read into memory before it can be registered.
+let MAX_BUFFERED_SIZE_BYTES = 100 * 1024 * 1024;
 
 export interface SlateLiveInvocationInfo {
   token: string;
@@ -277,7 +279,7 @@ export let uploadAttachmentDirect = async (
   let body =
     d.body instanceof Uint8Array || d.sizeBytes !== undefined
       ? d.body
-      : await bufferAttachmentBody(d.body, maxSizeBytes);
+      : await bufferAttachmentBody(d.body, Math.min(maxSizeBytes, MAX_BUFFERED_SIZE_BYTES));
   let sizeBytes = body instanceof Uint8Array ? body.byteLength : d.sizeBytes!;
 
   let reader = new ExactByteReader(body);
