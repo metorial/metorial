@@ -36,8 +36,8 @@ describe('gmail provider contract', () => {
         'import_message',
         'insert_message'
       ],
-      triggerIds: [],
-      triggerGroupIds: [],
+      triggerIds: ['email_received'],
+      triggerGroupIds: ['mailbox_events'],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'send_email', readOnly: false, destructive: false },
@@ -59,10 +59,10 @@ describe('gmail provider contract', () => {
         { id: 'import_message', readOnly: false, destructive: false },
         { id: 'insert_message', readOnly: false, destructive: false }
       ],
-      triggers: []
+      triggers: [{ id: 'email_received' }]
     });
 
-    expect(contract.actions).toHaveLength(18);
+    expect(contract.actions).toHaveLength(19);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['userId']);
 
     let expectedScopes = {

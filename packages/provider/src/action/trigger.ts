@@ -21,6 +21,7 @@ export interface SlateTriggerParameters<
   triggerGroup: SlateTriggerGroup<ConfigType, AuthType>;
   matches: SlateTriggerMatchesHandler;
   map: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
+  eventAttributes?: string[];
 }
 
 export class SlateTrigger<
@@ -34,6 +35,7 @@ export class SlateTrigger<
   #triggerGroup: SlateTriggerGroup<ConfigType, AuthType>;
   #matches: SlateTriggerMatchesHandler;
   #map: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
+  #eventAttributes: string[];
 
   private constructor(
     spec: SlateSpecification<ConfigType, AuthType>,
@@ -46,6 +48,7 @@ export class SlateTrigger<
     this.#triggerGroup = params.triggerGroup;
     this.#matches = params.matches;
     this.#map = params.map;
+    this.#eventAttributes = params.eventAttributes ?? [];
   }
 
   static create<ConfigType extends {}, AuthType extends {}>(
@@ -68,6 +71,10 @@ export class SlateTrigger<
 
   get map() {
     return this.#map;
+  }
+
+  get eventAttributes(): string[] {
+    return [...this.#eventAttributes];
   }
 }
 

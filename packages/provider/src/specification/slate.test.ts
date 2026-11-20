@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { SlateTool, SlateTrigger, SlateTriggerGroup, toolCategory } from '../action';
+import {
+  optionList,
+  SlateTool,
+  SlateTrigger,
+  SlateTriggerGroup,
+  toolCategory
+} from '../action';
 import { SlateAuth } from '../auth';
 import { SlateConfig } from '../config';
 import { Slate } from './slate';
@@ -37,12 +43,28 @@ let createManualWebhookTriggerGroup = (spec: ReturnType<typeof createTestSpec>, 
     .routingMatchers(async () => [])
     .build();
 
-let createAutoWebhookTriggerGroup = (spec: ReturnType<typeof createTestSpec>, key: string) =>
+let createAutoWebhookTriggerGroup = (
+  spec: ReturnType<typeof createTestSpec>,
+  key: string,
+  options: { deliveryConfig?: boolean } = {}
+) =>
   SlateTriggerGroup.create(spec, {
     key,
     name: key
   })
     .webhook({
+      deliveryConfig: options.deliveryConfig
+        ? {
+            userConfigSchema: z.object({}),
+            fullConfigSchema: z.object({}),
+            setup: async () => ({
+              webhookSetupDocument: '',
+              partialWebhookRegistrationPayload: {}
+            }),
+            finish: async () => ({ webhookRegistrationPayload: {} }),
+            authenticate: async () => ({ routingKeys: [] })
+          }
+        : undefined,
       autoRegistration: {
         webhookTargetList: async () => ({ targets: [], nextPageToken: null }),
         webhookRegister: async () => ({
@@ -70,8 +92,43 @@ describe('Slate.create', () => {
         triggerGroups: [first, second]
       })
     ).toThrow(
-      'Only one trigger group may use manual webhook registration, but found: manual_one, manual_two'
+      'Only one trigger group may use manual webhook registration or a delivery config, but found: manual_one, manual_two'
     );
+  });
+
+  it('rejects more than one trigger group with a manual registration or delivery config', () => {
+    let spec = createTestSpec();
+    let manual = createManualWebhookTriggerGroup(spec, 'manual_group');
+    let first = createAutoWebhookTriggerGroup(spec, 'config_one', { deliveryConfig: true });
+    let second = createAutoWebhookTriggerGroup(spec, 'config_two', { deliveryConfig: true });
+    let create = (triggerGroups: (typeof manual)[]) =>
+      Slate.create({ spec, tools: [], triggers: [], triggerGroups });
+
+    expect(() => create([first, second])).toThrow(
+      'Only one trigger group may use manual webhook registration or a delivery config, but found: config_one, config_two'
+    );
+    expect(() => create([manual, first])).toThrow('but found: manual_group, config_one');
+  });
+
+  it('allows a single delivery config alongside plain automatic trigger groups', () => {
+    let spec = createTestSpec();
+    let configured = createAutoWebhookTriggerGroup(spec, 'config_group', {
+      deliveryConfig: true
+    });
+    let auto = createAutoWebhookTriggerGroup(spec, 'auto_group');
+
+    let slate = Slate.create({
+      spec,
+      tools: [],
+      triggers: [],
+      triggerGroups: [auto, configured, createAutoWebhookTriggerGroup(spec, 'other_auto')]
+    });
+
+    expect(slate.triggerGroups.map(group => group.key)).toEqual([
+      'auto_group',
+      'config_group',
+      'other_auto'
+    ]);
   });
 
   it('allows a single manual webhook trigger group alongside other trigger groups', () => {
@@ -267,5 +324,68 @@ describe('Slate.create tool categories', () => {
         ]
       })
     ).toThrow('Tool category "crm" lists tool "stray", which is not registered in this slate');
+  });
+});
+
+describe('Slate.create option lists', () => {
+  it('keeps option lists in declared order with their params schema', () => {
+    let spec = createTestSpec();
+    let files = optionList(spec, {
+      key: 'files',
+      paramsSchema: z.object({ kind: z.string().optional() }),
+      list: async ctx => ({
+        options: [{ value: ctx.input.params.kind ?? 'any', label: 'Any' }]
+      })
+    });
+    let folders = optionList(spec, {
+      key: 'folders',
+      list: async () => ({ options: [] })
+    });
+
+    let slate = Slate.create({ spec, tools: [], triggers: [], optionLists: [files, folders] });
+
+    expect(slate.optionLists.map(list => list.key)).toEqual(['files', 'folders']);
+    expect(folders.paramsSchema.parse({})).toEqual({});
+    expect(files.paramsSchema.parse({ kind: 'sheet' })).toEqual({ kind: 'sheet' });
+    expect(Slate.create({ spec, tools: [], triggers: [] }).optionLists).toEqual([]);
+  });
+
+  it('rejects params with unknown keys for the default and custom params schemas', () => {
+    let spec = createTestSpec();
+    let list = async () => ({ options: [] });
+    let folders = optionList(spec, { key: 'folders', list });
+    let files = optionList(spec, {
+      key: 'files',
+      paramsSchema: z.object({ kind: z.string().optional() }),
+      list
+    });
+    let loose = optionList(spec, {
+      key: 'loose',
+      paramsSchema: z.object({ kind: z.string() }).passthrough(),
+      list
+    });
+
+    expect(folders.paramsSchema.safeParse({ kind: 'sheet' }).success).toBe(false);
+    expect(files.paramsSchema.safeParse({ knd: 'sheet' }).success).toBe(false);
+    expect(loose.paramsSchema.safeParse({ kind: 'sheet', extra: 1 }).success).toBe(false);
+  });
+
+  it('rejects a params schema that is not a zod object', () => {
+    expect(() =>
+      optionList(createTestSpec(), {
+        key: 'files',
+        paramsSchema: z.record(z.string(), z.string()) as any,
+        list: async () => ({ options: [] })
+      })
+    ).toThrow('Option list "files" params schema must be a zod object');
+  });
+
+  it('rejects duplicate option list keys', () => {
+    let spec = createTestSpec();
+    let list = () => optionList(spec, { key: 'files', list: async () => ({ options: [] }) });
+
+    expect(() =>
+      Slate.create({ spec, tools: [], triggers: [], optionLists: [list(), list()] })
+    ).toThrow('Option list "files" is registered more than once');
   });
 });

@@ -80,16 +80,42 @@ Plan video and display campaigns by generating reach and frequency forecasts. Ac
 
 ## Events
 
-Webhook is not supported in the Google Ads API for general account or campaign changes.
+### Lead received
 
-However, Google Ads does support one specific webhook mechanism:
+Enable callbacks for `lead_received` to receive `lead.received` events from Google Ads lead forms. General account/campaign changes are not included. The existing `adwords` scope is used; no additional OAuth consent is requested.
 
-### Lead Form Webhook
+Discovery starts with directly accessible customers and reads each root customer's identity and manager status. Enabled advertiser accounts are searched for forms directly; only manager accounts are queried through `customer_client`, without a depth filter, to include manager descendants. Each `LEAD_FORM` asset is a stable target keyed by its customer and asset IDs. Discovery is bounded to 100 API calls (including root classification) and 200 client customers per cycle, and 1,000 eligible forms per page; reaching a limit produces a partial-discovery diagnostic. Empty pages continue pagination, permission-denied accounts are skipped, and quota/server failures remain retryable. Google fixes GAQL search page size at 10,000 rows.
 
-POST requests to the webhook are sent in JSON format, adhering to a specific schema for user lead data. The JSON payload includes fields for lead identification, user-submitted data, form and campaign details, and verification keys. User-submitted data is contained within `user_column_data`, using `column_id` and `string_value` to represent the data type and its value.
+Google permits one webhook delivery method per form. Existing third-party destinations are skipped and preserved. Already registered destinations remain discoverable. Registration rechecks the asset identity and vacant webhook slot, generates a random secret, updates only `lead_form_asset.delivery_methods` (payload schema version 3, as in Google's [lead form sample](https://developers.google.com/google-ads/api/samples/add-lead-form-asset)), and reads the configuration back. A webhook left by an earlier registration attempt for the same receive URL, whose result was never saved, is replaced with a new secret; a webhook with any other destination is never changed. Other form fields and campaign associations are not changed. On failed verification it attempts ownership-checked rollback and confirms removal. Cleanup removes only the exact saved URL/secret configuration, preserves a replacement destination, and requires authorized readback before reporting success. Inaccessible or missing assets do not count as confirmed cleanup.
 
-- Configured per lead form extension within Google Ads campaigns.
-- Requires a webhook URL and a verification key.
-- Lead handlers should use the `lead_id` for deduplication and respond with specific HTTP codes indicating success or different types of errors.
-- The `asset_group_id` field is only populated for Performance Max campaigns.
-- Payload includes campaign ID, ad group ID, creative ID, click ID (gclid), and a test lead indicator.
+The API has no conditional asset update or ETag. An external change racing between the eligibility read and mutation cannot be made atomic. Avoid editing delivery settings concurrently with callback setup or removal. Enabling callbacks may fail if the current Google Ads account does not permit the asset update; the integration does not delete/recreate the form to work around that restriction.
+
+Incoming POST bodies are decoded as strict UTF-8 and parsed without rounding 64-bit numbers. The confidential `google_key` body value must match the saved random secret. This protocol has no HMAC signature or signed freshness timestamp; a timestamp check would reject legitimate delayed deliveries without proving authenticity. The key is the only authentication Google defines for these deliveries, so every delivery carrying the correct key is accepted. Google describes `form_id` as the unique ID of the form but does not state that it equals the lead form asset ID, and it does not retry a `4xx` response; a lead whose `form_id` differs from the registered asset ID is therefore still delivered, with a logged warning, and `formId` reports the value Google sent. A `lead_source` value, which Google's published payload does not define, is passed through as `leadSource` and never used to discard a lead. Authenticated `is_test: true` deliveries are acknowledged without creating a lead, including Google's unsaved-form dummy IDs. False/omitted `is_test` means production. Accepted deliveries are answered with status `200` and the JSON body `{}`, as Google documents. Secrets are removed before events are emitted.
+
+`lead_id` is the stable event ID and deduplication key. Repeated deliveries within the callback service's approximately 24-hour deduplication window are suppressed; later replays can recur. Consumers requiring permanent exactly-once intake should also deduplicate by lead ID. Customer ID comes from the verified registration because Google's webhook does not include it. All numeric IDs are decimal strings, including zero-valued optional ad IDs. Unknown answer column IDs and repeated columns are preserved in order.
+
+Example output:
+
+```json
+{
+  "leadId": "google-lead-unique-id",
+  "customerId": "1234567890",
+  "formId": "9007199254740993",
+  "campaignId": "9876543210",
+  "contact": { "fullName": "Example Person", "email": "test@example.com" },
+  "answers": [
+    { "column_id": "FULL_NAME", "string_value": "Example Person" },
+    { "column_id": "EMAIL", "string_value": "test@example.com" }
+  ]
+}
+```
+
+Optional output fields include `adGroupId`, `creativeId`, `assetGroupId`, `googleClickId`, `submittedAt`, `leadStage`, and `leadSource`. The contact object also exposes first/last name, phone, company, job title, and work contact details when supplied. All answers remain available even if no normalized contact field exists.
+
+### Verification boundary
+
+Local contract tests cover parsing, keys, acceptance of differing form IDs after a valid key, diagnostics, deduplication identity, discovery, ownership, readback and cleanup failures. Provider acceptance of updating/clearing delivery methods on an existing asset, real callback routing, and whether the delivered `form_id` equals the configured asset ID require a live test; local fixtures do not prove those behaviors.
+
+The private lifecycle scenario is gated by an explicit `suiteOwnedLeadForm` fixture containing `resourceName` and `allowWebhookLifecycle: true`. It uses a reserved `.invalid` receiver, reads back the delivery configuration, clears only its owned webhook, verifies absence, and repeats cleanup. It never creates an asset because AssetService has no remove operation. It must target a dedicated test form with a vacant slot and does not validate real callback delivery.
+
+References: [lead webhook payload](https://developers.google.com/google-ads/webhook/docs/implementation), [Google test leads](https://developers.google.com/google-ads/webhook/docs/testing), [lead form delivery methods](https://developers.google.com/google-ads/api/reference/rpc/v24/LeadFormAsset), [webhook fields](https://developers.google.com/google-ads/api/reference/rpc/v24/WebhookDelivery), [asset update](https://developers.google.com/google-ads/api/reference/rpc/v24/AssetOperation), [manager hierarchy](https://developers.google.com/google-ads/api/docs/account-management/get-account-hierarchy).

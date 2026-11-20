@@ -27,7 +27,7 @@ describe('google-ads provider contract', () => {
         'upload_offline_conversions',
         'manage_audience_lists'
       ],
-      triggerIds: [],
+      triggerIds: ['lead_received'],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_accounts', readOnly: true, destructive: false },
@@ -42,10 +42,10 @@ describe('google-ads provider contract', () => {
         { id: 'upload_offline_conversions', readOnly: false, destructive: false },
         { id: 'manage_audience_lists', readOnly: false, destructive: false }
       ],
-      triggers: []
+      triggers: [{ id: 'lead_received' }]
     });
 
-    expect(contract.actions).toHaveLength(11);
+    expect(contract.actions).toHaveLength(12);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['loginCustomerId']);
 
     let expectedScopes = {

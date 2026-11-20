@@ -2,9 +2,44 @@
 
 Create, read, and update spreadsheets and their cell data. Read and write values to individual cells, ranges, or multiple ranges using A1 notation or named ranges. Apply cell formatting including text styles, backgrounds, borders, number formats, and conditional formatting. Manage sheets (tabs) within a spreadsheet—add, delete, copy, rename, and reorder them. Create and manage embedded charts, pivot tables, filter views, data validation rules, protected ranges, named ranges, and merged cells. Perform batch operations to apply multiple updates atomically.
 
-## Events
+## New row trigger (parked)
 
-This integration does not currently expose event triggers.
+**Switched off.** This integration does not offer event triggers at the moment: spreadsheet activity is observed through the Google Drive integration's file events instead. This section describes the parked new row trigger and is kept for when it is switched back on.
+
+`new_row` fires when a row is added below the last filled row of a tab, checked
+every 15 minutes. Choose a spreadsheet (from the list, or paste its link or ID)
+and optionally a tab; without one the first tab is used. Rows already in the tab
+when the trigger is turned on are not reported. Each event carries the row
+number, the header row, the row's values, and the values by header text.
+
+Only counters are saved between checks (the tab ID, its number of rows and row
+numbers), never sheet contents, so the trigger cannot tell which rows changed:
+
+- When the tab has fewer rows than at the last check, or the last reported row
+  is now empty, rows were removed. The trigger counts again from the last filled
+  row and reports nothing for that check. A row added within the same 15
+  minutes is reported only if it lands below the row number of the last
+  reported row: after one row is deleted, the next row added takes that number
+  and is missed.
+- A row typed into an empty row above the last reported row is not reported.
+  Rows inserted in the middle push the rows below them down, and those of them
+  that move past the last reported row are reported again.
+- A value far below the data, such as a total, becomes the new last row: it is
+  reported, and rows added above it are not.
+- A tab is read 2,000 rows at a time, at most five times per check. Counting a
+  tab of more than 10,000 rows takes several checks, and rows added before the
+  count finishes can be counted as already there. A row more than 2,000 rows
+  below the last reported row is searched for 8,000 rows further on each check
+  that finds nothing nearer, so it can arrive several checks later.
+
+OAuth and service-account access are supported; API-key authentication is not
+advertised for this event.
+
+When a Google Drive connection of the same Google account is set up, the
+spreadsheet list shows every spreadsheet that account can see. Otherwise the
+list comes from this connection, which with the app-files Drive permission
+holds only spreadsheets created or opened with this app; any other spreadsheet
+can still be entered by link or ID.
 
 ## Tools
 

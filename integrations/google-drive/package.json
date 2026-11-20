@@ -9,19 +9,27 @@
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.31",
+    "slates": "1.0.0-rc.34",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.26",
+    "@slates/test": "1.0.0-rc.29",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.14",
+  "version": "0.2.17",
   "peerDependencies": {
+    "@slates/google-drive-files": "1.0.0",
+    "@slates/google-push-channels": "1.0.0",
     "@slates/oauth-google": "1.0.7"
   },
   "peerDependenciesMeta": {
+    "@slates/google-drive-files": {
+      "optional": true
+    },
+    "@slates/google-push-channels": {
+      "optional": true
+    },
     "@slates/oauth-google": {
       "optional": true
     }

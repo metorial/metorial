@@ -55,7 +55,27 @@ export let slatesActionTrigger = slatesActionBase.extend({
 
 export let slatesAction = z.union([slatesActionTool, slatesActionTrigger]);
 
+// Set on a top-level property of a trigger's output schema whose values are returned as event
+// attributes with every mapped event, so events can be filtered by them.
+export let slatesEventAttributeSchemaKey = 'x-slates-event-attribute';
+
+export let slatesEventAttributeMaxKeys = 8;
+export let slatesEventAttributeMaxValues = 16;
+export let slatesEventAttributeMaxValueLength = 256;
+export let slatesEventAttributeKeyPattern = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+
+export let slatesEventAttributes = z
+  .record(
+    z.string().regex(slatesEventAttributeKeyPattern),
+    z
+      .array(z.string().min(1).max(slatesEventAttributeMaxValueLength))
+      .min(1)
+      .max(slatesEventAttributeMaxValues)
+  )
+  .refine(attributes => Object.keys(attributes).length <= slatesEventAttributeMaxKeys);
+
 export type SlatesAction = z.infer<typeof slatesAction>;
 export type SlatesActionTool = z.infer<typeof slatesActionTool>;
 export type SlatesActionTrigger = z.infer<typeof slatesActionTrigger>;
 export type SlatesActionScopes = z.infer<typeof slatesActionScopes>;
+export type SlatesEventAttributes = z.infer<typeof slatesEventAttributes>;

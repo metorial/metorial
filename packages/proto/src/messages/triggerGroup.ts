@@ -1,5 +1,6 @@
 import z from 'zod';
 import {
+  slatesOption,
   slatesTriggerGroup,
   slatesTriggerRoutingMatcher,
   slatesWebhookTarget
@@ -22,10 +23,45 @@ export type SlatesTriggerGroupWebhookSkipped = z.infer<
   typeof slatesTriggerGroupWebhookSkipped
 >;
 
+let slatesTriggerGroupRoutingKeys = z.array(z.string().min(1).max(512)).max(16);
+
+let slatesTriggerGroupWebhookRequest = {
+  url: z.string(),
+  method: z.string(),
+  headers: z.record(z.string(), z.string()),
+  body: z
+    .object({
+      encoding: z.literal('base64'),
+      content: z.string()
+    })
+    .nullable()
+};
+
 let slatesTriggerGroupPollEvent = z.object({
   payload: z.record(z.string(), z.any()),
   idempotencyKey: z.string().optional(),
   triggerIds: z.array(z.string())
+});
+
+export let slatesTriggerGroupWebhookRegistrationResult = z.object({
+  webhookRegistrationIdentifier: z.string(),
+  webhookRegistrationPayload: z.any(),
+  expiresAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  renewAfter: z.iso.datetime({ offset: true }).nullable().optional(),
+  routingKeys: slatesTriggerGroupRoutingKeys.optional()
+});
+
+export let slatesTriggerGroupWebhookDeliveryAuthentication = z.object({
+  routingKeys: slatesTriggerGroupRoutingKeys,
+  rejected: z
+    .object({ status: z.number().int().min(400).max(599) })
+    .nullable()
+    .optional()
+});
+
+export let slatesTriggerGroupWebhookExpansionResult = z.object({
+  events: z.array(slatesTriggerGroupPollEvent.omit({ triggerIds: true })),
+  updatedState: z.any().nullable().optional()
 });
 
 /**
@@ -91,7 +127,8 @@ export let slatesMessageTriggerGroupWebhookTargetsListRequest = z.object({
   id: z.string(),
   params: z.object({
     triggerGroupId: z.string(),
-    pageToken: z.any().nullable().optional()
+    pageToken: z.any().nullable().optional(),
+    selection: z.record(z.string(), z.any()).optional()
   })
 });
 
@@ -124,7 +161,10 @@ export let slatesMessageTriggerGroupWebhookRegisterRequest = z.object({
     triggerGroupId: z.string(),
     webhookTargetIdentifier: z.string(),
     webhookTargetPayload: z.any(),
-    webhookUrl: z.string()
+    webhookUrl: z.string(),
+    operationId: z.string().min(1).optional(),
+    selection: z.record(z.string(), z.any()).optional(),
+    deliveryConfig: z.any().optional()
   })
 });
 
@@ -135,14 +175,43 @@ export type SlatesMessageTriggerGroupWebhookRegisterRequest = z.infer<
 export let slatesMessageTriggerGroupWebhookRegisterResponse = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.string(),
-  result: withRequestTraces({
-    webhookRegistrationIdentifier: z.string(),
-    webhookRegistrationPayload: z.any()
-  })
+  result: withRequestTraces(slatesTriggerGroupWebhookRegistrationResult.shape)
 });
 
 export type SlatesMessageTriggerGroupWebhookRegisterResponse = z.infer<
   typeof slatesMessageTriggerGroupWebhookRegisterResponse
+>;
+
+/** Renew an existing automatically registered webhook. */
+export let slatesMessageTriggerGroupWebhookRenewRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.webhook.renew'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    webhookRegistrationIdentifier: z.string(),
+    webhookRegistrationPayload: z.any(),
+    webhookUrl: z.string(),
+    webhookTargetIdentifier: z.string(),
+    webhookTargetPayload: z.any(),
+    operationId: z.string().min(1),
+    selection: z.record(z.string(), z.any()).optional(),
+    deliveryConfig: z.any().optional()
+  })
+});
+
+export type SlatesMessageTriggerGroupWebhookRenewRequest = z.infer<
+  typeof slatesMessageTriggerGroupWebhookRenewRequest
+>;
+
+export let slatesMessageTriggerGroupWebhookRenewResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces(slatesTriggerGroupWebhookRegistrationResult.shape)
+});
+
+export type SlatesMessageTriggerGroupWebhookRenewResponse = z.infer<
+  typeof slatesMessageTriggerGroupWebhookRenewResponse
 >;
 
 /**
@@ -243,15 +312,7 @@ export let slatesMessageTriggerGroupWebhookProcessRequest = z.object({
   id: z.string(),
   params: z.object({
     triggerGroupId: z.string(),
-    url: z.string(),
-    method: z.string(),
-    headers: z.record(z.string(), z.string()),
-    body: z
-      .object({
-        encoding: z.literal('base64'),
-        content: z.string()
-      })
-      .nullable(),
+    ...slatesTriggerGroupWebhookRequest,
     webhookRegistrationPayload: z.any()
   })
 });
@@ -265,6 +326,7 @@ export let slatesMessageTriggerGroupWebhookProcessResponse = z.object({
   id: z.string(),
   result: withRequestTraces({
     events: z.array(slatesTriggerGroupWebhookEvent),
+    requiresExpansion: z.boolean().optional(),
     response: slatesWebhookHttpResponse.nullable().optional(),
     skipped: slatesTriggerGroupWebhookSkipped.nullable().optional()
   })
@@ -272,6 +334,67 @@ export let slatesMessageTriggerGroupWebhookProcessResponse = z.object({
 
 export type SlatesMessageTriggerGroupWebhookProcessResponse = z.infer<
   typeof slatesMessageTriggerGroupWebhookProcessResponse
+>;
+
+/**
+ * Authenticate a request received through a delivery config. The hub hands it to the active
+ * registrations under that config that hold one of the returned routing keys.
+ */
+export let slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.webhook.delivery_authenticate'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    ...slatesTriggerGroupWebhookRequest,
+    deliveryConfig: z.any()
+  })
+});
+
+export type SlatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest = z.infer<
+  typeof slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest
+>;
+
+export let slatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces(slatesTriggerGroupWebhookDeliveryAuthentication.shape)
+});
+
+export type SlatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse = z.infer<
+  typeof slatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse
+>;
+
+/** Expand a verified delivery using the connection's credentials and durable state. */
+export let slatesMessageTriggerGroupWebhookExpandRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.webhook.expand'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    payload: z.record(z.string(), z.any()).nullable(),
+    state: z.any().nullable().optional(),
+    selection: z.record(z.string(), z.any()).optional(),
+    deliveryId: z.string().min(1),
+    webhookRegistrationPayload: z.any()
+  })
+});
+
+export type SlatesMessageTriggerGroupWebhookExpandRequest = z.infer<
+  typeof slatesMessageTriggerGroupWebhookExpandRequest
+>;
+
+export let slatesMessageTriggerGroupWebhookExpandResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    events: z.array(slatesTriggerGroupPollEvent),
+    updatedState: z.any().nullable().optional()
+  })
+});
+
+export type SlatesMessageTriggerGroupWebhookExpandResponse = z.infer<
+  typeof slatesMessageTriggerGroupWebhookExpandResponse
 >;
 
 /**
@@ -303,6 +426,40 @@ export type SlatesMessageTriggerGroupRoutingMatchersGetResponse = z.infer<
 >;
 
 /**
+ * List Selection Options
+ */
+export let slatesMessageTriggerGroupSelectionOptionsListRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.selection.options_list'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    field: z.string(),
+    query: z.string().nullable().optional(),
+    pageToken: z.any().nullable().optional(),
+    // The selection as entered so far; it may be incomplete and is not validated.
+    selection: z.record(z.string(), z.any()).optional()
+  })
+});
+
+export type SlatesMessageTriggerGroupSelectionOptionsListRequest = z.infer<
+  typeof slatesMessageTriggerGroupSelectionOptionsListRequest
+>;
+
+export let slatesMessageTriggerGroupSelectionOptionsListResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    options: z.array(slatesOption),
+    nextPageToken: z.any().nullable()
+  })
+});
+
+export type SlatesMessageTriggerGroupSelectionOptionsListResponse = z.infer<
+  typeof slatesMessageTriggerGroupSelectionOptionsListResponse
+>;
+
+/**
  * Poll
  */
 export let slatesMessageTriggerGroupPollingPollRequest = z.object({
@@ -311,7 +468,8 @@ export let slatesMessageTriggerGroupPollingPollRequest = z.object({
   id: z.string(),
   params: z.object({
     triggerGroupId: z.string(),
-    state: z.any().nullable()
+    state: z.any().nullable(),
+    selection: z.record(z.string(), z.any()).optional()
   })
 });
 
@@ -415,11 +573,15 @@ export type SlatesTriggerGroupRequests =
   | SlatesMessageTriggerGroupGetRequest
   | SlatesMessageTriggerGroupWebhookTargetsListRequest
   | SlatesMessageTriggerGroupWebhookRegisterRequest
+  | SlatesMessageTriggerGroupWebhookRenewRequest
+  | SlatesMessageTriggerGroupWebhookExpandRequest
   | SlatesMessageTriggerGroupWebhookUnregisterRequest
   | SlatesMessageTriggerGroupWebhookManualSetupRequest
   | SlatesMessageTriggerGroupWebhookManualFinishRequest
   | SlatesMessageTriggerGroupWebhookProcessRequest
+  | SlatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest
   | SlatesMessageTriggerGroupRoutingMatchersGetRequest
+  | SlatesMessageTriggerGroupSelectionOptionsListRequest
   | SlatesMessageTriggerGroupPollingPollRequest
   | SlatesMessageTriggerGroupGatewayConnectRequest
   | SlatesMessageTriggerGroupGatewayReceiveRequest;
@@ -429,11 +591,15 @@ export type SlatesTriggerGroupResponses =
   | SlatesMessageTriggerGroupGetResponse
   | SlatesMessageTriggerGroupWebhookTargetsListResponse
   | SlatesMessageTriggerGroupWebhookRegisterResponse
+  | SlatesMessageTriggerGroupWebhookRenewResponse
+  | SlatesMessageTriggerGroupWebhookExpandResponse
   | SlatesMessageTriggerGroupWebhookUnregisterResponse
   | SlatesMessageTriggerGroupWebhookManualSetupResponse
   | SlatesMessageTriggerGroupWebhookManualFinishResponse
   | SlatesMessageTriggerGroupWebhookProcessResponse
+  | SlatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse
   | SlatesMessageTriggerGroupRoutingMatchersGetResponse
+  | SlatesMessageTriggerGroupSelectionOptionsListResponse
   | SlatesMessageTriggerGroupPollingPollResponse
   | SlatesMessageTriggerGroupGatewayConnectResponse
   | SlatesMessageTriggerGroupGatewayReceiveResponse;
@@ -444,6 +610,8 @@ export let slatesTriggerGroupResponsesByMethod = {
   'slates/trigger_group.webhook.targets_list':
     slatesMessageTriggerGroupWebhookTargetsListResponse,
   'slates/trigger_group.webhook.register': slatesMessageTriggerGroupWebhookRegisterResponse,
+  'slates/trigger_group.webhook.renew': slatesMessageTriggerGroupWebhookRenewResponse,
+  'slates/trigger_group.webhook.expand': slatesMessageTriggerGroupWebhookExpandResponse,
   'slates/trigger_group.webhook.unregister':
     slatesMessageTriggerGroupWebhookUnregisterResponse,
   'slates/trigger_group.webhook.manual_setup':
@@ -451,8 +619,12 @@ export let slatesTriggerGroupResponsesByMethod = {
   'slates/trigger_group.webhook.manual_finish':
     slatesMessageTriggerGroupWebhookManualFinishResponse,
   'slates/trigger_group.webhook.process': slatesMessageTriggerGroupWebhookProcessResponse,
+  'slates/trigger_group.webhook.delivery_authenticate':
+    slatesMessageTriggerGroupWebhookDeliveryAuthenticateResponse,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetResponse,
+  'slates/trigger_group.selection.options_list':
+    slatesMessageTriggerGroupSelectionOptionsListResponse,
   'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollResponse,
   'slates/trigger_group.gateway.connect': slatesMessageTriggerGroupGatewayConnectResponse,
   'slates/trigger_group.gateway.receive': slatesMessageTriggerGroupGatewayReceiveResponse
@@ -464,14 +636,20 @@ export let slatesTriggerGroupRequestsByMethod = {
   'slates/trigger_group.webhook.targets_list':
     slatesMessageTriggerGroupWebhookTargetsListRequest,
   'slates/trigger_group.webhook.register': slatesMessageTriggerGroupWebhookRegisterRequest,
+  'slates/trigger_group.webhook.renew': slatesMessageTriggerGroupWebhookRenewRequest,
+  'slates/trigger_group.webhook.expand': slatesMessageTriggerGroupWebhookExpandRequest,
   'slates/trigger_group.webhook.unregister': slatesMessageTriggerGroupWebhookUnregisterRequest,
   'slates/trigger_group.webhook.manual_setup':
     slatesMessageTriggerGroupWebhookManualSetupRequest,
   'slates/trigger_group.webhook.manual_finish':
     slatesMessageTriggerGroupWebhookManualFinishRequest,
   'slates/trigger_group.webhook.process': slatesMessageTriggerGroupWebhookProcessRequest,
+  'slates/trigger_group.webhook.delivery_authenticate':
+    slatesMessageTriggerGroupWebhookDeliveryAuthenticateRequest,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetRequest,
+  'slates/trigger_group.selection.options_list':
+    slatesMessageTriggerGroupSelectionOptionsListRequest,
   'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollRequest,
   'slates/trigger_group.gateway.connect': slatesMessageTriggerGroupGatewayConnectRequest,
   'slates/trigger_group.gateway.receive': slatesMessageTriggerGroupGatewayReceiveRequest

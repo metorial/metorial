@@ -92,6 +92,37 @@ Remove a member from a Google Meet space.
 
 Update the configuration of an existing Google Meet meeting space. Modify access controls, moderation settings, feature restrictions, and auto-artifact settings. Only the fields you provide will be updated.
 
+## Triggers
+
+- **Transcript ready:** a transcript file has been generated for a meeting you
+  own, or for a meeting you were invited to when you can access its transcript.
+  Returns its document link and conference identifiers.
+- **Recording ready:** a recording file has been generated for a meeting you
+  own. Returns its recording link and conference identifiers.
+
+These triggers require recording/transcription entitlement, read access to
+meeting spaces, and Google event delivery set up once for the OAuth client: a
+Pub/Sub topic that Google Meet may publish to and an authenticated push
+subscription in the client's Cloud project. If you connect with your own OAuth
+client, select it in the guided delivery setup and enter the topic name,
+subscription name, and push service account; for the built-in client the
+service operator has done this. Subscriptions renew before expiry. Google also
+reports transcripts of meetings you were invited to but do not own; such an
+event is delivered only when your account can read the transcript and its
+conference, and is skipped otherwise. Historical artifacts are not replayed.
+File links retain Google's access permissions.
+
+Google keeps one meeting event subscription per account for an OAuth client.
+Several connections of the same account share it. If the account's meeting
+events are already delivered to another destination, because the same OAuth
+client sends them to a different Pub/Sub topic (it is also used elsewhere, or
+its delivery setup changed), enabling the triggers fails with an explanation
+and the existing subscription is left unchanged.
+
+Subscription health is checked every 15 minutes. Events missed during an
+inactive subscription or beyond delivery retention are not guaranteed to be
+recovered. See [event behavior and limits](docs/SPEC.md#event-triggers).
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

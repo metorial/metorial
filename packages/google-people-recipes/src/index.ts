@@ -24,6 +24,25 @@ export let DEFAULT_PERSON_FIELDS =
 
 export let READONLY_PERSON_FIELDS = 'names,emailAddresses,phoneNumbers';
 
+export type GoogleContactSource = {
+  type?: string;
+  id?: string;
+  updateTime?: string;
+  etag?: string;
+};
+
+export type GoogleContactRevision = {
+  resourceName?: string;
+  etag?: string;
+  metadata?: { sources?: GoogleContactSource[]; deleted?: boolean };
+  [field: string]: unknown;
+};
+
+export type GoogleContactRevisionPage = {
+  connections?: GoogleContactRevision[];
+  nextPageToken?: string;
+};
+
 export interface ContactInput {
   names?: Array<{
     givenName?: string;
@@ -394,6 +413,26 @@ export class GooglePeopleClient {
     return {
       Authorization: `Bearer ${this.config.token}`
     };
+  }
+
+  // Preserve source revisions instead of passing through the public contact formatter.
+  // https://developers.google.com/people/api/rest/v1/people.connections/list
+  async listContactRevisions(pageToken?: string): Promise<GoogleContactRevisionPage> {
+    try {
+      let response = await this.api.get('people/me/connections', {
+        params: {
+          personFields: `${DEFAULT_PERSON_FIELDS},metadata`,
+          sources: 'READ_SOURCE_TYPE_CONTACT',
+          sortOrder: 'LAST_MODIFIED_DESCENDING',
+          pageSize: 1000,
+          pageToken
+        },
+        headers: this.headers()
+      });
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'list contact revisions');
+    }
   }
 
   async getContact(resourceName: string, personFields?: string) {

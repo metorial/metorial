@@ -1,4 +1,12 @@
 import { isServiceError } from '@lowerdeck/error';
+import {
+  slatesEventAttributeSchemaKey,
+  slatesLinkedOptionList,
+  slatesSelectionOptionsLinkedSchemaKey,
+  slatesSelectionOptionsSchemaKey,
+  slatesTriggerGroup
+} from '@slates/proto';
+import { SlateAuth, SlateConfig, SlateSpecification, triggerGroup } from '@slates/provider';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -8,11 +16,14 @@ import {
   getExposedTriggerGroups,
   getMappableAction,
   getTriggersForGroup,
+  getWebhookDeliveryConfig,
+  getWebhookManualRegistration,
   isMappableTrigger,
   mapAction,
   mapAdapter,
   mapAuthMethod,
-  mapToolCategory
+  mapToolCategory,
+  mapTriggerGroup
 } from './spec';
 
 let baseAction = {
@@ -62,6 +73,40 @@ describe('mapAction', () => {
   it('maps a well-formed trigger', () => {
     let mapped = mapAction({} as any, validTrigger);
     expect(mapped).toMatchObject({ type: 'action.trigger', triggerGroupId: 'my_group' });
+  });
+
+  it('marks the event attribute fields in a trigger output schema', () => {
+    let trigger = {
+      ...validTrigger,
+      outputSchema: z.object({
+        fileId: z.string(),
+        parents: z.array(z.string()),
+        name: z.string()
+      }),
+      eventAttributes: ['fileId', 'parents']
+    };
+
+    let { properties } = mapAction({} as any, trigger).outputSchema;
+    expect(properties.fileId).toMatchObject({
+      type: 'string',
+      [slatesEventAttributeSchemaKey]: true
+    });
+    expect(properties.parents).toMatchObject({
+      type: 'array',
+      [slatesEventAttributeSchemaKey]: true
+    });
+    expect(properties.name).not.toHaveProperty(slatesEventAttributeSchemaKey);
+  });
+
+  it('leaves trigger output schemas unmarked without event attributes', () => {
+    let trigger = { ...validTrigger, outputSchema: z.object({ fileId: z.string() }) };
+
+    expect(mapAction({} as any, trigger).outputSchema.properties.fileId).not.toHaveProperty(
+      slatesEventAttributeSchemaKey
+    );
+    expect(
+      mapAction({} as any, { ...trigger, eventAttributes: [] }).outputSchema.properties.fileId
+    ).not.toHaveProperty(slatesEventAttributeSchemaKey);
   });
 
   it('includes the tool categories a tool belongs to', () => {
@@ -202,6 +247,92 @@ describe('adapter exposure', () => {
   });
 });
 
+describe('webhook registration config', () => {
+  let config = {
+    userConfigSchema: z.object({ secret: z.string().describe('Signing secret') }),
+    fullConfigSchema: z.object({ secret: z.string(), endpoint: z.string() }),
+    setup: async () => ({ webhookSetupDocument: '', partialWebhookRegistrationPayload: {} }),
+    finish: async () => ({ webhookRegistrationPayload: {} }),
+    authenticate: async () => ({ routingKeys: [] })
+  };
+  let schemas = {
+    userConfigSchema: {
+      type: 'object',
+      properties: { secret: { type: 'string', description: 'Signing secret' } },
+      required: ['secret']
+    },
+    fullConfigSchema: {
+      type: 'object',
+      properties: { secret: { type: 'string' }, endpoint: { type: 'string' } },
+      required: ['secret', 'endpoint']
+    }
+  };
+  let autoRegistration = {
+    webhookTargetList: async () => ({ targets: [], nextPageToken: null }),
+    webhookRegister: async () => ({
+      webhookRegistrationIdentifier: 'reg',
+      webhookRegistrationPayload: {}
+    }),
+    webhookUnregister: async () => {}
+  };
+  let group = (webhook: Record<string, unknown>): any => ({
+    key: 'group',
+    name: 'Group',
+    source: 'webhook',
+    webhook: { process: async () => ({ events: [] }), ...webhook }
+  });
+  let auto = group({ autoRegistration });
+  let manual = group({ manualRegistration: config });
+  let configured = group({ autoRegistration, deliveryConfig: config });
+
+  it('keeps plain automatic and manual groups serialised as before', () => {
+    expect(mapTriggerGroup(auto).invocation).toEqual({
+      type: 'webhook',
+      registration: { mode: 'auto' }
+    });
+    expect(mapTriggerGroup(manual).invocation).toMatchObject({
+      type: 'webhook',
+      registration: { mode: 'manual', ...schemas }
+    });
+    expect(
+      Object.keys((mapTriggerGroup(manual).invocation as any).registration).sort()
+    ).toEqual(['fullConfigSchema', 'mode', 'userConfigSchema']);
+  });
+
+  it('advertises the delivery config of an automatic group', () => {
+    let mapped = mapTriggerGroup(configured);
+    expect(mapped.invocation).toMatchObject({
+      type: 'webhook',
+      registration: { mode: 'auto', deliveryConfig: schemas }
+    });
+    expect(slatesTriggerGroup.parse(mapped).invocation).toEqual(mapped.invocation);
+  });
+
+  it('authenticates deliveries only for automatic groups with a delivery config', () => {
+    expect(getWebhookDeliveryConfig(configured)).toBe(config);
+    for (let unsupported of [
+      auto,
+      manual,
+      { key: 'group', name: 'Group', source: 'polling' } as any
+    ]) {
+      expect(() => getWebhookDeliveryConfig(unsupported)).toThrow(
+        'Trigger group does not support webhook delivery authentication: group'
+      );
+    }
+  });
+
+  it('serves setup and finish for manual groups and automatic groups with a delivery config', () => {
+    expect(getWebhookManualRegistration(manual)).toBe(config);
+    expect(getWebhookManualRegistration(configured)).toBe(config);
+    expect(() => getWebhookManualRegistration(auto)).toThrow(
+      'Trigger group does not support manual webhook registration: group'
+    );
+    expect(() =>
+      getWebhookManualRegistration({ key: 'poll', name: 'Poll', source: 'polling' } as any)
+    ).toThrow('Trigger group does not support manual webhook registration: poll');
+  });
+});
+
 describe('mapAuthMethod', () => {
   let slate: any = { spec: { auth: { outputSchema: z.object({ token: z.string() }) } } };
   let oauthMethod: any = {
@@ -242,5 +373,68 @@ describe('mapAuthMethod', () => {
       mapAuthMethod(slate, { ...oauthMethod, adminSetup: { required: true } }).capabilities
         .adminSetup
     ).toEqual({ enabled: true, required: true });
+  });
+});
+
+describe('selection options schema markers', () => {
+  let spec = SlateSpecification.create({
+    key: 'demo',
+    name: 'Demo',
+    config: SlateConfig.create(z.object({})),
+    auth: SlateAuth.create<{}>().output(z.object({}))
+  });
+  let list = async () => ({ options: [] });
+  let group = triggerGroup(spec, {
+    key: 'group',
+    name: 'Group',
+    selectionSchema: z.object({
+      own: z.string(),
+      linked: z.string(),
+      both: z.string(),
+      plain: z.string()
+    })
+  })
+    .polling({ pollEvents: async () => ({ events: [] }) })
+    .routingMatchers(async () => [])
+    .selectionOptions({
+      own: { list },
+      linked: { linked: { slate: 'acme/files', optionList: 'files' } },
+      both: {
+        list,
+        linked: { slate: 'acme/files', optionList: 'folders', params: { shared: true } }
+      }
+    })
+    .build();
+
+  it('marks own lists and linked lists separately', () => {
+    let mapped = mapTriggerGroup(group);
+    let properties = (mapped.selectionSchema as any).properties;
+
+    expect(properties.own).toEqual({
+      type: 'string',
+      [slatesSelectionOptionsSchemaKey]: true
+    });
+    expect(properties.linked).toEqual({
+      type: 'string',
+      [slatesSelectionOptionsLinkedSchemaKey]: {
+        slate: 'acme/files',
+        optionList: 'files',
+        params: {}
+      }
+    });
+    expect(properties.both).toEqual({
+      type: 'string',
+      [slatesSelectionOptionsSchemaKey]: true,
+      [slatesSelectionOptionsLinkedSchemaKey]: {
+        slate: 'acme/files',
+        optionList: 'folders',
+        params: { shared: true }
+      }
+    });
+    expect(properties.plain).toEqual({ type: 'string' });
+    expect(
+      slatesLinkedOptionList.parse(properties.both[slatesSelectionOptionsLinkedSchemaKey])
+    ).toEqual({ slate: 'acme/files', optionList: 'folders', params: { shared: true } });
+    expect(slatesTriggerGroup.safeParse(mapped).success).toBe(true);
   });
 });

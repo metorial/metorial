@@ -7,11 +7,17 @@ import type {
   SlatesTriggerGroup
 } from '@slates/proto';
 import {
+  slatesEventAttributeSchemaKey,
+  slatesSelectionOptionsLinkedSchemaKey,
+  slatesSelectionOptionsSchemaKey
+} from '@slates/proto';
+import {
   type Slate,
   type SlateAdapter,
   SlateDefaultPollingIntervalSeconds,
   type SlateToolCategory,
-  type SlateTrigger
+  type SlateTrigger,
+  type SlateTriggerGroupSelectionOptionsSources
 } from '@slates/provider';
 import z from 'zod';
 import { toJsonSchema } from './validation';
@@ -163,10 +169,22 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
 
   return {
     ...base,
+    outputSchema: markEventAttributes(base.outputSchema, a.eventAttributes ?? []),
     type: 'action.trigger',
     capabilities: {},
     triggerGroupId: a.triggerGroup.key
   };
+};
+
+let markEventAttributes = (schema: Record<string, any>, fields: string[]) => {
+  if (!fields.length) return schema;
+
+  let properties: Record<string, any> = { ...schema.properties };
+  for (let field of fields) {
+    properties[field] = { ...properties[field], [slatesEventAttributeSchemaKey]: true };
+  }
+
+  return { ...schema, properties };
 };
 
 export let isMappableTrigger = <ConfigType extends {}, AuthType extends {}>(
@@ -218,6 +236,20 @@ export let getTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   return group;
 };
 
+export let getOptionList = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  optionListId: string
+) => {
+  let list = (slate.optionLists ?? []).find(l => l.key === optionListId);
+  if (!list) {
+    throw new ServiceError(
+      badRequestError({ message: `Invalid option list ID: ${optionListId}` })
+    );
+  }
+
+  return list;
+};
+
 export let getTriggersForGroup = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   triggerGroupId: string
@@ -266,7 +298,11 @@ export let getWebhookAutoRegistration = <ConfigType extends {}, AuthType extends
 export let getWebhookManualRegistration = <ConfigType extends {}, AuthType extends {}>(
   group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
 ) => {
-  if (group.source !== 'webhook' || !group.webhook?.manualRegistration) {
+  let registration =
+    group.source === 'webhook'
+      ? (group.webhook?.manualRegistration ?? group.webhook?.deliveryConfig)
+      : undefined;
+  if (!registration) {
     throw new ServiceError(
       badRequestError({
         message: `Trigger group does not support manual webhook registration: ${group.key}`
@@ -274,8 +310,30 @@ export let getWebhookManualRegistration = <ConfigType extends {}, AuthType exten
     );
   }
 
-  return group.webhook.manualRegistration;
+  return registration;
 };
+
+export let getWebhookDeliveryConfig = <ConfigType extends {}, AuthType extends {}>(
+  group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
+) => {
+  if (group.source !== 'webhook' || !group.webhook?.deliveryConfig) {
+    throw new ServiceError(
+      badRequestError({
+        message: `Trigger group does not support webhook delivery authentication: ${group.key}`
+      })
+    );
+  }
+
+  return group.webhook.deliveryConfig;
+};
+
+let mapWebhookConfigSchemas = (config: {
+  userConfigSchema: z.ZodType<any>;
+  fullConfigSchema: z.ZodType<any>;
+}) => ({
+  userConfigSchema: toJsonSchema(config.userConfigSchema),
+  fullConfigSchema: toJsonSchema(config.fullConfigSchema)
+});
 
 export let mapToolCategory = (category: SlateToolCategory): SlatesToolCategory => ({
   id: category.key,
@@ -300,6 +358,33 @@ export let getExposedToolCategories = <ConfigType extends {}, AuthType extends {
   );
 };
 
+let markSelectionOptions = (
+  schema: Record<string, any>,
+  sources: Record<string, SlateTriggerGroupSelectionOptionsSources<any, any>>
+) => {
+  let entries = Object.entries(sources);
+  if (!entries.length) return schema;
+
+  let properties: Record<string, any> = { ...schema.properties };
+  for (let [field, source] of entries) {
+    properties[field] = {
+      ...properties[field],
+      ...(source.list ? { [slatesSelectionOptionsSchemaKey]: true } : {}),
+      ...(source.linked
+        ? {
+            [slatesSelectionOptionsLinkedSchemaKey]: {
+              slate: source.linked.slate,
+              optionList: source.linked.optionList,
+              params: source.linked.params ?? {}
+            }
+          }
+        : {})
+    };
+  }
+
+  return { ...schema, properties };
+};
+
 export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
 ): SlatesTriggerGroup => ({
@@ -307,6 +392,14 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   name: group.name,
   description: group.description,
   metadata: group.metadata,
+  ...(group.selectionSchema
+    ? {
+        selectionSchema: markSelectionOptions(
+          toJsonSchema(group.selectionSchema, 'input'),
+          group.selectionOptions
+        )
+      }
+    : {}),
   invocation:
     group.source === 'polling'
       ? {
@@ -317,16 +410,25 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
         ? { type: 'gateway' }
         : {
             type: 'webhook',
+            ...(group.webhook?.expandWebhook ? { supportsExpansion: true } : {}),
+            ...(group.webhook?.autoRegistration?.webhookRenew
+              ? { supportsRenewal: true }
+              : {}),
+            ...(group.webhook?.reconcileIntervalSeconds !== undefined
+              ? { reconcileIntervalSeconds: group.webhook.reconcileIntervalSeconds }
+              : {}),
             registration: group.webhook?.manualRegistration
               ? {
                   mode: 'manual',
-                  userConfigSchema: toJsonSchema(
-                    group.webhook.manualRegistration.userConfigSchema
-                  ),
-                  fullConfigSchema: toJsonSchema(
-                    group.webhook.manualRegistration.fullConfigSchema
-                  )
+                  ...mapWebhookConfigSchemas(group.webhook.manualRegistration)
                 }
-              : { mode: 'auto' }
+              : {
+                  mode: 'auto',
+                  ...(group.webhook?.deliveryConfig
+                    ? {
+                        deliveryConfig: mapWebhookConfigSchemas(group.webhook.deliveryConfig)
+                      }
+                    : {})
+                }
           }
 });

@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+import { z } from 'zod';
 import type {
   InsertTaskParams,
   ListTasksParams,
@@ -20,6 +21,25 @@ export class GoogleTasksClient {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  async getAccountId(): Promise<string> {
+    try {
+      let response = await this.api.get('https://www.googleapis.com/oauth2/v2/userinfo');
+      let profile = z.object({ id: z.string().trim().min(1) }).safeParse(response.data);
+      if (!profile.success) {
+        throw createApiServiceError('Google did not return a valid account identity.', {
+          reason: 'google_tasks_invalid_account'
+        });
+      }
+      return profile.data.id;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Tasks',
+        operation: 'resolve the connected Google account; authorize profile or email access',
+        reason: 'google_tasks_account_error'
+      });
+    }
   }
 
   // ---- Task Lists ----

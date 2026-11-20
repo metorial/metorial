@@ -36,6 +36,15 @@ export interface GmailMessage {
   raw?: string;
 }
 
+export interface GmailHistoryPage {
+  history?: Array<{
+    id: string;
+    messagesAdded?: Array<{ message: { id: string; threadId?: string } }>;
+  }>;
+  nextPageToken?: string;
+  historyId: string;
+}
+
 export interface InsertedGmailMessage {
   id: string;
   threadId?: string;
@@ -168,6 +177,40 @@ export class Client {
   }> {
     let response = await gmailAxios.get(`users/${this.userId}/profile`, {
       headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<{ id: string; email: string }> {
+    const response = await gmailAxios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async watchMailbox(topicName: string): Promise<{ historyId: string; expiration: string }> {
+    const response = await gmailAxios.post(
+      `users/${encodeURIComponent(this.userId)}/watch`,
+      { topicName },
+      { headers: this.headers() }
+    );
+    return response.data;
+  }
+
+  async stopMailboxWatch(): Promise<void> {
+    await gmailAxios.post(
+      `users/${encodeURIComponent(this.userId)}/stop`,
+      {},
+      {
+        headers: this.headers()
+      }
+    );
+  }
+
+  async listHistory(startHistoryId: string, pageToken?: string): Promise<GmailHistoryPage> {
+    const response = await gmailAxios.get(`users/${encodeURIComponent(this.userId)}/history`, {
+      headers: this.headers(),
+      params: { startHistoryId, pageToken, historyTypes: 'messageAdded', maxResults: 500 }
     });
     return response.data;
   }

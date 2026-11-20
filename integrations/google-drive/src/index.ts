@@ -1,4 +1,5 @@
 import { Slate } from 'slates';
+import { filesOptionList } from './option-lists';
 import { spec } from './spec';
 import {
   copyFileTool,
@@ -31,6 +32,7 @@ import {
   updateSharedDriveTool,
   uploadFileTool
 } from './tools';
+import { driveFolderEvents, fileAddedToFolder, fileUpdated } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -65,5 +67,7 @@ export let provider = Slate.create({
     listDriveLabelsTool,
     getDriveLabelTool
   ],
-  triggers: []
+  triggerGroups: [driveFolderEvents],
+  triggers: [fileAddedToFolder, fileUpdated],
+  optionLists: [filesOptionList]
 });

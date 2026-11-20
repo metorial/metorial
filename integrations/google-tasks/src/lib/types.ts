@@ -37,6 +37,12 @@ export interface Task {
   hidden?: boolean;
   links?: TaskLink[];
   webViewLink?: string;
+  assignmentInfo?: {
+    linkToTask?: string;
+    surfaceType?: string;
+    driveResourceInfo?: { driveFileId?: string; resourceKey?: string };
+    spaceInfo?: { space?: string };
+  };
 }
 
 export interface TasksResponse {
@@ -52,6 +58,7 @@ export interface ListTasksParams {
   showCompleted?: boolean;
   showDeleted?: boolean;
   showHidden?: boolean;
+  showAssigned?: boolean;
   completedMin?: string;
   completedMax?: string;
   dueMin?: string;

@@ -1,4 +1,4 @@
-import { anyOf } from 'slates';
+import { allOf, anyOf } from 'slates';
 
 export let googleTasksScopes = {
   tasks: 'https://www.googleapis.com/auth/tasks',
@@ -23,6 +23,10 @@ export let googleTasksActionScopes = {
   moveTask: tasksWrite,
   deleteTask: tasksWrite,
   clearCompletedTasks: tasksWrite,
+  taskCompleted: allOf(
+    tasksRead,
+    anyOf(googleTasksScopes.userinfoProfile, googleTasksScopes.userinfoEmail)
+  ),
   taskChanges: tasksRead,
   inboundWebhook: tasksRead
 } as const;

@@ -14,6 +14,7 @@ import {
   updateObjectMetadata,
   uploadObject
 } from './tools';
+// import { objectEvents, objectFinalized } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +31,9 @@ export let provider = Slate.create({
     manageLifecycle,
     manageNotifications
   ],
+  // TODO: re-register the object triggers. Postponed: each bucket's project must be allowed to
+  // publish to the delivery topic, which needs an operator per customer project.
+  // triggerGroups: [objectEvents],
+  // triggers: [objectFinalized]
   triggers: []
 });

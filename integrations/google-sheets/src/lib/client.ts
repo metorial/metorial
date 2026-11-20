@@ -1,9 +1,50 @@
 import { createApiServiceError, createAxios } from 'slates';
-import { normalizeA1Range } from './a1-range';
+import { z } from 'zod';
+import { normalizeA1Range, quoteA1SheetName } from './a1-range';
 
 const MAX_SHEET_TITLES_IN_HINT = 20;
 const MAX_SHEET_TITLES_HINT_LENGTH = 1000;
 const MAX_UPSTREAM_DETAIL_LENGTH = 300;
+const MAX_TAB_ROWS_RESPONSE_BYTES = 64 * 1024 * 1024;
+const MAX_VALUES_RESPONSE_BYTES = 32 * 1024 * 1024;
+
+const sheetTabListSchema = z.object({
+  spreadsheetId: z.string(),
+  sheets: z
+    .array(
+      z.object({
+        properties: z.object({
+          sheetId: z.number().int().nonnegative(),
+          title: z.string().min(1),
+          sheetType: z.string().optional(),
+          gridProperties: z
+            .object({ rowCount: z.number().int().nonnegative().optional() })
+            .optional()
+        })
+      })
+    )
+    .default([])
+});
+const tabRowsSchema = z.object({
+  valueRanges: z
+    .array(
+      z.object({
+        values: z.array(z.array(z.union([z.string(), z.number(), z.boolean()]))).default([])
+      })
+    )
+    .default([])
+});
+
+export type SheetTab = {
+  sheetId: number;
+  title: string;
+  isGrid: boolean;
+  rowCount: number;
+};
+export type SheetTabCell = string | number | boolean;
+
+const isResponseTooLargeError = (error: unknown) =>
+  error instanceof Error && /maxContentLength/.test(error.message);
 
 const isUnparseableRangeError = (error: unknown): error is Error =>
   error instanceof Error && /unable to parse range/i.test(error.message);
@@ -83,6 +124,19 @@ export class SheetsClient {
     }
   }
 
+  private async withValuesSizeLimit<T>(request: () => Promise<T>) {
+    try {
+      return await request();
+    } catch (error) {
+      if (!isResponseTooLargeError(error)) throw error;
+
+      throw createApiServiceError(
+        `The requested cells hold more than ${MAX_VALUES_RESPONSE_BYTES / 1024 / 1024} MiB of data, too much to read at once. Read a smaller range, for example fewer rows or only the columns you need.`,
+        { reason: 'google_sheets_values_too_large', parent: error }
+      );
+    }
+  }
+
   // --- Spreadsheet Management ---
 
   async createSpreadsheet(params: { title: string; locale?: string; sheetTitles?: string[] }) {
@@ -139,6 +193,67 @@ export class SheetsClient {
 
   // --- Reading Data ---
 
+  async listTabs(spreadsheetId: string): Promise<SheetTab[]> {
+    const response = await this.axios.get(
+      `/spreadsheets/${encodeURIComponent(spreadsheetId)}`,
+      {
+        params: {
+          fields:
+            'spreadsheetId,sheets.properties(sheetId,title,sheetType,gridProperties(rowCount))'
+        }
+      }
+    );
+    const parsed = sheetTabListSchema.safeParse(response.data);
+    if (!parsed.success || parsed.data.spreadsheetId !== spreadsheetId) {
+      throw createApiServiceError('Google Sheets returned an invalid list of tabs.', {
+        reason: 'google_sheets_tab_list_invalid'
+      });
+    }
+    return parsed.data.sheets.map(({ properties }) => ({
+      sheetId: properties.sheetId,
+      title: properties.title,
+      isGrid: (properties.sheetType ?? 'GRID') === 'GRID',
+      rowCount: properties.gridProperties?.rowCount ?? 0
+    }));
+  }
+
+  // Ranges are relative to the tab, for example "1:1" or "2:500".
+  async getTabRows(
+    spreadsheetId: string,
+    tabTitle: string,
+    ranges: string[]
+  ): Promise<SheetTabCell[][][]> {
+    const params = new URLSearchParams({
+      majorDimension: 'ROWS',
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
+      fields: 'valueRanges(values)'
+    });
+    const tab = quoteA1SheetName(tabTitle);
+    for (const range of ranges) params.append('ranges', `${tab}!${range}`);
+    let response: { data: unknown };
+    try {
+      response = await this.axios.get(
+        `/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchGet`,
+        { params, maxContentLength: MAX_TAB_ROWS_RESPONSE_BYTES }
+      );
+    } catch (error) {
+      if (error instanceof Error && /maxContentLength/.test(error.message))
+        throw createApiServiceError(
+          `These rows of the tab hold more than ${MAX_TAB_ROWS_RESPONSE_BYTES / 1024 / 1024} MiB of data, too much to read at once.`,
+          { reason: 'google_sheets_tab_rows_too_large', parent: error }
+        );
+      throw error;
+    }
+    const parsed = tabRowsSchema.safeParse(response.data);
+    if (!parsed.success || parsed.data.valueRanges.length !== ranges.length) {
+      throw createApiServiceError('Google Sheets returned invalid row data.', {
+        reason: 'google_sheets_tab_rows_invalid'
+      });
+    }
+    return parsed.data.valueRanges.map(range => range.values);
+  }
+
   async getValues(
     spreadsheetId: string,
     range: string,
@@ -149,10 +264,12 @@ export class SheetsClient {
     }
   ) {
     let normalizedRange = normalizeA1Range(range);
-    let response = await this.withRangeErrorHint(spreadsheetId, () =>
-      this.axios.get(
-        `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(normalizedRange)}`,
-        { params: options }
+    let response = await this.withValuesSizeLimit(() =>
+      this.withRangeErrorHint(spreadsheetId, () =>
+        this.axios.get(
+          `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(normalizedRange)}`,
+          { params: options, maxContentLength: MAX_VALUES_RESPONSE_BYTES }
+        )
       )
     );
     return response.data;
@@ -181,8 +298,13 @@ export class SheetsClient {
       params.set('dateTimeRenderOption', options.dateTimeRenderOption);
     }
 
-    let response = await this.withRangeErrorHint(spreadsheetId, () =>
-      this.axios.get(`/spreadsheets/${spreadsheetId}/values:batchGet`, { params })
+    let response = await this.withValuesSizeLimit(() =>
+      this.withRangeErrorHint(spreadsheetId, () =>
+        this.axios.get(`/spreadsheets/${spreadsheetId}/values:batchGet`, {
+          params,
+          maxContentLength: MAX_VALUES_RESPONSE_BYTES
+        })
+      )
     );
     return response.data;
   }

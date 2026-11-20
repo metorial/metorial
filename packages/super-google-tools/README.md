@@ -25,3 +25,8 @@ Before a source handler runs, its mapped or direct configuration is parsed with
 the source provider's configuration schema. The composer preserves source
 `ServiceError` instances and normalizes unexpected failures into a
 source-labelled `ServiceError` without exposing the original payload.
+
+Source providers are accepted through the public tool and configuration-schema
+contract, so their SDK releases do not need matching private class identities.
+The aggregate specification and returned tool instances use this package's SDK
+release. Triggers and adapter registration are not composed by this helper.

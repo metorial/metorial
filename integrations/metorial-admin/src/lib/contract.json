@@ -35586,6 +35586,10 @@
         "description": {
           "in": "body",
           "name": "description"
+        },
+        "trigger_group_selections": {
+          "in": "body",
+          "name": "trigger_group_selections"
         }
       },
       "inputSchema": {
@@ -35610,6 +35614,14 @@
               "null"
             ],
             "description": "Description for the callback. Defaults to the description of the integration provider."
+          },
+          "trigger_group_selections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "Resource selections keyed by trigger group key. Each value must match that group’s selection schema. Limited to 64 groups and 64 KiB of JSON."
           }
         },
         "required": [
@@ -35883,7 +35895,7 @@
     {
       "key": "callbacks_update",
       "name": "Update callback",
-      "description": "Updates the name, description or metadata of a callback. Everything else about a callback is derived from its integration provider - set `callbacks.status` to `disabled` there to tear it down.",
+      "description": "Updates the name, description, metadata or trigger group selections of a callback. Changing the selections re-registers the affected triggers. Everything else about a callback is derived from its integration provider - set `callbacks.status` to `disabled` there to tear it down.",
       "category": "callbacks",
       "method": "PATCH",
       "path": "/callbacks/:callbackId",
@@ -35906,6 +35918,10 @@
         "metadata": {
           "in": "body",
           "name": "metadata"
+        },
+        "trigger_group_selections": {
+          "in": "body",
+          "name": "trigger_group_selections"
         }
       },
       "inputSchema": {
@@ -35934,6 +35950,17 @@
             ],
             "additionalProperties": {},
             "description": "Updated custom metadata"
+          },
+          "trigger_group_selections": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "Resource selections keyed by trigger group key. Each value must match that group’s selection schema. Limited to 64 groups and 64 KiB of JSON."
           }
         },
         "required": [

@@ -9,8 +9,12 @@ import {
   SLATES_PROTOCOL_VERSION,
   type SlatesMessageAuthAdminCallbackHandleRequest,
   type SlatesMessageAuthAuthorizationUrlGetRequest,
+  type SlatesMessageTriggerGroupWebhookProcessRequest,
   type SlatesParticipant,
-  type SlatesRuntimeInfo
+  type SlatesRuntimeInfo,
+  slatesTriggerGroupWebhookDeliveryAuthentication,
+  slatesTriggerGroupWebhookExpansionResult,
+  slatesTriggerGroupWebhookRegistrationResult
 } from '@slates/proto';
 import {
   AuthConfigSecretRedactor,
@@ -24,8 +28,10 @@ import {
   type SlateLogListener,
   SlatePublicContext,
   type SlateRuntimeInfo,
+  type SlateTriggerGroup,
   uploadAttachmentDirect
 } from '@slates/provider';
+import { extractEventAttributes } from './eventAttributes';
 import { PQueue } from './pQueue';
 import {
   evaluateTriggerMatches,
@@ -36,8 +42,10 @@ import {
   getExposedActions,
   getExposedToolCategories,
   getExposedTriggerGroups,
+  getOptionList,
   getTriggerGroup,
   getWebhookAutoRegistration,
+  getWebhookDeliveryConfig,
   getWebhookManualRegistration,
   isMappableTrigger,
   mapAction,
@@ -51,6 +59,39 @@ import { toJsonSchema, validate } from './validation';
 import { serializeWebhookHttpResponse } from './webhook';
 
 let DEFAULT_MAX_ATTACHMENT_SIZE_BYTES = 100_000_000;
+
+let validateTriggerGroupSelection = (
+  group: SlateTriggerGroup<any, any>,
+  selection: Record<string, any> | undefined
+) =>
+  group.selectionSchema
+    ? validate(
+        group.selectionSchema,
+        selection === undefined ? {} : selection,
+        'trigger_group.selection',
+        `Invalid selection for trigger group "${group.key}"`
+      )
+    : (selection ?? {});
+
+let validateWebhookRegistration = (result: unknown) =>
+  validate(
+    slatesTriggerGroupWebhookRegistrationResult,
+    result,
+    'trigger_group.webhook.registration',
+    'Webhook registration returned an invalid result'
+  );
+
+let toWebhookRequest = (
+  params: Pick<
+    SlatesMessageTriggerGroupWebhookProcessRequest['params'],
+    'url' | 'method' | 'headers' | 'body'
+  >
+) =>
+  new Request(params.url, {
+    method: params.method,
+    headers: params.headers,
+    body: params.body ? Uint8Array.from(atob(params.body.content), c => c.charCodeAt(0)) : null
+  });
 
 let routeAttachmentsThroughDirectUpload = async (
   attachments: SlateAttachment[] | undefined,
@@ -1213,7 +1254,14 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         () => runWithContext(context, () => action.map(context))
       );
 
-      return withRequestTraces(context, { id: res.id, type: res.type, output: res.output });
+      let attributes = extractEventAttributes(action.eventAttributes ?? [], res.output);
+
+      return withRequestTraces(context, {
+        id: res.id,
+        type: res.type,
+        output: res.output,
+        ...(Object.keys(attributes).length ? { attributes } : {})
+      });
     });
 
     manager.onRequest('slates/action.trigger.poll_events', async ({ params }) => {
@@ -1279,7 +1327,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       let context = createContext(
         ctx.config,
-        { pageToken: params.pageToken ?? null },
+        {
+          pageToken: params.pageToken ?? null,
+          selection: validateTriggerGroupSelection(group, params.selection)
+        },
         ctx.auth?.output!
       );
       let res = await traceProviderCall(
@@ -1319,7 +1370,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         {
           webhookTargetIdentifier: params.webhookTargetIdentifier,
           webhookTargetPayload: params.webhookTargetPayload,
-          webhookUrl: params.webhookUrl
+          webhookUrl: params.webhookUrl,
+          operationId: params.operationId,
+          selection: validateTriggerGroupSelection(group, params.selection),
+          deliveryConfig: params.deliveryConfig
         },
         ctx.auth?.output!
       );
@@ -1336,13 +1390,58 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
             webhookTargetIdentifier: params.webhookTargetIdentifier
           }
         },
-        () => runWithContext(context, () => autoRegistration.webhookRegister(context))
+        () =>
+          runWithContext(context, async () =>
+            validateWebhookRegistration(await autoRegistration.webhookRegister(context))
+          )
       );
 
-      return withRequestTraces(context, {
-        webhookRegistrationIdentifier: res.webhookRegistrationIdentifier,
-        webhookRegistrationPayload: res.webhookRegistrationPayload
-      });
+      return withRequestTraces(context, res);
+    });
+
+    manager.onRequest('slates/trigger_group.webhook.renew', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let autoRegistration = getWebhookAutoRegistration(group);
+      let renew = autoRegistration.webhookRenew;
+      if (!renew) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger group does not support webhook renewal: ${params.triggerGroupId}`
+          })
+        );
+      }
+
+      let context = createContext(
+        ctx.config,
+        {
+          webhookRegistrationIdentifier: params.webhookRegistrationIdentifier,
+          webhookRegistrationPayload: params.webhookRegistrationPayload,
+          webhookUrl: params.webhookUrl,
+          webhookTargetIdentifier: params.webhookTargetIdentifier,
+          webhookTargetPayload: params.webhookTargetPayload,
+          operationId: params.operationId,
+          selection: validateTriggerGroupSelection(group, params.selection),
+          deliveryConfig: params.deliveryConfig
+        },
+        ctx.auth?.output!
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'webhookRenew',
+          message: `Renewing webhook for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: `Renewed webhook for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while renewing a webhook`,
+          metadata: { triggerGroupId: group.key, triggerGroupName: group.name }
+        },
+        () =>
+          runWithContext(context, async () =>
+            validateWebhookRegistration(await renew(context))
+          )
+      );
+
+      return withRequestTraces(context, res);
     });
 
     manager.onRequest('slates/trigger_group.webhook.unregister', async ({ params }) => {
@@ -1456,18 +1555,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         );
       }
 
-      let req = new Request(params.url, {
-        method: params.method,
-        headers: params.headers,
-        body: params.body
-          ? Uint8Array.from(atob(params.body.content), c => c.charCodeAt(0))
-          : null
-      });
-
       let context = createContext(
         {},
         {
-          request: req,
+          request: toWebhookRequest(params),
           webhookRegistrationPayload: params.webhookRegistrationPayload
         },
         {}
@@ -1515,10 +1606,118 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           matchers: event.matchers,
           payload: event.payload,
           idempotencyKey: event.idempotencyKey,
-          triggerIds: evaluateTriggerMatches(slate, group.key, event.payload)
+          triggerIds: group.webhook?.expandWebhook
+            ? []
+            : evaluateTriggerMatches(slate, group.key, event.payload)
         })),
+        ...(group.webhook?.expandWebhook ? { requiresExpansion: true } : {}),
         response,
         skipped: res.skipped ?? null
+      });
+    });
+
+    manager.onRequest(
+      'slates/trigger_group.webhook.delivery_authenticate',
+      async ({ params }) => {
+        let group = getTriggerGroup(slate, params.triggerGroupId);
+        let deliveryConfig = getWebhookDeliveryConfig(group);
+
+        let context = createContext(
+          {},
+          {
+            request: toWebhookRequest(params),
+            deliveryConfig: params.deliveryConfig
+          },
+          {}
+        );
+        let res = await traceProviderCall(
+          {
+            component: 'action',
+            functionName: 'webhookDeliveryAuthenticate',
+            message: `Authenticating a delivery for trigger group ${formatEntityLabel(group.name, group.key)}`,
+            successMessage: result =>
+              result.rejected
+                ? `Rejected a delivery with status ${result.rejected.status} for trigger group ${formatEntityLabel(group.name, group.key)}`
+                : `Authenticated a delivery for ${result.routingKeys.length} routing key(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+            errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while authenticating a delivery`,
+            metadata: {
+              triggerGroupId: group.key,
+              triggerGroupName: group.name,
+              requestMethod: params.method,
+              hasRequestBody: !!params.body
+            },
+            onSuccess: result => ({
+              routingKeyCount: result.routingKeys.length,
+              rejectedStatus: result.rejected?.status ?? null
+            })
+          },
+          () =>
+            runWithContext(context, async () => {
+              let authentication = await deliveryConfig.authenticate(context);
+              return validate(
+                slatesTriggerGroupWebhookDeliveryAuthentication,
+                authentication.rejected
+                  ? { routingKeys: [], rejected: authentication.rejected }
+                  : { routingKeys: authentication.routingKeys, rejected: null },
+                'trigger_group.webhook.delivery_authentication',
+                'Webhook delivery authentication returned an invalid result'
+              );
+            })
+        );
+
+        return withRequestTraces(context, res);
+      }
+    );
+
+    manager.onRequest('slates/trigger_group.webhook.expand', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let expand = group.source === 'webhook' ? group.webhook?.expandWebhook : undefined;
+      if (!expand) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger group does not support webhook expansion: ${params.triggerGroupId}`
+          })
+        );
+      }
+
+      let context = createContext(
+        ctx.config,
+        {
+          payload: params.payload,
+          state: params.state ?? null,
+          selection: validateTriggerGroupSelection(group, params.selection),
+          deliveryId: params.deliveryId,
+          webhookRegistrationPayload: params.webhookRegistrationPayload
+        },
+        ctx.auth?.output!
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'expandWebhook',
+          message: `Expanding webhook delivery for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: `Expanded webhook delivery for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while expanding a webhook delivery`,
+          metadata: { triggerGroupId: group.key, triggerGroupName: group.name }
+        },
+        () =>
+          runWithContext(context, async () =>
+            validate(
+              slatesTriggerGroupWebhookExpansionResult,
+              await expand(context),
+              'trigger_group.webhook.expansion',
+              'Webhook expansion returned an invalid result'
+            )
+          )
+      );
+
+      return withRequestTraces(context, {
+        ...(res.updatedState !== undefined ? { updatedState: res.updatedState } : {}),
+        events: res.events.map(event => ({
+          ...event,
+          triggerIds: evaluateTriggerMatches(slate, group.key, event.payload)
+        }))
       });
     });
 
@@ -1549,6 +1748,98 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       return withRequestTraces(context, { matchers });
     });
 
+    manager.onRequest('slates/trigger_group.selection.options_list', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let handler = Object.hasOwn(group.selectionOptions, params.field)
+        ? group.selectionOptions[params.field]?.list
+        : undefined;
+      if (!handler) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger group ${params.triggerGroupId} has no options for selection field: ${params.field}`
+          })
+        );
+      }
+
+      let context = createContext(
+        ctx.config,
+        {
+          query: params.query?.trim() || null,
+          pageToken: params.pageToken ?? null,
+          selection: params.selection ?? {}
+        },
+        ctx.auth?.output!
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'selectionOptions',
+          message: `Listing ${params.field} options for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: result =>
+            `Listed ${result.options.length} ${params.field} option(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while listing ${params.field} options`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
+            field: params.field
+          },
+          onSuccess: result => ({
+            optionCount: result.options.length
+          })
+        },
+        () => runWithContext(context, () => handler(context))
+      );
+
+      return withRequestTraces(context, {
+        options: res.options,
+        nextPageToken: res.nextPageToken ?? null
+      });
+    });
+
+    manager.onRequest('slates/option_list.options_list', async ({ params }) => {
+      let ctx = getContextFull();
+      let list = getOptionList(slate, params.optionListId);
+      let listParams = validate(
+        list.paramsSchema,
+        params.params ?? {},
+        'option_list.params',
+        `Invalid params for option list "${list.key}"`
+      );
+
+      let context = createContext(
+        ctx.config,
+        {
+          query: params.query?.trim() || null,
+          pageToken: params.pageToken ?? null,
+          params: listParams
+        },
+        ctx.auth?.output!
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'optionList',
+          message: `Listing options of option list "${list.key}"`,
+          successMessage: result =>
+            `Listed ${result.options.length} option(s) of option list "${list.key}"`,
+          errorMessage: `Option list "${list.key}" failed`,
+          metadata: {
+            optionListId: list.key
+          },
+          onSuccess: result => ({
+            optionCount: result.options.length
+          })
+        },
+        () => runWithContext(context, () => list.list(context))
+      );
+
+      return withRequestTraces(context, {
+        options: res.options,
+        nextPageToken: res.nextPageToken ?? null
+      });
+    });
+
     manager.onRequest('slates/trigger_group.polling.poll', async ({ params }) => {
       let ctx = getContextFull();
       let group = getTriggerGroup(slate, params.triggerGroupId);
@@ -1560,7 +1851,14 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         );
       }
 
-      let context = createContext(ctx.config, { state: params.state }, ctx.auth?.output!);
+      let context = createContext(
+        ctx.config,
+        {
+          state: params.state,
+          selection: validateTriggerGroupSelection(group, params.selection)
+        },
+        ctx.auth?.output!
+      );
       let res = await traceProviderCall(
         {
           component: 'action',

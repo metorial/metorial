@@ -1,5 +1,5 @@
 import z from 'zod';
-import { slatesAction } from '../types';
+import { slatesAction, slatesEventAttributes } from '../types';
 import { withRequestTraces } from './tracing';
 
 export let slatesWebhookHttpResponse = z.object({
@@ -145,7 +145,8 @@ export let slatesMessageActionTriggerEventMapResponse = z.object({
   result: withRequestTraces({
     type: z.string(),
     id: z.string(),
-    output: z.record(z.string(), z.any())
+    output: z.record(z.string(), z.any()),
+    attributes: slatesEventAttributes.optional()
   })
 });
 

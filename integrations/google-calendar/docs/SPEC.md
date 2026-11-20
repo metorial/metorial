@@ -104,27 +104,106 @@ New tool validation and upstream Google Calendar API failures use the shared `Se
 
 ## Events
 
-The Google Calendar API provides push notifications that let you monitor changes in resources, eliminating the extra network and compute costs involved with polling resources to determine if they have changed. Whenever a watched resource changes, the Google Calendar API notifies your application.
+The `calendar_events` automatic notification group exposes `event_changed` and
+`event_cancelled`. Enabling callbacks discovers readable entries in the user's
+CalendarList, including hidden calendars, with real calendar IDs. Free/busy-only
+and deleted entries are excluded. Each target belongs to the connected Google
+user; subscriptions are never shared across users.
 
-Push notifications are delivered as webhook callbacks to an HTTPS endpoint you register. You set up a notification channel for each resource endpoint you want to watch. A channel specifies routing information for notification messages, including the specific URL where you want to receive notifications. Whenever a channel's resource changes, the Google Calendar API sends a notification message as a POST request to that URL.
+Trigger eligibility requires all three permission groups: event reading,
+CalendarList reading, and account identity. Event permissions accept `calendar`,
+`calendar.readonly`, `calendar.events`, `calendar.events.readonly`,
+`calendar.events.owned`, or `calendar.events.owned.readonly`. CalendarList
+permissions accept `calendar`, `calendar.readonly`, `calendar.calendarlist`, or
+`calendar.calendarlist.readonly`. Account identity requires `userinfo.profile`
+or `userinfo.email` for OAuth2 `userinfo.get`. These names use Google's
+`https://www.googleapis.com/auth/` prefix. Event-only grants cannot enable these
+triggers because they cannot discover calendars. Existing tool scope contracts
+remain independent. See [CalendarList authorization](https://developers.google.com/workspace/calendar/api/v3/reference/calendarList/list#authorization)
+and [OAuth2 method scopes](https://www.googleapis.com/discovery/v1/apis/oauth2/v2/rest).
 
-Google Calendar's push notification system operates at the resource level rather than providing granular event-type filtering. When you create a watch channel for a calendar resource, Google sends notifications whenever any change occurs to that resource. The webhook notification does not include the actual event data in the payload — it serves as a signal that something changed. Your application must make subsequent API calls to retrieve the specific changes.
+Registration verifies both the account and calendar identities, reads a
+silent full `events.list` baseline, then opens an `events.watch` channel with a
+random verification token. The watch response must return the requested channel,
+token, resource URI, resource ID, and a future expiration. No historical event
+is emitted by the baseline. All sync pages retain `showDeleted=true`,
+`singleEvents=false`, and `maxResults=2500` without time or search filters.
 
-Google Calendar supports notification channels for up to one week before requiring renewal.
+Push notifications have no body. Validation compares the channel token in
+constant time and verifies the saved channel and resource IDs. `sync` messages
+are acknowledged without events, including the normal early-sync race. A wakeup
+can expand into zero or many event changes. Message numbers remain strings and
+are not used to reject out-of-order notifications. No HMAC or signed timestamp
+is claimed for Google's channel-token protocol.
 
-### Watchable Resource Categories
+Expansion uses the per-calendar durable sync token, with the registration's
+initial token only as bootstrap. Failure leaves the previous cursor intact, and
+reconciliation uses the same drain even when no notification arrives.
 
-Currently, the Google Calendar API supports notifications for changes to the Acl, CalendarList, Events, and Settings resources.
+An incremental drain is bounded per run. It stops at the first page boundary
+after 2,500 changes (so a batch stays under 5,000), after 100 pages, or after 45
+seconds, and returns the events read so far. Google issues the next sync token
+only on the last page, so the saved cursor then keeps the sync token the drain
+started from together with the next page token, and the next notification or
+reconciliation continues with the same query from that page. The replacement
+sync token is saved only when the last page has been read. If Google rejects the
+saved page token (400 or 410), a warning is recorded and the pending changes are
+read again from that sync token in one run. Changes already delivered keep the
+same revision identity, so repeats inside the delivery deduplication window are
+dropped; a repeat is possible only if the rejection comes after that window. If
+that re-read does not finish within 100 pages or 45 seconds, it is abandoned:
+the baseline is rebuilt once without announcing existing events, and a warning
+records that the pending changes were not delivered.
 
-- **Events**: Receive notifications when any event on a specific calendar is created, updated, or deleted. You specify the calendar ID to watch.
-- **CalendarList**: Receive notifications when the user's calendar list changes (calendars added, removed, or modified).
-- **ACL**: Receive notifications when sharing permissions on a specific calendar change.
-- **Settings**: Receive notifications when the user's calendar settings change.
+A 410 on the sync token itself rebuilds the full baseline without announcing
+existing events and records a warning: changes made between the expired token
+and the resynchronization are not delivered. The initial baseline and that
+rebuild read at most 100 pages or 45 seconds per run. A calendar that needs more
+saves the next page token without a sync token (at registration, in the saved
+registration), records a warning, and continues from that page on the next
+notification or reconciliation. No events are delivered for the calendar until
+the last page returns its sync token; Google documents that entries changed
+while a full sync is being paged are not missed. If Google rejects the saved
+page token (400 or 410), a warning is recorded and the baseline starts again.
 
-### Configuration Options
+`event_changed` combines creation and updates because the feed does not prove
+which happened. `event_cancelled` describes the watched calendar only. Outputs
+contain `kind`, `calendarId`, `eventId`, `revisionId`, and `event`. The event
+retains available ETag, status, title, description, location, links, created and
+updated times, start/end values, attendees, organizer, recurrence,
+`recurringEventId`, and `originalStartTime`, plus additional provider fields.
+All-day dates retain their exclusive end date; timed values retain offset and
+timezone. Cancelled recurring exceptions and deleted events may be sparse.
 
-- **Webhook URL**: Must be an HTTPS endpoint with a valid SSL certificate.
-- **Channel token**: An optional arbitrary string for routing or verification purposes.
-- **Channel ID**: A unique identifier you provide for each notification channel.
-- **Expiration**: Channels expire (typically after about one week) and must be renewed.
-- Some resources do not support webhook notifications (e.g., globally shared calendars like "Public holidays"), which will raise an exception when attempting to watch them.
+Revision identity hashes calendar ID, event ID, and ETag, falling back to update
+time and then the input sync transition for sparse tombstones. Retries reuse
+identities. Recurring instances sharing `iCalUID` remain distinct. This delivers
+observed changes, not an exhaustive intermediate edit history.
+
+Renewal creates a replacement channel using a stable operation ID and secret,
+retaining unexpired prior channel identities for overlap. A completed renewal
+replayed with its saved operation ID does not create another channel. If Google's
+response was lost, a channel-ID conflict remains a failure because Google exposes
+no channel get/list API; no successful readback is fabricated. Cleanup verifies
+the creating account, attempts every retained channel, and accepts known natural
+expiration or a successful stop response. An unconfirmed 404 stays retryable.
+Google also requires the original OAuth client for user-owned channel cleanup.
+
+Example output is in the README's Event notifications section. Contract tests
+cover channel-token verification, identity, paging, failures, token expiry and
+its warning, batched drains and their resumption, rejected page tokens and the
+abandoned re-read, recurrence, sparse cancellation, version keys and renewal overlap. The private
+live lifecycle uses a suite-owned secondary calendar and a reserved `.invalid`
+receiver. Google cannot provide independent channel readback or confirmed repeat
+stop; successful watch/renew/stop responses are the available lifecycle evidence.
+Real delivery and recovery still require a callback environment with durable
+state, atomic event/cursor persistence, reconciliation, and renewal enabled.
+
+Provider references:
+
+- [Push notifications and channel lifecycle](https://developers.google.com/workspace/calendar/api/guides/push)
+- [Incremental synchronization](https://developers.google.com/workspace/calendar/api/guides/sync)
+- [Event list](https://developers.google.com/workspace/calendar/api/v3/reference/events/list)
+- [Event resource and cancellation semantics](https://developers.google.com/workspace/calendar/api/v3/reference/events)
+- [Calendar discovery](https://developers.google.com/workspace/calendar/api/v3/reference/calendarList/list)
+- [Channel stop](https://developers.google.com/workspace/calendar/api/v3/reference/channels/stop)

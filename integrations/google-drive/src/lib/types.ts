@@ -2,6 +2,8 @@ export interface DriveFile {
   fileId: string;
   name: string;
   mimeType: string;
+  version?: string;
+  driveId?: string;
   description?: string;
   starred?: boolean;
   trashed?: boolean;

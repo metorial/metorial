@@ -1,6 +1,7 @@
 {
   "name": "@metorial/datadog",
   "description": "Monitor infrastructure, applications, and services across cloud environments. Submit, discover, and query metrics; create and manage monitors and alerts; build and clean up dashboards; search and analyze logs; manage incidents; track SLOs; run synthetic tests; inspect users and hosts; and schedule or cancel monitor downtimes.",
+  "timeout": 900,
   "categories": ["apis-and-http-requests", "security"],
   "skills": [
     "submit and query metrics",

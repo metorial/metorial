@@ -26,7 +26,7 @@ import type {
 } from './types';
 
 let FILE_FIELDS =
-  'id,name,mimeType,description,starred,trashed,parents,webViewLink,webContentLink,iconLink,thumbnailLink,size,createdTime,modifiedTime,sharedWithMeTime,owners,lastModifyingUser,shared,capabilities';
+  'id,name,mimeType,version,driveId,description,starred,trashed,parents,webViewLink,webContentLink,iconLink,thumbnailLink,size,createdTime,modifiedTime,sharedWithMeTime,owners,lastModifyingUser,shared,capabilities';
 
 export let GOOGLE_DRIVE_DEFAULT_PAGE_SIZE = 100;
 export let GOOGLE_DRIVE_MAX_PAGE_SIZE = 1000;
@@ -92,6 +92,8 @@ let mapFile = (raw: any): DriveFile => ({
   fileId: raw.id,
   name: raw.name,
   mimeType: raw.mimeType,
+  version: raw.version,
+  driveId: raw.driveId,
   description: raw.description,
   starred: raw.starred,
   trashed: raw.trashed,
@@ -1074,6 +1076,7 @@ export class GoogleDriveClient {
       pageSize?: number;
       driveId?: string;
       includeRemoved?: boolean;
+      includeCorpusRemovals?: boolean;
       spaces?: string;
     }
   ): Promise<ChangeListResponse> {
@@ -1095,6 +1098,8 @@ export class GoogleDriveClient {
     if (params?.driveId) requestParams.driveId = params.driveId;
     if (params?.includeRemoved !== undefined)
       requestParams.includeRemoved = params.includeRemoved;
+    if (params?.includeCorpusRemovals !== undefined)
+      requestParams.includeCorpusRemovals = params.includeCorpusRemovals;
     if (params?.spaces) requestParams.spaces = params.spaces;
 
     let response = await this.api.get('/changes', { params: requestParams });
@@ -1114,11 +1119,13 @@ export class GoogleDriveClient {
     params?: {
       expiration?: string;
       driveId?: string;
+      token?: string;
     }
   ): Promise<{
     channelId: string;
     resourceId: string;
     expiration: string;
+    token?: string;
   }> {
     let body: Record<string, any> = {
       id: channelId,
@@ -1126,6 +1133,7 @@ export class GoogleDriveClient {
       address: webhookUrl
     };
     if (params?.expiration) body.expiration = params.expiration;
+    if (params?.token) body.token = params.token;
 
     let requestParams: Record<string, any> = {
       pageToken,
@@ -1138,7 +1146,8 @@ export class GoogleDriveClient {
     return {
       channelId: response.data.id,
       resourceId: response.data.resourceId,
-      expiration: response.data.expiration
+      expiration: response.data.expiration,
+      token: response.data.token
     };
   }
 

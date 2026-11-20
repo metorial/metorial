@@ -92,6 +92,7 @@ export interface SlateActionParametersTrigger<
   triggerGroup: SlateTriggerGroup<ConfigType, AuthType>;
   matches: SlateTriggerMatchesHandler;
   map: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
+  eventAttributes?: string[];
 }
 
 export type SlateActionParametersAny<

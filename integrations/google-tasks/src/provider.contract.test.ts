@@ -28,7 +28,7 @@ describe('google-tasks provider contract', () => {
         'move_task',
         'clear_completed_tasks'
       ],
-      triggerIds: [],
+      triggerIds: ['task_completed'],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'list_task_lists', readOnly: true, destructive: false },
@@ -43,10 +43,10 @@ describe('google-tasks provider contract', () => {
         { id: 'move_task', readOnly: false, destructive: false },
         { id: 'clear_completed_tasks', readOnly: false, destructive: true }
       ],
-      triggers: []
+      triggers: [{ id: 'task_completed' }]
     });
 
-    expect(contract.actions).toHaveLength(11);
+    expect(contract.actions).toHaveLength(12);
 
     let expectedScopes = {
       list_task_lists: googleTasksActionScopes.listTaskLists,

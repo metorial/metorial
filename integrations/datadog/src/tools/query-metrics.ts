@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { isDatadogResponseTooLarge, MAX_METRICS_RESPONSE_BYTES } from '../lib/client';
 import { createClient, takeWithinOutputBudget } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -12,7 +13,7 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
     'The query uses Datadog metric query syntax, e.g. "avg:system.cpu.user{*}" or "sum:requests.count{service:web}.as_count()".',
     'Time range is specified as Unix timestamps in seconds.',
     'Use "from" as the start time and "to" as the end time.',
-    'Queries that return more series than fit in one response are cut off and marked truncated; narrow the scope, reduce the "by" grouping, or shorten the time range to see the rest.'
+    'Results too large to return inline are marked truncated and the complete result is provided as a downloadable JSON file in Datadog\'s raw query format. To get every series inline instead, narrow the scope, reduce the "by" grouping, or shorten the time range.'
   ],
   tags: {
     readOnly: true
@@ -47,11 +48,15 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
       truncated: z
         .boolean()
         .optional()
-        .describe('True when some series were left out because the result was too large'),
+        .describe(
+          'True when some or all series were left out because the result was too large; the complete result is provided as a downloadable JSON file'
+        ),
       totalSeries: z
         .number()
         .optional()
-        .describe('Total number of series the query returned before truncation'),
+        .describe(
+          'Total number of series the query returned before truncation, when the result was small enough to count'
+        ),
       fromDate: z.number().optional().describe('Query start timestamp'),
       toDate: z.number().optional().describe('Query end timestamp'),
       query: z.string().optional().describe('The query that was executed')
@@ -59,11 +64,38 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth, ctx.config);
-    let result = await client.queryMetrics({
+    let params = {
       from: ctx.input.from,
       to: ctx.input.to,
       query: ctx.input.query
-    });
+    };
+
+    let attachFullResult = () =>
+      ctx.addAttachment({
+        type: 'url',
+        mimeType: 'application/json',
+        ...client.getMetricsQueryDownload(params)
+      });
+
+    let result: any;
+    try {
+      result = await client.queryMetrics(params);
+    } catch (error) {
+      if (!isDatadogResponseTooLarge(error)) throw error;
+
+      await attachFullResult();
+
+      return {
+        output: {
+          series: [],
+          truncated: true,
+          query: ctx.input.query
+        },
+        message: `Queried metrics: **${ctx.input.query}** — the result is larger than ${
+          MAX_METRICS_RESPONSE_BYTES / 1024 / 1024
+        } MiB, too large to return inline. The complete result is provided as a downloadable JSON file. To get series inline, group by fewer or lower-cardinality tags, narrow the scope, or shorten the time range.`
+      };
+    }
 
     let allSeries: any[] = (result.series || []).map((s: any) => ({
       metric: s.metric,
@@ -74,6 +106,8 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
       tagSet: s.tag_set
     }));
     let { items: series, truncated } = takeWithinOutputBudget(allSeries);
+
+    if (truncated) await attachFullResult();
 
     return {
       output: {
@@ -87,7 +121,7 @@ Use metric queries like \`avg:system.cpu.user{host:myhost}\` or \`sum:my.custom.
       },
       message: `Queried metrics: **${ctx.input.query}** — returned ${series.length} series${
         truncated
-          ? ` (truncated from ${allSeries.length}; narrow the query or time range to see the rest)`
+          ? ` of ${allSeries.length}. The complete result is provided as a downloadable JSON file; to get every series inline, narrow the query or time range.`
           : ''
       }`
     };

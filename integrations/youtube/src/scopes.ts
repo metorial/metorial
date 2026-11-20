@@ -66,6 +66,11 @@ export let youtubeActionScopes = {
   manageComments: youtubeWrite,
   manageSubscriptions: youtubeWrite,
   channelActivity: youtubeRead,
-  newVideo: youtubeRead,
+  newVideo: anyOf(
+    youtubeScopes.youtubeReadonly,
+    youtubeScopes.youtube,
+    youtubeScopes.youtubeForceSsl,
+    youtubeScopes.youtubepartner
+  ),
   inboundWebhook: youtubeRead
 } as const;

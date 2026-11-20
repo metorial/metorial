@@ -13,6 +13,22 @@ let omitGoogleContactsTool = (
   reason
 });
 
+let omitGoogleChatTool = (
+  sourceKey: string,
+  reason: string
+): SuperGoogleOmittedToolManifestEntry => ({
+  sourceIntegration: 'google-chat',
+  sourceKey,
+  status: 'omitted',
+  reason
+});
+
+let chatMembershipReason =
+  'Member discovery and membership management remain available in the Google Chat integration; they are outside this aggregate tool selection.';
+
+let chatAppAdapterReason =
+  'These app-account chat actions belong to the Google Chat integration; this aggregate uses user OAuth and does not register the chat adapter.';
+
 let contactsWriteReason =
   'Changing saved contacts or contact groups needs the contacts scope, which is outside the aggregate OAuth scope set.';
 
@@ -272,6 +288,22 @@ export let superGoogle1ToolManifest: SuperGoogleToolManifestEntry[] = [
   { sourceIntegration: 'google-chat', sourceKey: 'get_custom_emoji' },
   { sourceIntegration: 'google-chat', sourceKey: 'manage_custom_emoji' },
   { sourceIntegration: 'google-chat', sourceKey: 'search_spaces_admin' },
+  omitGoogleChatTool('list_members', chatMembershipReason),
+  omitGoogleChatTool('manage_membership', chatMembershipReason),
+  omitGoogleChatTool('metorial_chat$message.send', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$message.edit', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$message.delete', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$message.get', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$message.sendEphemeral', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$channel.list', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$channel.get', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$channel.members', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$workspace.list', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$workspace.get', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$dm.openSingle', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$user.getAuthenticated', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$file.download', chatAppAdapterReason),
+  omitGoogleChatTool('metorial_chat$setup.get', chatAppAdapterReason),
 
   omitGoogleContactsTool('create_contact', contactsWriteReason),
   omitGoogleContactsTool('get_contact', contactsReadDuplicateReason('get_google_contact')),

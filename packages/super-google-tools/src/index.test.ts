@@ -3,12 +3,14 @@ import {
   createApiServiceError,
   SlateAuth,
   SlateConfig,
+  SlateContext,
+  SlateLogger,
   SlateSpecification,
   SlateTool
 } from 'slates';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { importSuperGoogleTools } from './index';
+import { importSuperGoogleTools, type SuperGoogleToolSource } from './index';
 
 let createSpec = (key: string, configSchema: z.ZodType<any> = z.object({})) =>
   SlateSpecification.create({
@@ -62,6 +64,83 @@ let providerFor = (source: ReturnType<typeof createSourceTool>) => ({
 });
 
 describe('@slates/super-google-tools', () => {
+  it('accepts source contracts with independent SDK private identities', async () => {
+    class EarlierSpecification {
+      #schema = z.object({ prefix: z.string() });
+      get configSchema() {
+        return this.#schema;
+      }
+    }
+
+    class EarlierContext {
+      constructor(
+        private readonly values: {
+          config: { prefix: string };
+          input: { query: string };
+          auth: { token: string };
+        }
+      ) {}
+      get config() {
+        return this.values.config;
+      }
+      get input() {
+        return this.values.input;
+      }
+      get auth() {
+        return this.values.auth;
+      }
+    }
+
+    let source = createSourceTool();
+    let earlierTool = {
+      type: 'tool' as const,
+      key: source.tool.key,
+      name: source.tool.name,
+      isPublic: false,
+      parameters: source.tool.parameters,
+      inputSchema: source.inputSchema,
+      outputSchema: source.outputSchema,
+      async handleInvocation(ctx: EarlierContext) {
+        return {
+          output: { id: `${ctx.config.prefix}:${ctx.input.query}:${ctx.auth.token}` },
+          message: 'Read through the source contract'
+        };
+      }
+    };
+    let descriptor = {
+      integration: 'gmail',
+      provider: {
+        spec: new EarlierSpecification(),
+        actions: [earlierTool, { type: 'trigger' as const }]
+      },
+      mapConfig: () => ({ prefix: 'mapped' })
+    } satisfies SuperGoogleToolSource;
+    let aggregateSpec = createSpec('super-booble-1');
+    let result = importSuperGoogleTools({
+      spec: aggregateSpec,
+      sources: [descriptor],
+      manifest: [{ sourceIntegration: 'gmail', sourceKey: source.tool.key }]
+    });
+    let imported = result.tools[0]!;
+    expect(imported).toBeInstanceOf(SlateTool);
+    expect(result.inventory.sourceToolCount).toBe(1);
+    expect(imported.configSchema).toBe(aggregateSpec.configSchema);
+    await expect(
+      imported.handleInvocation(
+        new SlateContext(
+          {},
+          { query: 'message' },
+          { token: 'access-token', authMethod: 'oauth' },
+          aggregateSpec,
+          new SlateLogger()
+        )
+      )
+    ).resolves.toEqual({
+      output: { id: 'mapped:message:access-token' },
+      message: 'Read through the source contract'
+    });
+  });
+
   it('preserves the tool contract and invocation result while rebinding auth and aliases', async () => {
     let source = createSourceTool();
     let aggregateSpec = createSpec('super-booble-1');

@@ -1,7 +1,6 @@
 import {
   buildApiServiceError,
   createApiServiceError,
-  type Slate,
   type SlateActionScopes,
   type SlateSpecification,
   SlateTool
@@ -9,9 +8,29 @@ import {
 
 type AnyTool = SlateTool<any, any, any, any>;
 
+// Source packages can use different SDK releases. Only consume their public
+// contract; private SDK class identities must not cross the composition boundary.
+export type SuperGoogleSourceTool = Pick<
+  AnyTool,
+  'type' | 'key' | 'name' | 'isPublic' | 'parameters' | 'inputSchema' | 'outputSchema'
+> & {
+  handleInvocation(context: {
+    readonly config: object;
+    readonly auth: object;
+    readonly input: object;
+  }): ReturnType<AnyTool['handleInvocation']>;
+};
+
+type SourceSpecification = Pick<SlateSpecification<any, any>, 'configSchema'>;
+
+type SourceAction = SuperGoogleSourceTool | { readonly type: 'trigger' };
+
 export type SuperGoogleToolSource<ConfigType extends {} = Record<string, unknown>> = {
   integration: string;
-  provider: Pick<Slate<any, any>, 'actions' | 'spec'>;
+  provider: {
+    readonly actions: readonly SourceAction[];
+    readonly spec: SourceSpecification;
+  };
   mapConfig?: (aggregateConfig: ConfigType) => Record<string, unknown>;
 };
 
@@ -81,8 +100,8 @@ let getSourceToolId = (sourceIntegration: string, sourceKey: string) =>
   `${sourceIntegration}:${sourceKey}`;
 
 let getSourceTools = (source: SuperGoogleToolSource<any>) => {
-  let tools = source.provider.actions.filter(action => action.type === 'tool') as AnyTool[];
-  let toolsByKey = new Map<string, AnyTool>();
+  let tools = source.provider.actions.filter(action => action.type === 'tool');
+  let toolsByKey = new Map<string, SuperGoogleSourceTool>();
 
   for (let tool of tools) {
     if (toolsByKey.has(tool.key)) {
@@ -151,8 +170,8 @@ let sourceInvocationError = (error: unknown, sourceIntegration: string, sourceKe
   });
 
 let invokeSourceTool = async (
-  sourceTool: AnyTool,
-  sourceSpec: SlateSpecification<any, any>,
+  sourceTool: SuperGoogleSourceTool,
+  sourceSpec: SourceSpecification,
   ctx: any,
   sourceIntegration: string,
   sourceKey: string,
@@ -195,8 +214,8 @@ export let importSuperGoogleTools = <ConfigType extends {}, AuthType extends {}>
   assertValidSources(sources);
 
   let normalizedAuthMethodKey = authMethodKey?.trim() || null;
-  let sourceTools = new Map<string, Map<string, AnyTool>>();
-  let sourceSpecs = new Map<string, SlateSpecification<any, any>>();
+  let sourceTools = new Map<string, Map<string, SuperGoogleSourceTool>>();
+  let sourceSpecs = new Map<string, SourceSpecification>();
   let configMappers = new Map<
     string,
     ((aggregateConfig: ConfigType) => Record<string, unknown>) | undefined

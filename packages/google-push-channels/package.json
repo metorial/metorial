@@ -1,0 +1,39 @@
+{
+  "name": "@slates/google-push-channels",
+  "version": "1.0.0",
+  "private": true,
+  "license": "FSL 1.1",
+  "type": "module",
+  "source": "src/index.ts",
+  "files": [
+    "src/**",
+    "dist/**",
+    "README.md",
+    "package.json"
+  ],
+  "exports": {
+    "bun": "./src/index.ts",
+    "types": "./dist/index.d.ts",
+    "require": "./dist/index.cjs",
+    "import": "./dist/index.module.js",
+    "default": "./dist/index.module.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.module.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "build": "tsup --config ../../tsup.packages.config.ts --external async_hooks",
+    "typecheck": "tsc --noEmit",
+    "biome:check": "biome check --write src"
+  },
+  "dependencies": {
+    "slates": "1.0.0-rc.33",
+    "zod": "^4.2"
+  },
+  "devDependencies": {
+    "@slates/tsconfig": "1.0.0-rc.1",
+    "typescript": "5.8.2",
+    "vitest": "^3.1.2"
+  }
+}

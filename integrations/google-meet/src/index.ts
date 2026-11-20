@@ -24,6 +24,7 @@ import {
   removeMemberTool,
   updateSpaceTool
 } from './tools';
+import { meetArtifactEvents, recordingReady, transcriptReady } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +51,6 @@ export let provider = Slate.create({
     getTranscriptEntryTool,
     listTranscriptEntriesTool
   ],
-  triggers: []
+  triggerGroups: [meetArtifactEvents],
+  triggers: [transcriptReady, recordingReady]
 });

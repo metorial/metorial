@@ -13,6 +13,7 @@ import {
   updateTask,
   updateTaskList
 } from './tools';
+import { taskCompleted, taskCompletionEvents } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +29,6 @@ export let provider = Slate.create({
     moveTask,
     clearCompletedTasks
   ],
-  triggers: []
+  triggerGroups: [taskCompletionEvents],
+  triggers: [taskCompleted]
 });

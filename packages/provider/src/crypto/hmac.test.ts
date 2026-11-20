@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { createHmacSignature, verifyHmacSignature } from './hmac';
+import { createHmacSignature, timingSafeStringEqual, verifyHmacSignature } from './hmac';
+
+describe('timingSafeStringEqual', () => {
+  it('matches only the identical string', () => {
+    expect(timingSafeStringEqual('secret', 'secret')).toBe(true);
+    expect(timingSafeStringEqual('secret', 'secreT')).toBe(false);
+    expect(timingSafeStringEqual('secret', 'secret-longer')).toBe(false);
+    expect(timingSafeStringEqual('secret', '')).toBe(false);
+  });
+
+  it('rejects a missing value and never matches an empty expectation', () => {
+    expect(timingSafeStringEqual('secret', null)).toBe(false);
+    expect(timingSafeStringEqual('', undefined)).toBe(false);
+    expect(timingSafeStringEqual('', null)).toBe(false);
+    expect(timingSafeStringEqual('', '')).toBe(false);
+  });
+});
 
 describe('createHmacSignature', () => {
   it('creates prefixed hexadecimal HMAC signatures', () => {

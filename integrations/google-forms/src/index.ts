@@ -9,6 +9,7 @@ import {
   setPublishSettings,
   updateForm
 } from './tools';
+// import { formResponses, newResponse } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,5 +21,9 @@ export let provider = Slate.create({
     listResponses,
     manageWatches
   ],
+  // Parked: form activity is now observed through Google Drive file events.
+  // The code under ./triggers is kept so the triggers can be registered again.
+  // triggerGroups: [formResponses],
+  // triggers: [newResponse]
   triggers: []
 });

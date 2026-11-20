@@ -90,6 +90,16 @@ export class GoogleAdsClient {
     return results;
   }
 
+  // AssetService has no remove: update the existing form's delivery settings, never replace it.
+  async mutateAssets(
+    customerId: string,
+    operations: MutateOperation[]
+  ): Promise<Record<string, any>> {
+    const cid = customerId.replace(/-/g, '');
+    const response = await this.http.post(`/customers/${cid}/assets:mutate`, { operations });
+    return response.data;
+  }
+
   // Campaign Management
 
   async mutateCampaigns(

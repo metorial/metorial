@@ -3,10 +3,13 @@ import type { SlateContext } from '../context';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from '../specification/specification';
 import type { SlateWebhookHttpResponseInit } from './action';
+import type { SlateOptionListPage } from './optionList';
 
 export let SlateDefaultPollingIntervalSeconds = 60 * 10;
 
 export type SlateTriggerRoutingMatcher = Record<string, any>;
+
+export type SlateTriggerGroupSelection = Record<string, any>;
 
 export type SlateWebhookTargetOwnership = 'single_user' | 'multi_user';
 
@@ -24,8 +27,86 @@ export type SlateTriggerGroupRoutingMatchersHandler<
   AuthType extends {}
 > = (context: SlateContext<ConfigType, AuthType, {}>) => Promise<SlateTriggerRoutingMatcher[]>;
 
+/** Lists the values an account can pick for one selection field. `selection` holds what is entered so far and may be incomplete. */
+export type SlateTriggerGroupSelectionOptionsHandler<
+  ConfigType extends {},
+  AuthType extends {}
+> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { query: string | null; pageToken: any | null; selection: SlateTriggerGroupSelection }
+  >
+) => Promise<SlateOptionListPage>;
+
+/** An option list exported by another integration, run with that integration's connection for the same account. */
+export interface SlateLinkedOptionList {
+  /** Registry name of the integration, as `<scope>/<name>`. */
+  slate: string;
+  optionList: string;
+  params?: Record<string, any>;
+}
+
+export interface SlateTriggerGroupSelectionOptionsSources<
+  ConfigType extends {},
+  AuthType extends {}
+> {
+  list?: SlateTriggerGroupSelectionOptionsHandler<ConfigType, AuthType>;
+  linked?: SlateLinkedOptionList;
+}
+
+let LINKED_SLATE_PATTERN = /^[^/\s]+\/[^/\s]+$/;
+
+let checkSelectionOptions = <ConfigType extends {}, AuthType extends {}>(
+  field: string,
+  sources: SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>,
+  shape: Record<string, unknown>
+): SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType> => {
+  if (!Object.hasOwn(shape, field)) {
+    throw new SlateDeclarationError(
+      `Selection field "${field}" is not a top-level property of the selection schema`
+    );
+  }
+  if (typeof sources !== 'object' || sources === null) {
+    throw new SlateDeclarationError(
+      `Selection field "${field}" must be declared as { list, linked }`
+    );
+  }
+
+  let { list, linked } = sources;
+  if (!list && !linked) {
+    throw new SlateDeclarationError(
+      `Selection field "${field}" needs its own options list, a linked option list, or both`
+    );
+  }
+  if (list !== undefined && typeof list !== 'function') {
+    throw new SlateDeclarationError(`Selection field "${field}" list must be a function`);
+  }
+  if (linked) {
+    if (typeof linked.slate !== 'string' || !LINKED_SLATE_PATTERN.test(linked.slate)) {
+      throw new SlateDeclarationError(
+        `Selection field "${field}" links to slate "${linked.slate}", which must be written as <scope>/<name>`
+      );
+    }
+    if (typeof linked.optionList !== 'string' || !linked.optionList.trim()) {
+      throw new SlateDeclarationError(
+        `Selection field "${field}" must name the option list it links to`
+      );
+    }
+  }
+
+  return {
+    ...(list ? { list } : {}),
+    ...(linked ? { linked } : {})
+  };
+};
+
 export type SlateTriggerGroupPollHandler<ConfigType extends {}, AuthType extends {}> = (
-  context: SlateContext<ConfigType, AuthType, { state: any | null }>
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { state: any | null; selection?: SlateTriggerGroupSelection }
+  >
 ) => Promise<{
   events: { payload: any; idempotencyKey?: string }[];
   updatedState?: any;
@@ -65,7 +146,11 @@ export type SlateTriggerGroupGatewayReceiveHandler<
 }>;
 
 export type SlateWebhookTargetListHandler<ConfigType extends {}, AuthType extends {}> = (
-  context: SlateContext<ConfigType, AuthType, { pageToken: any | null }>
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { pageToken: any | null; selection?: SlateTriggerGroupSelection }
+  >
 ) => Promise<{
   targets: SlateWebhookTarget[];
   nextPageToken: any | null;
@@ -81,11 +166,54 @@ export type SlateWebhookRegisterHandler<ConfigType extends {}, AuthType extends 
       webhookTargetIdentifier: string;
       webhookTargetPayload: any;
       webhookUrl: string;
+      operationId?: string;
+      selection?: SlateTriggerGroupSelection;
+      deliveryConfig?: unknown;
+    }
+  >
+) => Promise<SlateWebhookRegistrationResult>;
+
+export interface SlateWebhookRegistrationResult {
+  webhookRegistrationIdentifier: string;
+  webhookRegistrationPayload: any;
+  expiresAt?: string | null;
+  renewAfter?: string | null;
+  /** Identities of this registration on a delivery channel shared with other registrations. */
+  routingKeys?: string[];
+}
+
+export type SlateWebhookRenewHandler<ConfigType extends {}, AuthType extends {}> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    {
+      webhookRegistrationIdentifier: string;
+      webhookRegistrationPayload: any;
+      webhookUrl: string;
+      webhookTargetIdentifier: string;
+      webhookTargetPayload: any;
+      operationId: string;
+      selection?: SlateTriggerGroupSelection;
+      deliveryConfig?: unknown;
+    }
+  >
+) => Promise<SlateWebhookRegistrationResult>;
+
+export type SlateWebhookExpandHandler<ConfigType extends {}, AuthType extends {}> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    {
+      payload: unknown | null;
+      state: any | null;
+      selection?: SlateTriggerGroupSelection;
+      deliveryId: string;
+      webhookRegistrationPayload: any;
     }
   >
 ) => Promise<{
-  webhookRegistrationIdentifier: string;
-  webhookRegistrationPayload: any;
+  events: { payload: any; idempotencyKey?: string }[];
+  updatedState?: any;
 }>;
 
 export type SlateWebhookUnregisterHandler<ConfigType extends {}, AuthType extends {}> = (
@@ -146,6 +274,18 @@ export interface SlateWebhookSkipped {
   reason: string;
 }
 
+/**
+ * Routing keys name the registrations a request addresses; an empty list acknowledges it
+ * without handing it to any. A rejection answers the sender with its status.
+ */
+export type SlateWebhookDeliveryAuthentication =
+  | { routingKeys: string[]; rejected?: undefined }
+  | { rejected: { status: number }; routingKeys?: undefined };
+
+export type SlateWebhookDeliveryAuthenticateHandler = (
+  context: SlateContext<{}, {}, { request: Request; deliveryConfig: unknown }>
+) => Promise<SlateWebhookDeliveryAuthentication>;
+
 export interface SlateTriggerGroupPollingParameters<
   ConfigType extends {},
   AuthType extends {}
@@ -168,6 +308,7 @@ export interface SlateTriggerGroupWebhookAutoRegistrationParameters<
 > {
   webhookTargetList: SlateWebhookTargetListHandler<ConfigType, AuthType>;
   webhookRegister: SlateWebhookRegisterHandler<ConfigType, AuthType>;
+  webhookRenew?: SlateWebhookRenewHandler<ConfigType, AuthType>;
   webhookUnregister: SlateWebhookUnregisterHandler<ConfigType, AuthType>;
 }
 
@@ -181,13 +322,28 @@ export interface SlateTriggerGroupWebhookManualRegistrationParameters<
   finish?: SlateWebhookManualFinishHandler<UserConfigSchema, FullConfigSchema>;
 }
 
+/** A delivery setup a person completes once for an automatically registered group. */
+export type SlateTriggerGroupWebhookDeliveryConfigParameters<
+  UserConfigSchema extends z.ZodType<any> = z.ZodType<any>,
+  FullConfigSchema extends z.ZodType<any> = z.ZodType<any>
+> = SlateTriggerGroupWebhookManualRegistrationParameters<
+  UserConfigSchema,
+  FullConfigSchema
+> & {
+  finish: SlateWebhookManualFinishHandler<UserConfigSchema, FullConfigSchema>;
+  authenticate: SlateWebhookDeliveryAuthenticateHandler;
+};
+
 export interface SlateTriggerGroupWebhookParameters<
   ConfigType extends {},
   AuthType extends {}
 > {
   autoRegistration?: SlateTriggerGroupWebhookAutoRegistrationParameters<ConfigType, AuthType>;
   manualRegistration?: SlateTriggerGroupWebhookManualRegistrationParameters<any, any>;
+  deliveryConfig?: SlateTriggerGroupWebhookDeliveryConfigParameters<any, any>;
   process: SlateWebhookProcessHandler;
+  expandWebhook?: SlateWebhookExpandHandler<ConfigType, AuthType>;
+  reconcileIntervalSeconds?: number;
 }
 
 export interface SlateTriggerGroupCreateParameters<
@@ -198,6 +354,7 @@ export interface SlateTriggerGroupCreateParameters<
   description?: string;
   metadata?: Record<string, any>;
   eventSchema?: z.ZodType<InputType>;
+  selectionSchema?: z.ZodType<SlateTriggerGroupSelection>;
 }
 
 export interface SlateTriggerGroupParameters<
@@ -210,6 +367,10 @@ export interface SlateTriggerGroupParameters<
   webhook?: SlateTriggerGroupWebhookParameters<ConfigType, AuthType>;
   gateway?: SlateTriggerGroupGatewayParameters<ConfigType, AuthType>;
   routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType>;
+  selectionOptions?: Record<
+    string,
+    SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>
+  >;
 }
 
 export class SlateTriggerGroup<
@@ -261,6 +422,10 @@ export class SlateTriggerGroup<
     return this._params.source;
   }
 
+  get selectionSchema() {
+    return this._params.selectionSchema;
+  }
+
   get polling() {
     return this._params.polling;
   }
@@ -276,6 +441,10 @@ export class SlateTriggerGroup<
   get routingMatchers() {
     return this._params.routingMatchers;
   }
+
+  get selectionOptions() {
+    return this._params.selectionOptions ?? {};
+  }
 }
 
 export class SlateTriggerGroupBuilder<
@@ -289,6 +458,10 @@ export class SlateTriggerGroupBuilder<
   #gateway: SlateTriggerGroupGatewayParameters<ConfigType, AuthType> | null = null;
   #routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType> | null =
     null;
+  #selectionOptions: Record<
+    string,
+    SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>
+  > = {};
 
   constructor(
     private readonly spec: SlateSpecification<ConfigType, AuthType>,
@@ -327,7 +500,13 @@ export class SlateTriggerGroupBuilder<
       UserConfigSchema,
       FullConfigSchema
     >;
+    deliveryConfig?: SlateTriggerGroupWebhookDeliveryConfigParameters<
+      UserConfigSchema,
+      FullConfigSchema
+    >;
     process: SlateWebhookProcessHandler;
+    expandWebhook?: SlateWebhookExpandHandler<ConfigType, AuthType>;
+    reconcileIntervalSeconds?: number;
   }): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
     if (this.#source) {
       throw new SlateDeclarationError('Trigger group invocation is already defined');
@@ -339,11 +518,46 @@ export class SlateTriggerGroupBuilder<
       );
     }
 
+    if (props.deliveryConfig !== undefined) {
+      if (!props.autoRegistration) {
+        throw new SlateDeclarationError(
+          'A webhook delivery config requires automatic webhook registration'
+        );
+      }
+      if (!props.deliveryConfig.finish) {
+        throw new SlateDeclarationError('A webhook delivery config requires a finish handler');
+      }
+      if (!props.deliveryConfig.authenticate) {
+        throw new SlateDeclarationError(
+          'A webhook delivery config requires an authenticate handler'
+        );
+      }
+    }
+
+    if (props.reconcileIntervalSeconds !== undefined) {
+      if (
+        !Number.isSafeInteger(props.reconcileIntervalSeconds) ||
+        props.reconcileIntervalSeconds < 900
+      ) {
+        throw new SlateDeclarationError(
+          'Webhook reconciliation interval must be an integer of at least 900 seconds'
+        );
+      }
+      if (!props.expandWebhook) {
+        throw new SlateDeclarationError(
+          'Webhook reconciliation requires an expandWebhook handler'
+        );
+      }
+    }
+
     this.#source = 'webhook';
     this.#webhook = {
       autoRegistration: props.autoRegistration,
       manualRegistration: props.manualRegistration,
-      process: props.process
+      deliveryConfig: props.deliveryConfig,
+      process: props.process,
+      expandWebhook: props.expandWebhook,
+      reconcileIntervalSeconds: props.reconcileIntervalSeconds
     };
 
     return this;
@@ -370,6 +584,34 @@ export class SlateTriggerGroupBuilder<
     return this;
   }
 
+  /**
+   * Lets the dashboard offer a list for these selection fields instead of a typed-in value.
+   * Each field must be a top-level property of the selection schema, which must be a zod object.
+   * For an array property the listed options are values for its items.
+   */
+  selectionOptions(
+    declarations: Record<
+      string,
+      SlateTriggerGroupSelectionOptionsSources<ConfigType, AuthType>
+    >
+  ): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
+    let schema = this.params.selectionSchema;
+    if (!schema) {
+      throw new SlateDeclarationError('Selection options require a selection schema');
+    }
+    if (schema._zod?.def?.type !== 'object') {
+      throw new SlateDeclarationError(
+        'Selection options require the selection schema to be a zod object'
+      );
+    }
+
+    let shape = (schema as z.ZodObject<any>).shape;
+    for (let [field, sources] of Object.entries(declarations)) {
+      this.#selectionOptions[field] = checkSelectionOptions(field, sources, shape);
+    }
+    return this;
+  }
+
   build(): SlateTriggerGroup<ConfigType, AuthType, InputType> {
     if (!this.#source) {
       throw new SlateDeclarationError(
@@ -386,7 +628,8 @@ export class SlateTriggerGroupBuilder<
       polling: this.#polling ?? undefined,
       webhook: this.#webhook ?? undefined,
       gateway: this.#gateway ?? undefined,
-      routingMatchers: this.#routingMatchers
+      routingMatchers: this.#routingMatchers,
+      selectionOptions: this.#selectionOptions
     });
   }
 }

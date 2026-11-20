@@ -50,8 +50,8 @@ describe('google-drive provider contract', () => {
         'list_drive_labels',
         'get_drive_label'
       ],
-      triggerIds: [],
-      triggerGroupIds: [],
+      triggerIds: ['file_added_to_folder', 'file_updated'],
+      triggerGroupIds: ['folder_events'],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'search_files', readOnly: true, destructive: false },
@@ -86,7 +86,7 @@ describe('google-drive provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(29);
+    expect(contract.actions).toHaveLength(31);
 
     let expectedScopes = {
       search_files: googleDriveActionScopes.searchFiles,

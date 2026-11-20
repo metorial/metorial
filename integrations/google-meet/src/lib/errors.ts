@@ -1,4 +1,5 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
+import { getApiErrorResponseWithBody } from 'slates';
 
 type ErrorResponse = {
   status?: number;
@@ -76,6 +77,33 @@ let getErrorStatusText = (error: unknown) => {
   return response?.statusText;
 };
 
+let trimmed = (value: unknown) =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+// Google's canonical status plus the first ErrorInfo (or legacy) reason and its domain.
+let extractGoogleErrorCause = (
+  error: unknown
+): { code?: string; reason?: string; domain?: string } => {
+  let body = getApiErrorResponseWithBody(error)?.data;
+  let googleError = isRecord(body) && isRecord(body.error) ? body.error : undefined;
+  if (!googleError) {
+    return {};
+  }
+
+  let code = trimmed(googleError.status);
+  for (let key of ['details', 'errors']) {
+    let items = googleError[key];
+    if (!Array.isArray(items)) continue;
+    for (let item of items) {
+      if (isRecord(item) && trimmed(item.reason)) {
+        return { code, reason: trimmed(item.reason), domain: trimmed(item.domain) };
+      }
+    }
+  }
+
+  return { code };
+};
+
 export let googleMeetServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
@@ -94,6 +122,16 @@ export let googleMeetApiError = (error: unknown, operation = 'request') => {
 
   serviceError.data.reason = 'google_meet_api_error';
   serviceError.data.upstreamStatus = status;
+  let cause = extractGoogleErrorCause(error);
+  if (cause.code) {
+    serviceError.data.upstreamCode = cause.code;
+  }
+  if (cause.reason) {
+    serviceError.data.upstreamReason = cause.reason;
+  }
+  if (cause.domain) {
+    serviceError.data.upstreamDomain = cause.domain;
+  }
 
   if (error instanceof Error) {
     serviceError.setParent(error);
@@ -119,4 +157,23 @@ export let googleMeetOAuthError = (operation: string, error: unknown) => {
   }
 
   return serviceError;
+};
+
+// HTTP 409 is ALREADY_EXISTS or ABORTED; only a 409 without a status is ambiguous.
+export let isMeetAlreadyExists = (error: unknown) =>
+  error instanceof ServiceError &&
+  (error.data.upstreamCode === 'ALREADY_EXISTS' ||
+    (error.data.upstreamStatus === 409 && error.data.upstreamCode === undefined));
+// Missing scope, disabled API or spent quota is a 403 with domain "googleapis.com" (legacy:
+// "usageLimits" or "insufficientPermissions"); those fail the connection, other 403s one resource.
+let CONNECTION_WIDE_DOMAINS = ['googleapis.com', 'usageLimits'];
+export let isMeetResourceInaccessible = (error: unknown) => {
+  if (!(error instanceof ServiceError)) return false;
+  const { upstreamStatus, upstreamReason, upstreamDomain } = error.data;
+  if (upstreamStatus === 404) return true;
+  return (
+    upstreamStatus === 403 &&
+    upstreamReason !== 'insufficientPermissions' &&
+    !CONNECTION_WIDE_DOMAINS.includes(upstreamDomain)
+  );
 };

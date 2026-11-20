@@ -56,6 +56,14 @@ Executes a Google Ads Query Language (GAQL) query to retrieve reporting data, re
 
 Upload offline click conversions to Google Ads. Imports real-world transaction data like in-store purchases, qualified phone leads, or CRM events to measure full-funnel conversion impact. Each conversion requires a Google Click ID (gclid) to link the offline event back to the original ad click.
 
+## Lead received event
+
+Enable callbacks to receive `lead_received` (`lead.received`) when a person submits a Google Ads lead form. Accessible accounts and manager descendants are discovered automatically. Forms already delivering to another CRM are skipped; Google permits only one webhook per form. Registration requires permission to update the form's delivery settings.
+
+Events include lead IDs, decimal-string customer, form and campaign IDs, available ad group/creative/asset group IDs, click ID, contact fields, and every answer column, including unfamiliar column IDs. `lead_id` is the stable deduplication key. Test leads are acknowledged without producing events. Google uses a confidential body key, not a signed timestamp or HMAC signature; every lead carrying the correct key is delivered, including one whose form ID differs from the registered form.
+
+See the [event specification](./docs/SPEC.md#events) for lifecycle limits and an output example, and Google's [lead webhook contract](https://developers.google.com/google-ads/webhook/docs/implementation).
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

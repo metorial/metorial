@@ -144,3 +144,59 @@ Your callback server receives Atom feed notifications when a channel performs an
 - Subscribe via the Google PubSubHubbub hub at `https://pubsubhubbub.appspot.com/subscribe` by providing a callback URL, topic URL, and setting the mode to `subscribe`.
 - Notifications are delivered as Atom feed XML containing the video ID, channel ID, video title, author, and publish/update timestamps.
 - Subscriptions must be periodically renewed (typically every few days) as leases expire.
+
+### Implemented upload observation
+
+The integration exposes `upload_activities` (900-second polling) and `new_video`.
+It discovers only OAuth-owned channels with `channels.list(mine=true)`, then
+requests `activities.list` with a concrete channel ID, `snippet,contentDetails`,
+50 items per page, and fixed `publishedAfter`/`publishedBefore` timestamps. Only
+`snippet.type=upload` with `contentDetails.upload.videoId` produces an event. The
+source `snippet.publishedAt` is exposed as `activityPublishedAt`; it is the activity
+occurrence time, not a claim about video publication or processing completion.
+
+This is the deliberately narrow polling alternative for upload intake. Native
+Atom delivery combines uploads with metadata edits, while the asynchronous
+WebSub challenge, lease confirmation and unsubscribe lifecycle have not been
+verified for this integration. The integration does not register or claim those
+webhooks. The existing generic API-capability description above is not exposed
+trigger coverage.
+
+Persistent versioned state holds each owned channel's activation time, completed
+scan checkpoint, and recent video identities. Initial/newly owned channels are
+silently baselined. Later polls read from the previous checkpoint with a one-hour
+overlap, bounded by activation, and end at the poll's start time. A channel's
+events and checkpoint are returned only after all of its pages were read.
+Failures do not advance the checkpoint. Repeated activity records or metadata changes to a known
+upload do not create another event. The event identity is the channel/video pair;
+provider activity IDs are retained in output. A channel missing from the owned
+listing keeps its state for 24 hours and resumes from its checkpoint if it
+returns; after that its state is removed. New channels start silently. Mapping
+rechecks ownership.
+
+The scan budget is 100 activity pages per poll, 100 owned channels, and 10,000
+retained recent video identities. When the page budget runs out, channels that
+were fully read keep their events and new checkpoint, and the remaining channels
+keep their previous checkpoint and are read first on the next poll. A single
+channel that needs more than 100 pages is read in consecutive smaller windows
+from its checkpoint, without the overlap, halving the window until it fits; only
+more than 100 pages inside one minute fails. Repeated pagination tokens,
+malformed responses, inconsistent persisted state, or wrong-channel activity is
+a visible failure. There is no stateless fallback. Feed
+retention and completeness are controlled by YouTube: an outage can be caught up
+only while the feed still retains the activities, and late records older than
+the overlap can be missed. No promise is made for private upload visibility,
+private-to-public transitions, every channel associated with a Brand Account, or
+CMS-managed channels not returned by `mine=true`.
+
+Root contract coverage lives in `tests/integrations/youtube/triggers.test.ts`.
+The live `list_activities` scenario verifies a silent owner baseline. Optional
+`triggerActivityVideoId` and `triggerActivityOccurredAt` fixtures additionally
+replay an already uploaded owner's activity and verify mapping and persistent
+deduplication without uploading, publishing, or editing media. A real upload
+followed by a metadata edit and production callback delivery remain unverified.
+
+Sources: [owned channels](https://developers.google.com/youtube/data/reference/rest/v3/channels/list),
+[activity filters and pagination](https://developers.google.com/youtube/data/reference/rest/v3/activities/list),
+[activity fields](https://developers.google.com/youtube/data/reference/rest/v3/activities),
+[native push events](https://developers.google.com/youtube/data/guides/push_notifications).

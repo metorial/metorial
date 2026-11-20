@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
 let directoryApi = createAxios({
   baseURL: 'https://admin.googleapis.com/admin/directory/v1'
@@ -65,6 +65,28 @@ export class Client {
   }
 
   // ==================== USERS ====================
+
+  async getTriggerIdentity() {
+    try {
+      const [profile, customer] = await Promise.all([
+        directoryApi.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: this.headers
+        }),
+        directoryApi.get('/customers/my_customer', { headers: this.headers })
+      ]);
+      return {
+        ownerId: profile.data.id,
+        customerId: customer.data.id,
+        customerDomain: customer.data.customerDomain
+      };
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Admin',
+        reason: 'google_admin_identity_failed',
+        operation: 'resolve the connected administrator and customer'
+      });
+    }
+  }
 
   async listUsers(
     params: {
@@ -751,23 +773,33 @@ export class Client {
     filters?: string;
     actorIpAddress?: string;
     orgUnitId?: string;
+    customerId?: string;
   }) {
-    let response = await reportsApi.get(
-      `/activity/users/${encodeURIComponent(params.userKey)}/applications/${params.applicationName}`,
-      {
-        headers: this.headers,
-        params: {
-          eventName: params.eventName,
-          startTime: params.startTime,
-          endTime: params.endTime,
-          maxResults: params.maxResults || 100,
-          pageToken: params.pageToken,
-          filters: params.filters,
-          actorIpAddress: params.actorIpAddress,
-          orgUnitID: params.orgUnitId
+    let response = await reportsApi
+      .get(
+        `/activity/users/${encodeURIComponent(params.userKey)}/applications/${params.applicationName}`,
+        {
+          headers: this.headers,
+          params: {
+            eventName: params.eventName,
+            startTime: params.startTime,
+            endTime: params.endTime,
+            maxResults: params.maxResults || 100,
+            pageToken: params.pageToken,
+            filters: params.filters,
+            actorIpAddress: params.actorIpAddress,
+            orgUnitID: params.orgUnitId,
+            customerId: params.customerId
+          }
         }
-      }
-    );
+      )
+      .catch(error => {
+        throw buildApiServiceError(error, {
+          providerLabel: 'Google Admin',
+          reason: 'google_admin_activities_failed',
+          operation: 'retrieve audit activities'
+        });
+      });
     return response.data;
   }
 
@@ -1033,19 +1065,50 @@ export class Client {
     channelAddress: string;
     channelToken?: string;
     ttl?: number;
+    customerId?: string;
+    expiration?: string;
+    payload?: boolean;
   }) {
-    let response = await reportsApi.post(
-      `/activity/users/${encodeURIComponent(params.userKey)}/applications/${params.applicationName}/watch`,
-      {
-        id: params.channelId,
-        type: 'web_hook',
-        address: params.channelAddress,
-        token: params.channelToken,
-        params: params.ttl ? { ttl: String(params.ttl) } : undefined
-      },
-      { headers: this.headers }
-    );
+    let response = await reportsApi
+      .post(
+        `/activity/users/${encodeURIComponent(params.userKey)}/applications/${params.applicationName}/watch`,
+        {
+          id: params.channelId,
+          type: 'web_hook',
+          address: params.channelAddress,
+          token: params.channelToken,
+          expiration: params.expiration,
+          payload: params.payload,
+          params: params.ttl ? { ttl: String(params.ttl) } : undefined
+        },
+        { headers: this.headers, params: { customerId: params.customerId } }
+      )
+      .catch(error => {
+        throw buildApiServiceError(error, {
+          providerLabel: 'Google Admin',
+          reason: 'google_admin_watch_failed',
+          operation: 'watch administrator activities'
+        });
+      });
     return response.data;
+  }
+
+  async stopReportsChannel(channelId: string, resourceId: string) {
+    try {
+      await reportsApi.post(
+        'https://admin.googleapis.com/admin/reports_v1/channels/stop',
+        { id: channelId, resourceId },
+        {
+          headers: this.headers
+        }
+      );
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Admin',
+        reason: 'google_admin_stop_watch_failed',
+        operation: 'stop administrator activity notifications'
+      });
+    }
   }
 
   async stopChannel(channelId: string, resourceId: string) {

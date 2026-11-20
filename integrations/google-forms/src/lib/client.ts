@@ -24,6 +24,11 @@ export class GoogleFormsClient {
     });
   }
 
+  async getCurrentUser(): Promise<{ id?: string }> {
+    const response = await this.axios.get('https://www.googleapis.com/oauth2/v2/userinfo');
+    return response.data;
+  }
+
   // ─── Forms ──────────────────────────────────────────────────────
 
   async createForm(title: string, documentTitle?: string): Promise<GoogleForm> {

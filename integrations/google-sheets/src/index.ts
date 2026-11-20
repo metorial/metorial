@@ -19,6 +19,7 @@ import {
   updateSpreadsheet,
   writeCells
 } from './tools';
+// import { newRow, newRows } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -41,5 +42,9 @@ export let provider = Slate.create({
     createFilterView,
     mergeCells
   ],
+  // Parked: spreadsheet activity is now observed through Google Drive file events.
+  // The code under ./triggers is kept so the triggers can be registered again.
+  // triggerGroups: [newRows],
+  // triggers: [newRow]
   triggers: []
 });

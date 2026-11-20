@@ -95,3 +95,29 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
 </div>
+
+## Upload activity trigger
+
+`new_video` observes explicit upload activities from the OAuth connection's owned
+channels every 15 minutes. It returns the activity ID, channel/video IDs, title,
+activity occurrence time, observation time, and video URL. API keys cannot identify
+owned channels. The first poll silently starts a baseline, including when a new
+channel becomes visible to the connection.
+
+The trigger follows the channel activity feed. It does not promise a publication
+transition, detection of every private upload, or a notification for title,
+description, privacy, or processing changes. It scans from the saved checkpoint
+with a one-hour overlap and suppresses repeated video identities inside that
+window. Provider feed omissions and activities delayed by more than the overlap
+can be missed. Outage catch-up depends on the provider still returning the older
+activities. It never uses search results as upload events.
+
+Polling requires persistent trigger state; state and emitted events must be
+accepted together. Each scan reads at most 100 pages of activity, 100 owned
+channels, and 10,000 retained recent video IDs. When the page limit is reached,
+the channels already read are reported and the remaining channels are read
+first on the next scan. A channel whose own backlog exceeds the limit is caught
+up in smaller time steps over the following scans. An invalid scan fails
+without advancing the checkpoint.
+A channel that is missing from the owned list keeps its checkpoint for 24 hours
+and resumes from it; after that, re-adding it starts a new silent baseline.
