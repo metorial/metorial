@@ -87,7 +87,20 @@ interface NormalizedStreamInput {
   stream: ReadableStream<Uint8Array>;
   mimeType?: string;
   filename?: string;
+  sizeBytes?: number;
 }
+
+// fetch decodes compressed bodies, so content-length only gives the size of an unencoded one.
+let responseBodySize = (response: Response) => {
+  let encoding = response.headers.get('content-encoding');
+  if (encoding && encoding !== 'identity') return undefined;
+
+  let length = response.headers.get('content-length');
+  if (!length || !/^\d+$/.test(length)) return undefined;
+
+  let sizeBytes = Number(length);
+  return Number.isSafeInteger(sizeBytes) ? sizeBytes : undefined;
+};
 
 export class SlatePublicContext<InputType extends {}> {
   #input: InputType;
@@ -241,7 +254,8 @@ export class SlatePublicContext<InputType extends {}> {
           live,
           mimeType: normalized.mimeType,
           filename: normalized.filename,
-          body: normalized.stream
+          body: normalized.stream,
+          sizeBytes: normalized.sizeBytes
         })
       )
       .then(attachment => {
@@ -271,7 +285,8 @@ export class SlatePublicContext<InputType extends {}> {
       return {
         stream: input.body,
         mimeType: opts.mimeType ?? input.headers.get('content-type') ?? undefined,
-        filename: opts.filename
+        filename: opts.filename,
+        sizeBytes: responseBodySize(input)
       };
     }
 

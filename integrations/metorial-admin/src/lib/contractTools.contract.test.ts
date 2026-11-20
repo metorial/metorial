@@ -96,6 +96,21 @@ describe('Metorial API target (contract test: the API accepts any supported vers
     ]);
   });
 
+  it('uses the catalog for provider search and exposes one provider list tool', async () => {
+    let fetchMock = stubFetch();
+
+    await createTestClient().invokeTool('providers_list', {
+      search: 'github',
+      instance_id: 'inst_1'
+    });
+
+    expect(sentRequests(fetchMock)).toEqual([
+      [`${DEFAULT_API_URL}/provider-listings`, contract.generatedFrom.apiVersion]
+    ]);
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get('search')).toBe('github');
+    expect(contract.tools.some(tool => tool.key.startsWith('providers_listings_'))).toBe(false);
+  });
+
   it('sends call_endpoint to the environment API URL with the built-in API version', async () => {
     let fetchMock = stubFetch();
 

@@ -91,6 +91,7 @@ export let slatesMessageProviderCapabilitiesGetResponse = z.object({
         .object({
           capabilitiesNotification: z.boolean().optional(),
           liveInvocation: z.boolean().optional(),
+          multipartUpload: z.boolean().optional(),
           runtimeInfo: z.boolean().optional()
         })
         .optional(),

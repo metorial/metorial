@@ -516,6 +516,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         hub: {
           capabilitiesNotification: true,
           liveInvocation: true,
+          multipartUpload: true,
           runtimeInfo: true
         },
         provider: {
