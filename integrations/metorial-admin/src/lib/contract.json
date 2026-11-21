@@ -3058,7 +3058,7 @@
               "usable",
               "all"
             ],
-            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'shared' when ownership is enforced for the project and 'all' otherwise."
+            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'usable' for consumers, and otherwise to 'shared' when ownership is enforced for the project and 'all' when it isn't."
           },
           "status": {
             "anyOf": [
@@ -13367,6 +13367,10 @@
           "in": "query",
           "name": "provider_run_id"
         },
+        "issue_id": {
+          "in": "query",
+          "name": "issue_id"
+        },
         "provider_id": {
           "in": "query",
           "name": "provider_id"
@@ -13518,6 +13522,20 @@
               }
             ],
             "description": "Filter by provider run ID(s)"
+          },
+          "issue_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Filter by provider issue ID(s)"
           },
           "provider_id": {
             "anyOf": [
@@ -16399,7 +16417,7 @@
               "usable",
               "all"
             ],
-            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'shared' when ownership is enforced for the project and 'all' otherwise."
+            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'usable' for consumers, and otherwise to 'shared' when ownership is enforced for the project and 'all' when it isn't."
           },
           "status": {
             "anyOf": [
@@ -18419,7 +18437,7 @@
                 ]
               }
             ],
-            "description": "Which skills the endpoint exposes, both as skill resources and through the skill editing tools. Defaults to all skills the consumer has access to."
+            "description": "Which skills the endpoint exposes, both as skill resources and through the skill editing tools. Defaults to all skills the consumer has access to. A `selected` selection on a consumer-owned endpoint requires the project to allow skill selection."
           },
           "magic_mcp_servers": {
             "type": "array",
@@ -18842,7 +18860,7 @@
               "usable",
               "all"
             ],
-            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'shared' when ownership is enforced for the project and 'all' otherwise."
+            "description": "Which resources to return under the resource ownership rules. 'shared' returns only resources that aren't owned, 'usable' returns shared resources plus owned resources the caller can use, 'all' returns every resource the caller can see. Defaults to 'usable' for consumers, and otherwise to 'shared' when ownership is enforced for the project and 'all' when it isn't."
           },
           "status": {
             "anyOf": [
@@ -19036,7 +19054,7 @@
                 ]
               }
             ],
-            "description": "Which skills the endpoint exposes, both as skill resources and through the skill editing tools. Defaults to all skills the consumer has access to."
+            "description": "Which skills the endpoint exposes, both as skill resources and through the skill editing tools. Defaults to all skills the consumer has access to. A `selected` selection on a consumer-owned endpoint requires the project to allow skill selection."
           }
         },
         "required": [
@@ -19532,6 +19550,10 @@
           "in": "query",
           "name": "provider_id"
         },
+        "owned_by_me": {
+          "in": "query",
+          "name": "owned_by_me"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -19642,6 +19664,10 @@
               }
             ]
           },
+          "owned_by_me": {
+            "type": "boolean",
+            "description": "Only return skills the caller created or owns, including ones created through their other member or consumer identities"
+          },
           "created_at": {
             "type": "object",
             "properties": {
@@ -19723,6 +19749,10 @@
         "image_file_id": {
           "in": "body",
           "name": "image_file_id"
+        },
+        "image_icon": {
+          "in": "body",
+          "name": "image_icon"
         }
       },
       "inputSchema": {
@@ -19779,6 +19809,27 @@
               "string",
               "null"
             ]
+          },
+          "image_icon": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "icon": {
+                "type": "string",
+                "description": "Library icon id, e.g. rocket-2-line"
+              },
+              "color": {
+                "type": "string",
+                "description": "Tile color: gray, blue, green, yellow, orange, red or purple"
+              }
+            },
+            "required": [
+              "icon",
+              "color"
+            ],
+            "description": "Use a library icon with a tile color as the skill image. Pass null to reset to the default image. Cannot be combined with image_file_id."
           }
         },
         "required": [
@@ -21267,6 +21318,14 @@
         "allow_consumer_skill_assignment": {
           "in": "body",
           "name": "allow_consumer_skill_assignment"
+        },
+        "image_file_id": {
+          "in": "body",
+          "name": "image_file_id"
+        },
+        "image_icon": {
+          "in": "body",
+          "name": "image_icon"
         }
       },
       "inputSchema": {
@@ -21301,6 +21360,33 @@
           },
           "allow_consumer_skill_assignment": {
             "type": "boolean"
+          },
+          "image_file_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "image_icon": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "icon": {
+                "type": "string",
+                "description": "Library icon id, e.g. rocket-2-line"
+              },
+              "color": {
+                "type": "string",
+                "description": "Tile color: gray, blue, green, yellow, orange, red or purple"
+              }
+            },
+            "required": [
+              "icon",
+              "color"
+            ],
+            "description": "Use a library icon with a tile color as the skill group image. Pass null to reset to the default image. Cannot be combined with image_file_id."
           }
         },
         "required": [
@@ -21330,6 +21416,10 @@
         "allow_non_standard_directories": {
           "in": "body",
           "name": "allow_non_standard_directories"
+        },
+        "security_review_policy": {
+          "in": "body",
+          "name": "security_review_policy"
         }
       },
       "inputSchema": {
@@ -21350,6 +21440,15 @@
           },
           "allow_non_standard_directories": {
             "type": "boolean"
+          },
+          "security_review_policy": {
+            "type": "string",
+            "enum": [
+              "off",
+              "warn",
+              "block"
+            ],
+            "description": "How security reviews affect distribution: `warn` flags failing skills, `block` withholds them from syncs and exports. The strictest policy of all applicable configurations wins."
           }
         }
       }
@@ -21498,6 +21597,10 @@
         "allow_non_standard_directories": {
           "in": "body",
           "name": "allow_non_standard_directories"
+        },
+        "security_review_policy": {
+          "in": "body",
+          "name": "security_review_policy"
         }
       },
       "inputSchema": {
@@ -21522,6 +21625,15 @@
           },
           "allow_non_standard_directories": {
             "type": "boolean"
+          },
+          "security_review_policy": {
+            "type": "string",
+            "enum": [
+              "off",
+              "warn",
+              "block"
+            ],
+            "description": "How security reviews affect distribution: `warn` flags failing skills, `block` withholds them from syncs and exports. The strictest policy of all applicable configurations wins."
           }
         },
         "required": [
@@ -21916,6 +22028,10 @@
         "source": {
           "in": "body",
           "name": "source"
+        },
+        "skill_group_id": {
+          "in": "body",
+          "name": "skill_group_id"
         }
       },
       "inputSchema": {
@@ -21982,6 +22098,10 @@
                 ]
               }
             ]
+          },
+          "skill_group_id": {
+            "type": "string",
+            "description": "The ID of a skill group that every imported skill is added to."
           }
         },
         "required": [
@@ -22752,6 +22872,10 @@
         "skill_marketplace_id": {
           "in": "body",
           "name": "skill_marketplace_id"
+        },
+        "skill_group_id": {
+          "in": "body",
+          "name": "skill_group_id"
         }
       },
       "inputSchema": {
@@ -22759,7 +22883,8 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "The plugin name. Required unless skill_group_id is set, in which case it defaults to the group name."
           },
           "description": {
             "type": [
@@ -22793,11 +22918,12 @@
           },
           "skill_marketplace_id": {
             "type": "string"
+          },
+          "skill_group_id": {
+            "type": "string",
+            "description": "Creates the plugin from a skill group. The group's skills are synced into the plugin automatically and cannot be edited on the plugin directly. Name and description are copied from the group once and can be changed afterwards."
           }
-        },
-        "required": [
-          "name"
-        ]
+        }
       }
     },
     {
@@ -22884,6 +23010,10 @@
         "skill_configuration_id": {
           "in": "query",
           "name": "skill_configuration_id"
+        },
+        "skill_group_id": {
+          "in": "query",
+          "name": "skill_group_id"
         },
         "created_at": {
           "in": "query",
@@ -22984,6 +23114,20 @@
                 }
               }
             ]
+          },
+          "skill_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Only return plugins whose skills are synced from these skill groups."
           },
           "created_at": {
             "type": "object",
@@ -23290,6 +23434,10 @@
           "in": "query",
           "name": "skill_configuration_id"
         },
+        "skill_group_id": {
+          "in": "query",
+          "name": "skill_group_id"
+        },
         "search": {
           "in": "query",
           "name": "search"
@@ -23374,6 +23522,20 @@
                 }
               }
             ]
+          },
+          "skill_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Only return marketplaces that contain an active plugin synced from these skill groups."
           },
           "search": {
             "type": "string"
@@ -36593,6 +36755,10 @@
           "in": "query",
           "name": "provider_id"
         },
+        "attribute": {
+          "in": "query",
+          "name": "attribute"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -36720,6 +36886,20 @@
               }
             ],
             "description": "Filter by catalog provider ID(s)"
+          },
+          "attribute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Filter by event attribute, as \"key:value\" (split at the first colon, so the value may contain colons). The keys are the trigger output fields marked `x-metorial-event-attribute` in the `output_schema` of a provider trigger. Repeat the parameter to filter by several: values for the same key match any of them, different keys must all match."
           },
           "created_at": {
             "type": "object",
@@ -40293,6 +40473,10 @@
           "in": "query",
           "name": "provider_run_id"
         },
+        "issue_id": {
+          "in": "query",
+          "name": "issue_id"
+        },
         "created_at": {
           "in": "query",
           "name": "created_at"
@@ -40400,6 +40584,19 @@
             ]
           },
           "provider_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "issue_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -41315,6 +41512,14 @@
                   },
                   "skill_id": {
                     "type": "string"
+                  },
+                  "permission": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "write",
+                      "manage"
+                    ]
                   }
                 },
                 "required": [
@@ -41347,6 +41552,14 @@
                   },
                   "skill_group_id": {
                     "type": "string"
+                  },
+                  "permission": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "write",
+                      "manage"
+                    ]
                   }
                 },
                 "required": [
@@ -41752,7 +41965,7 @@
     {
       "key": "portals_access_update",
       "name": "Update portal access",
-      "description": "Updates the shared listing fields for a portal access rule.",
+      "description": "Updates the shared listing fields of a portal access rule, and the access level of skill and skill group rules.",
       "category": "portals",
       "method": "PATCH",
       "path": "/portals/:portalId/access/:accessId",
@@ -41779,6 +41992,10 @@
         "readme": {
           "in": "body",
           "name": "readme"
+        },
+        "permission": {
+          "in": "body",
+          "name": "permission"
         }
       },
       "inputSchema": {
@@ -41806,6 +42023,14 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "manage"
             ]
           }
         },
