@@ -54,4 +54,21 @@ describe('SlateLogger', () => {
       }
     });
   });
+
+  it('flushes a burst of logs as one batch before the caller continues', async () => {
+    let batches: SlateLogEntry[][] = [];
+    let logger = new SlateLogger([batch => batches.push(batch)]);
+
+    let run = async () => {
+      logger.info('first');
+      logger.info('second');
+      return 'result';
+    };
+
+    await run();
+
+    expect(batches.map(batch => batch.map(entry => entry.message))).toEqual([
+      ['first', 'second']
+    ]);
+  });
 });

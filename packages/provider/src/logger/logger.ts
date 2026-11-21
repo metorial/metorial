@@ -93,14 +93,14 @@ export type SlateLogListener = (entries: SlateLogEntry[]) => void;
 export class SlateLogger {
   #logs: SlateLogEntry[] = [];
   #listeners: SlateLogListener[] = [];
-  #timer: NodeJS.Timeout | null = null;
+  #flushScheduled = false;
 
   constructor(listeners: SlateLogListener[] = []) {
     this.#listeners.push(...listeners);
   }
 
   private flush() {
-    if (this.#timer) clearTimeout(this.#timer);
+    this.#flushScheduled = false;
     if (this.#logs.length === 0) return;
     let logs = this.#logs.splice(0);
 
@@ -109,12 +109,12 @@ export class SlateLogger {
     }
   }
 
+  // A microtask batches each burst of log calls and still flushes before the invocation's
+  // result goes out; the runtime drops log lines that arrive after the result.
   private scheduleFlush() {
-    if (this.#timer) return;
-    this.#timer = setTimeout(() => {
-      this.flush();
-      this.#timer = null;
-    }, 10);
+    if (this.#flushScheduled) return;
+    this.#flushScheduled = true;
+    queueMicrotask(() => this.flush());
   }
 
   log(type: SlateLogType, message: SlateLogMessageInput) {
