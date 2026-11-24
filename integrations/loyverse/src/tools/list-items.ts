@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client, joinIds } from '../lib/client';
+import { Client, joinUuids } from '../lib/client';
 import { itemSchema, mapItem } from '../lib/items';
 import { spec } from '../spec';
 
@@ -19,7 +19,12 @@ export let listItems = SlateTool.create(spec, {
         .optional()
         .describe('Number of items to return (1-250, default 50)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      itemIds: z.array(z.string()).optional().describe('Only return items with these IDs'),
+      itemIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Only return items with these item UUIDs (not names); omit to list all items'
+        ),
       createdAtMin: z
         .string()
         .optional()
@@ -50,7 +55,7 @@ export let listItems = SlateTool.create(spec, {
     let result = await client.listItems({
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
-      itemIds: joinIds(ctx.input.itemIds),
+      itemIds: joinUuids('Item IDs', ctx.input.itemIds),
       createdAtMin: ctx.input.createdAtMin,
       createdAtMax: ctx.input.createdAtMax,
       updatedAtMin: ctx.input.updatedAtMin,
