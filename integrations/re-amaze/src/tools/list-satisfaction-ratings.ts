@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { toNumericId } from '../lib/response';
+import { numericIdAlias, toNumericId, toProviderId } from '../lib/response';
 import { spec } from '../spec';
 
 export let listSatisfactionRatings = SlateTool.create(spec, {
@@ -49,16 +49,43 @@ export let listSatisfactionRatings = SlateTool.create(spec, {
       ratings: z
         .array(
           z.object({
-            ratingId: z.number().describe('Rating ID'),
+            ratingId: z
+              .number()
+              .optional()
+              .describe('Legacy numeric rating ID when available'),
+            ratingIdentifier: z.string().nullable().describe('Canonical rating ID'),
             rating: z.number().nullable().describe('Rating value (1-5 or null)'),
             comment: z.string().nullable().optional().describe('Customer comment'),
-            userId: z.number().nullable().optional().describe('Customer user ID'),
-            assigneeId: z.number().nullable().optional().describe('Assigned staff member ID'),
+            userId: z
+              .number()
+              .nullable()
+              .optional()
+              .describe('Legacy numeric customer user ID when available'),
+            userIdentifier: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Canonical customer user ID'),
+            assigneeId: z
+              .number()
+              .nullable()
+              .optional()
+              .describe('Legacy numeric assigned staff member ID when available'),
+            assigneeIdentifier: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Canonical assigned staff member ID'),
             conversationId: z
               .number()
               .nullable()
               .optional()
-              .describe('Associated conversation ID'),
+              .describe('Legacy numeric conversation ID when available'),
+            conversationIdentifier: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Canonical conversation ID or slug'),
             createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
             updatedAt: z.string().optional().describe('ISO 8601 last update timestamp')
           })
@@ -87,22 +114,31 @@ export let listSatisfactionRatings = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let ratings = (result.satisfaction_ratings || []).map((r: any) => ({
-      ratingId: toNumericId(r.id, 'Satisfaction rating ID'),
-      rating: r.rating,
-      comment: r.comment,
-      userId: r.user_id == null ? r.user_id : toNumericId(r.user_id, 'Rating customer ID'),
-      assigneeId:
-        r.assignee_id == null
-          ? r.assignee_id
-          : toNumericId(r.assignee_id, 'Rating assignee ID'),
-      conversationId:
-        r.conversation_id == null
-          ? r.conversation_id
-          : toNumericId(r.conversation_id, 'Rating conversation ID'),
-      createdAt: r.created_at,
-      updatedAt: r.updated_at
-    }));
+    let optionalId = (value: unknown, label: string) =>
+      value == null
+        ? { numeric: value as null | undefined, identifier: value as null | undefined }
+        : { numeric: numericIdAlias(value, label), identifier: toProviderId(value, label) };
+
+    let ratings = (result.satisfaction_ratings || []).map((r: any) => {
+      let id = optionalId(r.id, 'Satisfaction rating ID');
+      let user = optionalId(r.user_id, 'Rating customer ID');
+      let assignee = optionalId(r.assignee_id, 'Rating assignee ID');
+      let conversation = optionalId(r.conversation_id, 'Rating conversation ID');
+      return {
+        ratingId: id.numeric ?? undefined,
+        ratingIdentifier: id.identifier ?? null,
+        rating: r.rating,
+        comment: r.comment,
+        userId: user.numeric,
+        userIdentifier: user.identifier,
+        assigneeId: assignee.numeric,
+        assigneeIdentifier: assignee.identifier,
+        conversationId: conversation.numeric,
+        conversationIdentifier: conversation.identifier,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at
+      };
+    });
 
     return {
       output: {

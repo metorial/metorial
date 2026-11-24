@@ -26,8 +26,12 @@ export let toProviderId = (value: unknown, label: string): string => {
 };
 
 export let numericIdAlias = (value: unknown, label: string): number | undefined => {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+  }
   let identifier = toProviderId(value, label);
-  return /^\d+$/.test(identifier) ? toNumericId(identifier, label) : undefined;
+  let numeric = /^\d+$/.test(identifier) ? Number(identifier) : Number.NaN;
+  return Number.isSafeInteger(numeric) ? numeric : undefined;
 };
 
 export let resolveResourceId = (

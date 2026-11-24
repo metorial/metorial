@@ -17,5 +17,5 @@
     "@slates/test": "1.0.0-rc.26",
     "vitest": "^3.1.2"
   },
-  "version": "0.3.0"
+  "version": "0.3.1"
 }
