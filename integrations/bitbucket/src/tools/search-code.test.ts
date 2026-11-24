@@ -33,30 +33,23 @@ let createBitbucketToolTestClient = () =>
   });
 
 let searchResponse = {
-  values: [
+  id: 'request-1',
+  repositories: [{ url: 'https://bitbucket.org/acme-workspace/repo-one', name: 'repo-one' }],
+  matched_files: [
     {
-      file: {
-        path: 'src/index.ts',
-        links: {
-          self: {
-            href: 'https://api.bitbucket.org/2.0/repositories/acme-workspace/repo-one/src/abc123/src/index.ts'
-          }
-        }
-      },
-      content_matches: [
+      path: 'src/index.ts',
+      url: 'https://bitbucket.org/acme-workspace/repo-one/src/abc123/src/index.ts',
+      matched_chunks: [
         {
-          lines: [
-            {
-              line: 12,
-              segments: [{ text: 'needle', match: true }]
-            }
-          ]
+          source_code: 'let a = 1;\nneedle();\nlet b = 2;',
+          line_range: { start: 11, end: 13 },
+          matched_line_numbers: [12]
         }
       ]
     }
   ],
-  size: 1,
-  next: 'next-page'
+  metadata: { total_count: 1 },
+  pagination: { has_more: true, next_cursor: 'cursor-2' }
 };
 
 beforeEach(() => {
@@ -71,17 +64,18 @@ describe('Bitbucket search_code input compatibility', () => {
     let result = await client.invokeTool('search_code', {
       query: '  needle  ',
       repository: '  repo-one  ',
-      page: 2,
       pageLen: 10
     });
 
     expect(bitbucketClientMocks.clients).toEqual([
       { token: 'test-token', workspace: 'acme-workspace' }
     ]);
-    expect(bitbucketClientMocks.searchCode).toHaveBeenCalledWith('needle', {
-      repository: 'repo-one',
-      page: 2,
-      pageLen: 10
+    expect(bitbucketClientMocks.searchCode).toHaveBeenCalledWith({
+      query: {
+        search_term: 'needle',
+        filters: { attribute: 'repository', eq: 'repo-one' }
+      },
+      config: { max_results: 10 }
     });
     expect(result.output).toEqual({
       results: [
@@ -89,11 +83,12 @@ describe('Bitbucket search_code input compatibility', () => {
           repoSlug: 'repo-one',
           repoFullName: 'acme-workspace/repo-one',
           filePath: 'src/index.ts',
-          matchingLines: [{ line: 12, text: 'needle' }]
+          matchingLines: [{ line: 12, text: 'needle();' }]
         }
       ],
       totalCount: 1,
-      hasNextPage: true
+      hasNextPage: true,
+      nextPageToken: btoa(JSON.stringify({ requestId: 'request-1', cursor: 'cursor-2' }))
     });
     expect(result.message).toContain('in **repo-one**');
   });
@@ -103,10 +98,8 @@ describe('Bitbucket search_code input compatibility', () => {
 
     await client.invokeTool('search_code', { searchQuery: '  legacy term  ' });
 
-    expect(bitbucketClientMocks.searchCode).toHaveBeenCalledWith('legacy term', {
-      repository: undefined,
-      page: undefined,
-      pageLen: undefined
+    expect(bitbucketClientMocks.searchCode).toHaveBeenCalledWith({
+      query: { search_term: 'legacy term' }
     });
   });
 
@@ -118,39 +111,59 @@ describe('Bitbucket search_code input compatibility', () => {
       searchQuery: 'legacy term'
     });
 
-    expect(bitbucketClientMocks.searchCode).toHaveBeenCalledWith('canonical term', {
-      repository: undefined,
-      page: undefined,
-      pageLen: undefined
+    expect(bitbucketClientMocks.searchCode).toHaveBeenCalledWith({
+      query: { search_term: 'canonical term' }
+    });
+  });
+
+  it('turns query modifiers into filters and resumes from a page token', async () => {
+    let client = createBitbucketToolTestClient();
+
+    await client.invokeTool('search_code', {
+      query: 'needle repo:repo-* lang:go',
+      pageToken: btoa(JSON.stringify({ requestId: 'request-1', cursor: 'cursor-2' }))
+    });
+
+    expect(bitbucketClientMocks.searchCode).toHaveBeenCalledWith({
+      query: {
+        search_term: 'needle',
+        filters: {
+          and: [
+            { attribute: 'repository', wildcard: 'repo-*' },
+            { attribute: 'language', eq: 'go' }
+          ]
+        }
+      },
+      request_id: 'request-1',
+      pagination: { next_cursor: 'cursor-2' }
     });
   });
 
   it.each([
-    ['neither query field', {}],
-    ['blank query', { query: '   ' }],
-    ['blank legacy query', { searchQuery: '\t' }],
-    ['both query fields blank', { query: ' ', searchQuery: '  ' }]
-  ])('rejects %s before calling Bitbucket', async (_label, input) => {
-    let client = createBitbucketToolTestClient();
-
-    await expect(client.invokeTool('search_code', input)).rejects.toThrow(
+    ['neither query field', {}, 'Provide a code search query.'],
+    ['blank query', { query: '   ' }, 'Provide a code search query.'],
+    ['blank legacy query', { searchQuery: '\t' }, 'Provide a code search query.'],
+    [
+      'both query fields blank',
+      { query: ' ', searchQuery: '  ' },
       'Provide a code search query.'
-    );
-
-    expect(bitbucketClientMocks.searchCode).not.toHaveBeenCalled();
-  });
-
-  it('rejects repository scope supplied in both fields', async () => {
+    ],
+    [
+      'repository scope in both fields',
+      { query: 'needle repo:repo-two', repository: 'repo-one' },
+      'Provide repository either with the repository field or a repo: modifier in query, not both.'
+    ],
+    [
+      'a page number without a page token',
+      { query: 'needle', page: 2 },
+      'Bitbucket code search does not support page numbers.'
+    ],
+    ['an out-of-range pageLen', { query: 'needle', pageLen: 500 }, 'pageLen must be'],
+    ['a malformed page token', { query: 'needle', pageToken: 'nope' }, 'Invalid pageToken.']
+  ])('rejects %s before calling Bitbucket', async (_label, input, message) => {
     let client = createBitbucketToolTestClient();
 
-    await expect(
-      client.invokeTool('search_code', {
-        query: 'needle repo:repo-two',
-        repository: 'repo-one'
-      })
-    ).rejects.toThrow(
-      'Provide repository either with the repository field or a repo: modifier in query, not both.'
-    );
+    await expect(client.invokeTool('search_code', input)).rejects.toThrow(message);
 
     expect(bitbucketClientMocks.searchCode).not.toHaveBeenCalled();
   });

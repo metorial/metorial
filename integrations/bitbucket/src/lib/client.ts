@@ -656,19 +656,16 @@ export class Client {
 
   // ─── Code Search ───
 
-  async searchCode(
-    searchQuery: string,
-    opts?: { repository?: string; page?: number; pageLen?: number }
-  ) {
-    let params: Record<string, string> = {
-      search_query: opts?.repository ? `${searchQuery} repo:${opts.repository}` : searchQuery
-    };
-    if (opts?.page) params.page = String(opts.page);
-    if (opts?.pageLen) params.pagelen = String(opts.pageLen);
-
-    let response = await this.api.get(`/workspaces/${this.params.workspace}/search/code`, {
-      params
-    });
+  async searchCode(body: {
+    query: { search_term: string; filters?: Record<string, unknown> };
+    config?: { max_results?: number };
+    request_id?: string;
+    pagination?: { next_cursor: string };
+  }) {
+    let response = await this.api.post(
+      `/workspaces/${this.params.workspace}/codesearch`,
+      body
+    );
     return response.data;
   }
 
