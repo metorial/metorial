@@ -22,6 +22,12 @@ export type GranolaListMeetingsParams = {
   pageSize: number;
 };
 
+let toUtcTimestamp = (value?: string) => {
+  if (value === undefined || /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  let time = new Date(value);
+  return Number.isNaN(time.getTime()) ? value : time.toISOString().replace(/\.000Z$/, 'Z');
+};
+
 export class GranolaClient {
   private http: ReturnType<typeof createAuthenticatedAxios>;
 
@@ -69,9 +75,9 @@ export class GranolaClient {
   async listMeetings(params: GranolaListMeetingsParams) {
     let operation = 'list meetings';
     let data = await this.get(operation, '/v1/notes', {
-      created_before: params.createdBefore,
-      created_after: params.createdAfter,
-      updated_after: params.updatedAfter,
+      created_before: toUtcTimestamp(params.createdBefore),
+      created_after: toUtcTimestamp(params.createdAfter),
+      updated_after: toUtcTimestamp(params.updatedAfter),
       folder_id: params.folderId,
       cursor: params.cursor,
       page_size: params.pageSize
