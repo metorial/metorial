@@ -24,7 +24,7 @@ export class MetaAdsClient {
 
     axios.interceptors.response.use(
       response => response,
-      error => Promise.reject(metaAdsApiError(error))
+      error => Promise.reject(metaAdsApiError(error, 'request', this.token))
     );
 
     return axios;

@@ -1,10 +1,5 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
+import { getApiErrorResponseWithBody } from 'slates';
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -13,7 +8,7 @@ let stringValue = (value: unknown) =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
 
 let extractMetaMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
+  let response = getApiErrorResponseWithBody(error);
   let data = response?.data;
   let details: string[] = [];
 
@@ -57,7 +52,7 @@ let extractMetaMessage = (error: unknown) => {
 };
 
 let upstreamCodeFor = (error: unknown, key: 'code' | 'error_subcode') => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
+  let response = getApiErrorResponseWithBody(error);
   let data = isRecord(response?.data) ? response.data : undefined;
   let graphError = isRecord(data?.error) ? data.error : data;
   let value = graphError ? graphError[key] : undefined;
@@ -67,15 +62,15 @@ let upstreamCodeFor = (error: unknown, key: 'code' | 'error_subcode') => {
 export let metaAdsServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
-export let metaAdsApiError = (error: unknown, operation = 'request') => {
+export let metaAdsApiError = (error: unknown, operation = 'request', token?: string) => {
   if (error instanceof ServiceError) {
     return error;
   }
 
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let serviceError = metaAdsServiceError(
-    `Meta Marketing API ${operation} failed: ${extractMetaMessage(error)}`
-  );
+  let response = getApiErrorResponseWithBody(error);
+  let message = extractMetaMessage(error);
+  if (token) message = message.split(token).join('[redacted]');
+  let serviceError = metaAdsServiceError(`Meta Marketing API ${operation} failed: ${message}`);
 
   serviceError.data.reason = 'meta_ads_api_error';
   serviceError.data.upstreamStatus = response?.status;
