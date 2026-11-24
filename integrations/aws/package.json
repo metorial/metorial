@@ -3,7 +3,7 @@
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
-    "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
+    "build": "bunx @vercel/ncc build src/index.ts -o dist -m",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,5 +25,5 @@
   "devDependencies": {
     "typescript": "^5"
   },
-  "version": "0.2.0"
+  "version": "0.2.1"
 }

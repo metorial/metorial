@@ -360,9 +360,9 @@ export let getExposedToolCategories = <ConfigType extends {}, AuthType extends {
 
 let markSelectionOptions = (
   schema: Record<string, any>,
-  sources: Record<string, SlateTriggerGroupSelectionOptionsSources<any, any>>
+  sources: Record<string, SlateTriggerGroupSelectionOptionsSources<any, any>> | undefined
 ) => {
-  let entries = Object.entries(sources);
+  let entries = Object.entries(sources ?? {});
   if (!entries.length) return schema;
 
   let properties: Record<string, any> = { ...schema.properties };

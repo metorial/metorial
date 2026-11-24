@@ -1751,8 +1751,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     manager.onRequest('slates/trigger_group.selection.options_list', async ({ params }) => {
       let ctx = getContextFull();
       let group = getTriggerGroup(slate, params.triggerGroupId);
-      let handler = Object.hasOwn(group.selectionOptions, params.field)
-        ? group.selectionOptions[params.field]?.list
+      let handler = Object.hasOwn(group.selectionOptions ?? {}, params.field)
+        ? group.selectionOptions?.[params.field]?.list
         : undefined;
       if (!handler) {
         throw new ServiceError(

@@ -437,4 +437,12 @@ describe('selection options schema markers', () => {
     ).toEqual({ slate: 'acme/files', optionList: 'folders', params: { shared: true } });
     expect(slatesTriggerGroup.safeParse(mapped).success).toBe(true);
   });
+
+  it('maps groups from slates that predate selection options', () => {
+    let legacy = Object.create(group, { selectionOptions: { value: undefined } });
+    let properties = (mapTriggerGroup(legacy).selectionSchema as any).properties;
+
+    expect(properties.own).toEqual({ type: 'string' });
+    expect(properties.plain).toEqual({ type: 'string' });
+  });
 });
