@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SharePointClient } from '../lib/client';
+import { cleanId } from '../lib/ids';
 import { spec } from '../spec';
 import { oneOfRequiredError } from './errors';
 
@@ -63,15 +64,18 @@ export let getDrive = SlateTool.create(spec, {
       ownerName: d.owner?.user?.displayName
     });
 
-    if (ctx.input.driveId) {
-      let drive = await client.getDrive(ctx.input.driveId);
+    let driveId = cleanId(ctx.input.driveId);
+    let siteId = cleanId(ctx.input.siteId);
+
+    if (driveId) {
+      let drive = await client.getDrive(driveId);
       return {
         output: { drive: mapDrive(drive) },
         message: `Retrieved drive **${drive.name}** (\`${drive.id}\`).`
       };
     }
 
-    if (!ctx.input.siteId) {
+    if (!siteId) {
       throw oneOfRequiredError('One of siteId or driveId must be provided.', [
         'siteId',
         'driveId'
@@ -79,7 +83,7 @@ export let getDrive = SlateTool.create(spec, {
     }
 
     if (ctx.input.listAll) {
-      let data = await client.listDrives(ctx.input.siteId);
+      let data = await client.listDrives(siteId);
       let drives = (data.value || []).map(mapDrive);
       return {
         output: { drives },
@@ -87,7 +91,7 @@ export let getDrive = SlateTool.create(spec, {
       };
     }
 
-    let drive = await client.getDefaultDrive(ctx.input.siteId);
+    let drive = await client.getDefaultDrive(siteId);
     return {
       output: { drive: mapDrive(drive) },
       message: `Retrieved default drive **${drive.name}** (\`${drive.id}\`).`

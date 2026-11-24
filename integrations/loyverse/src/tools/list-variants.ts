@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client, joinIds } from '../lib/client';
+import { Client, joinUuids } from '../lib/client';
 import { mapVariant, variantSchema } from '../lib/items';
 import { spec } from '../spec';
 
@@ -20,11 +20,14 @@ export let listVariants = SlateTool.create(spec, {
         .describe('Number of variants to return (1-250, default 50)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
       sku: z.string().optional().describe('Only return the variant with this SKU'),
-      itemIds: z.array(z.string()).optional().describe('Only return variants of these items'),
+      itemIds: z
+        .array(z.string())
+        .optional()
+        .describe('Only return variants of these item UUIDs (not names)'),
       variantIds: z
         .array(z.string())
         .optional()
-        .describe('Only return variants with these IDs'),
+        .describe('Only return variants with these variant UUIDs'),
       createdAtMin: z
         .string()
         .optional()
@@ -56,8 +59,8 @@ export let listVariants = SlateTool.create(spec, {
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
       sku: ctx.input.sku,
-      itemIds: joinIds(ctx.input.itemIds),
-      variantIds: joinIds(ctx.input.variantIds),
+      itemIds: joinUuids('Item IDs', ctx.input.itemIds),
+      variantIds: joinUuids('Variant IDs', ctx.input.variantIds),
       createdAtMin: ctx.input.createdAtMin,
       createdAtMax: ctx.input.createdAtMax,
       updatedAtMin: ctx.input.updatedAtMin,

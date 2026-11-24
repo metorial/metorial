@@ -37,6 +37,21 @@ export let joinIds = (...values: (string | string[] | undefined)[]) => {
   return ids.length > 0 ? Array.from(new Set(ids)).join(',') : undefined;
 };
 
+let UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export let joinUuids = (label: string, values: string[] | undefined) => {
+  let invalid = (values ?? [])
+    .map(value => value.trim())
+    .filter(value => value && !UUID_PATTERN.test(value));
+  if (invalid.length > 0) {
+    throw createApiServiceError(
+      `${label} must be Loyverse UUIDs, but received: ${invalid.slice(0, 3).join(', ')}. Names are not accepted; list the records first to look up their IDs.`,
+      { reason: 'invalid_input' }
+    );
+  }
+  return joinIds(values);
+};
+
 let dateParams = (params?: DateRangeParams) => ({
   created_at_min: params?.createdAtMin,
   created_at_max: params?.createdAtMax,

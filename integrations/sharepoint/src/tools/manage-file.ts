@@ -1,6 +1,7 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SharePointClient } from '../lib/client';
+import { cleanId } from '../lib/ids';
 import { spec } from '../spec';
 import { oneOfRequiredError } from './errors';
 
@@ -133,7 +134,7 @@ export let manageFile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SharePointClient(ctx.auth.token);
-    let driveId = ctx.input.driveId.trim();
+    let driveId = cleanId(ctx.input.driveId);
     if (!driveId) {
       throw serviceError(
         'driveId is required and cannot be empty. Use Get Drives with the siteId to find the document library drive ID.',

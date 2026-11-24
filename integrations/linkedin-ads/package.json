@@ -10,7 +10,7 @@
   "dependencies": {
     "@types/node": "^20",
     "@lowerdeck/error": "^1.0.5",
-    "slates": "1.0.0-rc.25",
+    "slates": "1.0.0-rc.28",
     "zod": "^4.2"
   },
   "devDependencies": {
@@ -18,5 +18,5 @@
     "typescript": "^5",
     "vitest": "^3.2.4"
   },
-  "version": "0.3.1"
+  "version": "0.3.2"
 }

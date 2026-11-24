@@ -33,23 +33,19 @@ beforeEach(() => {
 });
 
 describe('Bitbucket code search client', () => {
-  it('adds the documented repo modifier when repository scope is provided', async () => {
-    axiosMocks.api.get.mockResolvedValue({ data: { values: [], size: 0 } });
+  it('posts to the workspace codesearch endpoint', async () => {
     let client = new Client({ token: 'token', workspace: 'acme-workspace' });
+    let body = {
+      query: { search_term: 'needle', filters: { attribute: 'repository', eq: 'repo-one' } },
+      config: { max_results: 10 }
+    };
 
-    await client.searchCode('needle', {
-      repository: 'repo-one',
-      page: 2,
-      pageLen: 10
-    });
+    await client.searchCode(body);
 
-    expect(axiosMocks.api.get).toHaveBeenCalledWith('/workspaces/acme-workspace/search/code', {
-      params: {
-        search_query: 'needle repo:repo-one',
-        page: '2',
-        pagelen: '10'
-      }
-    });
+    expect(axiosMocks.api.post).toHaveBeenCalledWith(
+      '/workspaces/acme-workspace/codesearch',
+      body
+    );
   });
 });
 

@@ -1,5 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { isExcludedIntegrationDirectory } from './excluded-integrations';
 
 export type IntegrationPackage = {
   directory: string;
@@ -19,7 +20,9 @@ export async function listIntegrationPackages(): Promise<IntegrationPackage[]> {
       withFileTypes: true
     });
 
-    for (const entry of entries.filter(item => item.isDirectory())) {
+    for (const entry of entries.filter(
+      item => item.isDirectory() && !isExcludedIntegrationDirectory(item.name)
+    )) {
       const directory = path.posix.join(root, entry.name);
       const packageJsonPath = path.join(INTEGRATIONS_WORKSPACE, directory, 'package.json');
       const packageJsonRaw = await readFile(packageJsonPath, 'utf8').catch(() => null);

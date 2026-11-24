@@ -10,7 +10,11 @@ export let updateTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      taskId: z.number().describe('ID of the task to update'),
+      taskId: z
+        .number()
+        .int()
+        .positive()
+        .describe('ID of the task to update. Use list_tasks to discover IDs.'),
       description: z.string().optional().describe('Updated description'),
       detail: z.string().optional().describe('Updated details'),
       dueOn: z.string().optional().describe('Updated due date (YYYY-MM-DD)'),

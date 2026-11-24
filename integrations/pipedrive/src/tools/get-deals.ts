@@ -39,9 +39,11 @@ Returns deal properties including title, value, stage, linked contacts, and time
       pipelineId: z.number().optional().describe('Filter deals by pipeline ID'),
       stageId: z.number().optional().describe('Filter deals by stage ID'),
       status: z
-        .enum(['open', 'won', 'lost', 'deleted', 'all_not_deleted'])
+        .enum(['open', 'won', 'lost', 'deleted', 'all_not_deleted', 'all'])
         .optional()
-        .describe('Filter by deal status'),
+        .describe(
+          'Filter by deal status. "all" and "all_not_deleted" both return every deal that is not deleted; use "deleted" for deleted deals.'
+        ),
       userId: z.number().optional().describe('Filter deals by owner user ID'),
       filterId: z.number().optional().describe('Filter ID for custom filtering'),
       start: z.number().optional().describe('Pagination start (0-based)'),
@@ -96,7 +98,7 @@ Returns deal properties including title, value, stage, linked contacts, and time
     let result = await client.getDeals({
       start: ctx.input.start,
       limit: ctx.input.limit,
-      status: ctx.input.status,
+      status: ctx.input.status === 'all' ? 'all_not_deleted' : ctx.input.status,
       stageId: ctx.input.stageId,
       pipelineId: ctx.input.pipelineId,
       userId: ctx.input.userId,

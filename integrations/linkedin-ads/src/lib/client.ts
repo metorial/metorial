@@ -1,13 +1,13 @@
-import { ServiceError } from '@lowerdeck/error';
 import {
+  type ApiErrorBuildHelpers,
   buildApiServiceError,
   createApiServiceError,
   createAuthenticatedAxios,
-  getApiErrorStatus,
   getResponseHeaderValue,
   isApiErrorRecord,
   pickDefined,
-  requestAxios
+  requestAxios,
+  truncateApiErrorMessage
 } from 'slates';
 import { z } from 'zod';
 
@@ -17,26 +17,42 @@ export const API_BASE = 'https://api.linkedin.com';
 export const invalid = (message: string) =>
   createApiServiceError(message, { reason: 'linkedin_ads_validation' });
 
-export const apiError = (error: unknown, operation = 'request') => {
-  const raw =
-    getApiErrorStatus(error) ??
-    (error instanceof ServiceError ? error.data.upstreamStatus : undefined);
-  const status = typeof raw === 'number' || typeof raw === 'string' ? Number(raw) : undefined;
-  const safeStatus =
-    Number.isInteger(status) && Number(status) >= 100 && Number(status) <= 599
-      ? status
-      : undefined;
-  return buildApiServiceError(
-    { response: { status: safeStatus } },
-    {
-      providerLabel: 'LinkedIn',
-      reason: 'linkedin_ads_api',
-      operation,
-      parent: {},
-      fallbackMessage:
-        'Check API product approval, granted permissions, account role, request fields and the supported Marketing API version.'
+const API_ERROR_HINT =
+  'Check API product approval, granted permissions, account role, request fields and the supported Marketing API version.';
+
+const API_ERROR_DETAILS = {
+  detailKeys: ['message', 'description', 'fieldPath', 'error', 'error_description'],
+  nestedKeys: ['errorDetails', 'inputErrors', 'input', 'inputPath']
+};
+
+export const apiError = (error: unknown, operation = 'request', token = '') => {
+  const responseOf = (input: unknown, helpers: ApiErrorBuildHelpers) => {
+    const response = helpers.getResponseWithBody(input);
+    return response ? { ...response, data: scrub(response.data, token) } : response;
+  };
+  return buildApiServiceError(error, {
+    providerLabel: 'LinkedIn',
+    reason: 'linkedin_ads_api',
+    operation,
+    parent: {},
+    extractResponse: responseOf,
+    extractMessage: (input, helpers) => {
+      const response = responseOf(input, helpers);
+      const details: string[] = [];
+      helpers.collectDetails(response?.data, details, API_ERROR_DETAILS);
+      if (details.length > 0) return truncateApiErrorMessage(details.join(' - '));
+      if (response?.status !== undefined) return API_ERROR_HINT;
+      return String(
+        scrub(helpers.extractMessage(input, { fallbackMessage: API_ERROR_HINT }), token)
+      );
+    },
+    extractUpstreamCode: (_input, response, helpers) => {
+      const data = response?.data;
+      if (!helpers.isRecord(data)) return undefined;
+      const code = data.code ?? data.serviceErrorCode;
+      return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
     }
-  );
+  });
 };
 
 export const numericId = (value: string, kind = 'sponsoredAccount') => {
@@ -86,9 +102,7 @@ export const continuation = (value: LinkedInPagedResponse<unknown>, offset = fal
 };
 const scrub = (value: unknown, token: string): unknown => {
   if (typeof value === 'string')
-    return value
-      .split(token)
-      .join('[redacted]')
+    return (token ? value.split(token).join('[redacted]') : value)
       .split('{{SLATE_AUTH_TOKEN}}')
       .join('[redacted]')
       .split('$$MT$secret$')
@@ -335,8 +349,7 @@ export class Client {
       timeout: 30000,
       maxRedirects: 0,
       authHeader: { value: `Bearer ${config.token}` },
-      headers: { 'LinkedIn-Version': API_VERSION, 'X-Restli-Protocol-Version': '2.0.0' },
-      errorAdapter: error => apiError(error)
+      headers: { 'LinkedIn-Version': API_VERSION, 'X-Restli-Protocol-Version': '2.0.0' }
     });
   }
   private async request(
@@ -370,7 +383,7 @@ export class Client {
                 .join('&')
           }
         }),
-      apiError
+      (error, operation) => apiError(error, operation, this.token)
     );
     return { ...response, data: scrub(response.data, this.token) };
   }

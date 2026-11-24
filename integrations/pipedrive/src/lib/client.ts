@@ -59,7 +59,16 @@ export class PipedriveClient {
     filterId?: number;
     sort?: string;
   }) {
-    let response = await this.http.get('/deals', { params });
+    let { stageId, pipelineId, userId, filterId, ...rest } = params ?? {};
+    let response = await this.http.get('/deals', {
+      params: {
+        ...rest,
+        stage_id: stageId,
+        pipeline_id: pipelineId,
+        user_id: userId,
+        filter_id: filterId
+      }
+    });
     return response.data;
   }
 

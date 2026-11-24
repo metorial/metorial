@@ -1,4 +1,5 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { Buffer } from 'node:buffer';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { gmailActionScopes } from '../scopes';
@@ -31,17 +32,16 @@ export let getAttachment = SlateTool.create(spec, {
     });
 
     let attachment = await client.getAttachment(ctx.input.messageId, ctx.input.attachmentId);
-    let normalizedData = attachment.data.replace(/-/g, '+').replace(/_/g, '/');
-    let padding = normalizedData.length % 4;
-    if (padding > 0) {
-      normalizedData = normalizedData.padEnd(normalizedData.length + (4 - padding), '=');
-    }
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(new Uint8Array(Buffer.from(attachment.data, 'base64url')))
+    });
 
     return {
       output: {
         size: attachment.size
       },
-      attachments: [createBase64Attachment(normalizedData)],
       message: `Downloaded attachment (**${attachment.size}** bytes).`
     };
   });
