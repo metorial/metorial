@@ -92,12 +92,8 @@ Use the same search operators available in the Gmail search bar: \`from:\`, \`to
       includeSpamTrash: ctx.input.includeSpamTrash
     });
 
-    let messages = await Promise.all(
-      listResult.messages.map(async msg => {
-        let full = await client.getMessage(msg.id);
-        return parseMessage(full);
-      })
-    );
+    let fullMessages = await client.getMessages(listResult.messages.map(msg => msg.id));
+    let messages = fullMessages.map(full => parseMessage(full));
 
     return {
       output: {

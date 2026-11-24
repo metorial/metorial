@@ -6,6 +6,8 @@ let gmailAxios = createAxios({
   baseURL: 'https://gmail.googleapis.com/gmail/v1/'
 });
 
+let GET_MESSAGES_CONCURRENCY = 4;
+
 export interface MessageHeader {
   name: string;
   value: string;
@@ -251,6 +253,31 @@ export class Client {
       params: { format: format || 'full' }
     });
     return response.data;
+  }
+
+  async getMessages(
+    messageIds: string[],
+    format?: string,
+    concurrency = GET_MESSAGES_CONCURRENCY
+  ): Promise<GmailMessage[]> {
+    let results: GmailMessage[] = new Array(messageIds.length);
+    let next = 0;
+    let failed = false;
+    let worker = async () => {
+      while (!failed && next < messageIds.length) {
+        let index = next++;
+        try {
+          results[index] = await this.getMessage(messageIds[index]!, format);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, messageIds.length) }, () => worker())
+    );
+    return results;
   }
 
   async sendMessage(params: {
