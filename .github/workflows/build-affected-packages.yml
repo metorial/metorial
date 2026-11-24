@@ -106,6 +106,8 @@ jobs:
                 full_build=true
                 full_build_reasons+=("$file")
                 ;;
+              integrations/super-booble-*/*)
+                ;;
               integrations/*/*)
                 package="${file#integrations/}"
                 package="${package%%/*}"

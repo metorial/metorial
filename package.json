@@ -27,6 +27,7 @@
     "packages/*",
     "adapters/*",
     "integrations/*",
+    "!integrations/super-booble-*",
     "test-integrations/*"
   ],
   "dependencies": {

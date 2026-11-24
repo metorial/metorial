@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { createLocalSlateTransport, createSlatesClient } from '@slates/client';
 import type { SlateAuthenticationMethod, SlatesAction } from '@slates/proto';
 import { $ } from 'bun';
+import { isExcludedIntegrationDirectory } from './lib/excluded-integrations';
 
 type JsonValue =
   | null
@@ -252,7 +253,7 @@ async function getIntegrationPackages(rootDir: string): Promise<IntegrationPacka
 
     const entries = await readdir(integrationsDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (!entry.isDirectory()) {
+      if (!entry.isDirectory() || isExcludedIntegrationDirectory(entry.name)) {
         continue;
       }
 
