@@ -5,7 +5,7 @@
 <h1 align="center">Metorial (YC F25)</h1>
 
 <p align="center">
-Open-source MCP gateway and identity layer for AI agents. <br />
+Source-available MCP gateway and identity layer for AI agents. <br />
 One URL behind your SSO for every MCP server, tool and skill, with per-user OAuth, permissions and audit logs.
 </p>
 
@@ -18,7 +18,7 @@ One URL behind your SSO for every MCP server, tool and skill, with per-user OAut
 
 Agents are being connected to production systems, but without a consistent identity and access layer around them: limited access control, no auditing, and no standard access restrictions. Metorial solves that.
 
-Metorial is an open-source MCP gateway: it sits between AI clients and agents (Claude, ChatGPT, Cursor, Claude Code, Codex, your own agents) and the systems they connect to, handling auth, permissions, and observability in one place. Employees sign in once through your identity provider and get one MCP URL with the servers, tools and skills their role allows. Instead of wiring integrations ad hoc, teams get a shared layer that standardizes how agents interact with systems.
+Metorial is a source-available MCP gateway: it sits between AI clients and agents (Claude, ChatGPT, Cursor, Claude Code, Codex, your own agents) and the systems they connect to, handling auth, permissions, and observability in one place. Employees sign in once through your identity provider and get one MCP URL with the servers, tools and skills their role allows. Instead of wiring integrations ad hoc, teams get a shared layer that standardizes how agents interact with systems.
 
 - **What an MCP gateway is and how Metorial works:** [metorial.com/mcp-gateway](https://metorial.com/mcp-gateway)
 - **How it compares** with other open-source and enterprise MCP gateways: [open-source MCP gateways compared](https://metorial.com/comparisons/best-open-source-mcp-gateways), [enterprise MCP gateways compared](https://metorial.com/comparisons/best-enterprise-ai-gateways-2026)
@@ -60,7 +60,7 @@ This makes agent activity enforceable and inspectable without relying on manual 
 ## Ecosystem
 
 - [**Metorial**](https://github.com/metorial/metorial): Integration catalog covering SaaS tools and enterprise systems.
-- [**Metorial Platform**](https://github.com/metorial/metorial-platform): Core engine, open source and self-hostable.
+- [**Metorial Platform**](https://github.com/metorial/metorial-platform): Core engine, source-available and self-hostable.
 - [**Metorial CLI**](https://github.com/metorial/cli): Agent-first CLI for interacting with integrations.
 - [**Lowerdeck**](https://github.com/metorial/lowerdeck): Shared libraries across the stack.
 - [**Starbase**](https://github.com/metorial/starbase): MCP debugging and testing utility.
@@ -78,7 +78,7 @@ If you want to build a custom integration, check out our [API documentation](htt
 
 ## Self-Hosting
 
-The [Metorial Platform](https://github.com/metorial/metorial-platform) is the code that powers the engine behind Metorial. It is open source and can be self-hosted. You can use it to run your own Metorial instance, powered by the MCP servers in this repo.
+The [Metorial Platform](https://github.com/metorial/metorial-platform) is the code that powers the engine behind Metorial. Its source is available and it can be self-hosted. You can use it to run your own Metorial instance, powered by the MCP servers in this repo.
 
 ## Quick Start
 
@@ -377,7 +377,7 @@ https://github.com/user-attachments/assets/c676411e-25b6-442a-af22-c8d99e2be25b
 Metorial is built from the ground up for developers. Here are some of the key features that make Metorial a great choice for developers:
 
 - **Customizable**: Metorial is highly customizable, allowing you to configure your integrations to fit your needs.
-- **Open source**: Metorial is open source, so you can run it on your own infrastructure or use our hosted platform.
+- **Self-hostable**: Run Metorial on your own infrastructure or use our hosted platform.
 - **Multi-instance support**: Create multiple instances of your Metorial Projects to test different configurations, environments or versions of your integrations.
 - **Powerful SDKs**: Metorial provides powerful SDKs for JavaScript/TypeScript and Python, making it easy to integrate with your AI applications.
 - **Detailed documentation**: Metorial provides [detailed documentation](https://metorial.com/docs) for all its features, including examples and tutorials to help you get started quickly.
@@ -386,7 +386,7 @@ Metorial is built from the ground up for developers. Here are some of the key fe
 
 ## License
 
-The Metorial Catalog is licensed under the [Apache License 2.0](LICENSE).
+The Metorial Catalog is licensed under the [Functional Source License 1.1 (FSL-1.1-ALv2)](LICENSE). For each version released under FSL, an additional Apache 2.0 license takes effect two years after that version is first made available.
 
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
